@@ -125,31 +125,10 @@ To ensure code quality and enable proper code review, configure your GitHub repo
    - Target: `main` branch
 
 3. **Configure Branch Protections:**
-   - ✅ **Require status checks to pass** (configure with all 7 required checks)
    - ✅ **Block force pushes**
    - ✅ **Require linear history** (keeps git history clean)
 
-4. **Configure Status Checks:**
-   - In the **Status checks** section, add:
-     - `Run Test Suite (code_quality)`
-     - `Run Test Suite (documentation)`
-     - `Run Test Suite (kubernetes_manifests)`
-     - `Run Test Suite (script_validation)`
-     - `Lint and Validate`
-     - `Security Scan`
-     - `Code Quality`
-
-5. **Configure Bypass Permissions (Required for GitHub Actions):**
-   - In the **Bypass list** section, add:
-     - **Repository admin Role** (essential for automated workflows to push to main)
-     - **Maintain Role** (optional, for trusted contributors)
-   - This allows GitHub Actions and trusted users to bypass rules for:
-     - Automated releases and version updates
-     - CI/CD pipeline operations
-     - Automated merges from pull requests
-     - Emergency fixes and hotfixes
-
-6. **Save the Ruleset:**
+4. **Save the Ruleset:**
    - Click **Create** to activate the ruleset
 
 #### **Benefits of Branch Rulesets**

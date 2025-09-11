@@ -107,27 +107,10 @@ To maintain code quality and enable proper code review, configure your GitHub re
    - **Enforcement status**: `Active`
    - **Target branches**: `main`
    - **Branch protections**:
-     - ✅ **Require status checks to pass** (configure with all 7 required checks)
      - ✅ **Block force pushes**
      - ✅ **Require linear history** (keeps git history clean)
 
-4. **Configure Status Checks:**
-   - In the **Status checks** section, add:
-     - `Run Test Suite (code_quality)` - Validates code quality and standards
-     - `Run Test Suite (documentation)` - Ensures documentation is properly formatted
-     - `Run Test Suite (kubernetes_manifests)` - Validates Kubernetes YAML files
-     - `Run Test Suite (script_validation)` - Validates shell scripts and automation
-     - `Lint and Validate` - Runs linting tools (ShellCheck, yamllint, markdownlint)
-     - `Security Scan` - Performs security vulnerability scanning
-     - `Code Quality` - Runs code quality analysis and metrics
-
-5. **Configure Bypass Permissions (Required for GitHub Actions):**
-   - In the **Bypass list** section, add:
-     - **Repository admin Role** (to allow automated workflows to push to main)
-     - **Maintain Role** (optional, for trusted contributors)
-   - This allows GitHub Actions and trusted users to bypass rules for automated releases and CI/CD operations
-
-6. **Save the Ruleset:**
+4. **Save the Ruleset:**
    - Click **Create** to activate the ruleset
 
 #### **Why GitHub Actions Bypass is Essential**
@@ -157,7 +140,6 @@ Without proper bypass permissions, your automated workflows will fail when tryin
 #### **Recommended Settings Explanation**
 
 **✅ Essential Settings:**
-- **Require status checks to pass**: Ensures tests and linting pass before merge
 - **Block force pushes**: Prevents accidental history rewriting and maintains audit trail
 
 **✅ Recommended Settings:**
