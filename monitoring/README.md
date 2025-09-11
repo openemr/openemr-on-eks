@@ -31,24 +31,24 @@ graph TB
             JAEG[Jaeger<br/>v1.72.0]
             ALERT[AlertManager]
         end
-        
+
         subgraph "OpenEMR Namespace"
             OE[OpenEMR Pods]
             SM[ServiceMonitor]
             PR[PrometheusRules]
         end
-        
+
         subgraph "Observability"
             CM[cert-manager<br/>v1.18.2]
             JO[Jaeger Operator]
         end
     end
-    
+
     subgraph "External Access"
         ING[NGINX Ingress]
         PF[Port Forward]
     end
-    
+
     OE --> SM
     SM --> PROM
     OE --> LOKI
@@ -90,12 +90,14 @@ Layer 2: Node-level (EKS Auto Mode)
 ## 📋 Prerequisites
 
 ### Required Components (From Core Deployment)
+
 - ✅ EKS cluster with Auto Mode enabled (Kubernetes 1.29+)
 - ✅ OpenEMR deployed and running
 - ✅ Storage classes created (gp3-monitoring-encrypted)
 - ✅ EFS CSI driver installed
 
 ### Required Tools
+
 ```bash
 # Verify tools are installed
 kubectl version --client  # >= 1.29
@@ -108,6 +110,7 @@ kubectl get nodes  # May be empty with Auto Mode
 ```
 
 ### Cluster Capacity Requirements
+
 ```bash
 # Minimum available resources needed:
 # - CPU: 4 cores (across all nodes)
@@ -121,6 +124,7 @@ kubectl describe nodes | grep -A 5 "Allocatable"
 ## 🚀 Quick Start
 
 ### Basic Installation (Recommended)
+
 ```bash
 cd monitoring
 
@@ -129,6 +133,7 @@ cd monitoring
 ```
 
 ### Production Installation with Ingress
+
 ```bash
 # Configure for production access
 export ENABLE_INGRESS="1"
@@ -147,6 +152,7 @@ export SLACK_CHANNEL="#openemr-alerts"
 ```
 
 ### Access Credentials
+
 ```bash
 # After installation, retrieve credentials
 cat credentials/monitoring-credentials.txt
@@ -161,6 +167,7 @@ cat credentials/monitoring-credentials.txt
 ### Monthly Cost Breakdown by Organization Size
 
 #### Small Clinic
+
 | Component | Configuration                      | Monthly Cost     |
 |-----------|------------------------------------|------------------|
 | EC2 Compute (Auto Mode) | 2 t3.small equiv. AVG ($0.0208/hr) | $30.36           |
@@ -169,6 +176,7 @@ cat credentials/monitoring-credentials.txt
 | **Total** |                                    | **~53.20/month** |
 
 #### Hospital
+
 | Component | Configuration                       | Monthly Cost     |
 |-----------|-------------------------------------|------------------|
 | EC2 Compute (Auto Mode) | 2 t3.medium equiv. AVG ($0.0416/hr) | $60.74           |
@@ -177,6 +185,7 @@ cat credentials/monitoring-credentials.txt
 | **Total** |                                     | **~87.23/month** |
 
 #### Large Hospital
+
 | Component | Configuration                      | Monthly Cost      |
 |-----------|------------------------------------|-------------------|
 | EC2 Compute (Auto Mode) | 2 t3.large equiv. AVG ($0.0832/hr) | $121.47           |
@@ -244,6 +253,7 @@ kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/cont
 After installation, these dashboards are automatically available:
 
 #### System Dashboards
+
 - **Kubernetes / Compute Resources / Cluster** - Overall cluster health
 - **Kubernetes / Compute Resources / Namespace (Pods)** - Per-namespace metrics
 - **Node Exporter / Nodes** - Host-level metrics
@@ -286,6 +296,7 @@ After installation, these dashboards are automatically available:
 ## 🔄 Maintenance
 
 ### Daily Tasks
+
 ```bash
 # Check component health
 kubectl get pods -n monitoring
@@ -296,6 +307,7 @@ kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-alertmanager 9
 ```
 
 ### Weekly Tasks
+
 ```bash
 # Review autoscaling events
 kubectl get events -n monitoring --field-selector reason=ScalingReplicaSet
@@ -309,6 +321,7 @@ kubectl exec -n monitoring prometheus-prometheus-stack-kube-prom-prometheus-0 --
 ```
 
 ### Monthly Tasks
+
 ```bash
 # Update Helm charts
 helm repo update
@@ -345,17 +358,20 @@ helm upgrade loki grafana/loki \
 ## 📚 Additional Resources
 
 ### Documentation
+
 - [Prometheus Best Practices](https://prometheus.io/docs/practices/)
 - [Grafana Dashboards](https://grafana.com/grafana/dashboards/)
 - [Loki Query Language](https://grafana.com/docs/loki/latest/logql/)
 - [EKS Auto Mode Documentation](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
 
 ### Troubleshooting
+
 - [Kubernetes Monitoring Guide](https://kubernetes.io/docs/tasks/debug/)
 - [Prometheus Troubleshooting](https://prometheus-operator.dev/docs/platform/troubleshooting/)
 
 ### Support
-- OpenEMR Community Forum: https://community.open-emr.org
+
+- OpenEMR Community Forum: <https://community.open-emr.org>
 - [Get an invite to join the Kubernetes Slack here!](https://communityinviter.com/apps/kubernetes/community)
 - [#prometheus-operator](https://kubernetes.slack.com/archives/CFFDS2Z7F) channel on Kubernetes Slack.
 

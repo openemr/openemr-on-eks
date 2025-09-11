@@ -267,10 +267,10 @@ setup_helm_repos(){
 # Passwords / Secrets
 # ------------------------------
 generate_secure_password(){ openssl rand -base64 32 | tr -dc 'A-Za-z0-9._-' | head -c 24; }
-create_secure_password_file(){ 
-  local p="$1" 
+create_secure_password_file(){
+  local p="$1"
   local f="$CREDENTIALS_DIR/grafana-admin-password"
-  
+
   # Backup existing file if it exists
   if [[ -f "$f" ]]; then
     local backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
@@ -278,7 +278,7 @@ create_secure_password_file(){
     cp "$f" "$backup_file"
     chmod 600 "$backup_file"
   fi
-  
+
   umask 077
   echo "$p" > "$f"
   chmod 600 "$f"
@@ -287,7 +287,7 @@ create_secure_password_file(){
 create_grafana_secret(){ local p="$1"; log_info "Creating Grafana admin secret..."; kubectl create secret generic grafana-admin-secret --from-literal=admin-user="admin" --from-literal=admin-password="$p" --namespace="$MONITORING_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -; log_audit "CREATE" "secret:grafana-admin-secret" "SUCCESS"; }
 write_credentials_file(){
   local p="$1" f="$CREDENTIALS_DIR/monitoring-credentials.txt"
-  
+
   # Backup existing file if it exists
   if [[ -f "$f" ]]; then
     local backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
@@ -295,7 +295,7 @@ write_credentials_file(){
     cp "$f" "$backup_file"
     chmod 600 "$backup_file"
   fi
-  
+
   umask 077
   cat > "$f" <<EOF
 # OpenEMR Monitoring Credentials

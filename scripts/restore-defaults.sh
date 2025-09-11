@@ -35,6 +35,7 @@ show_help() {
     echo "  • Restores storage.yaml to default template state"
     echo "  • Restores ingress.yaml to default template state"
     echo "  • Restores logging.yaml to default template state"
+    echo "  • Restores ssl-renewal.yaml to default template state"
     echo "  • Removes generated credentials files"
     echo "  • Cleans up temporary deployment files"
     echo ""
@@ -60,22 +61,23 @@ show_help() {
 
 # Function to create backup
 create_backup() {
-    local timestamp=$(date +%Y%m%d_%H%M%S)
+    local timestamp
+    timestamp=$(date +%Y%m%d_%H%M%S)
     local backup_dir="$PROJECT_ROOT/backups/restore_backup_$timestamp"
-    
+
     echo -e "${YELLOW}Creating backup in $backup_dir...${NC}"
     mkdir -p "$backup_dir"
-    
+
     # Backup k8s directory
     cp -r "$PROJECT_ROOT/k8s" "$backup_dir/"
-    
+
     echo -e "${GREEN}✅ Backup created successfully${NC}"
 }
 
 # Function to restore deployment.yaml to default state
 restore_deployment_yaml() {
     echo -e "${YELLOW}Restoring deployment.yaml to default state...${NC}"
-    
+
     # Try to restore from git
     cd "$PROJECT_ROOT"
     if git checkout HEAD -- k8s/deployment.yaml 2>/dev/null; then
@@ -90,7 +92,7 @@ restore_deployment_yaml() {
 # Function to restore service.yaml to default state
 restore_service_yaml() {
     echo -e "${YELLOW}Restoring service.yaml to default state...${NC}"
-    
+
     # Try to restore from git
     cd "$PROJECT_ROOT"
     if git checkout HEAD -- k8s/service.yaml 2>/dev/null; then
@@ -105,19 +107,20 @@ restore_service_yaml() {
 # Function to restore other YAML files to default state
 restore_other_yaml_files() {
     echo -e "${YELLOW}Restoring other YAML files to default state...${NC}"
-    
+
     cd "$PROJECT_ROOT"
-    
+
     # List of files to restore from git
     local files_to_restore=(
         "k8s/hpa.yaml"
-        "k8s/storage.yaml" 
+        "k8s/storage.yaml"
         "k8s/ingress.yaml"
         "k8s/logging.yaml"
         "k8s/configmap.yaml"
         "k8s/security.yaml"
+        "k8s/ssl-renewal.yaml"
     )
-    
+
     for file in "${files_to_restore[@]}"; do
         if [ -f "$file" ]; then
             if git checkout HEAD -- "$file" 2>/dev/null; then
@@ -132,28 +135,28 @@ restore_other_yaml_files() {
 # Function to clean up backup files
 cleanup_backup_files() {
     echo -e "${YELLOW}Cleaning up .bak files...${NC}"
-    
+
     find "$PROJECT_ROOT/k8s" -name "*.bak" -delete 2>/dev/null || true
     find "$PROJECT_ROOT/terraform" -name "*.bak" -delete 2>/dev/null || true
-    
+
     echo -e "${GREEN}✅ Backup files cleaned up${NC}"
 }
 
 # Function to clean up generated files
 cleanup_generated_files() {
     echo -e "${YELLOW}Cleaning up generated files...${NC}"
-    
+
     # Remove credentials files (various patterns)
     rm -f "$PROJECT_ROOT/k8s/openemr-credentials.txt"
     rm -f "$PROJECT_ROOT/k8s/openemr-credentials-"*.txt
-    
+
     # Remove log files
     rm -f "$PROJECT_ROOT/terraform/openemr-all-logs.txt"
-    
+
     # Remove any temporary files
     find "$PROJECT_ROOT/k8s" -name "*.tmp" -delete 2>/dev/null || true
     find "$PROJECT_ROOT/terraform" -name "*.tmp" -delete 2>/dev/null || true
-    
+
     echo -e "${GREEN}✅ Generated files cleaned up${NC}"
 }
 
@@ -162,13 +165,13 @@ restore_defaults() {
     echo -e "${BLUE}🔄 OpenEMR Deployment Files Default State Restoration${NC}"
     echo -e "${BLUE}====================================================${NC}"
     echo ""
-    
+
     restore_deployment_yaml
     restore_service_yaml
     restore_other_yaml_files
     cleanup_backup_files
     cleanup_generated_files
-    
+
     echo ""
     echo -e "${GREEN}🎉 All deployment files restored to default state!${NC}"
     echo ""

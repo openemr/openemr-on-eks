@@ -7,3 +7,4 @@ terraform/terraform.tfstate.backup
 terraform.tfstate
 .idea/*
 backups/*
+test-results/

@@ -17,7 +17,6 @@ This guide helps you configure optimal autoscaling for your OpenEMR deployment o
 - [Capacity Planning](#-capacity-planning)
 - [Summary](#summary)
 
-
 ## 📊 Understanding Healthcare Workload Patterns
 
 ### Typical Healthcare Usage Patterns
@@ -34,6 +33,7 @@ Healthcare organizations have predictable daily and seasonal patterns:
 | **7:00 PM-7:00 AM** | 🟢 Low | After-hours, emergency only |
 
 ### Seasonal Variations
+
 - **Flu Season** (Oct-Feb): increased load
 - **Back-to-School** (Aug-Sep): increased load
 - **Holiday Periods**: Reduced load except emergencies
@@ -49,7 +49,7 @@ graph TD
     D --> E[Auto Mode Provisions EC2]
     E --> F[Pods Scheduled on New EC2]
     F --> G[Load Distributed]
-    
+
     H[Patient Load Decreases] --> I[CPU/Memory Usage Falls]
     I --> J[HPA Triggers Scale-Down]
     J --> K[Pods Terminated]
@@ -58,6 +58,7 @@ graph TD
 ```
 
 ### Key Differences with Auto Mode
+
 - **No node group management**: Auto Mode handles all EC2 provisioning
 - **Instant pod scheduling**: No waiting for node provisioning
 - **Automatic bin packing**: Optimal pod placement for cost efficiency
@@ -111,6 +112,7 @@ spec:
 ```
 
 **Rationale:**
+
 - **Min 2 replicas**: Ensures availability during maintenance
 - **Max 6 replicas**: Handles 3x normal load for emergencies
 - **75% CPU threshold**: Allows headroom for spikes
@@ -261,6 +263,7 @@ kubectl describe hpa openemr-hpa -n openemr
 ### Operational Scripts for Autoscaling Management
 
 #### **Deployment Validation and Health Checks**
+
 ```bash
 cd scripts
 
@@ -275,6 +278,7 @@ cd scripts
 ```
 
 #### **Monitoring and Performance Analysis**
+
 ```bash
 # Use monitoring stack for detailed autoscaling metrics
 cd monitoring
@@ -288,6 +292,7 @@ cd monitoring
 ### Script-Based Troubleshooting Workflow
 
 #### **Step 1: Validate Overall System Health**
+
 ```bash
 cd scripts
 
@@ -299,6 +304,7 @@ cd scripts
 ```
 
 #### **Step 2: Check Application Configuration**
+
 ```bash
 # Check overall system health and application configuration
 ./check-openemr-versions.sh --latest
@@ -306,8 +312,9 @@ cd scripts
 ```
 
 #### **Step 3: Clean Deployment if Needed**
+
 ```bash
-# If HPA or deployment is corrupted 
+# If HPA or deployment is corrupted
 # WARNING: This will delete data so make sure you backup first!
 ./clean-deployment.sh
 
@@ -320,6 +327,7 @@ cd ../k8s && ./deploy.sh
 **Symptoms:** HPA continuously scales up and down
 
 **Diagnosis:**
+
 ```bash
 cd scripts
 ./validate-deployment.sh  # Check for underlying issues
@@ -329,6 +337,7 @@ kubectl describe hpa openemr-hpa -n openemr
 ```
 
 **Solution:**
+
 ```yaml
 # Increase stabilization windows
 behavior:
@@ -343,12 +352,14 @@ behavior:
 **Symptoms:** High latency during morning rush
 
 **Diagnosis:**
+
 ```bash
 cd scripts
 ./validate-deployment.sh  # Check system health
 ```
 
 **Solution:**
+
 ```yaml
 # More aggressive scaling
 metrics:
@@ -371,6 +382,7 @@ behavior:
 **Symptoms:** Pods remain pending despite Auto Mode
 
 **Diagnosis:**
+
 ```bash
 # Check pod events
 kubectl describe pod <pending-pod> -n openemr
@@ -384,13 +396,60 @@ kubectl get pod <pending-pod> -n openemr -o yaml | grep -A 5 "resources:"
 ```
 
 **Common Causes:**
+
 - **Resource requests too high**: Auto Mode has instance type limits
 - **Anti-affinity rules**: Conflicting with Auto Mode placement
 - **PVC issues**: Storage not available in the availability zone
 
 ## 🔧 Configuration Examples
 
+### 🔒 **MANDATORY: End-to-End Testing Before Configuration Changes**
+
+**Before making any autoscaling configuration changes, the end-to-end backup/restore test MUST pass successfully.** This ensures that infrastructure modifications don't break disaster recovery capabilities.
+
+#### **Testing Process**
+
+```bash
+# Run the complete end-to-end test
+./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+
+# Expected outcome: All 9 test steps must pass
+# ✅ Infrastructure deployment
+# ✅ OpenEMR installation
+# ✅ Test data creation
+# ✅ Backup creation
+# ✅ Infrastructure destruction
+# ✅ Infrastructure recreation
+# ✅ Backup restoration
+# ✅ Verification
+# ✅ Final cleanup
+```
+
+#### **Why This Is Critical**
+
+- **Disaster Recovery**: Ensures backup/restore functionality works correctly
+- **Infrastructure Validation**: Validates Terraform and Kubernetes configurations
+- **Regression Prevention**: Prevents changes that could break recovery procedures
+- **Compliance**: Demonstrates disaster recovery capabilities for audits
+- **Quality Assurance**: Ensures all changes are thoroughly tested
+
+#### **Test Requirements**
+
+- **All test steps must pass**: No exceptions or partial failures allowed
+- **Complete infrastructure cycle**: Test must validate full create/destroy/restore cycle
+- **Data integrity verification**: Proof files must be correctly restored
+- **Connectivity validation**: Database and application connectivity must work after restore
+- **Resource cleanup**: All test resources must be properly cleaned up
+
+#### **Failure Handling**
+
+- **If any test step fails**: Changes must be reverted or fixed before proceeding
+- **No exceptions**: This testing is mandatory for all configuration changes
+- **Re-test required**: After fixes, complete test must pass again
+- **Documentation required**: All changes must include test results
+
 ### Conservative (Cost-Optimized)
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -427,6 +486,7 @@ spec:
 ```
 
 ### Balanced (Recommended Default)
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -469,6 +529,7 @@ spec:
 ```
 
 ### Aggressive (Performance-Optimized)
+
 ```yaml
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -515,11 +576,13 @@ spec:
 ### For New Deployments
 
 1. **Start with Default Configuration**
+
    ```bash
    # Will be configured by default when you deploy
    ```
 
 2. **Monitor for 2 Weeks**
+
    ```bash
    # Daily monitoring
    # Use the monitoring stack tools
@@ -536,6 +599,7 @@ spec:
    - Increase max replicas if hitting limits
 
 5. **Document Changes**
+
    ```yaml
    # Track configuration changes
    annotations:
@@ -547,15 +611,18 @@ spec:
 ### Healthcare-Specific Considerations
 
 #### Patient Safety First
+
 - **Never set min replicas below 2** - Ensures availability
 - **Conservative scale-down** - Prevents disruption during care
 - **Lower thresholds for critical systems** - Prioritize performance
 
 #### Compliance Requirements
+
 - **Audit scaling events** - Track all changes
 - **Document configuration rationale** - For compliance reviews
 
 #### Cost Management
+
 - **Review monthly costs** - Compare with patient volume
 - **Optimize during off-hours** - Reduce minimums at night
 - **Use spot instances for non-critical** - Dev/test environments
@@ -565,26 +632,26 @@ spec:
 ### Calculating Required Capacity
 
 ```python
-def calculate_capacity(patient_count, visit_duration_min=20, 
+def calculate_capacity(patient_count, visit_duration_min=20,
                        peak_factor=2.5, utilization_target=0.7):
     """
     Calculate required OpenEMR capacity
-    
+
     Args:
         patient_count: Average daily patients
         visit_duration_min: Average visit duration in minutes
         peak_factor: Multiplier for peak vs average
         utilization_target: Target CPU utilization (0.7 = 70%)
-    
+
     Returns:
         dict: Capacity recommendations
     """
     # Concurrent users during peak assuming clinic is active for 8 hours a day
-    concurrent_users = (patient_count * peak_factor * visit_duration_min) / (8 * 60) 
-    
+    concurrent_users = (patient_count * peak_factor * visit_duration_min) / (8 * 60)
+
     # Pods needed (25 users per pod at target utilization)
     pods_needed = concurrent_users / (25 * utilization_target)
-    
+
     return {
         'min_replicas': max(2, int(pods_needed * 0.5)),  # 50% of peak
         'max_replicas': int(max(2, int(pods_needed * 0.5)) * 1.5),  # 150% of peak for headroom

@@ -29,7 +29,7 @@ check_command() {
 # Function to check AWS credentials
 check_aws_credentials() {
     echo -e "${BLUE}Checking AWS credential sources...${NC}"
-    
+
     # Check if credentials work first
     if aws sts get-caller-identity >/dev/null 2>&1; then
         ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
@@ -37,7 +37,7 @@ check_aws_credentials() {
         echo -e "${GREEN}✅ AWS credentials valid${NC}"
         echo -e "${GREEN}   Account ID: $ACCOUNT_ID${NC}"
         echo -e "${GREEN}   User/Role: $USER_ARN${NC}"
-        
+
         # Detect credential source
         detect_credential_source
         return 0
@@ -55,19 +55,19 @@ check_aws_credentials() {
 # Function to detect AWS credential source
 detect_credential_source() {
     local cred_sources=()
-    
+
     # Check environment variables
     if [ ! -z "$AWS_ACCESS_KEY_ID" ] && [ ! -z "$AWS_SECRET_ACCESS_KEY" ]; then
         cred_sources+=("Environment variables (AWS_ACCESS_KEY_ID)")
         echo -e "${BLUE}   📍 Source: Environment variables${NC}"
     fi
-    
+
     # Check AWS credentials file
     AWS_CREDS_FILE="${AWS_SHARED_CREDENTIALS_FILE:-$HOME/.aws/credentials}"
     if [ -f "$AWS_CREDS_FILE" ]; then
         cred_sources+=("Credentials file ($AWS_CREDS_FILE)")
         echo -e "${BLUE}   📍 Source: Credentials file found at $AWS_CREDS_FILE${NC}"
-        
+
         # Check which profiles are available
         if command -v grep >/dev/null 2>&1; then
             PROFILES=$(grep -E '^\[.*\]' "$AWS_CREDS_FILE" | sed 's/\[//g' | sed 's/\]//g' | tr '\n' ', ' | sed 's/, $//')
@@ -75,46 +75,46 @@ detect_credential_source() {
                 echo -e "${BLUE}   📋 Available profiles: $PROFILES${NC}"
             fi
         fi
-        
+
         # Check current profile
         CURRENT_PROFILE="${AWS_PROFILE:-default}"
         echo -e "${BLUE}   🎯 Current profile: $CURRENT_PROFILE${NC}"
     fi
-    
+
     # Check AWS config file
     AWS_CONFIG_FILE="${AWS_CONFIG_FILE:-$HOME/.aws/config}"
     if [ -f "$AWS_CONFIG_FILE" ]; then
         echo -e "${BLUE}   📍 Config file found at $AWS_CONFIG_FILE${NC}"
-        
+
         # Check for SSO configuration
         if grep -q "sso_" "$AWS_CONFIG_FILE" 2>/dev/null; then
             cred_sources+=("AWS SSO configuration")
             echo -e "${BLUE}   🔐 SSO configuration detected${NC}"
         fi
-        
+
         # Check for role assumption
         if grep -q "role_arn" "$AWS_CONFIG_FILE" 2>/dev/null; then
             cred_sources+=("IAM role assumption")
             echo -e "${BLUE}   👤 Role assumption configured${NC}"
         fi
     fi
-    
+
     # Check for instance profile (if running on EC2)
     if curl -s --max-time 2 http://169.254.169.254/latest/meta-data/iam/security-credentials/ >/dev/null 2>&1; then
         cred_sources+=("EC2 instance profile")
         echo -e "${BLUE}   🖥️  EC2 instance profile detected${NC}"
     fi
-    
+
     # Check for ECS task role
     if [ ! -z "$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI" ]; then
         cred_sources+=("ECS task role")
         echo -e "${BLUE}   📦 ECS task role detected${NC}"
     fi
-    
+
     # Check current region
     CURRENT_REGION=$(aws configure get region 2>/dev/null || echo "not set")
     echo -e "${BLUE}   🌍 Current region: $CURRENT_REGION${NC}"
-    
+
     if [ "$CURRENT_REGION" = "not set" ]; then
         echo -e "${YELLOW}   ⚠️  AWS region not configured${NC}"
         echo -e "${YELLOW}   💡 Set region: aws configure set region $AWS_REGION${NC}"
@@ -122,7 +122,7 @@ detect_credential_source() {
         echo -e "${YELLOW}   ⚠️  Current region ($CURRENT_REGION) differs from deployment region ($AWS_REGION)${NC}"
         echo -e "${YELLOW}   💡 Consider setting region: aws configure set region $AWS_REGION${NC}"
     fi
-    
+
     # Summary of credential sources
     if [ ${#cred_sources[@]} -eq 0 ]; then
         echo -e "${YELLOW}   ❓ Credential source unclear${NC}"
@@ -135,7 +135,7 @@ detect_credential_source() {
 check_cluster_access() {
     if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
         echo -e "${GREEN}✅ EKS cluster '$CLUSTER_NAME' is accessible${NC}"
-        
+
         # Check if kubectl can connect
         if kubectl get nodes >/dev/null 2>&1; then
             echo -e "${GREEN}✅ kubectl can connect to cluster (EKS Auto Mode)${NC}"
@@ -162,10 +162,10 @@ check_terraform_state() {
     else
         PROJECT_ROOT="$SCRIPT_DIR"
     fi
-    
+
     if [ -f "$PROJECT_ROOT/terraform/terraform.tfstate" ]; then
         echo -e "${GREEN}✅ Terraform state file exists${NC}"
-        
+
         # Check if infrastructure is deployed
         cd "$PROJECT_ROOT/terraform"
         if terraform show >/dev/null 2>&1; then
@@ -196,10 +196,10 @@ check_terraform_state() {
 # Function to check required resources
 check_required_resources() {
     echo -e "${BLUE}Checking AWS resources...${NC}"
-    
+
     local resources_found=0
     local total_resources=4
-    
+
     # Check VPC
     VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=${CLUSTER_NAME}-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
     if [ "$VPC_ID" != "None" ] && [ "$VPC_ID" != "" ]; then
@@ -209,7 +209,7 @@ check_required_resources() {
         echo -e "${BLUE}ℹ️  VPC not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
     fi
-    
+
     # Check RDS cluster
     RDS_CLUSTER=$(aws rds describe-db-clusters --query "DBClusters[?contains(DBClusterIdentifier, '${CLUSTER_NAME}')].DBClusterIdentifier" --output text 2>/dev/null)
     if [ "$RDS_CLUSTER" != "" ]; then
@@ -219,7 +219,7 @@ check_required_resources() {
         echo -e "${BLUE}ℹ️  RDS Aurora cluster not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
     fi
-    
+
     # Check ElastiCache
     REDIS_CLUSTER=$(aws elasticache describe-serverless-caches --query "ServerlessCaches[?contains(ServerlessCacheName, '${CLUSTER_NAME}')].ServerlessCacheName" --output text 2>/dev/null)
     if [ "$REDIS_CLUSTER" != "" ]; then
@@ -229,7 +229,7 @@ check_required_resources() {
         echo -e "${BLUE}ℹ️  ElastiCache Valkey cluster not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
     fi
-    
+
     # Check EFS
     EFS_ID=$(aws efs describe-file-systems --query "FileSystems[?contains(Name, '${CLUSTER_NAME}')].FileSystemId" --output text 2>/dev/null)
     if [ "$EFS_ID" != "" ]; then
@@ -239,7 +239,7 @@ check_required_resources() {
         echo -e "${BLUE}ℹ️  EFS file system not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
     fi
-    
+
     # Return special code for first-time deployment
     if [ $resources_found -eq 0 ]; then
         return 2  # Special return code for first-time deployment
@@ -253,10 +253,10 @@ check_required_resources() {
 # Function to check Kubernetes resources
 check_k8s_resources() {
     echo -e "${BLUE}Checking Kubernetes resources...${NC}"
-    
+
     local resources_found=0
     local total_resources=2
-    
+
     # Check namespace
     if kubectl get namespace $NAMESPACE >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Namespace '$NAMESPACE' exists${NC}"
@@ -265,7 +265,7 @@ check_k8s_resources() {
         echo -e "${YELLOW}⚠️  Namespace '$NAMESPACE' not found${NC}"
         echo -e "${YELLOW}💡 Will be created during deployment${NC}"
     fi
-    
+
     # Check if OpenEMR is already deployed
     if kubectl get deployment openemr -n $NAMESPACE >/dev/null 2>&1; then
         REPLICAS=$(kubectl get deployment openemr -n $NAMESPACE -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
@@ -275,11 +275,11 @@ check_k8s_resources() {
     else
         echo -e "${GREEN}✅ OpenEMR not yet deployed (clean deployment)${NC}"
     fi
-    
+
     # Check EKS Auto Mode
     echo -e "${GREEN}✅ EKS Auto Mode handles compute automatically${NC}"
     echo -e "${GREEN}💡 No Karpenter needed - Auto Mode manages all compute${NC}"
-    
+
     # Return special code for first-time deployment
     if [ $resources_found -eq 0 ]; then
         return 2  # Special return code for first-time deployment
@@ -293,7 +293,7 @@ check_k8s_resources() {
 # Function to check security configuration
 check_security_config() {
     echo -e "${BLUE}Checking security configuration...${NC}"
-    
+
     # Check if cluster exists first
     if ! aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
         echo -e "${BLUE}ℹ️  EKS cluster not found - security configuration will be applied during deployment${NC}"
@@ -308,11 +308,11 @@ check_security_config() {
         echo -e "${BLUE}   • Network policies and Pod Security Standards${NC}"
         return 0
     fi
-    
+
     # Check cluster endpoint access
     PUBLIC_ACCESS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text 2>/dev/null)
     PRIVATE_ACCESS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.endpointPrivateAccess' --output text 2>/dev/null)
-    
+
     if [ "$PUBLIC_ACCESS" = "True" ]; then
         ALLOWED_CIDRS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.publicAccessCidrs' --output text 2>/dev/null)
         echo -e "${YELLOW}⚠️  Public access enabled for: $ALLOWED_CIDRS${NC}"
@@ -320,13 +320,13 @@ check_security_config() {
     else
         echo -e "${GREEN}✅ Public access disabled (secure)${NC}"
     fi
-    
+
     if [ "$PRIVATE_ACCESS" = "True" ]; then
         echo -e "${GREEN}✅ Private access enabled${NC}"
     else
         echo -e "${RED}❌ Private access disabled (not recommended)${NC}"
     fi
-    
+
     # Check encryption
     ENCRYPTION_CONFIG=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.encryptionConfig' --output text 2>/dev/null)
     if [ "$ENCRYPTION_CONFIG" != "None" ] && [ "$ENCRYPTION_CONFIG" != "" ]; then
@@ -334,7 +334,7 @@ check_security_config() {
     else
         echo -e "${RED}❌ EKS secrets encryption not configured${NC}"
     fi
-    
+
     return 0
 }
 
@@ -342,13 +342,13 @@ check_security_config() {
 provide_recommendations() {
     echo -e "${BLUE}📋 Deployment Recommendations${NC}"
     echo -e "${BLUE}=============================${NC}"
-    
+
     # Only check IP changes if cluster exists
     if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
         # Check current IP
         CURRENT_IP=$(curl -s https://checkip.amazonaws.com 2>/dev/null || echo "unknown")
         ALLOWED_IP=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.publicAccessCidrs[0]' --output text 2>/dev/null | cut -d'/' -f1)
-        
+
         if [ "$CURRENT_IP" != "$ALLOWED_IP" ] && [ "$CURRENT_IP" != "unknown" ] && [ "$ALLOWED_IP" != "None" ] && [ "$ALLOWED_IP" != "" ]; then
             echo -e "${YELLOW}💡 Your IP has changed since cluster creation${NC}"
             echo -e "${YELLOW}   Current IP: $CURRENT_IP${NC}"
@@ -357,7 +357,7 @@ provide_recommendations() {
             echo ""
         fi
     fi
-    
+
     # Security recommendations
     echo -e "${GREEN}🔒 Security Best Practices:${NC}"
     echo -e "   • HTTPS-only access (port 443) - HTTP traffic is refused"
@@ -367,7 +367,7 @@ provide_recommendations() {
     echo -e "   • Regularly update container images"
     echo -e "   • Monitor audit logs for compliance"
     echo ""
-    
+
     # Cost optimization
     echo -e "${GREEN}💰 Cost Optimization:${NC}"
     echo -e "   • Aurora Serverless V2 scales automatically"
@@ -376,7 +376,7 @@ provide_recommendations() {
     echo -e "   • Monitor usage with CloudWatch dashboards"
     echo -e "   • Set up cost alerts and budgets"
     echo ""
-    
+
     # Monitoring
     echo -e "${GREEN}📊 Monitoring Setup:${NC}"
     echo -e "   • CloudWatch logging with Fluent Bit (included in OpenEMR deployment)"
@@ -398,18 +398,18 @@ provide_recommendations() {
 main() {
     local errors=0
     local first_time_deployment=false
-    
+
     echo -e "${BLUE}1. Checking prerequisites...${NC}"
     check_command "kubectl" || ((errors++))
     check_command "aws" || ((errors++))
     check_command "helm" || ((errors++))
     check_command "jq" || echo -e "${YELLOW}⚠️  jq not installed (optional but recommended)${NC}"
     echo ""
-    
+
     echo -e "${BLUE}2. Checking AWS credentials...${NC}"
     check_aws_credentials || ((errors++))
     echo ""
-    
+
     echo -e "${BLUE}3. Checking Terraform state...${NC}"
     check_terraform_state
     local terraform_check_result=$?
@@ -420,7 +420,7 @@ main() {
         ((errors++))
     fi
     echo ""
-    
+
     echo -e "${BLUE}4. Checking cluster access...${NC}"
     check_cluster_access
     local cluster_access_check_result=$?
@@ -431,7 +431,7 @@ main() {
         ((errors++))
     fi
     echo ""
-    
+
     echo -e "${BLUE}5. Checking AWS resources...${NC}"
     check_required_resources
     local aws_resources_check_result=$?
@@ -442,7 +442,7 @@ main() {
         ((errors++))
     fi
     echo ""
-    
+
     echo -e "${BLUE}6. Checking Kubernetes resources...${NC}"
     check_k8s_resources
     local k8s_resources_check_result=$?
@@ -453,11 +453,11 @@ main() {
         ((errors++))
     fi
     echo ""
-    
+
     echo -e "${BLUE}7. Checking security configuration...${NC}"
     check_security_config
     echo ""
-    
+
     # Summary
     if [ "$first_time_deployment" = true ] && [ $errors -eq 0 ]; then
         echo -e "${GREEN}🎉 First-time deployment validation completed!${NC}"
@@ -489,9 +489,9 @@ main() {
         echo -e "${RED}Please fix the issues above before deploying${NC}"
         echo ""
     fi
-    
+
     provide_recommendations
-    
+
     return $errors
 }
 

@@ -188,6 +188,9 @@ resource "aws_wafv2_web_acl_logging_configuration" "openemr" {
     aws_s3_bucket.waf_logs[0].arn
   ]
 
+  # Ensure S3 bucket policy is created before WAF logging configuration
+  depends_on = [aws_s3_bucket_policy.waf_logs]
+
   # Example filters/redactions (optional):
   # logging_filter {
   #   default_behavior = "KEEP"

@@ -116,14 +116,14 @@ output "alb_logs_bucket_arn" {
 output "cloudwatch_log_groups" {
   description = "CloudWatch log group names for OpenEMR 7.0.3.4"
   value = {
-    application     = aws_cloudwatch_log_group.openemr_app.name
-    access          = aws_cloudwatch_log_group.openemr_access.name
-    error           = aws_cloudwatch_log_group.openemr_error.name
-    audit           = aws_cloudwatch_log_group.openemr_audit.name
-    audit_detailed  = aws_cloudwatch_log_group.openemr_audit_detailed.name
-    system          = aws_cloudwatch_log_group.openemr_system.name
-    php_error       = aws_cloudwatch_log_group.openemr_php_error.name
-    fluent_bit      = aws_cloudwatch_log_group.fluent_bit_metrics.name
+    application    = aws_cloudwatch_log_group.openemr_app.name
+    access         = aws_cloudwatch_log_group.openemr_access.name
+    error          = aws_cloudwatch_log_group.openemr_error.name
+    audit          = aws_cloudwatch_log_group.openemr_audit.name
+    audit_detailed = aws_cloudwatch_log_group.openemr_audit_detailed.name
+    system         = aws_cloudwatch_log_group.openemr_system.name
+    php_error      = aws_cloudwatch_log_group.openemr_php_error.name
+    fluent_bit     = aws_cloudwatch_log_group.fluent_bit_metrics.name
   }
 }
 

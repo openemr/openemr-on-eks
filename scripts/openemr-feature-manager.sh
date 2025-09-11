@@ -71,33 +71,33 @@ check_terraform_config() {
 update_terraform_var() {
     local var_name="$1"
     local var_value="$2"
-    
+
     echo -e "${YELLOW}Updating $var_name to $var_value in terraform.tfvars...${NC}"
-    
+
     cd "$TERRAFORM_DIR"
-    
+
     # Check if the variable exists in the file
     if grep -q "^$var_name" terraform.tfvars; then
         # Update existing variable - escape special characters in sed
-        sed -i.bak "s/^$var_name[[:space:]]*=.*/$var_name = $var_value/" terraform.tfvars
+        sed -i.bak "s/^${var_name}[[:space:]]*=.*/${var_name} = ${var_value}/" terraform.tfvars
     else
         # Add new variable at the end with proper newline
         echo "" >> terraform.tfvars
         echo "$var_name = $var_value" >> terraform.tfvars
     fi
-    
+
     echo -e "${GREEN}✅ Updated $var_name = $var_value${NC}"
 }
 
 # Function to get current feature status from Terraform
 get_feature_status() {
     cd "$TERRAFORM_DIR"
-    
+
     if ! terraform output -json openemr_app_config >/dev/null 2>&1; then
         echo -e "${RED}Error: Unable to get Terraform outputs. Run 'terraform apply' first.${NC}"
         exit 1
     fi
-    
+
     local config=$(terraform output -json openemr_app_config)
     API_ENABLED=$(echo "$config" | jq -r '.api_enabled')
     PORTAL_ENABLED=$(echo "$config" | jq -r '.patient_portal_enabled')
@@ -108,7 +108,7 @@ get_feature_status() {
 apply_terraform_changes() {
     echo -e "${YELLOW}Applying Terraform changes...${NC}"
     cd "$TERRAFORM_DIR"
-    
+
     # Only apply the outputs, not the entire infrastructure
     if terraform apply -target=module.eks -target=aws_rds_cluster.openemr -auto-approve >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Terraform changes applied successfully${NC}"
@@ -122,7 +122,7 @@ apply_terraform_changes() {
 redeploy_openemr() {
     echo -e "${YELLOW}Redeploying OpenEMR with new configuration...${NC}"
     cd "$K8S_DIR"
-    
+
     # Run the deployment script
     if ./deploy.sh >/dev/null 2>&1; then
         echo -e "${GREEN}✅ OpenEMR redeployed successfully${NC}"
@@ -135,14 +135,14 @@ redeploy_openemr() {
 # Function to show feature status
 show_status() {
     local feature="$1"
-    
+
     get_feature_status
-    
+
     echo -e "${BLUE}📋 OpenEMR Feature Status${NC}"
     echo -e "${BLUE}=========================${NC}"
     echo -e "${BLUE}OpenEMR Version: ${GREEN}$OPENEMR_VERSION${NC}"
     echo ""
-    
+
     case "$feature" in
         "api")
             if [ "$API_ENABLED" = "true" ]; then
@@ -167,13 +167,13 @@ show_status() {
             else
                 echo -e "${YELLOW}🔒 REST API and FHIR endpoints: DISABLED${NC}"
             fi
-            
+
             if [ "$PORTAL_ENABLED" = "true" ]; then
                 echo -e "${GREEN}✅ Patient Portal: ENABLED${NC}"
             else
                 echo -e "${YELLOW}🔒 Patient Portal: DISABLED${NC}"
             fi
-            
+
             echo ""
             echo -e "${BLUE}💡 Management Commands:${NC}"
             echo -e "${BLUE}   • Enable API: $0 enable api${NC}"
@@ -182,7 +182,7 @@ show_status() {
             echo -e "${BLUE}   • Disable Portal: $0 disable portal${NC}"
             ;;
     esac
-    
+
     echo ""
     echo -e "${BLUE}🔒 Security: Features are disabled by default to minimize attack surface${NC}"
 }
@@ -190,9 +190,9 @@ show_status() {
 # Function to enable features
 enable_feature() {
     local feature="$1"
-    
+
     check_terraform_config
-    
+
     case "$feature" in
         "api")
             echo -e "${GREEN}🔓 Enabling OpenEMR REST API and FHIR endpoints...${NC}"
@@ -227,9 +227,9 @@ enable_feature() {
 # Function to disable features
 disable_feature() {
     local feature="$1"
-    
+
     check_terraform_config
-    
+
     case "$feature" in
         "api")
             echo -e "${YELLOW}🔒 Disabling OpenEMR REST API and FHIR endpoints...${NC}"

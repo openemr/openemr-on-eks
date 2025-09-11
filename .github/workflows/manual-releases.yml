@@ -69,13 +69,13 @@ jobs:
         run: |
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "last-tag=$LAST_TAG" >> $GITHUB_OUTPUT
-          
+
           if [[ -z "$LAST_TAG" ]]; then
             echo "::notice::No previous tags found. This will be the first release."
             echo "has-changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
+
           CHANGES=$(git log --oneline "$LAST_TAG..HEAD" 2>/dev/null | wc -l)
           if [[ $CHANGES -gt 0 ]]; then
             echo "::notice::Found $CHANGES commits since $LAST_TAG"
@@ -130,7 +130,7 @@ jobs:
           try:
               current = semver.Version.parse(os.environ["CURRENT"])
               bump_type = os.environ["BUMP"]
-              
+
               if bump_type == "major":
                   new = current.bump_major()
               elif bump_type == "minor":
@@ -140,13 +140,13 @@ jobs:
               else:
                   print(f"::error::Invalid bump type: {bump_type}")
                   sys.exit(1)
-              
+
               new_str = str(new)
               print(f"::notice::Bumping from {current} to {new_str} ({bump_type})")
-              
+
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                   f.write(f"new-version={new_str}\n")
-                  
+
           except Exception as e:
               print(f"::error::Failed to calculate version: {e}")
               sys.exit(1)
@@ -168,28 +168,28 @@ jobs:
           TRIGGERED_BY="${{ needs.determine-release-type.outputs.triggered-by }}"
           RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
           LAST_TAG="${{ needs.check-changes.outputs.last-tag }}"
-          
+
           # Create release notes file
           cat > RELEASE_NOTES.md << ENDOFNOTES
           ## Release v${NEW_VERSION}
-          
+
           **Release Type:** ${RELEASE_TYPE^}
           **Triggered By:** @${TRIGGERED_BY}
           **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-          
+
           ### Release Notes
           ${RELEASE_NOTES}
-          
+
           ### Changes
           ENDOFNOTES
-          
+
           # Add commit history
           if [[ -z "$LAST_TAG" ]]; then
             git log --oneline --reverse --pretty=format:"- %h: %s" >> RELEASE_NOTES.md
           else
             git log --oneline --reverse --pretty=format:"- %h: %s" "$LAST_TAG..HEAD" >> RELEASE_NOTES.md
           fi
-          
+
           # Add statistics
           echo -e "\n\n### Statistics" >> RELEASE_NOTES.md
           if [[ -n "$LAST_TAG" ]]; then
@@ -199,7 +199,7 @@ jobs:
           else
             echo "- First release" >> RELEASE_NOTES.md
           fi
-          
+
           # Output for GitHub Action
           {
             echo 'release-notes<<EOF'
@@ -212,21 +212,21 @@ jobs:
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
           TRIGGERED_BY="${{ needs.determine-release-type.outputs.triggered-by }}"
-          
+
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
-          
+
           git add VERSION
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" \
                      -m "Release type: ${{ needs.determine-release-type.outputs.release-type }}" \
                      -m "Triggered by: @$TRIGGERED_BY" \
                      -m "Release notes: ${{ github.event.inputs.release_notes }}"
-          
+
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION" -m "$(cat RELEASE_NOTES.md)"
-          
+
           git push origin main
           git push origin "v$NEW_VERSION"
-          
+
           echo "::notice::Successfully created tag v$NEW_VERSION"
 
       - name: Create GitHub Release
@@ -266,7 +266,7 @@ jobs:
         run: |
           echo "# 📦 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          
+
           if [[ "${{ needs.check-changes.outputs.has-changes }}" == "false" ]]; then
             echo "## ⏭️ No Release Created" >> $GITHUB_STEP_SUMMARY
             echo "No changes detected since the last release." >> $GITHUB_STEP_SUMMARY
@@ -292,7 +292,7 @@ jobs:
             echo "- **Check changes result:** ${{ needs.check-changes.result }}" >> $GITHUB_STEP_SUMMARY
             echo "- **Create release result:** ${{ needs.create-release.result }}" >> $GITHUB_STEP_SUMMARY
           fi
-          
+
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*Workflow run:* [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY

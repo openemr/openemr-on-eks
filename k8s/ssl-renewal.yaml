@@ -51,14 +51,14 @@ spec:
               set -e
               echo "=== Starting SSL Certificate Renewal ==="
               echo "Timestamp: $(date)"
-              
+
               # Create backup of existing certificates
               if [ -f /etc/ssl/certs/selfsigned.cert.pem ]; then
                 echo "=== Backing up existing certificates ==="
                 cp /etc/ssl/certs/selfsigned.cert.pem /etc/ssl/certs/selfsigned.cert.pem.backup.$(date +%Y%m%d_%H%M%S)
                 cp /etc/ssl/private/selfsigned.key.pem /etc/ssl/private/selfsigned.key.pem.backup.$(date +%Y%m%d_%H%M%S)
               fi
-              
+
               # Generate new SSL certificates (matching OpenEMR script format)
               echo "=== Generating new SSL certificates ==="
               openssl req -x509 -newkey rsa:4096 \
@@ -66,37 +66,37 @@ spec:
                 -out /etc/ssl/certs/selfsigned.cert.pem.new \
                 -days 365 -nodes \
                 -subj "/C=xx/ST=x/L=x/O=x/OU=x/CN=localhost"
-              
+
               # Verify new certificates
               echo "=== Verifying new certificates ==="
               openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem.new -text -noout | head -20
-              
+
               # Atomically replace certificates
               echo "=== Installing new certificates ==="
               mv /etc/ssl/private/selfsigned.key.pem.new /etc/ssl/private/selfsigned.key.pem
               mv /etc/ssl/certs/selfsigned.cert.pem.new /etc/ssl/certs/selfsigned.cert.pem
-              
+
               # Recreate symbolic links (matching OpenEMR script exactly)
               rm -f /etc/ssl/certs/webserver.cert.pem
               rm -f /etc/ssl/private/webserver.key.pem
               ln -s /etc/ssl/certs/selfsigned.cert.pem /etc/ssl/certs/webserver.cert.pem
               ln -s /etc/ssl/private/selfsigned.key.pem /etc/ssl/private/webserver.key.pem
-              
+
               # Update marker file with timestamp
               echo "SSL certificates renewed on $(date)" > /etc/ssl/docker-selfsigned-configured
-              
+
               # Set proper permissions
               chown -R apache:apache /etc/ssl/
               chmod 600 /etc/ssl/private/*
               chmod 644 /etc/ssl/certs/*
-              
+
               # Clean up old backups (keep only last 5)
               echo "=== Cleaning up old certificate backups ==="
               cd /etc/ssl/certs/
               ls -t selfsigned.cert.pem.backup.* 2>/dev/null | tail -n +6 | xargs rm -f || true
               cd /etc/ssl/private/
               ls -t selfsigned.key.pem.backup.* 2>/dev/null | tail -n +6 | xargs rm -f || true
-              
+
               echo "=== SSL Certificate Renewal Complete ==="
               echo "New certificate valid until: $(openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem -noout -enddate)"
             resources:
@@ -173,7 +173,7 @@ spec:
           else
             echo "No existing certificate found"
           fi
-          
+
           echo "=== Test completed successfully ==="
         resources:
           requests:

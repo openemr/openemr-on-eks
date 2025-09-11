@@ -86,17 +86,17 @@ fi
 get_docker_tags() {
     local registry="$1"
     local url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100"
-    
+
     echo -e "${YELLOW}Fetching tags from Docker Hub...${NC}"
-    
+
     # Get tags from Docker Hub API
     local response=$(curl -s "$url")
-    
+
     if [ $? -ne 0 ]; then
         echo -e "${RED}Error: Failed to fetch tags from Docker Hub${NC}" >&2
         exit 1
     fi
-    
+
     # Parse JSON response and extract tag names
     echo "$response" | jq -r '.results[].name' 2>/dev/null
 }
@@ -106,7 +106,7 @@ filter_versions() {
     local search_pattern="$1"
     local latest_only="$2"
     local count="$3"
-    
+
     # Filter out non-version tags and apply search pattern
     local filtered_tags
     if [ -n "$search_pattern" ]; then
@@ -114,7 +114,7 @@ filter_versions() {
     else
         filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | head -n "$count")
     fi
-    
+
     if [ "$latest_only" = true ]; then
         # For OpenEMR, recommend the stable version (typically second-to-latest)
         local stable_version=$(echo "$filtered_tags" | sed -n '2p')
@@ -144,7 +144,7 @@ if [ "$LATEST_ONLY" = true ]; then
     # Get the latest and second-to-latest versions
     latest_version=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | head -n 1)
     stable_version=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sed -n '2p')
-    
+
     if [ -n "$stable_version" ]; then
         echo -e "${GREEN}  $stable_version${NC} (stable - recommended for production)"
         if [ -n "$latest_version" ] && [ "$stable_version" != "$latest_version" ]; then
@@ -167,9 +167,9 @@ else
     else
         echo -e "${BLUE}Latest OpenEMR versions (showing up to $TAGS_TO_SHOW):${NC}"
     fi
-    
+
     versions=$(echo "$tags" | filter_versions "$SEARCH_PATTERN" false "$TAGS_TO_SHOW")
-    
+
     if [ -n "$versions" ]; then
         version_count=0
         echo "$versions" | while read -r version; do
@@ -186,7 +186,7 @@ else
                 echo -e "${YELLOW}  $version${NC} (pre-release)"
             fi
         done
-        
+
         echo ""
         echo -e "${BLUE}To use a specific version in your deployment:${NC}"
         echo -e "${YELLOW}  # In terraform.tfvars (recommended stable version)${NC}"

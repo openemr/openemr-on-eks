@@ -7,6 +7,7 @@
 - [Release Schedule](#-release-schedule)
 - [How It Works](#-how-it-works)
 - [Manual Release Process](#-manual-release-process)
+- [End-to-End Testing Requirements](#️-end-to-end-testing-requirements)
 - [Release Notes Generation](#-release-notes-generation)
 - [Safety Features](#️-safety-features)
 - [File Structure](#-file-structure)
@@ -25,11 +26,13 @@ This document describes the manual release system for the OpenEMR on EKS project
 ## 🚀 Overview
 
 The manual release system manages project versions and creates GitHub releases based on:
+
 - **Manual triggers only**: All releases are manually initiated through GitHub Actions
 - **Full control**: You decide when and what type of release to create
 - **Flexible timing**: No automatic schedules, releases happen when you want them
 
 ## 🎯 Release Architecture
+
 ```mermaid
 graph TD
     A[User goes to actions tab in GitHub repository] --> B[User selects manual releases workflow]
@@ -38,7 +41,7 @@ graph TD
     D --> E[REQUIRED; Users adds release notes describing the changes]
     E --> F[User clicks run workflow]
     F --> G[Automated workflow triggered]
-    
+
     G --> H[determine-release-type job runs]
     H --> I[check-changes job runs]
     I --> J[create-release job runs]
@@ -117,6 +120,7 @@ else:  # patch
 ```
 
 **Version Reset Rules:**
+
 - **Major bump** (`1.0.0`): Resets both minor and patch to `0`
 - **Minor bump** (`0.1.0`): Resets patch to `0`
 - **Patch bump** (`0.0.1`): Only increments patch number
@@ -130,6 +134,7 @@ Version information is updated in the primary version file:
 ### 5. Release Creation
 
 The system creates:
+
 - Git tag with the new version
 - GitHub release with comprehensive release notes
 - Commit with version bump and metadata
@@ -139,16 +144,26 @@ The system creates:
 
 ### Triggering a Manual Release
 
-1. Go to the **Actions** tab in your GitHub repository
-2. Select **Manual Releases** workflow
-3. Click **Run workflow**
-4. Choose your release type:
+1. **🔒 MANDATORY**: Run end-to-end backup/restore test before any changes
+
+   ```bash
+   ./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+   ```
+
+   - All 9 test steps must pass successfully
+   - This ensures disaster recovery capabilities remain intact
+   - No exceptions - testing is mandatory for all releases
+
+2. Go to the **Actions** tab in your GitHub repository
+3. Select **Manual Releases** workflow
+4. Click **Run workflow**
+5. Choose your release type:
    - **Major**: For breaking changes
    - **Minor**: For new features
    - **Patch**: For bug fixes
-5. **Required**: Add release notes describing the changes
-6. (Optional) Enable dry run for testing
-7. Click **Run workflow**
+6. **Required**: Add release notes describing the changes
+7. (Optional) Enable dry run for testing
+8. Click **Run workflow**
 
 ### Manual Release Options
 
@@ -159,6 +174,60 @@ The system creates:
 | `dry_run` | Test without creating release | `true`/`false` |
 
 **Important**: Release notes are now **required** for all manual releases to ensure proper documentation of changes.
+
+## 🔒 End-to-End Testing Requirements
+
+### **MANDATORY BEFORE ANY RELEASE**
+
+Before any manual release can be created, the end-to-end backup/restore test script **must** pass successfully. This is a core requirement that ensures disaster recovery capabilities remain intact.
+
+#### **Why This Is Critical**
+
+- **Disaster Recovery**: Ensures the core backup/restore functionality remains intact
+- **Infrastructure Validation**: Validates that Terraform and Kubernetes configurations work correctly
+- **Regression Prevention**: Prevents releases that could break production recovery procedures
+- **Compliance**: Demonstrates that disaster recovery capabilities are maintained
+- **Quality Assurance**: Ensures all changes are thoroughly tested before release
+
+#### **Testing Process**
+
+```bash
+# Run the complete end-to-end test
+./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+
+# Expected outcome: All 9 test steps must pass
+# ✅ Infrastructure deployment
+# ✅ OpenEMR installation
+# ✅ Test data creation
+# ✅ Backup creation
+# ✅ Infrastructure destruction
+# ✅ Infrastructure recreation
+# ✅ Backup restoration
+# ✅ Verification
+# ✅ Final cleanup
+```
+
+#### **Test Requirements**
+
+- **All test steps must pass**: No exceptions or partial failures allowed
+- **Complete infrastructure cycle**: Test must validate full create/destroy/restore cycle
+- **Data integrity verification**: Proof files must be correctly restored
+- **Connectivity validation**: Database and application connectivity must work after restore
+- **Resource cleanup**: All test resources must be properly cleaned up
+
+#### **Failure Handling**
+
+- **If any test step fails**: Release process must be halted
+- **Changes must be reverted**: Fix issues before proceeding with release
+- **Re-test required**: After fixes, complete test must pass again
+- **No exceptions**: This testing is mandatory for all releases
+
+#### **Integration with Release Process**
+
+- **Pre-release validation**: Test must pass before release workflow can proceed
+- **Release notes requirement**: Include test results in release notes
+- **Team coordination**: Ensure all team members understand this requirement
+- **Documentation**: All releases must include test validation results
 
 ## 🔍 Release Notes Generation
 
@@ -258,6 +327,7 @@ VERSION                        # Current version file
 ### Workflow File Location
 
 The manual release workflow is located at:
+
 ```
 .github/workflows/manual-releases.yml
 ```
@@ -272,23 +342,27 @@ The manual release workflow is located at:
 ### Secrets
 
 The workflow uses the following secrets:
+
 - `GITHUB_TOKEN` - Automatically provided by GitHub Actions
 
 ## 🔄 Workflow Jobs
 
 ### 1. `determine-release-type`
+
 - Determines the release type from manual input
 - Sets appropriate version bump type
 - Captures trigger information
 - Provides outputs for other jobs
 
 ### 2. `check-changes`
+
 - Checks if there are changes since last release
 - Prevents unnecessary releases
 - Handles first-time releases gracefully
 - Provides change detection output
 
 ### 3. `create-release`
+
 - Updates VERSION file
 - Creates Git tags and commits
 - Generates comprehensive release notes
@@ -296,6 +370,7 @@ The workflow uses the following secrets:
 - Supports dry run mode
 
 ### 4. `notify-completion`
+
 - Provides final status notification
 - Runs regardless of success/failure
 - Generates workflow summary
@@ -306,6 +381,7 @@ The workflow uses the following secrets:
 ### Workflow Status
 
 Monitor release status in the GitHub Actions tab:
+
 - `✅ Release completed successfully`: Release successful
 - `❌ Release failed`: Release failed
 - `⏭️ No changes detected, release skipped`: No changes detected
@@ -314,6 +390,7 @@ Monitor release status in the GitHub Actions tab:
 ### Logs
 
 Detailed logs are available for each job:
+
 - Click on the workflow run
 - Expand individual job steps
 - View console output for debugging
@@ -322,46 +399,55 @@ Detailed logs are available for each job:
 ### Common Issues
 
 #### No Changes Detected
+
 - **Cause**: No commits since last release tag
 - **Solution**: Make changes and commit them before manually initiating a release
 
 #### Version File Not Found
+
 - **Cause**: Missing VERSION file
 - **Solution**: Ensure VERSION file exists in repository root
 
 #### Permission Errors
+
 - **Cause**: Insufficient repository permissions
 - **Solution**: Ensure workflow has write access to repository
 
 #### Invalid Version Format
+
 - **Cause**: VERSION file contains invalid semantic version
 - **Solution**: Ensure VERSION file contains valid format (e.g., "1.0.0")
 
 ## 🚀 Best Practices
 
 ### 1. Version Management
+
 - Keep the `VERSION` file in the repository root
 - Use [semantic versioning](https://semver.org/) (MAJOR.MINOR.PATCH)
 - Ensure VERSION file contains valid semantic version format
 
 ### 2. Release Notes
+
 - Write clear, descriptive release notes
 - Include context about what changed and why
 - Reference related issues or pull requests when applicable
 
 ### 3. Testing
+
 - Use dry run mode for testing release process
 - Test with different release types
 - Verify version file updates
 - Test change detection logic
 
 ### 4. Monitoring
+
 - Regularly check workflow execution
 - Monitor release creation
 - Review generated release notes
 - Check workflow summaries for insights
 
 ### 5. Release Planning
+
 - Plan releases based on feature completion
 - Coordinate releases with team schedules
 - Use major releases sparingly for breaking changes

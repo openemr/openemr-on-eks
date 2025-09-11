@@ -1,0 +1,116 @@
+# OpenEMR EKS CI/CD Test Configuration
+# This file defines test suites for GitHub Actions CI/CD pipeline
+# All tests run locally without requiring AWS access
+
+test_suites:
+  code_quality:
+    name: "Code Quality Tests"
+    description: "Tests for code quality, syntax, and best practices"
+    tests:
+      - name: "shell_script_validation"
+        description: "Validate shell script syntax and best practices"
+        type: "shell"
+        files: ["scripts/*.sh"]
+        enabled: true
+
+      - name: "yaml_validation"
+        description: "Validate YAML syntax and structure"
+        type: "yaml"
+        files: ["k8s/*.yaml", "monitoring/*.yaml", "scripts/*.yaml"]
+        enabled: true
+
+      - name: "terraform_validation"
+        description: "Validate Terraform configuration syntax"
+        type: "terraform"
+        files: ["terraform/*.tf"]
+        enabled: true
+
+      - name: "markdown_validation"
+        description: "Validate markdown documentation"
+        type: "markdown"
+        files: ["docs/*.md"]
+        enabled: true
+
+  kubernetes_manifests:
+    name: "Kubernetes Manifest Tests"
+    description: "Tests for Kubernetes manifest files"
+    tests:
+      - name: "manifest_syntax"
+        description: "Validate Kubernetes manifest syntax"
+        type: "k8s_syntax"
+        files: ["k8s/*.yaml"]
+        enabled: true
+
+      - name: "manifest_best_practices"
+        description: "Check Kubernetes manifest best practices"
+        type: "k8s_best_practices"
+        files: ["k8s/*.yaml"]
+        enabled: true
+
+      - name: "security_policies"
+        description: "Validate security and network policies"
+        type: "k8s_security"
+        files: ["k8s/security.yaml", "k8s/network-policies.yaml"]
+        enabled: true
+
+  script_validation:
+    name: "Script Validation Tests"
+    description: "Tests for script functionality and error handling"
+    tests:
+      - name: "script_syntax_check"
+        description: "Check shell script syntax"
+        type: "shell_syntax"
+        files: ["scripts/*.sh"]
+        enabled: true
+
+      - name: "script_logic_test"
+        description: "Test script logic and error handling"
+        type: "shell_logic"
+        files: ["scripts/*.sh"]
+        enabled: true
+
+      - name: "script_dependencies"
+        description: "Check script dependencies and requirements"
+        type: "shell_dependencies"
+        files: ["scripts/*.sh"]
+        enabled: true
+
+  documentation:
+    name: "Documentation Tests"
+    description: "Tests for documentation quality and consistency"
+    tests:
+      - name: "link_validation"
+        description: "Validate internal and external links"
+        type: "markdown_links"
+        files: ["docs/*.md"]
+        enabled: true
+
+      - name: "code_examples"
+        description: "Validate code examples in documentation"
+        type: "markdown_code"
+        files: ["docs/*.md"]
+        enabled: true
+
+      - name: "documentation_coverage"
+        description: "Check documentation coverage of code"
+        type: "coverage"
+        files: ["docs/*.md"]
+        enabled: true
+
+ci_cd_settings:
+  github_actions:
+    enabled: true
+    matrix_testing: true
+    parallel_execution: true
+    fail_fast: false
+
+  test_execution:
+    timeout_minutes: 30
+    max_retries: 2
+    artifact_retention_days: 7
+
+  reporting:
+    format: "junit"
+    output_dir: "test-results"
+    generate_summary: true
+    notify_on_failure: true

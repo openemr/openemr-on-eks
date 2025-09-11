@@ -1,7 +1,7 @@
 # OpenEMR Monitoring Stack - Configuration Reference
-# 
+#
 # ⚠️  IMPORTANT: This file is for REFERENCE ONLY
-# 
+#
 # The install-monitoring.sh script generates Helm values dynamically
 # based on your environment and configuration. This file shows what
 # the generated configuration looks like for documentation purposes.
@@ -61,22 +61,22 @@
 #     existingSecret: "grafana-admin-secret"    # Secure credential management
 #     userKey: admin-user
 #     passwordKey: admin-password
-#   
+#
 #   persistence:
 #     enabled: true
 #     storageClassName: gp3-monitoring-encrypted
 #     size: 20Gi
 #     accessModes: ["ReadWriteOncePod"]          # Auto-detected optimal mode
-#   
+#
 #   securityContext:
 #     runAsUser: 472
 #     runAsGroup: 472
 #     fsGroup: 472
-#   
+#
 #   resources:
 #     requests: { cpu: 100m, memory: 256Mi }
 #     limits:   { cpu: 1000m, memory: 1Gi }
-#   
+#
 #   sidecar:
 #     dashboards:
 #       enabled: true
@@ -84,7 +84,7 @@
 #     datasources:
 #       enabled: true
 #       searchNamespace: ALL
-#   
+#
 #   grafana.ini:
 #     security:
 #       cookie_secure: true
@@ -102,21 +102,21 @@
 #     serviceMonitorNamespaceSelector: {}
 #     ruleSelector: {}
 #     ruleNamespaceSelector: {}
-#     
+#
 #     storageSpec:
 #       volumeClaimTemplate:
 #         spec:
 #           storageClassName: gp3-monitoring-encrypted
 #           accessModes: ["ReadWriteOncePod"]
 #           resources: { requests: { storage: 100Gi } }
-#     
+#
 #     resources:
 #       requests: { cpu: 500m, memory: 2Gi }
 #     limits:   { cpu: 2000m, memory: 4Gi }
-#     
+#
 #     retention: 30d
 #     retentionSize: 90GB
-#     
+#
 #     securityContext:
 #       runAsUser: 1000
 #       runAsGroup: 3000
@@ -128,7 +128,7 @@
 
 # 🔒 Enhanced Security:
 # - Automatic RBAC configuration
-# - Network policies for pod isolation  
+# - Network policies for pod isolation
 # - Security contexts with non-root users
 # - Encrypted storage with dedicated KMS keys
 

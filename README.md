@@ -1,47 +1,70 @@
-# OpenEMR EKS Deployment with Auto Mode
+<div align="center">
+
+# OpenEMR EKS Deployment with Auto Mode v2.x.x
+
+*"Democratizing healthcare technology by making enterprise-grade OpenEMR deployments accessible to organizations of any size through automated, cloud-native infrastructure."*
+
+<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="300">
+
+</div>
 
 This deployment provides a production-ready OpenEMR system on Amazon EKS with **EKS Auto Mode** for fully managed EC2 infrastructure with automatic provisioning and optimization.
 
 > **⚠️ HIPAA Compliance Notice**: No matter what you're deploying to AWS full HIPAA compliance requires ...
+>
 > - Executed Business Associate Agreement (BAA) with AWS
 > - Organizational policies and procedures
 > - Staff training and access controls
 > - Regular security audits and risk assessments
 
+> **⚠️ End-to-End Test Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete AWS resources (including backup buckets and RDS snapshots) and automatically reset Kubernetes manifests to their default state. **Only run in development AWS accounts** and commit/stash any uncommitted changes to `k8s/` manifests before testing.
+
 ## 📋 Table of Contents
 
 ### **🚀 Getting Started**
+
 - [Architecture Overview](#architecture-overview)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#-quick-start)
 - [Directory Structure](#directory-structure)
 
 ### **💰 Cost Analysis**
+
 - [EKS Auto Mode Pricing](#-eks-auto-mode-pricing-structure)
 - [Why Auto Mode is Worth the 12% Markup](#why-auto-mode-is-worth-the-12-markup)
 - [Cost Optimization Strategies](#cost-optimization-strategies)
 - [Monthly Cost Breakdown by Organization Size](#monthly-cost-breakdown-by-organization-size)
 
 ### **🔒 Security & Compliance**
+
 - [Production Best Practice - Jumpbox Architecture](#-production-best-practice---jumpbox-architecture)
 - [Operational Scripts](#%EF%B8%8F-operational-scripts)
 
 ### **📚 Infrastructure**
+
 - [Terraform Organization](#%EF%B8%8F-terraform-infrastructure-organization)
 - [Kubernetes Manifests](#-working-with-kubernetes-manifests)
 - [Deployment Workflow](#-deployment-workflow)
 - [Backup & Restore System](#-backup--restore-system)
 
 ### **⚙️ Operations**
+
 - [Monitoring & Observability](#-monitoring--observability)
 - [Disaster Recovery](#disaster-recovery-procedures)
 - [Troubleshooting](#-troubleshooting-guide)
 
 ### **�  Workflows & Operations**
+
 - [Common Workflows](#-common-workflows)
 - [Manual Release System](#-manual-release-system)
 
+### **🧪 Testing & Quality**
+
+- [Testing Framework](#-testing-framework)
+- [CI/CD Pipeline](#-cicd-pipeline)
+
 ### **📚 Additional Resources**
+
 - [Additional Resources](#-additional-resources)
 - [License and Compliance](#-additional-resources-1)
 
@@ -58,13 +81,13 @@ graph TB
                 BN[Bottlerocket Nodes<br/>SELinux Enforced]
                 OP[OpenEMR Pods<br/>PHI Processing]
             end
-            
+
             subgraph "Data Layer"
                 RDS[Aurora Serverless V2<br/>MySQL 8.0]
                 CACHE[Valkey Serverless<br/>Session Cache]
                 EFS[EFS Storage<br/>Encrypted PHI]
             end
-            
+
             subgraph "Security Layer"
                 KMS[6 KMS Keys<br/>Granular Encryption]
                 SG[Security Groups]
@@ -72,14 +95,14 @@ graph TB
                 WAF[WAFv2<br/>DDoS & Bot Protection]
             end
         end
-        
+
         subgraph "Compliance & Monitoring"
             CW[CloudWatch Logs<br/>365-Day Audit Retention]
             CT[CloudTrail<br/>API Auditing]
             VFL[VPC Flow Logs<br/>Network Monitoring]
         end
     end
-    
+
     OP --> RDS
     OP --> CACHE
     OP --> EFS
@@ -92,22 +115,22 @@ graph TB
 ```
 
 ### **EKS Auto Mode Architecture**
-- Documentation:
 
 - Features
-  - **Fully Managed Compute**: 
+  - **Fully Managed Compute**:
     - [AWS EKS Auto Mode Documentation](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
     - EC2 instances provisioned automatically with 12% management fee
-  - **Kubernetes 1.33**: 
+  - **Kubernetes 1.33**:
     - [Kubernetes v1.33 Octarine Release Blog](https://kubernetes.io/blog/2025/04/23/kubernetes-v1-33-release/)
     - Latest stable version with Auto Mode support
-  - **Bottlerocket OS**: 
+  - **Bottlerocket OS**:
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
     - Rust-based, immutable, security-hardened Linux with SELinux enforcement and no SSH access
 
 ## Prerequisites
 
 ### **Required AWS Configuration**
+
 ```bash
 # Minimum AWS CLI version
 aws --version  # Must be 2.15.0 or higher
@@ -123,9 +146,63 @@ aws --version  # Must be 2.15.0 or higher
 - Kubernetes version: 1.29 or higher (1.33 configured)
 ```
 
+### **Repository Configuration (Recommended)**
+
+For production deployments, configure **branch rulesets** to ensure code quality and enable proper code review:
+
+#### **Configure Branch Rulesets**
+
+1. **Navigate to Repository Settings:**
+   - Go to your GitHub repository → **Settings** → **Rules** → **Rulesets**
+
+2. **Create New Branch Ruleset:**
+   - Click **New ruleset** → **New branch ruleset**
+   - Name: `Main Branch Protection`
+   - Target: `main` branch
+   - Enable: **Require a pull request before merging**
+   - Enable: **Require status checks to pass** (add all 7 required checks):
+     1. `Run Test Suite (code_quality)`
+     2. `Run Test Suite (documentation)`
+     3. `Run Test Suite (kubernetes_manifests)`
+     4. `Run Test Suite (script_validation)`
+     5. `Lint and Validate`
+     6. `Security Scan`
+     7. `Code Quality`
+   - Enable: **Block force pushes**
+   - Enable: **Require linear history**
+   - Enable: **Require signed commits**
+   - **Important**: Add **Repository admin Role** to bypass list (allows automated workflows)
+   - Click **Create** to activate
+
+3. **Benefits of Rulesets:**
+   - **Modern Approach**: More flexible than traditional branch protection
+   - **Granular Control**: Define specific rules for different branches
+   - **Bypass Permissions**: Grant trusted users ability to bypass rules
+   - **Code Quality**: All changes reviewed before merging
+   - **Testing**: Required tests must pass before merge
+   - **Security**: Prevents accidental pushes to main
+   - **Compliance**: Meets enterprise security requirements
+
+#### **Workflow After Configuration**
+
+```bash
+# Create feature branch
+git checkout -b feature/your-feature-name
+
+# Make changes and commit
+git add .
+git commit -m "feat: add your feature"
+git push origin feature/your-feature-name
+
+# Create pull request on GitHub
+# Wait for reviews and status checks
+# Merge after approval
+```
+
 ## 🚀 Quick Start
 
 ### **1. Pre-Deployment Validation**
+
 ```bash
 # Clone repository
 git clone <repository-url>
@@ -136,6 +213,7 @@ cd openemr-on-eks
 
 # Install required tools on macOS
 brew install terraform kubectl helm awscli jq
+# install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Configure AWS credentials
 aws configure
@@ -267,6 +345,7 @@ Next steps for first-time deployment:
 ```
 
 ### **2. Configure Infrastructure**
+
 ```bash
 cd ../terraform
 
@@ -310,6 +389,7 @@ EOF
 The `enable_waf` parameter controls AWS WAFv2 deployment for enhanced security:
 
 #### **WAF Features When Enabled:**
+
 - **AWS Managed Rules**: Core Rule Set (CRS), SQL Injection protection, Known Bad Inputs
 - **Rate Limiting**: Blocks excessive requests (2000 requests per 5 minutes per IP)
 - **Bot Protection**: Blocks suspicious User-Agent patterns (bot, scraper, crawler, spider)
@@ -317,6 +397,7 @@ The `enable_waf` parameter controls AWS WAFv2 deployment for enhanced security:
 - **CloudWatch Metrics**: Real-time monitoring and alerting capabilities
 
 #### **WAF Configuration Options:**
+
 ```bash
 # Enable WAF (recommended for production)
 enable_waf = true
@@ -326,27 +407,31 @@ enable_waf = false
 ```
 
 #### **WAF Integration:**
+
 - **Automatic ALB Association**: WAF automatically associates with Application Load Balancer
 - **Kubernetes Integration**: WAF ACL ARN automatically injected into ingress configuration
 - **Security Headers**: Enhanced security headers and DDoS protection
 
 #### **WAF Architecture:**
+
 The WAF configuration is defined in `terraform/waf.tf` and includes:
 
 - **Web ACL**: Regional WAFv2 Web ACL with multiple security rules
 - **S3 Logging**: Direct WAF logs to S3 bucket with lifecycle policies
-- **Security Rules**: 
+- **Security Rules**:
   - AWS Managed Rules for common attack patterns
   - Rate limiting to prevent DDoS attacks
   - User-Agent filtering for bot protection
 - **Conditional Deployment**: All WAF resources are created only when `enable_waf = true`
 
 #### **WAF Logs and Monitoring:**
+
 - **Log Destination**: S3 bucket with 90-day retention
 - **CloudWatch Metrics**: Real-time monitoring for all WAF rules
 - **Log Analysis**: WAF logs can be analyzed for security insights and threat detection
 
 ### **3. Deploy Infrastructure**
+
 ```bash
 # Initialize Terraform
 terraform init -upgrade
@@ -369,6 +454,7 @@ time terraform apply --auto-approve tfplan
 The modular structure allows for **targeted deployments** and **efficient development**:
 
 #### **🎯 Targeted Planning**
+
 ```bash
 # Plan changes for specific services
 terraform plan -target=module.vpc                   # VPC changes only
@@ -377,6 +463,7 @@ terraform plan -target=aws_eks_cluster.openemr      # EKS changes only
 ```
 
 #### **🔧 Selective Deployment**
+
 ```bash
 # Apply changes to specific resources
 terraform apply -target=aws_kms_key.rds             # Update RDS encryption
@@ -384,6 +471,7 @@ terraform apply -target=aws_efs_file_system.openemr # Update EFS configuration
 ```
 
 #### **📊 Resource Inspection**
+
 ```bash
 # View resources by file/service
 terraform state list | grep rds                      # All RDS resources
@@ -391,6 +479,7 @@ terraform state list | grep kms                      # All KMS resources
 ```
 
 #### **🔍 Validation by Service**
+
 ```bash
 # Validate specific configurations
 terraform validate                                   # Validate all files
@@ -399,6 +488,7 @@ terraform fmt -recursive                             # Format all files
 ```
 
 #### **🎭 Environment-Specific Configurations**
+
 ```bash
 # Testing deployment (deletion protection disabled)
 terraform apply -var-file="terraform-testing.tfvars"
@@ -408,6 +498,7 @@ terraform apply -var="rds_deletion_protection=false"
 ```
 
 ### **4. Deploy OpenEMR Application**
+
 ```bash
 cd ../k8s
 
@@ -429,10 +520,11 @@ kubectl get pods -n openemr -o wide
 kubectl get nodeclaim
 
 # Verify WAF integration (if enabled)
-kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn 
+kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn
 ```
 
 ### **5. Access Your System**
+
 ```bash
 # Get LoadBalancer URL (HTTPS-only so add "https://" to the beginning to make it work in the browser)
 kubectl get svc openemr-service -n openemr
@@ -444,6 +536,7 @@ cat openemr-credentials.txt
 **🔒 Security Note**: The load balancer only listens on port 443 (HTTPS). HTTP traffic on port 80 will be refused by the load balancer for maximum security. All access must use HTTPS.
 
 ### **6. Secure Your Deployment**
+
 ```bash
 # Option A: Temporary security (can toggle access as needed)
 cd ../scripts
@@ -487,10 +580,12 @@ cd ../scripts
 ```
 
 **What's included by default in OpenEMR deployment:**
+
 - ✅ CloudWatch log forwarding via Fluent Bit
 - ✅ CloudWatch metrics (AWS infrastructure metrics)
 
 **What this optional monitoring stack adds:**
+
 - 📊 **Prometheus**: kube-prometheus-stack v75.18.1 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
 - 📝 **Loki**: v6.35.1 single-binary (log aggregation with 720h retention)
@@ -509,9 +604,12 @@ cd ../scripts
 ```
 openemr-on-eks/
 ├── .github/                            # GitHub Actions and workflows
+│   ├── README.md                       # Comprehensive GitHub workflows documentation
 │   └── workflows/                      # CI/CD automation workflows
+│       ├── ci-cd-tests.yml             # Automated testing and quality assurance
 │       └── manual-releases.yml         # Manual release workflow for version management
 ├── terraform/                          # Infrastructure as Code (Modular Structure)
+│   ├── README.md                       # Complete Terraform infrastructure documentation
 │   ├── main.tf                         # Terraform providers and data sources
 │   ├── variables.tf                    # Input variables and defaults (including autoscaling)
 │   ├── outputs.tf                      # Output values for other components
@@ -530,13 +628,14 @@ openemr-on-eks/
 │   ├── terraform-testing.tfvars        # Testing configuration (deletion protection disabled)
 │   └── terraform-production.tfvars     # Production configuration reference (deletion protection enabled)
 ├── k8s/                                # Kubernetes manifests
+│   ├── README.md                       # Complete Kubernetes manifests documentation
 │   ├── deploy.sh                       # Main deployment script (deploys OpenEMR to the EKS cluster)
 │   ├── namespace.yaml                  # Namespace definitions with Pod Security Standards
 │   ├── storage.yaml                    # Storage classes (EFS for OpenEMR, optimized EBS for monitoring)
 │   ├── security.yaml                   # RBAC, service accounts, and security policies
 │   ├── network-policies.yaml           # Network policies for our deployment
 │   ├── secrets.yaml                    # OpenEMR Admin, Database and Valkey credential templates
-│   ├── deployment.yaml                 # OpenEMR application deployment
+│   ├── deployment.yaml                 # OpenEMR application deployment with MYSQL_DATABASE env var
 │   ├── service.yaml                    # Defines OpenEMR service and load balancer configuration
 │   ├── hpa.yaml                        # Horizontal Pod Autoscaler configuration
 │   ├── ingress.yaml                    # Ingress controller configuration
@@ -560,24 +659,40 @@ openemr-on-eks/
 │   │   └── grafana-admin-password      # Grafana admin password only (created during installation)
 │   └── backups/                        # Configuration backups directory (created during installation, future use)
 ├── scripts/                            # Operational and deployment scripts
+│   ├── README.md                       # Complete scripts documentation and maintenance guide
 │   ├── check-openemr-versions.sh       # OpenEMR version discovery and management
 │   ├── validate-deployment.sh          # Pre-deployment validation and health checks
 │   ├── validate-efs-csi.sh             # EFS CSI driver validation and troubleshooting
-│   ├── clean-deployment.sh             # Deployment cleanup (deletes all stored data; preserves infrastructure)
+│   ├── clean-deployment.sh             # Enhanced deployment cleanup (deletes PVCs and stale configs)
 │   ├── restore-defaults.sh             # Restore deployment files to default template state
 │   ├── openemr-feature-manager.sh      # OpenEMR feature configuration management
 │   ├── ssl-cert-manager.sh             # SSL certificate management (ACM integration)
 │   ├── ssl-renewal-manager.sh          # Self-signed certificate renewal automation
 │   ├── cluster-security-manager.sh     # Cluster access security management
 │   ├── backup.sh                       # Cross-region backup procedures
-│   └── restore.sh                      # Cross-region disaster recovery
-└── docs/                               # Complete documentation
-    ├── DEPLOYMENT_GUIDE.md             # Step-by-step deployment guide
-    ├── AUTOSCALING_GUIDE.md            # Autoscaling configuration and optimization
-    ├── MANUAL_RELEASES.md              # Guide to the OpenEMR on EKS release system
-    ├── TROUBLESHOOTING.md              # Troubleshooting and solutions
-    ├── BACKUP_RESTORE_GUIDE.md         # Comprehensive backup and restore guide
-    └── LOGGING_GUIDE.md                # OpenEMR 7.0.3.4 Enhanced Logging
+│   ├── restore.sh                      # Cross-region disaster recovery (with DB reconfiguration)
+│   ├── test-end-to-end-backup-restore.sh # End-to-end backup/restore testing
+│   ├── run-test-suite.sh               # CI/CD test suite runner
+│   └── test-config.yaml                # Test configuration for CI/CD framework
+├── docs/                               # Complete documentation
+│   ├── README.md                       # Complete documentation index and maintenance guide
+│   ├── DEPLOYMENT_GUIDE.md             # Step-by-step deployment guide
+│   ├── AUTOSCALING_GUIDE.md            # Autoscaling configuration and optimization
+│   ├── MANUAL_RELEASES.md              # Guide to the OpenEMR on EKS release system
+│   ├── TROUBLESHOOTING.md              # Troubleshooting and solutions
+│   ├── BACKUP_RESTORE_GUIDE.md         # Comprehensive backup and restore guide
+│   ├── LOGGING_GUIDE.md                # OpenEMR 7.0.3.4 Enhanced Logging
+│   ├── TESTING_GUIDE.md                # Comprehensive CI/CD testing framework
+│   └── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
+├── images/                             # Visual assets and branding materials
+│   ├── README.md                       # Complete images documentation and usage guidelines
+│   ├── openemr_on_eks_logo.png         # Main project logo for documentation and branding (optimized for web)
+│   └── openemr_on_eks_github_banner.png # GitHub repository banner for social media display
+├── .pre-commit-config.yaml             # Pre-commit hooks configuration
+├── .yamllint                           # YAML linting configuration (relaxed rules)
+├── .markdownlint.json                  # Markdown linting configuration (relaxed rules)
+├── VERSION                             # Current project version
+└── LICENSE                             # Project license
 ```
 
 ## 💰 EKS Auto Mode Pricing Structure
@@ -590,7 +705,6 @@ EKS Auto Mode adds a **12% management fee** on top of standard EC2 costs:
 Total Cost = EC2 Instance Cost + (EC2 Instance Cost × 0.12) + EKS Control Plane ($73/month)
 ```
 
-
 ---
 
 ## **Why Auto Mode is Worth the 12% Markup**
@@ -598,6 +712,7 @@ Total Cost = EC2 Instance Cost + (EC2 Instance Cost × 0.12) + EKS Control Plane
 EKS Auto Mode’s 12% compute markup isn’t just for convenience — it’s for eliminating entire categories of operational overhead, reducing downtime risk, and often lowering *total* cost when factoring in efficiency gains.
 
 ### **1. Operational Burden Elimination**
+
 - **No node group management** — AWS provisions, right-sizes, and manages the lifecycle of compute nodes automatically.
 - **Automatic OS updates and patching** — Security patches and kernel upgrades without downtime.
 - **No AMI selection/maintenance** — AWS handles image selection and maintenance.
@@ -606,20 +721,22 @@ EKS Auto Mode’s 12% compute markup isn’t just for convenience — it’s for
 This replaces the ongoing SRE/DevOps effort for node management, saving both headcount and operational complexity.
 
 ### **2. Built-in Right-Sizing and Cost Efficiency**
-While per-vCPU costs are higher, Auto Mode can *reduce* total monthly spend by aligning compute supply closely with demand:  
 
-- **Bin-packing efficiency** — Pods are scheduled onto right-sized nodes automatically, minimizing waste from underutilized instances.  
-- **Automatic Node Optimization with Karpenter** — Karpenter dynamically launches the most efficient instance types based on pod resource requests, workload mix, and availability zone capacity. This means fewer idle resources, better spot usage (if enabled), and optimal balance between price and performance without manual tuning.  
-- **Ephemeral on-demand nodes** — Compute is provisioned only for the duration of workload execution, then scaled down immediately when idle, eliminating costs from long-lived, underutilized nodes.  
-- **No need for capacity planning** — Teams don’t need to guess at cluster sizing or maintain large safety buffers. Auto Mode reacts in real time to workloads, reducing both operational overhead and cost.  
-- **Workload-driven elasticity** — The system can scale up quickly for bursty traffic (e.g., peak patient visits in OpenEMR) and scale back down after demand subsides, ensuring spend closely tracks actual usage.  
+While per-vCPU costs are higher, Auto Mode can *reduce* total monthly spend by aligning compute supply closely with demand:
 
-> **💡 Example:**  
+- **Bin-packing efficiency** — Pods are scheduled onto right-sized nodes automatically, minimizing waste from underutilized instances.
+- **Automatic Node Optimization with Karpenter** — Karpenter dynamically launches the most efficient instance types based on pod resource requests, workload mix, and availability zone capacity. This means fewer idle resources, better spot usage (if enabled), and optimal balance between price and performance without manual tuning.
+- **Ephemeral on-demand nodes** — Compute is provisioned only for the duration of workload execution, then scaled down immediately when idle, eliminating costs from long-lived, underutilized nodes.
+- **No need for capacity planning** — Teams don’t need to guess at cluster sizing or maintain large safety buffers. Auto Mode reacts in real time to workloads, reducing both operational overhead and cost.
+- **Workload-driven elasticity** — The system can scale up quickly for bursty traffic (e.g., peak patient visits in OpenEMR) and scale back down after demand subsides, ensuring spend closely tracks actual usage.
+
+> **💡 Example:**
 > A medium-sized OpenEMR deployment with hundreds of concurrent users might require **6 m5.large nodes** under static provisioning (~$420/month). With EKS Auto Mode and Karpenter, the same workload could run on a mix of **a few optimized Graviton instances** that scale down after hours, cutting costs to ~$320/month. Savings come from eliminating idle nodes, continuously resizing compute to actual demand and whenever possible trying to use the most cost-efficient nodes to run a workload.
 
 For spiky or unpredictable workloads, this often offsets the markup entirely.
 
 ### **3. Reduced Risk and Downtime**
+
 - **Managed upgrades** — Node fleets are always kept compatible with the control plane.
 - **Zero-downtime replacements** — AWS handles cordoning, draining, and re-scheduling pods.
 - **Built-in fault tolerance** — Automatic AZ balancing and replacement.
@@ -627,6 +744,7 @@ For spiky or unpredictable workloads, this often offsets the markup entirely.
 These guardrails reduce the risk of human error and outages.
 
 ### **4. Strategic Focus**
+
 - **Developer focus** — Teams spend more time on application reliability and performance tuning.
 - **Faster delivery** — No delays from infra maintenance or capacity planning.
 - **No deep infra expertise required** — Avoids the need for Karpenter/EC2/AMI operational knowledge.
@@ -634,6 +752,7 @@ These guardrails reduce the risk of human error and outages.
 The real return on investment often comes from time gains and the reliability of the system.
 
 ### **When the Markup Makes the Most Sense**
+
 - **Small/medium teams** without dedicated infra staff.
 - **Highly variable workloads** (batch jobs, CI/CD runners, ML training).
 - **Security/compliance-critical environments** where timely patching is non-negotiable.
@@ -644,6 +763,7 @@ The real return on investment often comes from time gains and the reliability of
 ### **Cost Optimization Strategies**
 
 #### **Production Environment Optimization**
+
 - **Compute Savings Plans**: Commit to 1-3 year terms for 72% savings
 - **Graviton Instances**: ARM-based instances with 20% cost reduction
 - **Spot Instances**: Offers substantial discount versus on-demand instances
@@ -651,6 +771,7 @@ The real return on investment often comes from time gains and the reliability of
 ## Monthly Cost Breakdown by Organization Size
 
 ### **Small Clinic (average 10s of users concurrently) (hundreds of patients served)**
+
 | Component | Configuration | Monthly Cost | Auto Mode Fee |
 |-----------|--------------|--------------|---------------|
 | EKS Control Plane | 1 cluster | $73          | N/A |
@@ -662,7 +783,8 @@ The real return on investment often comes from time gains and the reliability of
 | WAFv2 | 5 rules + 1 ACL | $10          | N/A |
 | **Total** | | **$385**     | |
 
-### ** Mid-Size Hospital (average 100s of users concurrently) (thousands of patients served)**
+### **Mid-Size Hospital (average 100s of users concurrently) (thousands of patients served)**
+
 | Component | Configuration | Monthly Cost | Auto Mode Fee |
 |-----------|--------------|--------------|---------------|
 | EKS Control Plane | 1 cluster | $73          | N/A |
@@ -675,6 +797,7 @@ The real return on investment often comes from time gains and the reliability of
 | **Total** | | **$816**     | |
 
 ### **Large Hospital (average 1000s of users concurrently) (millions of patients served)**
+
 | Component | Configuration | Monthly Cost | Auto Mode Fee |
 |-----------|--------------|--------------|---------------|
 | EKS Control Plane | 1 cluster | $73          | N/A |
@@ -687,27 +810,29 @@ The real return on investment often comes from time gains and the reliability of
 | **Total** | | **$2636**   | |
 
 ### Pricing Documentation
+
 - Compute Pricing
-    - [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
-    - [Amazon EC2 Spot Pricing](https://aws.amazon.com/ec2/spot/pricing/)
+  - [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
+  - [Amazon EC2 Spot Pricing](https://aws.amazon.com/ec2/spot/pricing/)
 - Compute Orchestration Pricing
-    - [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/)
+  - [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/)
 - Database Pricing
-    - [Amazon Aurora Pricing (see section on Aurora Serverless v2 MySQL compatible pricing specifically)](https://aws.amazon.com/rds/aurora/pricing/)
+  - [Amazon Aurora Pricing (see section on Aurora Serverless v2 MySQL compatible pricing specifically)](https://aws.amazon.com/rds/aurora/pricing/)
 - Web-Caching Pricing
-    - [Amazon Elasticache Pricing (see section on Valkey Serverless pricing specifically)](https://aws.amazon.com/elasticache/pricing/)
+  - [Amazon Elasticache Pricing (see section on Valkey Serverless pricing specifically)](https://aws.amazon.com/elasticache/pricing/)
 - Data Storage Pricing
-    - [Amazon EFS Pricing](https://aws.amazon.com/efs/pricing/)
+  - [Amazon EFS Pricing](https://aws.amazon.com/efs/pricing/)
 - Network Infrastructure Pricing
-    - [Amazon VPC/NAT Gateway Pricing](https://aws.amazon.com/vpc/pricing/)
+  - [Amazon VPC/NAT Gateway Pricing](https://aws.amazon.com/vpc/pricing/)
 - Web Application Security Pricing
-    - [AWS WAF Pricing](https://aws.amazon.com/waf/pricing/)
-    
+  - [AWS WAF Pricing](https://aws.amazon.com/waf/pricing/)
+
 ### **🔒 WAFv2 Pricing Breakdown**
 
 WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will also pay $0.60 per 1 million requests):
 
 #### **Monthly WAF Static Cost Calculation**
+
 ```bash
 # Note for detailed WAF pricing see here: https://aws.amazon.com/waf/pricing/
 # Note you will also pay $0.60 per 1 million requests
@@ -717,6 +842,7 @@ WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will al
 ```
 
 #### **WAF Cost Optimization**
+
 - **Rule Efficiency**: Minimize the number of rules while maintaining security
 - **Rule Consolidation**: Combine similar rules to reduce rule count
 - **AWS Managed Rules**: Use AWS Managed Rules when possible for cost-effectiveness
@@ -731,6 +857,7 @@ WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will al
 3. **Access the cluster only through the jumpbox** for all management tasks
 
 #### **Jumpbox Setup Benefits**
+
 - **Zero external attack surface** - EKS API server not accessible from internet
 - **Centralized access control** - All cluster access goes through one secure point
 - **Audit trail** - All administrative actions logged through jumpbox
@@ -738,6 +865,7 @@ WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will al
 - **Cost effective** - Minimal resources needed (1 vCPU, 1GB RAM) for kubectl access
 
 #### **Recommended Jumpbox Configuration**
+
 ```bash
 # Create jumpbox in private subnet with EKS cluster access
 # - Minimum requirements: 1 vCPU, 1GB RAM (sufficient for kubectl/helm operations)
@@ -748,6 +876,7 @@ WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will al
 ```
 
 #### **Access Pattern for Production**
+
 ```bash
 # 1. SSH to jumpbox (only entry point)
 ssh -i your-key.pem ec2-user@jumpbox-private-ip
@@ -763,7 +892,9 @@ terraform plan  # If Terraform state accessible from jumpbox
 Since the jumpbox is in a private subnet (no direct internet access), you need secure methods to reach it:
 
 ##### **Option 1: AWS Systems Manager Session Manager (Recommended)**
+
 **Most secure - no SSH keys, no open ports, full audit logging**
+
 ```bash
 # Prerequisites: Jumpbox needs SSM agent and IAM role with SSM permissions
 
@@ -776,6 +907,7 @@ helm list -A
 ```
 
 **Benefits:**
+
 - ✅ No SSH keys to manage or rotate
 - ✅ No inbound ports open on jumpbox
 - ✅ Full session logging to CloudWatch
@@ -783,7 +915,9 @@ helm list -A
 - ✅ Works from anywhere with AWS CLI access
 
 ##### **Option 2: AWS Client VPN (Hospital/Remote Access)**
+
 **For teams needing persistent VPN access**
+
 ```bash
 # Set up AWS Client VPN endpoint in same VPC
 # Download VPN client configuration
@@ -794,13 +928,16 @@ ssh -i your-key.pem ec2-user@jumpbox-private-ip
 ```
 
 **Benefits:**
+
 - ✅ Secure tunnel into private network
 - ✅ Multiple users can access simultaneously
 - ✅ Works with hospital VPN policies
 - ✅ Can access multiple private resources
 
 ##### **Option 3: Site-to-Site VPN (Hospital Network Integration)**
+
 **For permanent hospital network connection**
+
 ```bash
 # AWS Site-to-Site VPN connects hospital network to AWS VPC
 # Hospital staff access jumpbox as if it's on local network
@@ -808,13 +945,16 @@ ssh -i your-key.pem ec2-user@jumpbox-private-ip
 ```
 
 **Benefits:**
+
 - ✅ Seamless integration with hospital network
 - ✅ No additional client software needed
 - ✅ Consistent with existing IT policies
 - ✅ High bandwidth for large operations
 
 ##### **Option 4: Public Bastion + Private Jumpbox (Layered Security)**
+
 **Two-hop architecture for maximum security**
+
 ```bash
 # Public bastion (minimal, hardened) -> Private jumpbox -> EKS cluster
 ssh -i bastion-key.pem ec2-user@bastion-public-ip
@@ -823,6 +963,7 @@ ssh -i jumpbox-key.pem ec2-user@jumpbox-private-ip
 ```
 
 **Benefits:**
+
 - ✅ Defense in depth
 - ✅ Public bastion can be heavily monitored
 - ✅ Private jumpbox completely isolated
@@ -876,6 +1017,7 @@ aws cloudwatch put-metric-alarm \
 ```
 
 #### **Security Implementation**
+
 ```bash
 # Step 1: After initial deployment, permanently disable public access
 aws eks update-cluster-config \
@@ -890,6 +1032,7 @@ aws eks update-cluster-config \
 ```
 
 ### **⚠️ Important Notes**
+
 - **Cluster updates take 2-3 minutes** to apply
 - **Applications continue running** when public access is disabled
 - **Internal communication unaffected** - only external kubectl/API access is blocked
@@ -903,140 +1046,183 @@ The `scripts/` directory contains essential operational tools for managing your 
 ### **Application Management Scripts**
 
 #### **`check-openemr-versions.sh`** - OpenEMR Version Discovery
+
 ```bash
 cd scripts && ./check-openemr-versions.sh [--latest|--count N|--search PATTERN]
 ```
-**Purpose:** Discover available OpenEMR Docker image versions from Docker Hub  
-**Features:** Latest version check, version search, current deployment version display, OpenEMR versioning pattern awareness  
-**When to use:** Before version upgrades, checking for new releases, version planning  
+
+**Purpose:** Discover available OpenEMR Docker image versions from Docker Hub
+**Features:** Latest version check, version search, current deployment version display, OpenEMR versioning pattern awareness
+**When to use:** Before version upgrades, checking for new releases, version planning
 
 #### **`openemr-feature-manager.sh`** - OpenEMR Feature Configuration
+
 ```bash
 cd scripts && ./openemr-feature-manager.sh {enable|disable|status} {api|portal|all}
 ```
-**Purpose:** Manage OpenEMR API and Patient Portal features with database-level enforcement  
-**Features:** Runtime feature toggling, database configuration, network policy updates, security validation  
-**When to use:** Enabling/disabling features post-deployment, security hardening, compliance requirements  
+
+**Purpose:** Manage OpenEMR API and Patient Portal features with database-level enforcement
+**Features:** Runtime feature toggling, database configuration, network policy updates, security validation
+**When to use:** Enabling/disabling features post-deployment, security hardening, compliance requirements
 
 ### **Validation & Troubleshooting Scripts**
 
 #### **`validate-deployment.sh`** - Pre-deployment Validation
+
 ```bash
 cd scripts && ./validate-deployment.sh
 ```
-**Purpose:** Comprehensive health check for the entire OpenEMR deployment  
-**Checks:** Cluster connectivity, infrastructure status, application health, SSL certificates  
-**When to use:** Before deployments, during troubleshooting, routine health checks  
+
+**Purpose:** Comprehensive health check for the entire OpenEMR deployment
+**Checks:** Cluster connectivity, infrastructure status, application health, SSL certificates
+**When to use:** Before deployments, during troubleshooting, routine health checks
 
 #### **`validate-efs-csi.sh`** - EFS CSI Driver Validation
+
 ```bash
 cd scripts && ./validate-efs-csi.sh
 ```
-**Purpose:** Specialized validation for EFS CSI driver and storage issues  
-**Checks:** EFS CSI controller status, IAM permissions, PVC provisioning, storage accessibility  
-**When to use:** When pods are stuck in Pending, storage issues, after infrastructure changes  
+
+**Purpose:** Specialized validation for EFS CSI driver and storage issues
+**Checks:** EFS CSI controller status, IAM permissions, PVC provisioning, storage accessibility
+**When to use:** When pods are stuck in Pending, storage issues, after infrastructure changes
 
 ### **Deployment Management Scripts**
 
 #### **`clean-deployment.sh`** - Safe Deployment Cleanup
+
 ```bash
-cd scripts && ./clean-deployment.sh
+cd scripts && ./clean-deployment.sh [OPTIONS]
 ```
-**Purpose:** Clean OpenEMR deployment while preserving infrastructure  
-**Actions:** Removes namespace, cleans PVCs/PVs, restarts EFS CSI controller, cleans backup files  
-**When to use:** Before fresh deployments, when deployment is corrupted, testing scenarios  
+
+**Purpose:** Clean OpenEMR deployment while preserving infrastructure
+**Actions:** Removes namespace, cleans PVCs/PVs, restarts EFS CSI controller, cleans backup files
+**When to use:** Before fresh deployments, when deployment is corrupted, testing scenarios
 **Safety:** Preserves EKS cluster, RDS database, and all infrastructure - only removes application layer
 
+**Options:**
+
+- `--force` or `-f`: Skip confirmation prompts (great for automated testing)
+- `--help` or `-h`: Show usage information
+
+**Examples:**
+
+```bash
+./clean-deployment.sh              # Interactive cleanup with prompts
+./clean-deployment.sh --force      # Force cleanup without prompts
+./clean-deployment.sh -f           # Force cleanup without prompts (short form)
+```
+
 #### **`restore-defaults.sh`** - Restore Files to Default Template State
+
 ```bash
 cd scripts && ./restore-defaults.sh [--backup] [--force]
 ```
-**Purpose:** Restore all deployment files to their default template state for clean git tracking  
-**Actions:** Resets YAML files to templates, removes .bak files, cleans generated files, preserves configuration  
-**When to use:** Before git commits, after deployments, when preparing for configuration changes, team collaboration  
-**Safety:** Preserves terraform.tfvars, infrastructure state, and all documentation  
-**Requirements:** Git repository (uses git checkout to restore original files)  
-**⚠️ Developer Warning:** Will erase structural changes to YAML files - only use for cleaning deployment artifacts  
+
+**Purpose:** Restore all deployment files to their default template state for clean git tracking
+**Actions:** Resets YAML files to templates, removes .bak files, cleans generated files, preserves configuration
+**When to use:** Before git commits, after deployments, when preparing for configuration changes, team collaboration
+**Safety:** Preserves terraform.tfvars, infrastructure state, and all documentation
+**Requirements:** Git repository (uses git checkout to restore original files)
+**⚠️ Developer Warning:** Will erase structural changes to YAML files - only use for cleaning deployment artifacts
 
 ### **Security Management Scripts**
 
 #### **`cluster-security-manager.sh`** - Cluster Access Control
+
 ```bash
 cd scripts && ./cluster-security-manager.sh {enable|disable|status|auto-disable|check-ip}
 ```
-**Purpose:** Manage EKS cluster public access for security  
-**Features:** IP-based access control, auto-disable scheduling, security status monitoring  
-**When to use:** Before cluster management, security hardening, IP address changes  
+
+**Purpose:** Manage EKS cluster public access for security
+**Features:** IP-based access control, auto-disable scheduling, security status monitoring
+**When to use:** Before cluster management, security hardening, IP address changes
 
 ### **SSL Certificate Management Scripts**
 
 #### **`ssl-cert-manager.sh`** - AWS Certificate Manager Integration
+
 ```bash
 cd scripts && ./ssl-cert-manager.sh {request|validate|deploy|status|cleanup}
 ```
-**Purpose:** Manage SSL certificates with automatic DNS validation  
-**Features:** ACM certificate requests, DNS validation, deployment automation  
-**When to use:** Setting up production SSL, certificate renewals, domain changes  
+
+**Purpose:** Manage SSL certificates with automatic DNS validation
+**Features:** ACM certificate requests, DNS validation, deployment automation
+**When to use:** Setting up production SSL, certificate renewals, domain changes
 
 #### **`ssl-renewal-manager.sh`** - Self-signed Certificate Automation
+
 ```bash
 cd scripts && ./ssl-renewal-manager.sh {deploy|status|run-now|logs|cleanup}
 ```
-**Purpose:** Automate self-signed certificate renewal for development environments  
-**Features:** Kubernetes CronJob management, certificate rotation, renewal monitoring  
-**When to use:** Development environments, testing, when ACM certificates aren't needed  
+
+**Purpose:** Automate self-signed certificate renewal for development environments
+**Features:** Kubernetes CronJob management, certificate rotation, renewal monitoring
+**When to use:** Development environments, testing, when ACM certificates aren't needed
 
 ### **Backup & Recovery Scripts**
 
 #### **`backup.sh`** - Cross-Region Backup Procedures
+
 ```bash
 cd scripts && ./backup.sh
 ```
-**Purpose:** Create comprehensive cross-region backups of all OpenEMR components  
-**Features:** Aurora snapshots, EFS backups, K8s configs, application data, rich metadata  
-**Cross-Region:** Automatic backup to different AWS regions for disaster recovery  
-**When to use:** Before major changes, routine backup schedules, disaster recovery preparation  
+
+**Purpose:** Create comprehensive cross-region backups of all OpenEMR components
+**Features:** Aurora snapshots, EFS backups, K8s configs, application data, rich metadata
+**Cross-Region:** Automatic backup to different AWS regions for disaster recovery
+**When to use:** Before major changes, routine backup schedules, disaster recovery preparation
 
 **🆕 Smart Polling & Timeout Management**
+
 - **Intelligent Waiting**: Automatically waits for RDS clusters and snapshots to be available
 - **Configurable Timeouts**: Set custom timeouts via environment variables for different environments
 - **Real-Time Updates**: Status updates every 30 seconds with remaining time estimates
 - **Production Ready**: Handles large databases and busy clusters with appropriate waiting periods
 
 **Environment Variables:**
+
 ```bash
 export CLUSTER_AVAILABILITY_TIMEOUT=1800    # 30 min default
-export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default  
+export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
 export POLLING_INTERVAL=30                 # 30 sec default
-```  
+```
 
-#### **`restore.sh`** - Cross-Region Disaster Recovery
+#### **`restore.sh`** - Simple, Reliable Disaster Recovery
+
 ```bash
 cd scripts && ./restore.sh <backup-bucket> <snapshot-id> [backup-region]
 ```
-**Purpose:** Restore OpenEMR from cross-region backups during disaster recovery  
-**Features:** Full infrastructure restoration, cross-region snapshot handling, automated verification  
-**Cross-Region:** Restore from any AWS region where backup is stored  
-**When to use:** Disaster recovery, data corruption recovery, environment migration, testing  
 
-**🆕 Smart Polling & Timeout Management**
-- **Intelligent Waiting**: Automatically waits for RDS clusters and snapshots to be available during restore
-- **Configurable Timeouts**: Same environment variables as backup script for consistency
-- **Real-Time Updates**: Status updates every 30 seconds with remaining time estimates
-- **Production Ready**: Handles large database restoration with appropriate waiting periods
+**Purpose:** Simple, reliable restore from cross-region backups during disaster recovery
+**Features:**
+- **One-command restore** with auto-detection
+- **Cross-region snapshot handling** with automatic copying
+- **Auto-reconfiguration** of database and Redis connections
+- **Manual fallback instructions** if automated process fails
+
+**🆕 Key Improvements**
+
+- **Simplified Usage**: Only requires backup bucket and snapshot ID
+- **Auto-Detection**: Automatically detects EKS cluster from Terraform
+- **Faster Execution**: Uses existing OpenEMR pods (no temporary resources)
+- **Smart Reconfiguration**: Automatically updates database and Redis settings
+- **Manual Fallback**: Built-in step-by-step manual restore instructions
+
+**When to use:** Disaster recovery, data corruption recovery, environment migration, testing
 
 **Environment Variables:**
+
 ```bash
 export CLUSTER_AVAILABILITY_TIMEOUT=1800    # 30 min default
-export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default  
+export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
 export POLLING_INTERVAL=30                 # 30 sec default
-```  
-
-  
+```
 
 ### **Script Usage Patterns**
 
 #### **Daily Operations**
+
 ```bash
 # Health check
 ./validate-deployment.sh
@@ -1046,6 +1232,7 @@ export POLLING_INTERVAL=30                 # 30 sec default
 ```
 
 #### **Troubleshooting Workflow**
+
 ```bash
 # 1. General validation
 ./validate-deployment.sh
@@ -1059,26 +1246,31 @@ export POLLING_INTERVAL=30                 # 30 sec default
 The infrastructure is organized into **modular Terraform files** for better maintainability:
 
 ### **Core Configuration**
+
 - **`main.tf`** - Terraform providers, required versions, and data sources
 - **`variables.tf`** - All input variables with descriptions and defaults
 - **`outputs.tf`** - Resource outputs for integration with Kubernetes
 
 ### **Networking & Security**
+
 - **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
 - **`kms.tf`** - 6 dedicated KMS keys for granular encryption
 - **`iam.tf`** - Service account roles with Auto Mode trust policies
 - **`waf.tf`** - Configures WAFv2 for our ingress to our application
 
 ### **Compute & Storage**
+
 - **`eks.tf`** - EKS cluster with Auto Mode configuration
 - **`efs.tf`** - EFS file system with elastic performance mode
 - **`s3.tf`** - S3 buckets for ALB logs with lifecycle policies
 
 ### **Data Services**
+
 - **`rds.tf`** - Aurora Serverless V2 MySQL with encryption
 - **`elasticache.tf`** - Valkey Serverless cache
 
 ### **Observability & Compliance**
+
 - **`cloudwatch.tf`** - Log groups with retention settings
 - **`cloudtrail.tf`** - CloudTrail logging with encrypted S3 storage
 
@@ -1087,20 +1279,27 @@ The infrastructure is organized into **modular Terraform files** for better main
 The Kubernetes manifests are organized for clear separation of concerns:
 
 ### **Application Deployment**
-- **`deployment.yaml`** - OpenEMR application with Auto Mode optimization
+
+- **`setup-job.yaml`** - Initial OpenEMR configuration job for resilient deployment and setup recovery
+- **`deployment.yaml`** - OpenEMR application with Auto Mode optimization (version: `${OPENEMR_VERSION}`)
 - **`service.yaml`** - Defines OpenEMR service and the load balancer configuration (including optional AWS Certificate Manager and AWS WAF v2 integrations)
 - **`secrets.yaml`** - Database credentials and Redis authentication
 
+> **📝 Version Management**: OpenEMR version is always specified as `${OPENEMR_VERSION}` in manifests and substituted during deployment from Terraform configuration.
+
 ### **Storage & Persistence**
+
 - **`storage.yaml`** - EFS storage classes and PVCs
 - **`namespace.yaml`** - Namespace with Pod Security Standards
 
 ### **Security & Access Control**
+
 - **`security.yaml`** - RBAC, service accounts, Pod Disruption Budget
 - **`ingress.yaml`** - Ingress controller configuration
 - **`network-policies.yaml`** - Networking policies for our deployment
 
 ### **Observability & Operations**
+
 - **`logging.yaml`** - Fluent Bit sidecar configuration for log collection
 - **`hpa.yaml`** - Horizontal Pod Autoscaler configuration
 - **`ssl-renewal.yaml`** - Automated SSL certificate renewal
@@ -1108,6 +1307,7 @@ The Kubernetes manifests are organized for clear separation of concerns:
 ### **🔧 Working with Kubernetes Manifests**
 
 #### **🎯 Targeted Deployments**
+
 ```bash
 # Deploy specific components
 kubectl apply -f namespace.yaml                    # Namespaces only
@@ -1118,6 +1318,7 @@ kubectl apply -f deployment.yaml                   # Application only
 ```
 
 #### **📊 Resource Management**
+
 ```bash
 # Check resource status by type
 kubectl get all -n openemr                         # All resources
@@ -1126,6 +1327,7 @@ kubectl get secrets -n openemr                     # Secret resources
 ```
 
 #### **🔍 Debugging & Troubleshooting**
+
 ```bash
 # Application debugging
 kubectl describe deployment openemr -n openemr     # Deployment status
@@ -1149,6 +1351,17 @@ kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn  # WAF association
 terraform output waf_enabled                              # WAF deployment status
 terraform output waf_web_acl_arn                          # WAF ACL ARN
 ```
+
+### **🔄 Resilient Deployment Architecture**
+
+The deployment system includes **automatic OpenEMR initialization** that provides resilience and recovery capabilities:
+
+- **Automatic Setup**: OpenEMR containers handle their own initialization automatically
+- **State Persistence**: Application state is preserved across container restarts
+- **Fault Tolerance**: Built-in retry mechanisms for database and service connections
+- **Health Monitoring**: Comprehensive health checks and readiness probes
+- **Automatic Recovery**: Failed containers are automatically restarted
+- **Resource Management**: Efficient resource allocation and autoscaling
 
 ### **🚀 Deployment Workflow**
 
@@ -1223,7 +1436,7 @@ The backup and restore scripts include **intelligent polling** to handle AWS res
 # RDS Cluster Availability Timeout (default: 30 minutes)
 export CLUSTER_AVAILABILITY_TIMEOUT=1800
 
-# RDS Snapshot Availability Timeout (default: 30 minutes)  
+# RDS Snapshot Availability Timeout (default: 30 minutes)
 export SNAPSHOT_AVAILABILITY_TIMEOUT=1800
 
 # Polling Interval in Seconds (default: 30 seconds)
@@ -1261,6 +1474,87 @@ export POLLING_INTERVAL=60                 # 1 minute updates for production
 BACKUP_REGION=us-east-1 ./scripts/backup.sh
 ```
 
+### **🔄 Simplified Restore Functionality**
+
+The restore script has been significantly simplified and made more reliable:
+
+#### 🎯 Key Improvements
+
+- **One-command restore** - Only requires backup bucket and snapshot ID
+- **Auto-detection** - Automatically detects EKS cluster from Terraform output
+- **Faster execution** - Uses existing OpenEMR pods instead of creating temporary ones
+- **Auto-reconfiguration** - Automatically updates database and Redis connections
+- **Manual fallback** - Built-in step-by-step manual restore instructions
+
+#### 🧩 Modular Restore Options
+
+- **Database Restore**: Restore Aurora RDS from snapshots with cross-region support
+- **Application Data Restore**: Download and extract app data from S3 to EFS
+- **Auto-Reconfiguration**: Automatically update database and Redis connections
+- **Manual Instructions**: Get step-by-step manual restore guide if needed
+
+#### Usage Examples
+
+```bash
+# Basic restore (most common)
+./restore.sh my-backup-bucket my-snapshot-id
+
+# Cross-region restore
+./restore.sh my-backup-bucket my-snapshot-id us-east-1
+
+# Automated restore (skip confirmations)
+./restore.sh my-backup-bucket my-snapshot-id --force
+
+# Selective restore
+RESTORE_APP_DATA=false ./restore.sh my-backup-bucket my-snapshot-id
+
+# Get manual instructions
+./restore.sh --manual-instructions
+```
+
+### **🧪 End-to-End Testing**
+
+The project includes a comprehensive **automated end-to-end backup/restore test script** that validates the entire process:
+
+#### **Complete Test Coverage**
+
+```bash
+# Run the full end-to-end test
+./scripts/test-end-to-end-backup-restore.sh
+
+# Custom test configuration
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test \
+  --aws-region us-west-2
+```
+
+#### **What the Test Validates**
+
+1. **Infrastructure Deployment** - Complete EKS cluster creation
+2. **OpenEMR Installation** - Full application deployment
+3. **Test Data Creation** - Timestamped proof files for verification
+4. **Backup Creation** - Complete backup of the installation
+5. **Infrastructure Destruction** - Complete resource cleanup
+6. **Infrastructure Recreation** - Rebuild from scratch
+7. **Backup Restoration** - Restore from backup
+8. **Verification** - Confirm data integrity and connectivity
+9. **Final Cleanup** - Remove all test resources
+
+#### **Test Benefits**
+
+- **Pre-production Validation** - Verify backup/restore before going live
+- **Disaster Recovery Testing** - Test complete recovery procedures
+- **Infrastructure Validation** - Ensure Terraform configurations work
+- **Compliance Testing** - Demonstrate capabilities for audits
+- **Automated Verification** - No manual intervention required
+
+#### **⚠️ Test Considerations**
+
+- **Resources**: AWS resources will be created and destroyed during testing
+- **Duration**: 2-4 hours depending on infrastructure size
+- **Resources**: Creates and destroys real AWS resources
+- **Requirements**: Proper AWS credentials and permissions
+
 ### **📚 Documentation**
 
 - **[Complete Backup/Restore Guide](docs/BACKUP_RESTORE_GUIDE.md)** - Comprehensive documentation
@@ -1268,11 +1562,13 @@ BACKUP_REGION=us-east-1 ./scripts/backup.sh
 ## 📊 Monitoring & Observability
 
 ### **Core Monitoring (Included)**
+
 - **CloudWatch Logs**: Application, error, and audit logs
 - **CloudWatch Metrics**: Infrastructure and application metrics
 - **Fluent Bit**: Log collection and forwarding
 
 ### **Enhanced Monitoring Stack (Optional)**
+
 ```bash
 cd monitoring
 ./install-monitoring.sh
@@ -1302,6 +1598,7 @@ The monitoring installation script now **automatically backs up existing credent
 ```
 
 **Benefits:**
+
 - **No credential loss**: Existing passwords and settings are preserved
 - **Timestamped backups**: Easy to identify when credentials were changed
 - **Safe reinstallation**: Can reinstall monitoring without losing access
@@ -1310,6 +1607,7 @@ The monitoring installation script now **automatically backs up existing credent
 ## 🔄 **Common Workflows**
 
 ### **Development Workflow**
+
 ```bash
 # 1. Make configuration changes
 vim terraform/terraform.tfvars
@@ -1330,6 +1628,7 @@ git add . && git commit -m "Update configuration"
 **⚠️ Important:** The `restore-defaults.sh` script will erase any structural changes you've made to YAML files. Only use it when you're changing configuration values, not when you're actively developing or modifying the file structure itself.
 
 ### **Team Collaboration Workflow**
+
 ```bash
 # Before sharing code (unless you're trying to make structural changes to to the YAML Kubernetes manifests for development purposes)
 cd scripts && ./restore-defaults.sh --force
@@ -1340,6 +1639,7 @@ cd k8s && ./deploy.sh  # Deploy with your terraform.tfvars
 ```
 
 ### **Troubleshooting Workflow**
+
 ```bash
 # 1. Validate deployment
 cd scripts && ./validate-deployment.sh
@@ -1355,6 +1655,7 @@ cd ../scripts && ./restore-defaults.sh
 ### **⚠️ Developer Warnings**
 
 #### **restore-defaults.sh Usage Warning**
+
 The `restore-defaults.sh` script uses `git checkout HEAD --` to restore files to their original repository state. This means:
 
 - ✅ **Safe for configuration changes**: When you only modify values in terraform.tfvars
@@ -1363,6 +1664,7 @@ The `restore-defaults.sh` script uses `git checkout HEAD --` to restore files to
 - ❌ **DANGEROUS during development**: Will lose custom changes to deployment templates
 
 **Use Cases:**
+
 - ✅ After deployments to clean up for git commits
 - ✅ When switching between different configurations
 - ✅ Before sharing code with team members
@@ -1374,6 +1676,7 @@ The `restore-defaults.sh` script uses `git checkout HEAD --` to restore files to
 ### **Common Issues**
 
 #### **Cannot Access Cluster**
+
 ```bash
 # Your IP has likely changed
 cd scripts
@@ -1382,6 +1685,7 @@ cd scripts
 ```
 
 #### **Pods Not Starting**
+
 ```bash
 # Check pod status
 kubectl describe pod <pod-name> -n openemr
@@ -1392,6 +1696,7 @@ cd scripts
 ```
 
 #### **Auto Mode Specific Issues**
+
 ```bash
 # Check Auto Mode status
 aws eks describe-cluster --name openemr-eks \
@@ -1404,6 +1709,28 @@ kubectl get nodeclaim
 kubectl get events -n openemr --sort-by='.lastTimestamp'
 ```
 
+#### **Pre-commit Hook Issues**
+
+```bash
+# If ShellCheck fails with Docker errors, ensure Docker is running
+docker --version
+docker ps
+
+# If pre-commit is not found, use the full path (example below from MacOS)
+/Library/Frameworks/Python.framework/Versions/<python_version>/bin/python3 -m pre_commit run --all-files
+
+# Alternative: Skip ShellCheck if Docker is not available
+pre-commit run --all-files --hook shellcheck --verbose
+
+# If yamllint is too strict, check the .yamllint configuration
+cat .yamllint
+# Modify .yamllint to disable specific rules if needed
+
+# If markdownlint is too strict, check the .markdownlint.json configuration
+cat .markdownlint.json
+# Modify .markdownlint.json to disable specific rules if needed
+```
+
 ## Disaster Recovery Procedures
 
 ### **🚀 New Comprehensive Backup & Restore System**
@@ -1411,6 +1738,7 @@ kubectl get events -n openemr --sort-by='.lastTimestamp'
 Our enhanced backup and restore system provides **simple, reliable, and comprehensive** data protection:
 
 #### **Quick Backup**
+
 ```bash
 # Create cross-region backup (recommended)
 ./scripts/backup.sh --backup-region us-east-1
@@ -1420,15 +1748,17 @@ Our enhanced backup and restore system provides **simple, reliable, and comprehe
 ```
 
 #### **Quick Restore**
+
 ```bash
-# Restore from backup (with confirmation prompt)
+# Simple restore (auto-detects cluster and restores everything)
+./scripts/restore.sh <backup-bucket> <snapshot-id>
+
+# Cross-region restore
 ./scripts/restore.sh <backup-bucket> <snapshot-id> <backup-region>
 
 # Example
 ./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
 ```
-
-
 
 ### **What Gets Protected**
 
@@ -1441,12 +1771,14 @@ Our enhanced backup and restore system provides **simple, reliable, and comprehe
 ### **Disaster Recovery Process**
 
 1. **Create Regular Backups**
+
    ```bash
    # Daily automated backup (add to cron)
    0 2 * * * /path/to/scripts/backup.sh --backup-region us-east-1
    ```
 
 2. **In Case of Disaster**
+
    ```bash
    # Restore to disaster recovery region
    AWS_REGION=us-east-1 ./scripts/restore.sh \
@@ -1465,11 +1797,13 @@ Our enhanced backup and restore system provides **simple, reliable, and comprehe
 The project includes a manual release system that manages versions and creates GitHub releases:
 
 #### **📅 Release Schedule**
+
 - **Manual releases only**: Triggered when you want them
 - **Full user tracking**: Records who triggered each release
 - **Complete audit trail**: All release metadata includes trigger source
 
 #### **🔧 Key Features**
+
 - **Semantic versioning**: Automatic version calculation and file updates
 - **Change detection**: Only releases when there are actual changes
 - **User accountability**: Every release shows who triggered it
@@ -1478,6 +1812,7 @@ The project includes a manual release system that manages versions and creates G
 - **Dry run mode**: Test releases without creating them
 
 #### **🚀 Quick Start**
+
 ```bash
 # Create release via GitHub Actions
 # Go to Actions > Manual Releases > Run workflow
@@ -1490,19 +1825,123 @@ The project includes a manual release system that manages versions and creates G
 
 For complete release system documentation, see [Manual Releases Guide](docs/MANUAL_RELEASES.md).
 
+## 🧪 Testing Framework
+
+Our comprehensive testing strategy ensures code quality and reliability without requiring external infrastructure access.
+
+### **Test Suites**
+
+- **🔍 Code Quality Tests** - Syntax validation, best practices, and code standards
+- **☸️ Kubernetes Manifest Tests** - K8s syntax validation and security checks
+- **📜 Script Validation Tests** - Shell script syntax and logic validation
+- **📚 Documentation Tests** - Markdown validation and link checking
+
+### **Running Tests Locally**
+
+```bash
+# Run all tests
+cd scripts
+./run-test-suite.sh
+
+# Run specific test suite
+./run-test-suite.sh -s code_quality
+./run-test-suite.sh -s kubernetes_manifests
+./run-test-suite.sh -s script_validation
+./run-test-suite.sh -s documentation
+```
+
+### **Pre-commit Hooks**
+
+Automated quality checks run before each commit:
+
+```bash
+# Install pre-commit hooks
+pip install pre-commit
+pre-commit install
+pre-commit install --hook-type commit-msg
+
+# Note: Docker is required for ShellCheck pre-commit hooks
+# Make sure Docker is running before running pre-commit
+```
+
+**Available Hooks:**
+
+- Code formatting (Black, isort, flake8)
+- Security scanning (Bandit, Checkov)
+- Validation (YAML with relaxed rules via `.yamllint`, JSON, Terraform, Kubernetes)
+- Documentation (Markdown linting with relaxed rules via `.markdownlint.json`)
+- Shell scripts (ShellCheck)
+
+### **Test Results**
+
+- **Local Reports** - Stored in `test-results/` directory
+- **CI/CD Integration** - Automatic testing on all pull requests
+- **Security Scanning** - Vulnerability detection with Trivy
+- **Quality Metrics** - Code coverage and best practice compliance
+
+📖 **Detailed Testing Guide**: [Testing Guide](docs/TESTING_GUIDE.md)
+
+## 🔄 CI/CD Pipeline
+
+Automated testing and quality assurance through GitHub Actions.
+
+### **Automated Workflows**
+
+- **🧪 Test Matrix** - Parallel execution of all test suites
+- **🔍 Lint & Validate** - Code quality and syntax validation
+- **🛡️ Security Scan** - Vulnerability detection and reporting
+- **📊 Quality Check** - Common issue detection and prevention
+- **📋 Summary Report** - Comprehensive test results and status
+
+### **Trigger Conditions**
+
+- **Push** to `main` or `develop` branches
+- **Pull Requests** to `main` or `develop` branches
+- **Manual Trigger** via workflow dispatch
+
+### **Quality Gates**
+
+- All tests must pass before merging
+- Security vulnerabilities are automatically detected
+- Code quality standards are enforced
+- Documentation is validated for completeness
+
+### **Artifacts & Reporting**
+
+- **Test Results** - Stored for 7 days with detailed reports
+- **Security Reports** - Available in GitHub Security tab
+- **Pull Request Comments** - Automatic status updates and summaries
+- **Failure Notifications** - Immediate feedback on test failures
+
 ## 📚 Additional Resources
 
-### **Documentation**
+### **Comprehensive Documentation**
+
+Each directory now includes detailed README.md files with maintenance guidance for developers and maintainers:
+
+#### **🏗️ Infrastructure Documentation**
+
+- **[Terraform Directory](terraform/README.md)** - Complete infrastructure documentation with dependency graphs
+- **[Kubernetes Directory](k8s/README.md)** - Kubernetes manifests documentation with deployment workflows
+- **[Scripts Directory](scripts/README.md)** - Operational scripts documentation and maintenance guide
+- **[GitHub Directory](.github/workflows/README.md)** - CI/CD workflows and automation documentation
+- **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
+
+#### **📖 User Documentation**
+
+- **[Documentation Index](docs/README.md)** - Complete documentation index and maintenance guide
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
 - [Autoscaling Guide](docs/AUTOSCALING_GUIDE.md)
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md)
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md)
-- [Logging Guide](docs/LOGGING_GUIDE.md)
+- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.3.4 Enhanced Logging
+- [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
+- [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
 - [Monitoring Setup](monitoring/README.md)
 
-
 ### **Support**
+
 - [OpenEMR Community Forums Support Section](https://community.open-emr.org/c/support/16)
 - [AWS Support (with support plan)](https://aws.amazon.com/contact-us/)
 - [GitHub Issues for this deployment](../../issues)

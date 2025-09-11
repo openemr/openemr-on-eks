@@ -36,7 +36,7 @@ graph TB
         B[SystemLogger] --> E[System Logs]
         C[Custom ADODB Wrapper] --> F[SQL Audit Logs]
     end
-    
+
     subgraph "File System"
         D --> G[var-log-openemr]
         E --> H[openemr-logs-and-misc]
@@ -44,12 +44,12 @@ graph TB
         H --> J
         I --> J
     end
-    
+
     subgraph "Fluent Bit Sidecar"
         G --> J[Fluent Bit Container]
         J --> K[CloudWatch Logs]
     end
-    
+
     subgraph "AWS CloudWatch"
         K --> L[aws-eks-cluster-openemr-test]
         K --> M[aws-eks-cluster-openemr-apache]
@@ -59,7 +59,7 @@ graph TB
         K --> Q[aws-eks-cluster-openemr-php_error]
         K --> R[aws-eks-cluster-fluent-bit-metrics]
     end
-    
+
     %% Add descriptive labels
     L -.-> L1["/aws/eks/CLUSTER_NAME/openemr/test"]
     M -.-> M1["/aws/eks/CLUSTER_NAME/openemr/apache"]
@@ -86,6 +86,7 @@ graph TB
 | `/aws/eks/${CLUSTER_NAME}/fluent-bit/metrics` | Fluent Bit operational metrics | 30 days | KMS | ✅ Working |
 
 **Status Legend:**
+
 - ✅ **Working**: Logs are actively flowing to CloudWatch
 - 🔄 **Monitoring**: Paths are monitored, waiting for log files to be generated
 
@@ -400,7 +401,7 @@ class EventAuditLogger
 {
     // Logs audited events to database tables
     public function newEvent($event, $status, $comments = '', $user = '', $group = '', $success = '1', $log_from = '', $patient_id = '', $log_user = '', $log_group = '')
-    
+
     // Records log items with RFC3881 compliance
     public function recordLogItem($event, $status, $comments = '', $user = '', $group = '', $success = '1', $log_from = '', $patient_id = '', $log_user = '', $log_group = '')
 }
@@ -547,7 +548,8 @@ aws logs describe-log-streams --log-group-name "/aws/eks/${CLUSTER_NAME}/openemr
 
 **Cause**: Log directories or files don't exist yet
 
-**Solution**: 
+**Solution**:
+
 ```bash
 # Create missing directories and placeholder files
 kubectl exec <pod-name> -c openemr -n openemr -- mkdir -p /var/log/openemr /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/system_logs /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/audit_logs
@@ -578,6 +580,26 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 3. **Verify IAM permissions**: Check CloudWatch Logs permissions
 4. **Test authentication**: Verify IRSA token and role assumption
 5. **Monitor CloudWatch**: Check if log groups are being created
+
+## Recent Improvements (August 28, 2025)
+
+### Enhanced Health Checks
+
+- **Improved probe configuration**: Better timing and failure thresholds for production workloads
+- **User-Agent headers**: Added health check identification for better monitoring
+- **Optimized intervals**: Reduced unnecessary health check overhead
+
+### Resource Optimization
+
+- **Better resource allocation**: Increased CPU and memory limits for improved performance
+- **Fluent Bit optimization**: Enhanced resource allocation for better log processing
+- **Security context improvements**: Added proper group permissions for compliance
+
+### Performance Enhancements
+
+- **Startup probe optimization**: Better handling of slow-starting containers
+- **Readiness probe tuning**: Faster detection of ready state
+- **Liveness probe improvements**: More resilient to temporary issues
 
 ## Best Practices
 

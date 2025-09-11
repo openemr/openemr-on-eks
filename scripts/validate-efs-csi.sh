@@ -33,7 +33,7 @@ echo -e "${YELLOW}2. Checking EFS CSI service account IAM configuration...${NC}"
 if kubectl get serviceaccount efs-csi-controller-sa -n kube-system > /dev/null 2>&1; then
     # Check for IRSA annotation (traditional method)
     IRSA_ANNOTATION=$(kubectl get serviceaccount efs-csi-controller-sa -n kube-system -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}' 2>/dev/null || echo "")
-    
+
     # Check for Pod Identity (newer method)
     POD_IDENTITY_CHECK=false
     if command -v aws >/dev/null 2>&1; then
@@ -44,7 +44,7 @@ if kubectl get serviceaccount efs-csi-controller-sa -n kube-system > /dev/null 2
             POD_IDENTITY_ROLE=$(aws eks list-pod-identity-associations --cluster-name $CLUSTER_NAME --region $AWS_REGION --query "associations[?serviceAccount=='efs-csi-controller-sa'].roleArn" --output text 2>/dev/null || echo "")
         fi
     fi
-    
+
     if [ -n "$IRSA_ANNOTATION" ]; then
         echo -e "${GREEN}✅ EFS CSI service account has IRSA IAM role annotation${NC}"
         echo -e "${BLUE}   Role ARN: $IRSA_ANNOTATION${NC}"
@@ -73,7 +73,7 @@ if [ -d "../terraform" ]; then
     EFS_ID=$(terraform output -raw efs_id 2>/dev/null || echo "unknown")
     if [ "$EFS_ID" != "unknown" ] && [ -n "$EFS_ID" ]; then
         echo -e "${GREEN}✅ EFS ID from Terraform: $EFS_ID${NC}"
-        
+
         # Check if EFS is accessible via AWS CLI
         if command -v aws >/dev/null 2>&1; then
             if aws efs describe-file-systems --file-system-id "$EFS_ID" --region "$AWS_REGION" > /dev/null 2>&1; then
@@ -120,12 +120,12 @@ if kubectl get namespace openemr > /dev/null 2>&1; then
         echo -e "${BLUE}PVC Status:${NC}"
         kubectl get pvc -n openemr
         echo ""
-        
+
         # Check essential PVCs (required for OpenEMR to start)
         ESSENTIAL_BOUND=$(kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | grep -c "Bound" || echo "0")
         BACKUP_STATUS=$(kubectl get pvc openemr-backup-pvc -n openemr --no-headers 2>/dev/null | awk '{print $2}' || echo "Not Found")
         TOTAL_PVCS=$(kubectl get pvc -n openemr --no-headers | wc -l | tr -d ' ')
-        
+
         echo -e "${BLUE}Essential PVCs (required for OpenEMR):${NC}"
         kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | while read line; do
             PVC_NAME=$(echo "$line" | awk '{print $1}')
@@ -136,7 +136,7 @@ if kubectl get namespace openemr > /dev/null 2>&1; then
                 echo -e "${RED}   ❌ $PVC_NAME: $PVC_STATUS${NC}"
             fi
         done
-        
+
         echo -e "${BLUE}Backup PVC (binds when backup runs):${NC}"
         if [ "$BACKUP_STATUS" = "Pending" ]; then
             echo -e "${BLUE}   ℹ️  openemr-backup-pvc: $BACKUP_STATUS (normal - uses WaitForFirstConsumer)${NC}"
@@ -146,14 +146,14 @@ if kubectl get namespace openemr > /dev/null 2>&1; then
             echo -e "${YELLOW}   ⚠️  openemr-backup-pvc: $BACKUP_STATUS${NC}"
         fi
         echo ""
-        
+
         if [ "$ESSENTIAL_BOUND" -ge 3 ]; then
             echo -e "${GREEN}✅ All essential PVCs are bound (3/3)${NC}"
             echo -e "${BLUE}💡 OpenEMR pods should be able to start successfully${NC}"
         else
             echo -e "${YELLOW}⚠️  Only $ESSENTIAL_BOUND/3 essential PVCs are bound${NC}"
             echo -e "${YELLOW}💡 OpenEMR pods may remain in Pending status${NC}"
-            
+
             # Show events for pending essential PVCs
             echo -e "${BLUE}Checking events for pending essential PVCs...${NC}"
             kubectl describe pvc -n openemr | grep -A 10 "Events:" | head -20 || echo "No events found"
@@ -173,7 +173,7 @@ if kubectl get namespace openemr > /dev/null 2>&1; then
         echo -e "${BLUE}Pod Status:${NC}"
         kubectl get pods -n openemr
         echo ""
-        
+
         POD_STATUS=$(kubectl get pods -n openemr --no-headers | awk '{print $3}' | head -1 || echo "None")
         case "$POD_STATUS" in
             "Running")

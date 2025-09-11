@@ -8,6 +8,7 @@ metadata:
     version: v1
 spec:
   # replicas managed by HPA - see hpa.yaml
+  progressDeadlineSeconds: 2400  # 40 minutes to accommodate leader pod DB setup (10min) + buffer
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -60,23 +61,23 @@ spec:
         workingDir: /var/www/localhost/htdocs/openemr
         command: ["/bin/sh", "-c"]
         args:
-        - |          
+        - |
           # Download AWS root CA certificates for secure connections
           echo "=== Downloading SSL certificates ==="
           curl --cacert /swarm-pieces/ssl/certs/ca-certificates.crt -o /root/certs/redis/redis-ca --create-dirs https://www.amazontrust.com/repository/AmazonRootCA1.pem && \
           chown apache /root/certs/redis/redis-ca && \
           curl --cacert /swarm-pieces/ssl/certs/ca-certificates.crt -o /root/certs/mysql/server/mysql-ca --create-dirs https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem && \
           chown apache /root/certs/mysql/server/mysql-ca && \
-          
+
           # Setting up crontab for certificate renewal
           echo "1 23 * * * httpd -k graceful" >> /etc/crontabs/root && \
-          
+
           echo "=== Setting up OpenEMR script ==="
           chmod +x ./openemr.sh && \
-          
+
           echo "=== Starting OpenEMR initialization ==="
           ./openemr.sh && \
-          
+
           echo "=== OpenEMR Ready ==="
           # Keep the container running
           tail -f /dev/null
@@ -106,6 +107,11 @@ spec:
             secretKeyRef:
               name: openemr-db-credentials
               key: mysql-password
+        - name: MYSQL_DATABASE
+          valueFrom:
+            secretKeyRef:
+              name: openemr-db-credentials
+              key: mysql-database
         - name: MYSQL_PORT
           value: "3306"
         - name: REDIS_SERVER
@@ -142,7 +148,7 @@ spec:
         # OpenEMR API Configuration (conditionally set by deploy script)
         # OPENEMR_SETTING_rest_api will be added if API is enabled
         # OPENEMR_SETTING_rest_fhir_api will be added if API is enabled
-        # OpenEMR Patient Portal Configuration (conditionally set by deploy script)  
+        # OpenEMR Patient Portal Configuration (conditionally set by deploy script)
         # OPENEMR_SETTING_portal_onsite_two_address will be added if portal is enabled
         # OPENEMR_SETTING_portal_onsite_two_enable will be added if portal is enabled
         # OPENEMR_SETTING_ccda_alt_service_enable will be added if portal is enabled
@@ -155,32 +161,40 @@ spec:
             cpu: 1000m
             memory: 1Gi
         startupProbe:
-          httpGet:
-            path: /interface/login/login.php
+          tcpSocket:
             port: 80
-            scheme: HTTP
-          initialDelaySeconds: 60
-          periodSeconds: 30
+          initialDelaySeconds: 600   # 10 minutes - Apache starts AFTER database setup
+          periodSeconds: 15          # Check frequently once Apache should be starting
           timeoutSeconds: 10
-          failureThreshold: 25
+          failureThreshold: 40       # Allow 10 more minutes (600s + 40*15s = 1200s = 20min total)
+                                     # Leader: 10min DB setup + Apache start + OpenEMR init + buffer
         readinessProbe:
           httpGet:
             path: /interface/login/login.php
             port: 80
             scheme: HTTP
-          initialDelaySeconds: 240
-          periodSeconds: 30
-          timeoutSeconds: 10
-          failureThreshold: 3
+            httpHeaders:
+            - name: User-Agent
+              value: "Kubernetes-Health-Check/1.0"
+          initialDelaySeconds: 900   # 15 minutes - after Apache starts and OpenEMR initializes
+          periodSeconds: 30          # Check every 30s for OpenEMR readiness
+          timeoutSeconds: 20         # Longer timeout for OpenEMR response
+          failureThreshold: 20       # Allow 10 more minutes (900s + 20*30s = 1500s = 25min total)
+                                     # Leader pod: DB setup → Apache → OpenEMR ready
+          successThreshold: 2        # Require 2 consecutive successes for stability
         livenessProbe:
           httpGet:
             path: /interface/login/login.php
             port: 80
             scheme: HTTP
-          initialDelaySeconds: 300
-          periodSeconds: 60
-          timeoutSeconds: 10
-          failureThreshold: 5
+            httpHeaders:
+            - name: User-Agent
+              value: "Kubernetes-Health-Check/1.0"
+          initialDelaySeconds: 1200  # 20 minutes - after readiness probe succeeds
+          periodSeconds: 30          # Check every 30s during normal operation
+          timeoutSeconds: 20         # Longer timeout for OpenEMR response
+          failureThreshold: 10       # Allow more failures before restart (10*30s = 5min)
+          successThreshold: 1        # Fast recovery detection
         volumeMounts:
         - name: openemr-sites
           mountPath: /var/www/localhost/htdocs/openemr/sites
@@ -199,14 +213,14 @@ spec:
           name: fluent-bit-fwd
           protocol: TCP
         env:
-        - name: AWS_REGION
-          value: "${AWS_REGION}"
-        - name: CLUSTER_NAME
-          value: "${CLUSTER_NAME}"
-        - name: AWS_WEB_IDENTITY_TOKEN_FILE
-          value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
-        - name: AWS_ROLE_ARN
-          value: "${OPENEMR_ROLE_ARN}"
+          - name: AWS_REGION
+            value: "${AWS_REGION}"
+          - name: CLUSTER_NAME
+            value: "${CLUSTER_NAME}"
+          - name: AWS_WEB_IDENTITY_TOKEN_FILE
+            value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+          - name: AWS_ROLE_ARN
+            value: "${OPENEMR_ROLE_ARN}"
 
 
         resources:
@@ -226,18 +240,18 @@ spec:
           httpGet:
             path: /
             port: 2020
-          initialDelaySeconds: 30
+          initialDelaySeconds: 30   # Fluent-bit starts quickly
           periodSeconds: 30
-          timeoutSeconds: 1
+          timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /api/v1/health
             port: 2020
-          initialDelaySeconds: 10
-          periodSeconds: 10
-          timeoutSeconds: 1
-          failureThreshold: 3
+          initialDelaySeconds: 15   # Fluent-bit starts quickly
+          periodSeconds: 15
+          timeoutSeconds: 5
+          failureThreshold: 6
 
       volumes:
       - name: db-credentials

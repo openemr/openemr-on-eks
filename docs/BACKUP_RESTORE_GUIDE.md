@@ -25,6 +25,16 @@ The OpenEMR backup system provides:
 - ✅ **Cross-region disaster recovery** capabilities
 - ✅ **Simple, reliable scripts** with graceful error handling
 
+The restore system has been significantly simplified and improved:
+
+- ✅ **One-command restore** - Simple, reliable restore with auto-detection
+- ✅ **Automatic cluster detection** - No need to specify cluster names manually
+- ✅ **Smart database restore** - Cross-region snapshot copying and cluster restoration
+- ✅ **Application data restore** - Downloads and extracts data directly to EFS via existing pods
+- ✅ **Auto-reconfiguration** - Automatically updates database and Redis connections
+- ✅ **Manual fallback** - Step-by-step manual instructions if automated process fails
+- ✅ **Modular options** - Restore database, app data, or both as needed
+
 ### Backup Architecture
 
 ```mermaid
@@ -34,19 +44,19 @@ graph TB
         A --> D[Kubernetes Configs]
         A --> E[Application Data]
     end
-    
+
     subgraph "Backup Process"
         B --> F[Aurora Snapshot]
         D --> H[K8s Config Export]
         E --> I[App Data Archive]
     end
-    
+
     subgraph "Backup Region (us-east-1)"
         F --> J[S3 Bucket - Metadata]
         H --> L[S3 Bucket - K8s Configs]
         I --> M[S3 Bucket - App Data]
     end
-    
+
     subgraph "Cross-Region Copy"
         F --> N[Cross-Region Snapshot Copy]
     end
@@ -61,13 +71,13 @@ graph TB
         C[S3 Backup Data] --> B
         D[Cross-Region Snapshot] --> B
     end
-    
+
     subgraph "Target Region"
         B --> E[New Aurora Cluster]
         B --> G[Restored K8s Configs]
         B --> H[Restored App Data]
     end
-    
+
     subgraph "Application Layer"
         E --> I[OpenEMR Application]
         G --> I
@@ -78,11 +88,13 @@ graph TB
 ## What Gets Backed Up
 
 ### 🗄️ Database (RDS Aurora)
+
 - **Aurora cluster snapshots** with point-in-time recovery
 - **Cross-region snapshot copying** for disaster recovery
 - **Automated retention policies** (30 days default)
 
 ### ⚙️ Kubernetes Configuration
+
 - All resources in the OpenEMR namespace
 - Secrets and ConfigMaps
 - Persistent Volume Claims (PVCs)
@@ -90,20 +102,62 @@ graph TB
 - Service definitions
 
 ### 📦 Application Data
+
 - OpenEMR sites directory (`/var/www/localhost/htdocs/openemr/sites/`)
 - Patient data and uploaded files
 - Custom configurations and templates
 - Log files and audit trails
 
 ### 📋 Backup Metadata
+
 - JSON metadata with restore instructions
 - Human-readable reports with status
 - Cross-region backup information
 - Timestamp and versioning data
 
+### 🔍 Logging Configuration (OpenEMR 7.0.3.4)
+
+The restore process now includes comprehensive logging configuration for OpenEMR 7.0.3.4:
+
+**Log Directory Structure:**
+
+- `/var/log/openemr/` - Application logs (error, access, system)
+- `/var/log/apache2/` - Web server logs
+- `/var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/`
+  - `system_logs/` - System-level operational logs
+  - `audit_logs/` - Detailed audit trails
+  - `logbook/` - Legacy logbook entries
+
+**CloudWatch Integration:**
+
+- **Automatic log group creation** during restore
+- **Real-time log streaming** via Fluent Bit sidecar
+- **IRSA authentication** for secure AWS service integration
+- **KMS encryption** for all log data
+- **Compliance tagging** for audit requirements
+
+**Log Types Captured:**
+
+- **Application Logs**: OpenEMR PHP application events
+- **Audit Logs**: User actions, patient record access, database operations
+- **System Logs**: Component status, operational events, health checks
+- **Access Logs**: Web server requests and responses
+- **Error Logs**: Application errors with stack traces
+- **PHP Errors**: Detailed PHP errors with file and line information
+- **Fluent Bit Metrics**: Operational metrics and health monitoring
+
+**Restore Options:**
+
+- `CONFIGURE_LOGGING=true` (default) - Full logging setup with Fluent Bit sidecar
+- `CONFIGURE_LOGGING=false` - Skip logging configuration
+- Automatic log directory creation and permission setup
+- OpenEMR configuration file updates for logging paths
+- Fluent Bit sidecar deployment with IRSA authentication
+
 ## Prerequisites
 
 ### Required Tools
+
 ```bash
 # Verify required tools are installed
 aws --version        # AWS CLI v2
@@ -113,13 +167,16 @@ jq --version         # JSON processor
 ```
 
 ### AWS Permissions
+
 Your AWS credentials need permissions for:
+
 - RDS snapshot creation and management
 - S3 bucket creation and management
 - EKS cluster access
 - Cross-region resource access
 
 ### Infrastructure Requirements
+
 - EKS cluster with OpenEMR deployed
 - RDS Aurora cluster (optional - gracefully handled if missing)
 - EFS file system with application data
@@ -128,6 +185,7 @@ Your AWS credentials need permissions for:
 ## Quick Start
 
 ### Create a Backup
+
 ```bash
 # Basic backup to same region
 ./scripts/backup.sh
@@ -140,6 +198,7 @@ Your AWS credentials need permissions for:
 ```
 
 ### Restore from Backup
+
 ```bash
 # Restore from backup (will prompt for confirmation)
 ./scripts/restore.sh <backup-bucket> <snapshot-id> <backup-region>
@@ -147,8 +206,6 @@ Your AWS credentials need permissions for:
 # Example
 ./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
 ```
-
-
 
 ## Backup Operations
 
@@ -194,6 +251,8 @@ Options:
 6. **Metadata Generation**
    - Create JSON metadata with restore instructions
    - Generate human-readable report
+   - Capture database configuration for automatic restore
+   - Store VPC, security group, and scaling settings
    - Upload both to S3 backup bucket
 
 ### Backup Outputs
@@ -220,49 +279,129 @@ Application Data: SUCCESS (app-data-backup-20250815-120000.tar.gz)
 ### Restore Script Usage
 
 ```bash
-./scripts/restore.sh <backup-bucket> <snapshot-id> [backup-region]
+./scripts/restore.sh <backup-bucket> <snapshot-id> [backup-region] [options]
 
 Arguments:
   backup-bucket    S3 bucket containing the backup
-  snapshot-id      RDS snapshot identifier (use 'none' if no RDS backup)
-  backup-region    AWS region where backup is stored (default: us-west-2)
+  snapshot-id      RDS cluster snapshot identifier
+  backup-region    AWS region where backup is stored (optional, defaults to target region)
+
+Options:
+  --cluster-name NAME    EKS cluster name (auto-detected from Terraform if not specified)
+  --force, -f            Skip confirmation prompts
+  --recreate-storage     Recreate storage classes before restore
+  --help, -h             Show help message
+  --manual-instructions  Show manual restore instructions
 
 Environment Variables:
-  CLUSTER_NAME     Target EKS cluster name (default: openemr-eks)
-  AWS_REGION       Target AWS region (default: us-west-2)
-  NAMESPACE        Kubernetes namespace (default: openemr)
+  AWS_REGION            Target AWS region (default: us-west-2)
+  NAMESPACE             Kubernetes namespace (default: openemr)
+  RESTORE_DATABASE      Restore database (default: true)
+  RESTORE_APP_DATA      Restore application data (default: true)
+  RECONFIGURE_DB        Reconfigure database (default: true)
 ```
+
+### Key Improvements in the New Restore Script
+
+- **🎯 Simplified Usage**: Only requires backup bucket and snapshot ID
+- **🔍 Auto-Detection**: Automatically detects EKS cluster from Terraform output
+- **⚡ Faster Execution**: Uses existing OpenEMR pods instead of creating temporary ones
+- **🔧 Auto-Reconfiguration**: Automatically updates database and Redis connections
+- **📋 Manual Fallback**: Provides step-by-step manual instructions if needed
 
 ### Restore Process Flow
 
-1. **Prerequisites Check**
+1. **Auto-Detection & Validation**
+   - Auto-detect EKS cluster name from Terraform output
    - Verify AWS credentials and region access
    - Confirm backup bucket exists and is accessible
+   - Update kubeconfig for target cluster
 
-2. **Backup Metadata Download**
-   - Download and parse backup metadata
-   - Verify backup integrity and compatibility
+2. **Database Restore** (if `RESTORE_DATABASE=true`)
+   - Copy RDS snapshot to target region if needed
+   - Restore Aurora cluster from snapshot
+   - Use existing cluster identifier "openemr-eks"
 
-3. **RDS Aurora Restore**
-   - Create new Aurora cluster from snapshot
-   - Handle cross-region snapshot copying if needed
-   - Create Aurora Serverless V2 instances
-   - Wait for cluster availability
+3. **Application Data Restore** (if `RESTORE_APP_DATA=true`)
+   - Find existing OpenEMR pod in the cluster
+   - Download backup from S3 to local temporary file
+   - Copy backup to pod and extract to EFS volume
+   - Clean up temporary files
 
-4. **Kubernetes Configuration Restore**
-   - Download and extract Kubernetes backup
-   - Apply configurations to target cluster
-   - Handle conflicts gracefully
+4. **Database Reconfiguration** (if `RECONFIGURE_DB=true`)
+   - Get database credentials from Kubernetes secrets
+   - Update OpenEMR sqlconf.php file with new connection details
+   - Use existing pod to perform configuration updates
 
-5. **Application Data Restore**
-   - Download application data backup
-   - Extract to running OpenEMR pods
-   - Verify data integrity
+5. **Redis/Valkey Reconfiguration**
+   - Get Redis cluster details from Terraform output
+   - Update Redis credentials secret in Kubernetes
+   - Ensure OpenEMR can connect to Redis/Valkey
 
-6. **Verification & Reporting**
-   - Provide detailed restore results
-   - List new resource identifiers
-   - Suggest next steps for verification
+6. **Completion**
+   - Provide restore status and next steps
+   - All operations use existing infrastructure (no temporary resources)
+
+### Advanced Features
+
+#### **Redis/Valkey Auto-Reconfiguration**
+
+The restore script automatically handles Redis/Valkey connection updates:
+
+- **Automatic Detection**: Gets Redis cluster details from Terraform output
+- **Secret Management**: Updates `openemr-redis-credentials` secret in Kubernetes
+- **Connection Validation**: Ensures OpenEMR can connect to the restored Redis/Valkey cluster
+- **No Manual Intervention**: All Redis configuration is handled automatically
+
+This ensures that after a restore, OpenEMR can immediately connect to the correct Redis/Valkey instance without manual configuration.
+
+#### **Error Handling & Validation**
+
+The restore script includes comprehensive error handling:
+
+- **Pre-flight Checks**: Validates AWS credentials, cluster access, and backup availability
+- **Graceful Degradation**: Continues with available operations if some components fail
+- **Detailed Logging**: Color-coded output with timestamps for easy troubleshooting
+- **Manual Fallback**: Built-in manual restore instructions when automated process fails
+
+### Restore Examples
+
+#### Basic Restore (Simplified - Most Common Use Case)
+
+```bash
+# Simple restore - script auto-detects cluster and restores everything
+./scripts/restore.sh my-backup-bucket my-snapshot-id
+
+# Cross-region restore
+./scripts/restore.sh my-backup-bucket my-snapshot-id us-east-1
+```
+
+#### Automated Restore (Skip Confirmations)
+
+```bash
+# Skip confirmation prompts for automated scripts
+./scripts/restore.sh my-backup-bucket my-snapshot-id --force
+```
+
+#### Selective Restore (Modular Options)
+
+```bash
+# Only restore database, skip application data
+RESTORE_APP_DATA=false ./scripts/restore.sh my-backup-bucket my-snapshot-id
+
+# Only restore application data, skip database
+RESTORE_DATABASE=false ./scripts/restore.sh my-backup-bucket my-snapshot-id
+
+# Skip database reconfiguration
+RECONFIGURE_DB=false ./scripts/restore.sh my-backup-bucket my-snapshot-id
+```
+
+#### Manual Restore Instructions
+
+```bash
+# Get step-by-step manual restore instructions
+./scripts/restore.sh --manual-instructions
+```
 
 ### Cross-Region Restore
 
@@ -280,9 +419,129 @@ aws rds copy-db-cluster-snapshot \
 ./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000-us-east-1 us-east-1
 ```
 
-## Testing & Validation
+### Manual Restore Instructions
 
+For situations where you need full control over the restore process or want to understand what's happening, the restore script provides manual instructions:
 
+```bash
+# Get step-by-step manual restore guide
+./scripts/restore.sh --manual-instructions
+```
+
+The manual restore guide covers:
+
+- **Step-by-step commands** for each restore operation
+- **No script dependency** for understanding the process
+- **Full control** over each step
+- **Educational value** for learning the restore process
+
+This is useful for:
+
+- Learning the restore process
+- Custom restore workflows
+- Troubleshooting automated restores
+- Situations where you need full control
+
+## Backward Compatibility
+
+**The restore script maintains 100% backward compatibility with existing workflows:**
+
+- ✅ **Existing restore commands work unchanged** - no modifications needed
+- ✅ **All restore operations enabled by default** - behaves exactly as before
+- ✅ **No breaking changes** - existing automation and scripts continue to work
+- ✅ **Same output format** - same success/error messages and exit codes
+
+**What this means for you:**
+
+- If you have existing restore automation, it will continue to work without changes
+- If you manually run restore commands, they will work exactly as before
+- The new modular options are purely additive - they don't change default behavior
+
+### Restore Options and Use Cases
+
+The restore script now provides granular control over what gets restored, making it suitable for various scenarios:
+
+#### **Development and Testing**
+
+```bash
+# Set up development environment from production backup
+NEW_DB_CLUSTER="openemr-dev-$(date +%Y%m%d)" \
+./scripts/restore.sh backup-bucket snapshot-id
+```
+
+#### **Database Migration**
+
+```bash
+# Restore database to existing cluster for migration
+EXISTING_DB_CLUSTER="my-production-db" \
+RESTORE_APP_DATA=false \
+./scripts/restore.sh backup-bucket snapshot-id
+```
+
+#### **Full Disaster Recovery**
+
+```bash
+# Complete restore with automatic database setup
+RESTORE_DATABASE=true RESTORE_APP_DATA=true RESTORE_K8S_CONFIG=true RECONFIGURE_DB=true \
+./scripts/restore.sh backup-bucket snapshot-id
+```
+
+#### **Backup Integrity Testing**
+
+```bash
+# Test backup without affecting production
+RESTORE_DATABASE=true RESTORE_APP_DATA=true NEW_DB_CLUSTER="backup-test-$(date +%Y%m%d)" \
+./scripts/restore.sh backup-bucket snapshot-id
+```
+
+#### **End-to-End Backup/Restore Testing**
+
+For comprehensive testing of the entire backup and restore process, use the automated end-to-end test script:
+
+```bash
+# Run complete end-to-end test
+./scripts/test-end-to-end-backup-restore.sh
+
+# Custom test configuration
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test \
+  --aws-region us-west-2 \
+  --namespace openemr
+```
+
+**What the End-to-End Test Does:**
+
+1. **Deploy Infrastructure** - Creates complete EKS cluster from scratch
+2. **Deploy OpenEMR** - Installs and configures OpenEMR application
+3. **Deploy Test Data** - Creates timestamped proof.txt file for verification
+4. **Create Backup** - Runs full backup of the installation
+5. **Destroy Infrastructure** - Completely removes all AWS resources
+6. **Recreate Infrastructure** - Rebuilds the infrastructure from scratch
+7. **Restore from Backup** - Restores the application from the backup
+8. **Verify Restoration** - Confirms proof.txt exists and database connectivity works
+9. **Final Cleanup** - Removes all resources and test backups
+
+**Test Features:**
+
+- **Automated Infrastructure Management** - Uses Terraform with auto-approve
+- **Comprehensive Verification** - Tests data integrity and connectivity
+- **Resource Cleanup** - Ensures no orphaned resources remain
+- **Detailed Reporting** - Provides step-by-step results and timing
+- **Resource Usage** - Notes that AWS resources will be created and destroyed
+
+**Use Cases:**
+
+- **Pre-production Validation** - Verify backup/restore works before going live
+- **Disaster Recovery Testing** - Test complete recovery procedures
+- **Infrastructure Validation** - Ensure Terraform configurations work correctly
+- **Compliance Testing** - Demonstrate backup/restore capabilities for audits
+
+**⚠️ Important Notes:**
+
+- This test creates and destroys real AWS resources
+- AWS resources will be created and destroyed during testing
+- Requires proper AWS credentials and permissions
+- Test duration: 2-4 hours depending on infrastructure size
 
 ## Cross-Region Disaster Recovery
 
@@ -307,6 +566,7 @@ aws rds copy-db-cluster-snapshot \
    - Verify network connectivity and DNS
 
 3. **Execute Restore**
+
    ```bash
    # Restore to disaster recovery region
    AWS_REGION=us-east-1 ./scripts/restore.sh \
@@ -338,16 +598,19 @@ Monitor backup success through:
 ### Maintenance Tasks
 
 #### Weekly
+
 - Review backup reports for any failures
 - Verify S3 bucket lifecycle policies
 - Check RDS snapshot retention
 
 #### Monthly
+
 - Run full backup/restore test cycle
 - Review and update disaster recovery procedures
 - Audit cross-region backup costs
 
 #### Quarterly
+
 - Test cross-region disaster recovery procedures
 - Review and update backup retention policies
 - Validate backup/restore documentation
@@ -365,6 +628,7 @@ Monitor backup success through:
 #### Backup Script Fails
 
 **Issue**: AWS credentials not configured
+
 ```bash
 # Solution: Configure AWS credentials
 aws configure
@@ -373,12 +637,14 @@ export AWS_PROFILE=your-profile
 ```
 
 **Issue**: Kubernetes cluster not accessible
+
 ```bash
 # Solution: Update kubeconfig
 aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 ```
 
 **Issue**: RDS cluster in backing-up state
+
 ```
 # This is normal - the script will skip and continue
 # The cluster will be available for backup on the next run
@@ -387,12 +653,14 @@ aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 #### Restore Script Fails
 
 **Issue**: Backup bucket not found
+
 ```bash
 # Solution: Verify bucket name and region
 aws s3 ls s3://your-backup-bucket --region us-east-1
 ```
 
 **Issue**: Cross-region snapshot not available
+
 ```bash
 # Solution: Copy snapshot to target region first
 aws rds copy-db-cluster-snapshot \
@@ -402,9 +670,45 @@ aws rds copy-db-cluster-snapshot \
   --region target-region
 ```
 
+**Issue**: EKS cluster not found or not accessible
+
+```bash
+# Solution: Verify cluster exists and update kubeconfig
+aws eks describe-cluster --name openemr-eks --region us-west-2
+aws eks update-kubeconfig --region us-west-2 --name openemr-eks
+```
+
+**Issue**: No OpenEMR pod found for restore
+
+```bash
+# Solution: Ensure OpenEMR is deployed and running
+kubectl get pods -n openemr -l app=openemr
+# If no pods, deploy OpenEMR first
+cd k8s && ./deploy.sh
+```
+
+**Issue**: Database reconfiguration fails
+
+```bash
+# Solution: Check database credentials secret
+kubectl get secret openemr-db-credentials -n openemr -o yaml
+# Verify database endpoint is accessible
+kubectl exec -n openemr <pod-name> -c openemr -- nslookup <db-endpoint>
+```
+
+**Issue**: Redis/Valkey reconfiguration fails
+
+```bash
+# Solution: Check Redis cluster details from Terraform
+cd terraform && terraform output redis_endpoint
+# Verify Redis credentials secret
+kubectl get secret openemr-redis-credentials -n openemr -o yaml
+```
+
 #### Test Script Issues
 
 **Issue**: Application not ready
+
 ```bash
 # Solution: Check pod status and logs
 kubectl get pods -n openemr
@@ -422,6 +726,7 @@ kubectl logs -f deployment/openemr -n openemr
 ### Support Information
 
 For additional support:
+
 - Review the comprehensive test reports
 - Check AWS CloudWatch logs for detailed execution traces
 - Verify backup metadata JSON files for restore instructions

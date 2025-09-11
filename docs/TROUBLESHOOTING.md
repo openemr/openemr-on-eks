@@ -5,30 +5,36 @@ This comprehensive guide helps diagnose and resolve issues with OpenEMR on EKS A
 ## 📋 Table of Contents
 
 ### **🔧 Quick Diagnostics**
+
 - [Essential Validation Scripts](#essential-validation-scripts)
 - [Complete Scripts Reference for Troubleshooting](#complete-scripts-reference-for-troubleshooting)
 - [Script-Based Troubleshooting Workflow](#script-based-troubleshooting-workflow)
 - [Auto Mode Health Check](#auto-mode-health-check)
 
 ### **🚨 Common Issues and Solutions**
+
 - [Monitoring Installation Warnings](#1-monitoring-installation-warnings)
 - [Cannot Access Cluster](#2-cannot-access-cluster)
 - [Terraform Deployment Failures](#3-terraform-deployment-failures)
 - [Pods Not Starting](#4-pods-not-starting)
 - [Database Connection Issues](#5-database-connection-issues)
 - [EKS Auto Mode Specific Issues](#6-eks-auto-mode-specific-issues)
+- [HPA Metrics Server Issues](#7-hpa-metrics-server-issues)
+- [Logging and Monitoring Issues](#8-logging-and-monitoring-issues)
 - [Common Error Messages Reference](#-common-error-messages-reference)
 
-
 ### **💰 Cost and Performance**
+
 - [Unexpected High Costs](#unexpected-high-costs)
 - [Performance Degradation](#performance-degradation)
 
 ### **🔍 Advanced Debugging**
+
 - [Security Incident Response](#-security-incident-response)
-- [Best Practices for Error Prevention](#-best-practices-for-error-prevention)
+- [Best Practices for Error Prevention](#️-best-practices-for-error-prevention)
 
 ### **📞 Getting Help**
+
 - [Getting Help](#-getting-help-1)
 
 ---
@@ -56,6 +62,7 @@ cd scripts
 ### Complete Scripts Reference for Troubleshooting
 
 #### **Application Issues**
+
 ```bash
 # Check OpenEMR version and available updates
 ./check-openemr-versions.sh --latest
@@ -69,6 +76,7 @@ cd scripts
 ```
 
 #### **Infrastructure Issues**
+
 ```bash
 # Comprehensive deployment validation
 ./validate-deployment.sh
@@ -82,6 +90,7 @@ cd scripts
 ```
 
 #### **Security and Access Issues**
+
 ```bash
 # Check cluster access status
 ./cluster-security-manager.sh status
@@ -114,6 +123,7 @@ See comprehensive documentation on the backup and restore system [here](../docs/
 ### Script-Based Troubleshooting Workflow
 
 #### **Step 1: Initial Diagnosis**
+
 ```bash
 cd scripts
 
@@ -122,12 +132,13 @@ cd scripts
 
 # If validation fails, check specific areas:
 # - AWS credentials
-# - Cluster connectivity  
+# - Cluster connectivity
 # - Infrastructure status
 # - Application health
 ```
 
 #### **Step 2: Specific Issue Diagnosis**
+
 ```bash
 # For pod/storage issues:
 ./validate-efs-csi.sh
@@ -145,6 +156,7 @@ cd scripts
 ```
 
 #### **Step 3: Resolution Actions**
+
 ```bash
 # Clean deployment if corrupted:
 # WARNING: ONLY USE IN DEVELOPMENT OR AFTER BACKING UP DATA! This will result in data loss.
@@ -198,6 +210,7 @@ kubectl get pods --all-namespaces --field-selector=status.phase=Pending
 ### 1. Monitoring Installation Warnings
 
 #### **Warning: "OpenEMR dashboard not configured"**
+
 ```
 [WARN] ⚠️ OpenEMR dashboard not configured
 ```
@@ -206,13 +219,15 @@ kubectl get pods --all-namespaces --field-selector=status.phase=Pending
 
 For more information search [install-monitoring.sh](../monitoring/install-monitoring.sh) for "OpenEMR dashboard not configured".
 
-**Impact:** 
+**Impact:**
+
 - ✅ All monitoring functionality works normally
 - ✅ Prometheus collects OpenEMR metrics
 - ✅ Grafana displays standard Kubernetes dashboards
 - ⚠️ No OpenEMR-specific dashboard available
 
-**Resolution:** 
+**Resolution:**
+
 - This warning can be safely ignored
 - The monitoring stack is fully functional
 - Custom OpenEMR dashboards can be added later if needed
@@ -221,6 +236,7 @@ For more information search [install-monitoring.sh](../monitoring/install-monito
 ### 2. Cannot Access Cluster
 
 #### Symptoms
+
 ```
 Unable to connect to the server: dial tcp: i/o timeout
 error: You must be logged in to the server (Unauthorized)
@@ -228,6 +244,7 @@ The connection to the server was refused
 ```
 
 #### Root Causes
+
 - **IP address change**
 - **Cluster endpoint disabled**
 - **AWS credentials expired**
@@ -236,6 +253,7 @@ The connection to the server was refused
 #### Solutions
 
 **Quick Fix - Update IP Access:**
+
 ```bash
 # Check your current IP vs allowed
 cd scripts
@@ -253,12 +271,14 @@ kubectl get nodes
 #### Issue: Auto Mode Not Available
 
 **Error:**
+
 ```
-Error: error creating EKS Cluster: InvalidParameterException: 
+Error: error creating EKS Cluster: InvalidParameterException:
 Compute config is not supported for Kubernetes version 1.28
 ```
 
 **Solution:**
+
 ```hcl
 # In terraform.tfvars, ensure:
 kubernetes_version = "1.33"  # Must be 1.29 or higher
@@ -267,6 +287,7 @@ kubernetes_version = "1.33"  # Must be 1.29 or higher
 #### Issue: Insufficient IAM Permissions
 
 **Error:**
+
 ```
 Error: error creating EKS Cluster: AccessDeniedException
 ```
@@ -281,12 +302,14 @@ Verify you have the appropriate IAM permissions.
 #### Issue: VPC CIDR Conflicts
 
 **Error:**
+
 ```
 Error: error creating VPC: VpcAlreadyExists: The VPC with CIDR block 10.0.0.0/16 already exists.
 
 ```
 
 **Solution:**
+
 ```bash
 # Check existing VPCs
 aws ec2 describe-vpcs --query 'Vpcs[].CidrBlock'
@@ -300,12 +323,14 @@ vpc_cidr = "10.1.0.0/16"  # Avoid conflicts
 #### Issue: Pods Pending with Auto Mode
 
 **Symptoms:**
+
 ```
 NAME                      READY   STATUS    RESTARTS   AGE
 openemr-7d8b9c6f5-x2klm   0/1     Pending   0          10m
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check pod events
 kubectl describe pod openemr-7d8b9c6f5-x2klm -n openemr
@@ -320,6 +345,7 @@ kubectl describe pod openemr-7d8b9c6f5-x2klm -n openemr
 
 **1. Pod Security Standards Issue:**
 See [deployment.yaml](../k8s/deployment.yaml) for correct configurations.
+
 ```yaml
 # Update pod spec with correct configuration
     spec:
@@ -352,6 +378,7 @@ See [deployment.yaml](../k8s/deployment.yaml) for correct configurations.
 ```
 
 **2. Resource Requests Too High:**
+
 ```yaml
 # Auto Mode has instance type limits
 # Adjust resource requests
@@ -365,6 +392,7 @@ resources:
 ```
 
 **3. Storage Issues with EFS:**
+
 ```bash
 # Validate EFS CSI driver
 cd scripts
@@ -381,6 +409,7 @@ kubectl get pvc -n openemr
 ### 5. Database Connection Issues
 
 #### Symptoms
+
 ```
 Database connection failed
 SQLSTATE[HY000] [2002] Connection refused
@@ -388,6 +417,7 @@ ERROR 1045 (28000): Access denied for user 'openemr'@'10.0.1.23'
 ```
 
 #### Diagnosis
+
 ```bash
 # Check Aurora cluster status
 aws rds describe-db-clusters \
@@ -406,6 +436,7 @@ kubectl exec -it deployment/openemr -n openemr -- /bin/sh
 #### Solutions
 
 **1. Security Group Issue:**
+
 ```bash
 # Get Aurora security group
 SG_ID=$(aws rds describe-db-clusters \
@@ -422,6 +453,7 @@ aws ec2 authorize-security-group-ingress \
 ```
 
 **2. Wrong Password in Secret:**
+
 ```bash
 # Get correct password from Terraform
 cd terraform
@@ -442,12 +474,14 @@ kubectl rollout restart deployment openemr -n openemr
 #### Issue: Nodes Not Provisioning
 
 **Symptoms:**
+
 ```
 Pods remain pending
 No nodes visible with kubectl get nodes
 ```
 
 **Diagnosis:**
+
 ```bash
 # Check Auto Mode events
 kubectl get events --all-namespaces | grep -i "auto-mode"
@@ -463,6 +497,7 @@ aws eks describe-cluster --name openemr-eks \
 **Solutions:**
 
 **1. Enable Auto Mode (if not enabled):**
+
 ```bash
 aws eks update-cluster-config \
   --name openemr-eks \
@@ -478,12 +513,14 @@ See documentation [here](https://docs.aws.amazon.com/servicequotas/latest/usergu
 #### Issue: 21-Day Node Rotation Disruption
 
 **Symptoms:**
+
 ```
 Pods restarting every 21 days
 Brief service interruptions
 ```
 
 **Solution:**
+
 ```yaml
 # Configure Pod Disruption Budget
 # NOTE: This is already done for you by default in the deployment.
@@ -497,6 +534,247 @@ spec:
   selector:
     matchLabels:
       app: openemr
+```
+
+### 7. HPA Metrics Server Issues
+
+#### Issue: HPA Cannot Collect Metrics
+
+**Symptoms:**
+
+```
+Warning   FailedGetResourceMetric        horizontalpodautoscaler/openemr-hpa
+failed to get cpu utilization: unable to get metrics for resource cpu:
+unable to fetch metrics from resource metrics API: the server could not find
+the requested resource (get pods.metrics.k8s.io)
+```
+
+**Root Cause:**
+
+The Kubernetes Metrics Server is not installed in the EKS cluster, which is required for HPA to collect resource metrics.
+
+**Diagnosis:**
+
+```bash
+# Check if metrics-server is running
+kubectl get pods -n kube-system | grep metrics-server
+
+# Check HPA status
+kubectl describe hpa -n openemr openemr-hpa
+
+# Test metrics API
+kubectl top nodes
+kubectl top pods -n openemr
+```
+
+**Solution:**
+
+The EKS cluster configuration now includes the Metrics Server addon by default. After deploying with the updated configuration:
+
+1. **Verify Metrics Server is running:**
+
+   ```bash
+   kubectl get pods -n kube-system | grep metrics-server
+   ```
+
+2. **Test metrics collection:**
+
+   ```bash
+   kubectl top nodes
+   kubectl top pods -n openemr
+   ```
+
+3. **Check HPA status:**
+
+   ```bash
+   kubectl describe hpa -n openemr openemr-hpa
+   ```
+
+**Prevention:**
+
+- The Metrics Server addon is now included in the EKS cluster configuration
+- This ensures HPA can collect the necessary metrics for autoscaling decisions
+- The addon is automatically managed by EKS and kept up to date
+
+### 8. Logging and Monitoring Issues
+
+#### Issue: CloudWatch Logs Not Appearing
+
+**Symptoms:**
+
+```
+No logs visible in CloudWatch
+Fluent Bit pods showing errors
+OpenEMR logs not being captured
+```
+
+**Diagnosis:**
+
+```bash
+# Check Fluent Bit pod status
+kubectl get pods -n openemr -l app=fluent-bit
+
+# Check Fluent Bit logs
+kubectl logs -n openemr -l app=fluent-bit
+
+# Verify log groups exist
+aws logs describe-log-groups \
+  --log-group-name-prefix "/aws/eks/openemr-eks/openemr" \
+  --region us-west-2
+
+# Check Fluent Bit configuration
+kubectl get configmap fluent-bit-config -n openemr -o yaml
+```
+
+**Solutions:**
+
+**1. Restart Fluent Bit:**
+
+```bash
+# Restart Fluent Bit daemonset
+kubectl rollout restart daemonset fluent-bit -n openemr
+
+# Wait for pods to be ready
+kubectl wait --for=condition=ready pod -l app=fluent-bit -n openemr --timeout=300s
+```
+
+**2. Verify Log Directory Permissions:**
+
+```bash
+# Check log directory permissions in OpenEMR pod
+kubectl exec -n openemr deployment/openemr -- ls -la /var/log/openemr/
+
+# Fix permissions if needed
+kubectl exec -n openemr deployment/openemr -- chown -R www-data:www-data /var/log/openemr/
+kubectl exec -n openemr deployment/openemr -- chmod 755 /var/log/openemr/
+```
+
+**3. Check CloudWatch IAM Permissions:**
+
+```bash
+# Verify Fluent Bit service account has proper permissions
+kubectl get serviceaccount fluent-bit -n openemr -o yaml
+
+# Check if IAM role is attached
+kubectl get serviceaccount fluent-bit -n openemr -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
+```
+
+#### Issue: OpenEMR Logging Configuration Missing
+
+**Symptoms:**
+
+```
+OpenEMR not writing to expected log locations
+Log files not being created
+Application errors not captured
+```
+
+**Diagnosis:**
+
+```bash
+# Check OpenEMR configuration
+kubectl exec -n openemr deployment/openemr -- cat /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php | grep -A 10 "Logging Configuration"
+
+# Check log directory structure
+kubectl exec -n openemr deployment/openemr -- find /var/log/openemr -type f -name "*.log"
+
+# Check OpenEMR error logs
+kubectl exec -n openemr deployment/openemr -- tail -f /var/log/openemr/error.log
+```
+
+**Solutions:**
+
+**1. Reconfigure Logging During Restore:**
+
+```bash
+# Enable logging configuration during restore
+CONFIGURE_LOGGING=true ./restore.sh <backup-bucket> <snapshot-id>
+
+# Or manually configure logging
+kubectl exec -n openemr deployment/openemr -- bash -c '
+mkdir -p /var/log/openemr /var/log/apache2
+chown -R www-data:www-data /var/log/openemr /var/log/apache2
+touch /var/log/openemr/error.log /var/log/openemr/access.log /var/log/openemr/system.log
+chmod 644 /var/log/openemr/*.log
+'
+```
+
+**2. Update OpenEMR Configuration:**
+
+```bash
+# Add logging configuration to sqlconf.php
+kubectl exec -n openemr deployment/openemr -- bash -c '
+echo "" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "// OpenEMR 7.0.3.4 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "\$sqlconf[\"log_dir\"] = \"/var/log/openemr\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "\$sqlconf[\"error_log\"] = \"/var/log/openemr/error.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "\$sqlconf[\"access_log\"] = \"/var/log/openemr/access.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "\$sqlconf[\"system_log\"] = \"/var/log/openemr/system.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+'
+```
+
+#### Issue: High Log Volume or Performance Impact
+
+**Symptoms:**
+
+```
+CloudWatch costs increasing rapidly
+Application performance degradation
+High Fluent Bit resource usage
+```
+
+**Diagnosis:**
+
+```bash
+# Check log volume in CloudWatch
+aws logs describe-log-streams \
+  --log-group-name "/aws/eks/openemr-eks/openemr/application" \
+  --region us-west-2
+
+# Check Fluent Bit resource usage
+kubectl top pods -n openemr -l app=fluent-bit
+
+# Review log retention settings
+aws logs describe-log-groups \
+  --log-group-name-prefix "/aws/eks/openemr-eks/openemr" \
+  --region us-west-2 \
+  --query 'logGroups[*].[logGroupName,retentionInDays]'
+```
+
+**Solutions:**
+
+**1. Adjust Log Retention:**
+
+```bash
+# Reduce retention for non-critical logs
+aws logs put-retention-policy \
+  --log-group-name "/aws/eks/openemr-eks/openemr/access" \
+  --retention-in-days 7
+
+aws logs put-retention-policy \
+  --log-group-name "/aws/eks/openemr-eks/openemr/error" \
+  --retention-in-days 14
+```
+
+**2. Optimize Fluent Bit Configuration:**
+
+```bash
+# Update Fluent Bit config to reduce buffer sizes
+kubectl patch configmap fluent-bit-config -n openemr -p '{
+  "data": {
+    "fluent-bit.conf": "..."  # Reduce Mem_Buf_Limit and Buffer_Chunk_Size
+  }
+}'
+
+# Restart Fluent Bit to apply changes
+kubectl rollout restart daemonset fluent-bit -n openemr
+```
+
+**3. Filter Unnecessary Logs:**
+
+```bash
+# Add filters in Fluent Bit config to exclude verbose logs
+# Example: Exclude health check logs, debug logs, etc.
 ```
 
 ## 📊 Common Error Messages Reference
@@ -519,6 +797,7 @@ spec:
 ### Unexpected High Costs
 
 #### Diagnosis
+
 ```bash
 # Check Auto Mode compute costs (change time range to be one of interest)
 aws ce get-cost-and-usage \
@@ -547,6 +826,7 @@ aws cloudwatch get-metric-statistics \
 #### Solutions
 
 **1. Right-size Pod Resources:**
+
 ```bash
 # Check actual vs requested
 
@@ -569,6 +849,7 @@ kubectl patch deployment openemr -n openemr -p '{
 ```
 
 **2. Optimize Aurora Serverless:**
+
 ```bash
 # Reduce minimum ACUs if appropriate
 aws rds modify-db-cluster \
@@ -579,17 +860,20 @@ aws rds modify-db-cluster \
 ### Performance Degradation
 
 #### Symptoms
+
 - Slow page loads (>3 seconds)
 - Database timeout errors
 - High CPU/memory usage
 
 #### Diagnosis
+
 ```bash
 # Check HPA status
 kubectl get hpa -n openemr
 ```
 
 #### Solutions
+
 ```bash
 # Scale up immediately
 kubectl scale deployment openemr --replicas=5 -n openemr
@@ -646,6 +930,51 @@ aws ec2 revoke-security-group-egress \
 
 ## 🎯 Best Practices for Error Prevention
 
+### 🔒 **MANDATORY: End-to-End Testing Before Any Changes**
+
+**Before making any changes to the repository or infrastructure, the end-to-end backup/restore test MUST pass successfully.** This is a core requirement that ensures disaster recovery capabilities remain intact.
+
+#### **Testing Process**
+
+```bash
+# Run the complete end-to-end test
+./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+
+# Expected outcome: All 9 test steps must pass
+# ✅ Infrastructure deployment
+# ✅ OpenEMR installation
+# ✅ Test data creation
+# ✅ Backup creation
+# ✅ Infrastructure destruction
+# ✅ Infrastructure recreation
+# ✅ Backup restoration
+# ✅ Verification
+# ✅ Final cleanup
+```
+
+#### **Why This Is Critical**
+
+- **Disaster Recovery**: Ensures backup/restore functionality works correctly
+- **Infrastructure Validation**: Validates Terraform and Kubernetes configurations
+- **Regression Prevention**: Prevents changes that could break recovery procedures
+- **Compliance**: Demonstrates disaster recovery capabilities for audits
+- **Quality Assurance**: Ensures all changes are thoroughly tested
+
+#### **Test Requirements**
+
+- **All test steps must pass**: No exceptions or partial failures allowed
+- **Complete infrastructure cycle**: Test must validate full create/destroy/restore cycle
+- **Data integrity verification**: Proof files must be correctly restored
+- **Connectivity validation**: Database and application connectivity must work after restore
+- **Resource cleanup**: All test resources must be properly cleaned up
+
+#### **Failure Handling**
+
+- **If any test step fails**: Changes must be reverted or fixed before proceeding
+- **No exceptions**: This testing is mandatory for all development workflows
+- **Re-test required**: After fixes, complete test must pass again
+- **Documentation required**: All changes must include test results
+
 ### Daily Health Checks
 
 ```bash
@@ -694,6 +1023,7 @@ aws eks describe-addon-versions --kubernetes-version 1.33 \
 ### Before Asking for Help
 
 1. **Run validation scripts**
+
    ```bash
    cd scripts
    ./validate-deployment.sh

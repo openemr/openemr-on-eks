@@ -40,7 +40,7 @@ show_usage() {
 request_certificate() {
     local domain=$1
     local auto_dns=${2:-"true"}  # Default to auto DNS creation
-    
+
     if [ -z "$domain" ]; then
         echo -e "${RED}Error: Domain name is required${NC}"
         echo "Usage: $0 request <domain> [auto-dns]"
@@ -49,27 +49,27 @@ request_certificate() {
     fi
 
     echo -e "${YELLOW}Requesting SSL certificate for domain: $domain${NC}"
-    
+
     CERT_ARN=$(aws acm request-certificate \
         --domain-name "$domain" \
         --validation-method DNS \
         --region "$AWS_REGION" \
         --query 'CertificateArn' \
         --output text)
-    
+
     if [ $? -ne 0 ]; then
         echo -e "${RED}❌ Failed to request certificate${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ Certificate request submitted successfully!${NC}"
     echo -e "${YELLOW}Certificate ARN:${NC} $CERT_ARN"
     echo ""
-    
+
     if [ "$auto_dns" = "true" ]; then
         echo -e "${YELLOW}⏳ Waiting for DNS validation records to be available...${NC}"
         sleep 10  # Wait for AWS to generate validation records
-        
+
         # Get the hosted zone ID for the domain
         HOSTED_ZONE_ID=$(get_hosted_zone_id "$domain")
         if [ -z "$HOSTED_ZONE_ID" ]; then
@@ -78,9 +78,9 @@ request_certificate() {
             echo -e "${YELLOW}Or run with manual DNS: $0 request $domain false${NC}"
             exit 1
         fi
-        
+
         echo -e "${GREEN}✅ Found Route53 hosted zone: $HOSTED_ZONE_ID${NC}"
-        
+
         # Create DNS validation records automatically
         if create_dns_validation_records "$CERT_ARN" "$HOSTED_ZONE_ID"; then
             echo -e "${GREEN}✅ DNS validation records created automatically!${NC}"
@@ -102,41 +102,41 @@ request_certificate() {
 get_hosted_zone_id() {
     local domain=$1
     local base_domain
-    
+
     # Try the exact domain first
     ZONE_ID=$(aws route53 list-hosted-zones \
         --query "HostedZones[?Name=='${domain}.'].Id" \
         --output text 2>/dev/null | sed 's|/hostedzone/||')
-    
+
     if [ ! -z "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
         echo "$ZONE_ID"
         return 0
     fi
-    
+
     # Try parent domains (e.g., for subdomain.example.com, try example.com)
     base_domain=$(echo "$domain" | sed 's/^[^.]*\.//')
     while [[ "$base_domain" == *.* ]]; do
         ZONE_ID=$(aws route53 list-hosted-zones \
             --query "HostedZones[?Name=='${base_domain}.'].Id" \
             --output text 2>/dev/null | sed 's|/hostedzone/||')
-        
+
         if [ ! -z "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
             echo "$ZONE_ID"
             return 0
         fi
-        
+
         base_domain=$(echo "$base_domain" | sed 's/^[^.]*\.//')
     done
-    
+
     return 1
 }
 
 create_dns_validation_records() {
     local cert_arn=$1
     local hosted_zone_id=$2
-    
+
     echo -e "${YELLOW}Creating DNS validation records in Route53...${NC}"
-    
+
     # Get validation records from ACM
     local validation_data
     validation_data=$(aws acm describe-certificate \
@@ -144,28 +144,28 @@ create_dns_validation_records() {
         --region "$AWS_REGION" \
         --query 'Certificate.DomainValidationOptions[0].ResourceRecord' \
         --output json 2>/dev/null)
-    
+
     if [ -z "$validation_data" ] || [ "$validation_data" = "null" ]; then
         echo -e "${RED}❌ Could not retrieve validation records from ACM${NC}"
         echo -e "${YELLOW}The certificate might still be processing. Wait a few seconds and try again.${NC}"
         return 1
     fi
-    
+
     # Extract individual values
     local record_name=$(echo "$validation_data" | jq -r '.Name')
     local record_type=$(echo "$validation_data" | jq -r '.Type')
     local record_value=$(echo "$validation_data" | jq -r '.Value')
-    
+
     if [ -z "$record_name" ] || [ "$record_name" = "null" ] || [ -z "$record_value" ] || [ "$record_value" = "null" ]; then
         echo -e "${RED}❌ Invalid validation record data received${NC}"
         return 1
     fi
-    
+
     echo -e "${BLUE}Creating DNS record:${NC}"
     echo -e "${BLUE}  Name: ${NC}$record_name"
     echo -e "${BLUE}  Type: ${NC}$record_type"
     echo -e "${BLUE}  Value: ${NC}$record_value"
-    
+
     # Create change batch with JSON structure
     local change_batch=$(cat <<EOF
 {
@@ -187,16 +187,16 @@ create_dns_validation_records() {
 }
 EOF
 )
-    
+
     # Apply the change batch
     local change_result
     change_result=$(aws route53 change-resource-record-sets \
         --hosted-zone-id "$hosted_zone_id" \
         --change-batch "$change_batch" \
         --output json 2>&1)
-    
+
     local exit_code=$?
-    
+
     if [ $exit_code -eq 0 ]; then
         local change_id=$(echo "$change_result" | jq -r '.ChangeInfo.Id' 2>/dev/null)
         echo -e "${GREEN}✅ DNS validation records created successfully${NC}"
@@ -205,7 +205,7 @@ EOF
     else
         echo -e "${RED}❌ Failed to create DNS validation records${NC}"
         echo -e "${RED}Error details:${NC} $change_result"
-        
+
         # Check for common errors
         if echo "$change_result" | grep -q "already exists"; then
             echo -e "${YELLOW}💡 The DNS record might already exist. This could be normal.${NC}"
@@ -215,14 +215,14 @@ EOF
         elif echo "$change_result" | grep -q "AccessDenied"; then
             echo -e "${YELLOW}💡 Access denied. Check your Route53 permissions.${NC}"
         fi
-        
+
         return 1
     fi
 }
 
 show_manual_dns_instructions() {
     local cert_arn=$1
-    
+
     echo -e "${YELLOW}Manual DNS validation required:${NC}"
     echo "1. Complete DNS validation in the AWS Console:"
     echo "   https://console.aws.amazon.com/acm/home?region=$AWS_REGION"
@@ -235,7 +235,7 @@ show_manual_dns_instructions() {
 list_certificates() {
     echo -e "${YELLOW}Listing SSL certificates in region $AWS_REGION:${NC}"
     echo ""
-    
+
     aws acm list-certificates \
         --region "$AWS_REGION" \
         --query 'CertificateSummaryList[*].{Domain:DomainName,ARN:CertificateArn,Status:Status}' \
@@ -253,13 +253,13 @@ validate_certificate() {
     echo -e "${YELLOW}Checking validation status for certificate:${NC}"
     echo "$cert_arn"
     echo ""
-    
+
     CERT_STATUS=$(aws acm describe-certificate \
         --certificate-arn "$cert_arn" \
         --region "$AWS_REGION" \
         --query 'Certificate.Status' \
         --output text)
-    
+
     if [ "$CERT_STATUS" = "ISSUED" ]; then
         echo -e "${GREEN}✅ Certificate is validated and ready to use!${NC}"
         echo ""
@@ -305,7 +305,7 @@ deploy_with_certificate() {
         --region "$AWS_REGION" \
         --query 'Certificate.Status' \
         --output text)
-    
+
     if [ "$CERT_STATUS" != "ISSUED" ]; then
         echo -e "${RED}❌ Certificate is not in ISSUED status (current: $CERT_STATUS)${NC}"
         echo "Please ensure the certificate is validated before deploying"
@@ -313,7 +313,7 @@ deploy_with_certificate() {
     fi
 
     echo -e "${GREEN}✅ Certificate is valid, proceeding with deployment...${NC}"
-    
+
     # Detect script location and set project root
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
     if [[ "$SCRIPT_DIR" == */scripts ]]; then
@@ -321,7 +321,7 @@ deploy_with_certificate() {
     else
         PROJECT_ROOT="$SCRIPT_DIR"
     fi
-    
+
     if [ ! -f "$PROJECT_ROOT/k8s/deploy.sh" ]; then
         echo -e "${RED}❌ Could not find k8s/deploy.sh at $PROJECT_ROOT/k8s/deploy.sh${NC}"
         echo -e "${YELLOW}Please ensure you're running from the correct project directory.${NC}"
@@ -332,10 +332,10 @@ deploy_with_certificate() {
     export SSL_CERT_ARN="$cert_arn"
     echo -e "${YELLOW}Deploying OpenEMR with SSL certificate...${NC}"
     echo -e "${YELLOW}Certificate ARN:${NC} $cert_arn"
-    
+
     cd "$PROJECT_ROOT/k8s"
     ./deploy.sh
-    
+
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}✅ Deployment completed successfully with SSL certificate!${NC}"
         echo ""
@@ -353,28 +353,28 @@ deploy_with_certificate() {
 show_status() {
     echo -e "${YELLOW}Current SSL configuration in cluster:${NC}"
     echo ""
-    
+
     # Check if service exists
     if ! kubectl get service openemr-service -n $NAMESPACE >/dev/null 2>&1; then
         echo -e "${RED}❌ OpenEMR service not found. Deploy the application first.${NC}"
         exit 1
     fi
-    
+
     # Check service annotations for SSL configuration
     SSL_CERT=$(kubectl get service openemr-service -n $NAMESPACE -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert}' 2>/dev/null)
     SSL_PORTS=$(kubectl get service openemr-service -n $NAMESPACE -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports}' 2>/dev/null)
-    
+
     if [ ! -z "$SSL_CERT" ] && [ "$SSL_CERT" != "null" ]; then
         echo -e "${GREEN}✅ SSL Mode: AWS Certificate Manager${NC}"
         echo -e "${YELLOW}Certificate ARN:${NC} $SSL_CERT"
-        
+
         # Validate certificate status
         CERT_STATUS=$(aws acm describe-certificate \
             --certificate-arn "$SSL_CERT" \
             --region "$AWS_REGION" \
             --query 'Certificate.Status' \
             --output text 2>/dev/null)
-        
+
         if [ "$CERT_STATUS" = "ISSUED" ]; then
             echo -e "${GREEN}Certificate Status: ✅ Valid${NC}"
         else
@@ -384,12 +384,12 @@ show_status() {
         echo -e "${YELLOW}SSL Mode: Self-Signed Certificates${NC}"
         echo -e "${YELLOW}Note: Browsers will show security warnings${NC}"
     fi
-    
+
     # Show service ports
     echo ""
     echo -e "${YELLOW}Available ports:${NC}"
     kubectl get service openemr-service -n $NAMESPACE -o custom-columns=NAME:.metadata.name,PORTS:.spec.ports[*].port
-    
+
     # Show LoadBalancer URL
     LB_URL=$(kubectl get svc openemr-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
     if [ ! -z "$LB_URL" ]; then
@@ -410,14 +410,14 @@ auto_validate_certificate() {
     echo -e "${YELLOW}Auto-validating certificate:${NC}"
     echo "$cert_arn"
     echo ""
-    
+
     # Check certificate status
     CERT_STATUS=$(aws acm describe-certificate \
         --certificate-arn "$cert_arn" \
         --region "$AWS_REGION" \
         --query 'Certificate.Status' \
         --output text)
-    
+
     if [ "$CERT_STATUS" = "ISSUED" ]; then
         echo -e "${GREEN}✅ Certificate is already validated and ready to use!${NC}"
         return 0
@@ -426,16 +426,16 @@ auto_validate_certificate() {
         echo "Auto-validation only works for certificates in PENDING_VALIDATION status"
         exit 1
     fi
-    
+
     # Get the domain name from the certificate
     DOMAIN=$(aws acm describe-certificate \
         --certificate-arn "$cert_arn" \
         --region "$AWS_REGION" \
         --query 'Certificate.DomainName' \
         --output text)
-    
+
     echo -e "${YELLOW}Certificate domain: $DOMAIN${NC}"
-    
+
     # Get the hosted zone ID for the domain
     HOSTED_ZONE_ID=$(get_hosted_zone_id "$DOMAIN")
     if [ -z "$HOSTED_ZONE_ID" ]; then
@@ -443,9 +443,9 @@ auto_validate_certificate() {
         echo -e "${YELLOW}Please ensure you have a Route53 hosted zone for this domain${NC}"
         exit 1
     fi
-    
+
     echo -e "${GREEN}✅ Found Route53 hosted zone: $HOSTED_ZONE_ID${NC}"
-    
+
     # Create DNS validation records
     if create_dns_validation_records "$cert_arn" "$HOSTED_ZONE_ID"; then
         echo -e "${GREEN}✅ DNS validation records created successfully!${NC}"
