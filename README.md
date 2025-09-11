@@ -159,7 +159,6 @@ For production deployments, configure **branch rulesets** to ensure code quality
    - Click **New ruleset** → **New branch ruleset**
    - Name: `Main Branch Protection`
    - Target: `main` branch
-   - Enable: **Require a pull request before merging**
    - Enable: **Require status checks to pass** (add all 7 required checks):
      1. `Run Test Suite (code_quality)`
      2. `Run Test Suite (documentation)`
@@ -170,7 +169,6 @@ For production deployments, configure **branch rulesets** to ensure code quality
      7. `Code Quality`
    - Enable: **Block force pushes**
    - Enable: **Require linear history**
-   - Enable: **Require signed commits**
    - **Important**: Add **Repository admin Role** to bypass list (allows automated workflows)
    - Click **Create** to activate
 

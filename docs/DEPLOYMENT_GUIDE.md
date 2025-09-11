@@ -107,11 +107,9 @@ To maintain code quality and enable proper code review, configure your GitHub re
    - **Enforcement status**: `Active`
    - **Target branches**: `main`
    - **Branch protections**:
-     - ✅ **Require a pull request before merging**
      - ✅ **Require status checks to pass** (configure with all 7 required checks)
      - ✅ **Block force pushes**
      - ✅ **Require linear history** (keeps git history clean)
-     - ✅ **Require signed commits** (enhances security)
 
 4. **Configure Status Checks:**
    - In the **Status checks** section, add:
@@ -159,13 +157,11 @@ Without proper bypass permissions, your automated workflows will fail when tryin
 #### **Recommended Settings Explanation**
 
 **✅ Essential Settings:**
-- **Require a pull request before merging**: Ensures all human changes are reviewed
 - **Require status checks to pass**: Ensures tests and linting pass before merge
 - **Block force pushes**: Prevents accidental history rewriting and maintains audit trail
 
 **✅ Recommended Settings:**
 - **Require linear history**: Keeps git history clean and easier to follow
-- **Require signed commits**: Ensures commit authenticity and prevents tampering
 
 **❌ Not Recommended:**
 - **Restrict creations/updates/deletions**: Would block normal development workflow

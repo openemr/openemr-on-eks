@@ -125,11 +125,9 @@ To ensure code quality and enable proper code review, configure your GitHub repo
    - Target: `main` branch
 
 3. **Configure Branch Protections:**
-   - ✅ **Require a pull request before merging**
    - ✅ **Require status checks to pass** (configure with all 7 required checks)
    - ✅ **Block force pushes**
    - ✅ **Require linear history** (keeps git history clean)
-   - ✅ **Require signed commits** (enhances security)
 
 4. **Configure Status Checks:**
    - In the **Status checks** section, add:
