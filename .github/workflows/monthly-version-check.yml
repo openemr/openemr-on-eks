@@ -1,0 +1,472 @@
+name: Version Check & Awareness
+
+on:
+  schedule:
+    # Run on the 1st of every month at 9:00 AM UTC
+    - cron: '0 9 1 * *'
+  workflow_dispatch:
+    inputs:
+      check_type:
+        description: 'Type of version check'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - applications
+          - infrastructure
+          - terraform_modules
+          - github_workflows
+          - monitoring
+          - eks_addons
+      create_issue:
+        description: 'Create GitHub issue for updates'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  VERSION_CHECK_ENABLED: "true"
+  LOG_LEVEL: INFO
+  TF_VERSION: "1.5.7"
+  KUBECTL_VERSION: "v1.33.0"
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: read
+  actions: read
+
+jobs:
+  version-check:
+    name: Check for Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Setup kubectl
+        uses: azure/setup-kubectl@v4
+        with:
+          version: ${{ env.KUBECTL_VERSION }}
+
+      - name: Setup Dependencies
+        run: |
+          # Install required tools
+          sudo apt-get update
+          sudo apt-get install -y curl jq
+
+          # Install yq
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+
+      - name: Configure AWS credentials (optional)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        continue-on-error: true
+
+      - name: Run Version Awareness Check
+        id: version_check
+        run: |
+          # Initialize log file
+          touch scripts/version-check.log
+          
+          # Check if script exists and is executable
+          if [ ! -f "scripts/version-manager.sh" ]; then
+            echo "ERROR: version-manager.sh not found" | tee scripts/version-check.log
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+          
+          chmod +x scripts/version-manager.sh
+
+          # Test script execution and dependencies
+          echo "Testing script execution..." >> scripts/version-check.log
+          echo "yq version: $(yq --version)" >> scripts/version-check.log
+          echo "jq version: $(jq --version)" >> scripts/version-check.log
+          echo "versions.yaml exists: $(test -f versions.yaml && echo 'yes' || echo 'no')" >> scripts/version-check.log
+          
+          # Test basic script functionality
+          ./scripts/version-manager.sh status >> scripts/version-check.log 2>&1 || echo "Script status check failed" >> scripts/version-check.log
+
+          # Determine if this is a manual run or scheduled run
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual run - use timestamp
+            TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S UTC")
+            REPORT_TITLE="Manual Version Check Report - $TIMESTAMP"
+            echo "VERSION_CHECK_MONTH=$TIMESTAMP" >> $GITHUB_ENV
+            echo "IS_MANUAL_RUN=true" >> $GITHUB_ENV
+            echo "REPORT_TITLE=$REPORT_TITLE" >> $GITHUB_ENV
+          else
+            # Scheduled run - use month format
+            CURRENT_MONTH=$(date +"%B %Y")
+            REPORT_TITLE="Version Check Report for Month of $CURRENT_MONTH"
+            echo "VERSION_CHECK_MONTH=$CURRENT_MONTH" >> $GITHUB_ENV
+            echo "IS_MANUAL_RUN=false" >> $GITHUB_ENV
+            echo "REPORT_TITLE=$REPORT_TITLE" >> $GITHUB_ENV
+          fi
+
+          # Run version check based on input
+          echo "Running version check for: ${{ github.event.inputs.check_type || 'all' }}" >> scripts/version-check.log
+          echo "Report title: $REPORT_TITLE" >> scripts/version-check.log
+          
+          case "${{ github.event.inputs.check_type || 'all' }}" in
+            "applications")
+              ./scripts/version-manager.sh check --components applications --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            "infrastructure")
+              ./scripts/version-manager.sh check --components infrastructure --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            "terraform_modules")
+              ./scripts/version-manager.sh check --components terraform_modules --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            "github_workflows")
+              ./scripts/version-manager.sh check --components github_workflows --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            "monitoring")
+              ./scripts/version-manager.sh check --components monitoring --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            "eks_addons")
+              ./scripts/version-manager.sh check --components eks_addons --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+            *)
+              ./scripts/version-manager.sh check --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              ;;
+          esac
+
+          # Copy version-updates.log to scripts directory for artifact upload
+          if [ -f "version-updates.log" ]; then
+            cp version-updates.log scripts/version-updates.log
+          fi
+          
+          # Copy version-check.log to root directory for report generation
+          if [ -f "scripts/version-check.log" ]; then
+            cp scripts/version-check.log version-check.log
+          fi
+          
+          # Check if updates were found in both log files
+          if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log; then
+            echo "updates_found=true" >> $GITHUB_OUTPUT
+            echo "Updates found in log" | tee -a scripts/version-check.log
+          else
+            echo "updates_found=false" >> $GITHUB_OUTPUT
+            echo "No updates found in log" | tee -a scripts/version-check.log
+          fi
+          
+          # Always set updates_found to ensure downstream jobs can run
+          echo "Final updates_found status: $(grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log && echo 'true' || echo 'false')" | tee -a scripts/version-check.log
+
+      - name: Upload Version Check Logs
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: version-check-logs-${{ github.run_number }}
+          path: |
+            scripts/version-check.log
+            scripts/version-updates.log
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Create Version Awareness Report
+        if: always()
+        run: |
+          # Generate detailed awareness report
+          if [ "${{ env.IS_MANUAL_RUN }}" = "true" ]; then
+            # Manual run report
+            echo "# 📢 OpenEMR EKS Version Check Report" > update-report.md
+            echo "" >> update-report.md
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> update-report.md
+            echo "**Workflow:** [Monthly Version Check & Awareness](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> update-report.md
+            echo "**Triggered by:** Manual workflow dispatch by @${{ github.actor }}" >> update-report.md
+            echo "**Timestamp:** ${{ env.VERSION_CHECK_MONTH }}" >> update-report.md
+            echo "" >> update-report.md
+            echo "## 📋 Summary" >> update-report.md
+            echo "" >> update-report.md
+            echo "This manual version check has identified available updates for your OpenEMR EKS deployment components. This is an **awareness notification** - no automatic updates will be applied." >> update-report.md
+          else
+            # Scheduled monthly report
+            echo "# 📢 OpenEMR EKS Monthly Version Awareness Report" > update-report.md
+            echo "" >> update-report.md
+            echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> update-report.md
+            echo "**Workflow:** [Monthly Version Check & Awareness](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> update-report.md
+            echo "**Triggered by:** Scheduled monthly check" >> update-report.md
+            echo "**Month:** ${{ env.VERSION_CHECK_MONTH }}" >> update-report.md
+            echo "" >> update-report.md
+            echo "## 📋 Summary" >> update-report.md
+            echo "" >> update-report.md
+            echo "This monthly automated check has identified available updates for your OpenEMR EKS deployment components. This is an **awareness notification** - no automatic updates will be applied." >> update-report.md
+          fi
+
+          echo "" >> update-report.md
+          echo "## 🔍 Check Results" >> update-report.md
+          echo "" >> update-report.md
+          if [ -f "scripts/version-check.log" ] || [ -f "scripts/version-updates.log" ]; then
+            # Extract only the summary section from the log
+            if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
+              echo "### ✅ Updates Available" >> update-report.md
+              echo "" >> update-report.md
+              
+              # Create a modern table format
+              echo "| Component | Current → Latest | Priority |" >> update-report.md
+              echo "|-----------|------------------|----------|" >> update-report.md
+              
+              # Extract updates and categorize by priority
+              (grep -E "→ [^❌]" scripts/version-check.log 2>/dev/null || grep -E "→ [^❌]" scripts/version-updates.log 2>/dev/null) | sed 's/.*INFO\] //' | sed 's/ update available: /: /' | sed 's/ → / → /' | grep -v "→ null" | grep -v "→ ❌" | grep -v "→ Unable to determine" | while IFS=':' read -r component versions; do
+                # Determine priority based on component type
+                priority="🟡 Medium"
+                if [[ "$component" == *"OpenEMR"* ]] || [[ "$component" == *"Kubernetes"* ]] || [[ "$component" == *"EKS"* ]]; then
+                  priority="🔴 High"
+                elif [[ "$component" == *"Terraform"* ]] || [[ "$component" == *"Prometheus"* ]] || [[ "$component" == *"Loki"* ]]; then
+                  priority="🟡 Medium"
+                elif [[ "$component" == *"actions/"* ]] || [[ "$component" == *"commitizen"* ]]; then
+                  priority="🟢 Low"
+                fi
+                echo "| **$component** | \`$versions\` | $priority |" >> update-report.md
+              done
+              
+              echo "" >> update-report.md
+              echo "### 📍 Quick File Reference" >> update-report.md
+              echo "" >> update-report.md
+              echo "> 💡 **Detailed file locations with line numbers** are available in the workflow artifacts below" >> update-report.md
+              
+              # Add note about failed checks if any
+              if grep -q "Unable to determine" scripts/version-check.log 2>/dev/null || grep -q "Unable to determine" scripts/version-updates.log 2>/dev/null; then
+                echo "" >> update-report.md
+                echo "### ⚠️ Note" >> update-report.md
+                echo "Some components could not be checked due to API limitations or network issues. Check the full log for details." >> update-report.md
+              fi
+            else
+              echo "### ✅ All Components Up to Date" >> update-report.md
+              echo "" >> update-report.md
+              echo "No updates available at this time." >> update-report.md
+            fi
+          else
+            echo "### ❌ Check Failed" >> update-report.md
+            echo "" >> update-report.md
+            echo "Version check could not complete. Please check the workflow logs for details." >> update-report.md
+          fi
+          echo "" >> update-report.md
+
+          echo "## 📁 Generated Reports" >> update-report.md
+          echo "" >> update-report.md
+          echo "- **Version Check Log:** Available in workflow artifacts" >> update-report.md
+          echo "- **Detailed Report:** Available in workflow artifacts" >> update-report.md
+          echo "" >> update-report.md
+          echo "**How to access:** Go to the [workflow run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}) and scroll down to the 'Artifacts' section to download the reports." >> update-report.md
+          echo "" >> update-report.md
+
+          echo "## 🚀 Action Plan" >> update-report.md
+          echo "" >> update-report.md
+          echo "### 🔴 High Priority (Apply First)" >> update-report.md
+          echo "- Review and test **OpenEMR**, **Kubernetes**, and **EKS** updates" >> update-report.md
+          echo "- Check for breaking changes in release notes" >> update-report.md
+          echo "" >> update-report.md
+          echo "### 🟡 Medium Priority (Schedule for Next Maintenance)" >> update-report.md
+          echo "- Update **Terraform**, **Prometheus**, and **Loki** components" >> update-report.md
+          echo "- Test in development environment first" >> update-report.md
+          echo "" >> update-report.md
+          echo "### 🟢 Low Priority (When Convenient)" >> update-report.md
+          echo "- Update **GitHub Actions** and **pre-commit hooks**" >> update-report.md
+          echo "- These can be updated during regular development cycles" >> update-report.md
+          echo "" >> update-report.md
+          echo "### 🔧 Quick Commands" >> update-report.md
+          echo "" >> update-report.md
+          echo "\`\`\`bash" >> update-report.md
+          echo "# Check current status" >> update-report.md
+          echo "./scripts/version-dashboard.sh" >> update-report.md
+          echo "" >> update-report.md
+          echo "# Check specific components" >> update-report.md
+          echo "./scripts/version-manager.sh check --components applications" >> update-report.md
+          echo "\`\`\`" >> update-report.md
+          echo "" >> update-report.md
+          echo "> **Note:** All updates must be applied manually. No automatic updates will be performed." >> update-report.md
+          echo "" >> update-report.md
+
+          if [ "${{ env.IS_MANUAL_RUN }}" = "true" ]; then
+            echo "---" >> update-report.md
+            echo "" >> update-report.md
+            echo "*This awareness report was generated automatically by the OpenEMR EKS Version Awareness system.*" >> update-report.md
+          else
+            echo "---" >> update-report.md
+            echo "" >> update-report.md
+            echo "*This monthly awareness report was generated automatically by the OpenEMR EKS Version Awareness system.*" >> update-report.md
+          fi
+
+      - name: Create Detailed Report
+        if: always()
+        run: |
+          # Generate detailed report for artifact
+          if [ -f "scripts/version-check.log" ] || [ -f "scripts/version-updates.log" ]; then
+            # Create detailed report with all information
+            if [ "${{ env.IS_MANUAL_RUN }}" = "true" ]; then
+              echo "# 📢 OpenEMR EKS Version Check - Detailed Report" > detailed-report.md
+              echo "" >> detailed-report.md
+              echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> detailed-report.md
+              echo "**Workflow:** [Monthly Version Check & Awareness](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> detailed-report.md
+              echo "**Triggered by:** Manual workflow dispatch by @${{ github.actor }}" >> detailed-report.md
+              echo "**Timestamp:** ${{ env.VERSION_CHECK_MONTH }}" >> detailed-report.md
+            else
+              echo "# 📢 OpenEMR EKS Monthly Version Check - Detailed Report" > detailed-report.md
+              echo "" >> detailed-report.md
+              echo "**Generated:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> detailed-report.md
+              echo "**Workflow:** [Monthly Version Check & Awareness](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> detailed-report.md
+              echo "**Triggered by:** Scheduled monthly check" >> detailed-report.md
+              echo "**Month:** ${{ env.VERSION_CHECK_MONTH }}" >> detailed-report.md
+            fi
+            echo "" >> detailed-report.md
+            echo "## 📋 Summary" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "This detailed report contains comprehensive information about available updates for your OpenEMR EKS deployment components." >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "## 🔍 Check Results" >> detailed-report.md
+            echo "" >> detailed-report.md
+            if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
+              echo "### ✅ Updates Available" >> detailed-report.md
+              echo "" >> detailed-report.md
+              echo "**Available Updates:**" >> detailed-report.md
+              echo "" >> detailed-report.md
+              # Extract only the actual version changes, filtering out null values and errors
+              (grep -E "→ [^❌]" scripts/version-check.log 2>/dev/null || grep -E "→ [^❌]" scripts/version-updates.log 2>/dev/null) | sed 's/.*INFO\] //' | sed 's/ update available: /: /' | sed 's/ → / → /' | grep -v "→ null" | grep -v "→ ❌" | grep -v "→ Unable to determine" >> detailed-report.md
+              echo "" >> detailed-report.md
+              echo "### 📍 Version Locations" >> detailed-report.md
+              echo "" >> detailed-report.md
+              # Extract version locations for each component, but only for successful updates
+              (grep -A 15 "### 📍 Version Locations for" scripts/version-check.log 2>/dev/null || grep -A 15 "### 📍 Version Locations for" scripts/version-updates.log 2>/dev/null) | grep -v "→ null" | grep -v "→ ❌" | grep -v "→ Unable to determine" >> detailed-report.md
+              
+              # Add note about failed checks if any
+              if grep -q "Unable to determine" scripts/version-check.log 2>/dev/null || grep -q "Unable to determine" scripts/version-updates.log 2>/dev/null; then
+                echo "" >> detailed-report.md
+                echo "### ⚠️ Note" >> detailed-report.md
+                echo "Some components could not be checked due to API limitations or network issues. Check the full log for details." >> detailed-report.md
+              fi
+            else
+              echo "### ✅ All Components Up to Date" >> detailed-report.md
+              echo "" >> detailed-report.md
+              echo "No updates available at this time." >> detailed-report.md
+            fi
+            echo "" >> detailed-report.md
+            echo "## 🎯 Next Steps" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "1. **Review updates** above and assess priority" >> detailed-report.md
+            echo "2. **Test updates in development** before applying to production" >> detailed-report.md
+            echo "3. **Check release notes** for breaking changes" >> detailed-report.md
+            echo "4. **Apply updates manually** during maintenance windows" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "### 🔧 Quick Commands" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "\`\`\`bash" >> detailed-report.md
+            echo "# Check current status" >> detailed-report.md
+            echo "./scripts/version-dashboard.sh" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "# Check specific components" >> detailed-report.md
+            echo "./scripts/version-manager.sh check --components applications" >> detailed-report.md
+            echo "\`\`\`" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "> **Note:** All updates must be applied manually. No automatic updates will be performed." >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "---" >> detailed-report.md
+            echo "" >> detailed-report.md
+            echo "*This detailed report was generated automatically by the OpenEMR EKS Version Awareness system.*" >> detailed-report.md
+          fi
+
+      - name: Upload Detailed Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: detailed-version-report-${{ github.run_number }}
+          path: |
+            detailed-report.md
+          retention-days: 30
+          if-no-files-found: warn
+
+      - name: Create GitHub Issue
+        if: always() && github.event.inputs.create_issue == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = fs.readFileSync('update-report.md', 'utf8');
+            const isManualRun = process.env.IS_MANUAL_RUN === 'true';
+            const reportTitle = process.env.REPORT_TITLE || 'Version Check Report';
+            const timestamp = process.env.VERSION_CHECK_MONTH || new Date().toISOString();
+
+            if (isManualRun) {
+              // Manual run - always create a new timestamped issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: reportTitle,
+                body: report,
+                labels: ['version-check', 'manual', 'maintenance', 'dependencies', 'awareness']
+              });
+
+              console.log('Created manual version check issue:', issue.data.html_url);
+            } else {
+              // Scheduled run - check for existing monthly issue
+              const issues = await github.rest.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: 'open',
+                labels: 'version-check,automated,monthly'
+              });
+
+              const existingIssue = issues.data.find(issue =>
+                issue.title.includes(`Version Check Report for Month of`)
+              );
+
+              if (existingIssue) {
+                console.log('Similar monthly issue already exists:', existingIssue.html_url);
+                return;
+              }
+
+              // Create new monthly issue
+              const issue = await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: reportTitle,
+                body: report,
+                labels: ['version-check', 'automated', 'monthly', 'maintenance', 'dependencies', 'awareness']
+              });
+
+              console.log('Created monthly issue:', issue.data.html_url);
+            }
+
+  notification:
+    name: Send Notifications
+    runs-on: ubuntu-24.04
+    needs: version-check
+    if: always()
+
+    steps:
+      - name: Notify on Success
+        if: needs.version-check.result == 'success'
+        run: |
+          if [ "${{ env.IS_MANUAL_RUN }}" = "true" ]; then
+            echo "✅ Manual version check completed successfully"
+            echo "Updates found and reported at ${{ env.VERSION_CHECK_MONTH }}"
+          else
+            echo "✅ Monthly version check completed successfully"
+            echo "Updates found and reported for ${{ env.VERSION_CHECK_MONTH }}"
+          fi
+
+      - name: Notify on Failure
+        if: needs.version-check.result == 'failure'
+        run: |
+          if [ "${{ env.IS_MANUAL_RUN }}" = "true" ]; then
+            echo "❌ Manual version check failed"
+          else
+            echo "❌ Monthly version check failed"
+          fi
+          exit 1

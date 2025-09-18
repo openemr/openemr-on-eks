@@ -7,7 +7,7 @@
 - [Release Schedule](#-release-schedule)
 - [How It Works](#-how-it-works)
 - [Manual Release Process](#-manual-release-process)
-- [End-to-End Testing Requirements](#️-end-to-end-testing-requirements)
+- [End-to-End Testing Requirements](#-end-to-end-testing-requirements)
 - [Release Notes Generation](#-release-notes-generation)
 - [Safety Features](#️-safety-features)
 - [File Structure](#-file-structure)

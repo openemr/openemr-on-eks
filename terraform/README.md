@@ -2,6 +2,44 @@
 
 This directory contains the complete infrastructure-as-code (IaC) configuration for the OpenEMR on EKS deployment. The infrastructure is designed for production-grade healthcare applications with comprehensive security, compliance, and monitoring capabilities.
 
+## 📋 Table of Contents
+
+### **📁 Directory Overview**
+- [Directory Structure](#directory-structure)
+  - [Core Configuration Files](#core-configuration-files)
+  - [Infrastructure Modules](#infrastructure-modules)
+
+### **🏗️ Infrastructure Architecture**
+- [Infrastructure Dependency Graph](#infrastructure-dependency-graph)
+
+### **📄 Configuration Files**
+- [Core Configuration](#core-configuration)
+  - [main.tf](#maintf)
+  - [variables.tf](#variablestf)
+  - [outputs.tf](#outputstf)
+  - [terraform.tfvars.example](#terraformtfvarsexample)
+- [Infrastructure Modules](#infrastructure-modules-1)
+  - [vpc.tf](#vpctf)
+  - [eks.tf](#ekstf)
+  - [iam.tf](#iamtf)
+  - [kms.tf](#kmstf)
+  - [rds.tf](#rdstf)
+  - [efs.tf](#efstf)
+  - [elasticache.tf](#elasticachetf)
+  - [s3.tf](#s3tf)
+  - [cloudwatch.tf](#cloudwatchtf)
+  - [waf.tf](#waftf)
+  - [cloudtrail.tf](#cloudtrailtf)
+
+### **🚀 Deployment & Operations**
+- [Maintenance Guidelines](#maintenance-guidelines)
+- [Cost Optimization](#cost-optimization)
+
+### **🔧 Reference & Support**
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+- [Support](#support)
+
 ## Directory Structure
 
 ### Core Configuration Files
@@ -44,6 +82,7 @@ graph TD
     K --> L[waf.tf<br/>AWS WAF security]
     L --> M[cloudtrail.tf<br/>CloudTrail audit logging]
     M --> N[outputs.tf<br/>Output values]
+    N --> O[../docs/VERSION_MANAGEMENT.md<br/>Version awareness system]
 
     %% Additional dependencies
     C --> J
@@ -62,14 +101,16 @@ graph TD
     classDef security fill:#ffebee,stroke:#b71c1c,stroke-width:2px
     classDef monitoring fill:#f1f8e9,stroke:#33691e,stroke-width:2px
     classDef output fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    classDef documentation fill:#fff8e1,stroke:#f57f17,stroke-width:2px
 
     class A,B foundation
     class D networking
     class E,F compute
     class G,H,I,J storage
     class C,L,M security
-    class K monitoring
     class N output
+    class O documentation
+    class K monitoring
 ```
 
 ## File Descriptions

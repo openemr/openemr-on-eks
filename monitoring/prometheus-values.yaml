@@ -31,7 +31,7 @@
 # Namespaces
 # MONITORING_NAMESPACE="monitoring"             # Monitoring components
 # OPENEMR_NAMESPACE="openemr"                   # OpenEMR application
-# OBSERVABILITY_NAMESPACE="observability"      # Jaeger operator
+# OBSERVABILITY_NAMESPACE="observability"       # Jaeger operator
 
 # Chart Versions (pinned for stability)
 # CHART_KPS_VERSION="75.18.1"                  # kube-prometheus-stack

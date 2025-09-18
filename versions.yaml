@@ -1,0 +1,329 @@
+# OpenEMR EKS Project - Version Management Configuration
+# This file centralizes all version information for awareness and notifications
+# Updated for monthly automated version checking with AWS CLI integration
+
+project:
+  name: "openemr-on-eks"
+  version: "2.0.0"
+  description: "OpenEMR deployment on Amazon EKS with comprehensive monitoring and security"
+  last_updated: "2025-09-18"
+  aws_integration: true
+
+# Core Application Versions
+applications:
+  openemr:
+    current: "7.0.3"
+    registry: "openemr/openemr"
+    release_notes_url: "https://github.com/openemr/openemr/releases"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of OpenEMR docker image we use."
+
+  fluent_bit:
+    current: "4.0.8"
+    registry: "fluent/fluent-bit"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of Fluent Bit sidecar for OpenEMR that sends logs to CloudWatch Log Groups."
+
+# Infrastructure Versions
+infrastructure:
+  eks:
+    current: "1.33"
+    aws_supported_versions: ["1.28", "1.29", "1.30", "1.31", "1.32", "1.33"]
+    notify_on_update: true
+    requires_aws_cli: true
+    description: "Amazon EKS cluster version"
+
+  terraform:
+    current: "1.5.7"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Terraform version used in documentation"
+
+# Database Versions
+databases:
+  aurora_mysql:
+    current: "8.0.mysql_aurora.3.10.0"
+    aws_available_versions_url: "https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.AuroraMysqlEngineVersion.html"
+    notify_on_update: true
+    requires_aws_cli: true
+    fallback_method: "documentation_scraping"
+    description: "Engine version for the aurora MySQL database we use"
+
+# EKS Add-ons Versions (only non-Auto Mode managed add-ons)
+# Note: CoreDNS, kube-proxy, VPC CNI, and EBS CSI Driver are managed by EKS Auto Mode
+eks_addons:
+  efs_csi_driver:
+    current: "v2.1.11-eksbuild.1"
+    notify_on_update: true
+    requires_aws_cli: true
+    aws_addon_name: "aws-efs-csi-driver"
+    description: "EFS CSI Driver for persistent storage"
+
+  metrics_server:
+    current: "v0.8.0-eksbuild.2"
+    notify_on_update: true
+    requires_aws_cli: true
+    aws_addon_name: "metrics-server"
+    description: "Kubernetes Metrics Server for resource metrics"
+
+# Terraform Modules
+terraform_modules:
+  terraform_aws:
+    source: "hashicorp/aws"
+    current: "6.6.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Official AWS provider from Hashicorp for Terraform."
+
+  terraform_kubernetes:
+    source: "hashicorp/kubernetes"
+    current: "2.38.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Official Kubernetes provider from Hashicorp for Terraform."
+
+  aws_pod_identity:
+    source: "terraform-aws-modules/eks-pod-identity/aws"
+    current: "2.0.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "AWS provided module for EKS pod identities for Terraform."
+
+  aws_eks:
+    source: "terraform-aws-modules/eks/aws"
+    current: "21.0.9"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "AWS provided module for EKS for Terraform."
+
+  aws_vpc:
+    source: "terraform-aws-modules/vpc/aws"
+    current: "6.0.1"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "AWS provided module for VPCs for Terraform."
+
+# GitHub Workflow Actions Dependencies
+github_workflows:
+  actions_checkout:
+    current: "v5"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for checking out code from a registry."
+
+  actions_setup_python:
+    current: "v5"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for setting up a specified Python version."
+
+  actions_setup_terraform:
+    current: "v3"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for setting up a specified Terraform version."
+
+  actions_setup_kubectl:
+    current: "v4"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for setting up a specified Kubectl version (azure/setup-kubectl)."
+
+  actions_upload_artifact:
+    current: "v4"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for uploading an artifact for storage."
+
+  actions_download_artifact:
+    current: "v5"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for downloading an artifact as part of a workflow."
+
+  trivy_action:
+    current: "master"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Scans the whole repository for security vulnerabilities."
+
+  codeql_action:
+    current: "v3"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Uploads the generated Trivy report in Sarif format to the Github Security tab."
+
+  github_runner:
+    current: "ubuntu-24.04"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "GitHub-hosted runner environment (ubuntu-24.04)"
+
+# Pre-commit Hooks Versions
+pre_commit_hooks:
+  pre_commit_hooks:
+    current: "v6.0.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/pre-commit/pre-commit-hooks"
+
+  black:
+    current: "25.1.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/psf/black"
+
+  isort:
+    current: "6.0.1"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/pycqa/isort"
+
+  flake8:
+    current: "7.3.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/pycqa/flake8"
+
+  bandit:
+    current: "1.8.6"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/pycqa/bandit"
+
+  terraform_hooks:
+    current: "v1.100.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/antonbabenko/pre-commit-terraform"
+
+  shellcheck:
+    current: "v0.11.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/koalaman/shellcheck-precommit"
+
+  markdownlint:
+    current: "v0.45.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/igorshubovych/markdownlint-cli"
+
+  yamllint:
+    current: "v1.37.1"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/adrienverge/yamllint"
+
+  commitizen:
+    current: "v4.8.3"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "https://github.com/commitizen-tools/commitizen"
+
+# Semver Package Versions (used in workflows)
+semver_packages:
+  python_version:
+    current: "3.13.7"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of Python used in Github CI/CD workflows."
+
+  terraform_version:
+    current: "1.5.7"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of Terraform used in Github CI/CD workflows."
+
+  kubectl_version:
+    current: "v1.33.4"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of Kubectl used in Github CI/CD workflows."
+
+  semver:
+    current: "3.0.4"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Version of the 'Semver' Python package used in Github CI/CD workflows."
+
+# Monitoring Stack Versions
+monitoring:
+  prometheus_operator:
+    current: "75.18.1"
+    chart: "kube-prometheus-stack"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Hosts custom monitoring dashboards for the setup and integrates with pager duty for automated alerting."
+
+  loki:
+    current: "6.35.1"
+    chart: "loki"
+    repository: "grafana"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Loki for log aggregation."
+
+  jaeger:
+    current: "3.4.1"
+    chart: "jaeger"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Jaeger for trace monitoring of the setup."
+
+  cert_manager:
+    current: "v1.18.2"
+    chart: "cert-manager"
+    repository: "jetstack"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "cert-manager for TLS certificate management"
+
+# Notification Settings
+notifications:
+  github_issues:
+    enabled: true
+    labels: ["version-update", "maintenance", "dependencies", "monthly-check"]
+    create_for:
+      - "applications"
+      - "infrastructure"
+      - "terraform_modules"
+      - "github_workflows"
+      - "pre_commit_hooks"
+      - "semver_packages"
+      - "monitoring"
+      - "eks_addons"
+    priority_threshold: "medium" # low, medium, high, critical
+    monthly_schedule: true
+    issue_title_template: "Version Check Report for Month of {month}"
+
+# Logging Configuration
+logging:
+  enabled: true
+  retention_days: 30
+  log_level: "INFO"
+
+# AWS CLI Configuration
+aws_cli:
+  required_for:
+    - "aurora_mysql"
+    - "eks_addons"
+  optional_for:
+    - "infrastructure"
+  fallback_methods:
+    aurora_mysql: "documentation_scraping"
+    eks_addons: "hardcoded_versions"
+  credentials_setup:
+    environment_variables:
+      - "AWS_ACCESS_KEY_ID"
+      - "AWS_SECRET_ACCESS_KEY"
+      - "AWS_REGION"
+    github_secrets:
+      - "AWS_ACCESS_KEY_ID"
+      - "AWS_SECRET_ACCESS_KEY"
+      - "AWS_REGION"
+    aws_cli_config: "~/.aws/credentials"
+    aws_cli_config_file: "~/.aws/config"

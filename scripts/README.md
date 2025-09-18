@@ -2,6 +2,48 @@
 
 This directory contains all the operational scripts for the OpenEMR on EKS deployment. These scripts handle infrastructure management, application deployment, monitoring, security, and maintenance tasks.
 
+## 📋 Table of Contents
+
+### **📁 Directory Overview**
+- [Directory Structure](#directory-structure)
+  - [Core Deployment Scripts](#core-deployment-scripts)
+  - [Infrastructure Management](#infrastructure-management)
+  - [Security & Compliance](#security--compliance)
+  - [Feature Management](#feature-management)
+  - [Version Management](#version-management)
+  - [Testing & Validation](#testing--validation)
+
+### **📄 Script Categories**
+- [Deployment & Infrastructure](#1-deployment--infrastructure)
+  - [clean-deployment.sh](#clean-deploymentsh)
+  - [restore-defaults.sh](#restore-defaultssh)
+  - [validate-deployment.sh](#validate-deploymentsh)
+  - [validate-efs-csi.sh](#validate-efs-csish)
+- [Backup & Restore](#2-backup--restore)
+  - [backup.sh](#backupsh)
+  - [restore.sh](#restoresh)
+- [Security & Compliance](#3-security--compliance)
+  - [cluster-security-manager.sh](#cluster-security-managersh)
+  - [ssl-cert-manager.sh](#ssl-cert-managersh)
+  - [ssl-renewal-manager.sh](#ssl-renewal-managersh)
+- [Feature Management](#4-feature-management)
+  - [openemr-feature-manager.sh](#openemr-feature-managersh)
+  - [check-openemr-versions.sh](#check-openemr-versionssh)
+- [Version Management](#5-version-management)
+  - [version-manager.sh](#version-managersh)
+- [Testing & Validation](#6-testing--validation)
+  - [run-test-suite.sh](#run-test-suitesh)
+  - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
+  - [test-config.yaml](#test-configyaml)
+
+### **🔧 Maintenance & Operations**
+- [Maintenance Guidelines](#maintenance-guidelines)
+  - [Adding New Scripts](#adding-new-scripts)
+  - [Updating Existing Scripts](#updating-existing-scripts)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Support](#support)
+
 ## Directory Structure
 
 ### Core Deployment Scripts
@@ -25,7 +67,11 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 ### Feature Management
 
 - **`openemr-feature-manager.sh`** - OpenEMR feature flag management and configuration
-- **`check-openemr-versions.sh`** - OpenEMR version checking and update management
+- **`check-openemr-versions.sh`** - OpenEMR version checking and awareness
+
+### Version Management
+
+- **`version-manager.sh`** - Comprehensive version awareness checking for all project dependencies
 
 ### Testing & Validation
 
@@ -48,6 +94,50 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Maintenance Notes**:
   - Ensure all resources are properly identified for cleanup
   - Update resource names if infrastructure changes
+
+#### `restore-defaults.sh`
+
+- **Purpose**: Resets Kubernetes manifests to default state with placeholders
+- **Dependencies**: kubectl, yq, git
+- **Key Features**:
+  - Restores all Kubernetes manifest files to their default template state
+  - Replaces actual values with placeholder text
+  - Preserves file structure while removing sensitive data
+  - Safe to run without affecting running deployments
+- **Maintenance Notes**:
+  - Update placeholder values if template structure changes
+  - Ensure all manifest files are included in restoration process
+  - Test restoration process after infrastructure changes
+
+#### `validate-deployment.sh`
+
+- **Purpose**: Pre-deployment validation and health checks for running deployments
+- **Dependencies**: kubectl, aws, terraform
+- **Key Features**:
+  - Validates Kubernetes cluster connectivity and configuration
+  - Checks resource availability and health status
+  - Verifies storage and networking components
+  - Validates security policies and RBAC configurations
+  - Provides comprehensive deployment readiness assessment
+- **Maintenance Notes**:
+  - Update validation checks as infrastructure evolves
+  - Add new resource types to validation as they're deployed
+  - Modify health check criteria based on operational requirements
+
+#### `validate-efs-csi.sh`
+
+- **Purpose**: EFS CSI driver validation and troubleshooting
+- **Dependencies**: kubectl, aws
+- **Key Features**:
+  - Validates EFS CSI driver installation and configuration
+  - Tests EFS connectivity and mount capabilities
+  - Checks storage class and persistent volume configurations
+  - Provides troubleshooting information for EFS-related issues
+  - Validates EFS access points and security groups
+- **Maintenance Notes**:
+  - Update validation criteria as EFS CSI driver versions change
+  - Add new EFS features to validation as they're implemented
+  - Modify troubleshooting steps based on common issues
 
 ### 2. Backup & Restore
 
@@ -83,10 +173,10 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   ```bash
   # Basic restore
   ./restore.sh my-backup-bucket my-snapshot-id
-  
+
   # Cross-region restore
   ./restore.sh my-backup-bucket my-snapshot-id us-east-1
-  
+
   # Force restore (skip confirmations)
   ./restore.sh my-backup-bucket my-snapshot-id --force
   ```
@@ -112,7 +202,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 
 #### `ssl-cert-manager.sh`
 
-- **Purpose**: SSL certificate management
+- **Purpose**: [ACM](https://aws.amazon.com/certificate-manager/) SSL certificate management
 - **Dependencies**: kubectl, aws
 - **Key Features**:
   - Manages SSL certificates for OpenEMR
@@ -121,6 +211,22 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Maintenance Notes**:
   - Update certificate renewal logic
   - Modify SSL configuration as needed
+
+#### `ssl-renewal-manager.sh`
+
+- **Purpose**: Automated SSL certificate renewal system for self-signed certificates
+- **Dependencies**: kubectl, openssl, aws
+- **Key Features**:
+  - Automates renewal of self-signed certificates used by OpenEMR
+  - Handles encryption between load balancer and OpenEMR pods
+  - Manages self-signed (**note:** and **only** self-signed certificates unlike the ssl-cert-manager.sh script which **only** manages [ACM](https://aws.amazon.com/certificate-manager/)) certificates) certificate lifecycle and rotation
+  - Updates Kubernetes secrets with new certificates
+  - Provides certificate validation and health checks
+- **Maintenance Notes**:
+  - Update certificate renewal schedules as needed
+  - Modify certificate validation criteria as needed
+  - Adjust renewal thresholds based on operational requirements
+  - Test certificate rotation process after infrastructure changes
 
 ### 4. Feature Management
 
@@ -138,17 +244,56 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 
 #### `check-openemr-versions.sh`
 
-- **Purpose**: OpenEMR version management
-- **Dependencies**: kubectl, aws
+- **Purpose**: OpenEMR version checking and awareness
+- **Dependencies**: kubectl, aws, curl, jq
 - **Key Features**:
-  - Checks current OpenEMR version
-  - Identifies available updates
-  - Helps manages version upgrades
+  - Checks current OpenEMR version in running deployment
+  - Identifies available updates from Docker Hub
+  - Provides version upgrade recommendations
+  - Generates detailed version reports
+  - Supports both manual and automated checking (manual via a call from the command line and automated via crontab or something similar)
 - **Maintenance Notes**:
-  - Update version checking logic if needed
-  - Modify upgrade procedures if needed
+  - Modify upgrade procedures as OpenEMR evolves
+  - Adjust version comparison criteria as needed
 
-### 5. Testing & Validation
+### 5. Version Management
+
+#### `version-manager.sh`
+
+- **Purpose**: Comprehensive version awareness and checking system (read-only)
+- **Dependencies**: curl, jq, yq, aws (optional), kubectl, terraform
+- **Key Features**:
+  - **Dual run modes**: Monthly automated and manual timestamped runs
+  - **Component selection**: Choose specific component types for manual runs
+  - **Comprehensive search**: Automatically searches codebase for version strings when updates are found
+  - **AWS integration**: Uses AWS CLI for definitive version lookups when credentials are available
+  - **Graceful fallback**: Works without AWS credentials, reporting what cannot be checked
+  - **GitHub integration**: Creates timestamped issues for manual runs, monthly issues for scheduled runs
+  - **Flexible reporting**: Option to run checks without creating issues
+  - **Multi-component support**: Applications, infrastructure, Terraform modules, GitHub workflows, monitoring, EKS add-ons
+- **Usage Examples**:
+  ```bash
+  # Check all components
+  ./version-manager.sh check
+
+  # Check specific component types
+  ./version-manager.sh check --components applications
+  ./version-manager.sh check --components eks_addons
+
+  # Create GitHub issue with custom title
+  ./version-manager.sh check --create-issue --month="Custom Report Title"
+
+  # Show current status
+  ./version-manager.sh status
+  ```
+- **Maintenance Notes**:
+  - Update version fetching logic for new components
+  - Add new component types as needed
+  - Modify AWS CLI integration as services change
+  - Update codebase search patterns for new file types
+
+
+### 6. Testing & Validation
 
 #### `run-test-suite.sh`
 
@@ -173,6 +318,22 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Maintenance Notes**:
   - Update test data as needed
   - Modify test validation criteria as needed
+
+#### `test-config.yaml`
+
+- **Purpose**: Test configuration for CI/CD pipeline
+- **Dependencies**: yq, kubectl, aws
+- **Key Features**:
+  - Centralized test configuration management
+  - Defines test environments and parameters
+  - Configures test data and validation criteria
+  - Supports multiple test scenarios and environments
+  - Integrates with automated testing workflows
+- **Maintenance Notes**:
+  - Update test parameters as infrastructure changes
+  - Add new test scenarios as features are added
+  - Modify validation criteria based on operational requirements
+  - Ensure configuration compatibility with CI/CD pipeline updates
 
 ## Maintenance Guidelines
 

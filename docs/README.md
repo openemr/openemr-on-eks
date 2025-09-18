@@ -2,6 +2,34 @@
 
 This directory contains comprehensive documentation for the OpenEMR on EKS deployment project. The documentation is designed for developers, maintainers, and operators who need to understand, deploy, maintain, and troubleshoot the system.
 
+## 📋 Table of Contents
+
+### **📁 Directory Overview**
+- [Directory Structure](#directory-structure)
+- [Documentation Dependency Graph](#documentation-dependency-graph)
+
+### **📄 Core Documentation Files**
+- [Deployment Guide](#deployment_guidemd)
+- [Backup & Restore Guide](#backup_restore_guidemd)
+- [Autoscaling Guide](#autoscaling_guidemd)
+- [Logging Guide](#logging_guidemd)
+- [Testing Guide](#testing_guidemd)
+- [End-to-End Testing Requirements](#end_to_end_testing_requirementsmd)
+- [Manual Releases](#manual_releasesmd)
+- [Version Management](#version_managementmd)
+- [Troubleshooting Guide](#troubleshootingmd)
+
+### **🔗 Related Documentation**
+- [Main Project README](../README.md)
+- [Terraform Documentation](../terraform/README.md)
+- [Kubernetes Documentation](../k8s/README.md)
+- [Scripts Documentation](../scripts/README.md)
+- [Monitoring Documentation](../monitoring/README.md)
+
+### **📖 Documentation Maintenance**
+- [Maintenance Guidelines](#maintenance-guidelines)
+- [Support and Contributing](#support-and-contributing)
+
 ## Directory Structure
 
 ### Core Documentation Files
@@ -13,6 +41,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`TESTING_GUIDE.md`** - Testing framework and CI/CD procedures
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
+- **`VERSION_MANAGEMENT.md`** - Version awareness and dependency management
 - **`TROUBLESHOOTING.md`** - Common issues and resolution procedures
 
 ## Documentation Dependency Graph
@@ -32,7 +61,12 @@ graph TD
     F --> G[TESTING_GUIDE.md]
     G --> H[MANUAL_RELEASES.md]
 
-    I[VERSION] --> H
+    A --> M[VERSION_MANAGEMENT.md]
+    M --> H
+    M --> I[VERSION]
+    L[scripts/] --> M
+
+    I --> H
     J[terraform/] --> A
     K[k8s/] --> A
     L[scripts/] --> A
@@ -45,6 +79,7 @@ graph TD
     style F fill:#fce4ec
     style G fill:#f1f8e9
     style H fill:#e0f2f1
+    style M fill:#fff8e1
 ```
 
 ## File Descriptions
@@ -172,6 +207,22 @@ graph TD
   - Modify version bumping logic as needed
   - Add new safety features as requirements change
   - Update release notes templates for new formats
+
+#### `VERSION_MANAGEMENT.md`
+
+- **Purpose**: Version awareness and dependency management system
+- **Key Features**:
+  - Comprehensive version tracking for all project dependencies
+  - Automated GitHub issue creation for updates
+  - Centralized configuration via `versions.yaml`
+  - Visual dashboard for version status
+  - Manual control - no automatic updates
+- **Dependencies**: `versions.yaml`, `scripts/version-manager.sh`, `.github/workflows/version-check.yml`
+- **Maintenance Notes**:
+  - Update tracked components as project evolves
+  - Modify notification settings as needed
+  - Add new component types for comprehensive coverage
+  - Update version checking logic for new APIs
 
 ### Troubleshooting and Support
 

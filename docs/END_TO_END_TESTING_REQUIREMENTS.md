@@ -55,7 +55,7 @@ This comprehensive test ensures that any changes to the repository don't break t
 
 ### **Compliance and Auditing**
 
-- **HIPAA Requirements**: Demonstrates data protection capabilities
+- **Regulatory Compliance**: Demonstrates data protection capabilities for healthcare applications
 - **Audit Trail**: Provides evidence of disaster recovery testing
 - **Risk Mitigation**: Reduces risk of data loss or system failure
 

@@ -2,6 +2,40 @@
 
 This directory contains all the Kubernetes manifests and deployment scripts for the OpenEMR on EKS deployment. The manifests are designed for production-grade healthcare applications with comprehensive security, compliance, monitoring, and high availability features.
 
+## 📋 Table of Contents
+
+### **📁 Directory Overview**
+- [Directory Structure](#directory-structure)
+- [Core Deployment Files](#core-deployment-files)
+
+### **📄 Deployment Script and Manifest Files**
+- Deployment Script
+  - [deploy.sh](#deploysh)
+- Kubernetes Manifest Files
+  - [namespace.yaml](#namespaceyaml)
+  - [secrets.yaml](#secretsyaml)
+  - [storage.yaml](#storageyaml)
+  - [deployment.yaml](#deploymentyaml)
+  - [service.yaml](#serviceyaml)
+  - [ingress.yaml](#ingressyaml)
+  - [hpa.yaml](#hpayaml)
+  - [security.yaml](#securityyaml)
+  - [network-policies.yaml](#network-policiesyaml)
+  - [logging.yaml](#loggingyaml)
+  - [ssl-renewal.yaml](#ssl-renewalyaml)
+
+### **🚀 Deployment & Operations**
+- [Deployment Workflow](#deployment-workflow)
+  - [1-prerequisites](#1-prerequisites)
+  - [2-deployment-order](#2-deployment-order)
+  - [3-configuration-management](#3-configuration-management)
+
+### **🔧 Reference & Support**
+- [Maintenance Guidelines](#maintenance-guidelines)
+- [Best Practices](#best-practices)
+- [Troubleshooting](#troubleshooting)
+- [Support](#support)
+
 ## Directory Structure
 
 ### Core Deployment Files
@@ -452,5 +486,5 @@ For issues related to:
 
 - **Kubernetes manifests**: Check this README and troubleshooting section
 - **Deployment script**: Review `deploy.sh` comments and error messages
-- **Infrastructure**: Refer to terraform directory documentation
-- **Monitoring**: Check monitoring directory documentation
+- **Infrastructure**: Refer to [terraform directory documentation](../terraform/README.md)
+- **Monitoring**: Check [monitoring directory documentation](../monitoring/README.md)

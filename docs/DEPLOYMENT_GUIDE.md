@@ -1598,6 +1598,5 @@ cd ../scripts
 
 - **OpenEMR Documentation**: <https://www.open-emr.org/wiki/>
 - **AWS EKS Documentation**: <https://docs.aws.amazon.com/eks/>
-- **AWS HIPAA Guide**: <https://aws.amazon.com/compliance/hipaa-compliance/>
 
-Remember: Healthcare data requires special care. Always follow your organization's policies and procedures for handling PHI.
+Remember: Healthcare data requires special care. Always follow your organization's policies and procedures for handling sensitive healthcare information.

@@ -53,7 +53,7 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 - [Disaster Recovery](#disaster-recovery-procedures)
 - [Troubleshooting](#-troubleshooting-guide)
 
-### **�  Workflows & Operations**
+### **⚙️  Workflows & Operations**
 
 - [Common Workflows](#-common-workflows)
 - [Manual Release System](#-manual-release-system)
@@ -66,6 +66,7 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 ### **📚 Additional Resources**
 
 - [Additional Resources](#-additional-resources)
+- [Version Awareness](#-version-awareness)
 - [License and Compliance](#-additional-resources-1)
 
 ---
@@ -597,7 +598,8 @@ openemr-on-eks/
 │   ├── README.md                       # Comprehensive GitHub workflows documentation
 │   └── workflows/                      # CI/CD automation workflows
 │       ├── ci-cd-tests.yml             # Automated testing and quality assurance
-│       └── manual-releases.yml         # Manual release workflow for version management
+│       ├── manual-releases.yml         # Manual release workflow for version management
+│       └── version-check.yml           # Automated version awareness checking
 ├── terraform/                          # Infrastructure as Code (Modular Structure)
 │   ├── README.md                       # Complete Terraform infrastructure documentation
 │   ├── main.tf                         # Terraform providers and data sources
@@ -651,6 +653,7 @@ openemr-on-eks/
 ├── scripts/                            # Operational and deployment scripts
 │   ├── README.md                       # Complete scripts documentation and maintenance guide
 │   ├── check-openemr-versions.sh       # OpenEMR version discovery and management
+│   ├── version-manager.sh              # Comprehensive version awareness checking
 │   ├── validate-deployment.sh          # Pre-deployment validation and health checks
 │   ├── validate-efs-csi.sh             # EFS CSI driver validation and troubleshooting
 │   ├── clean-deployment.sh             # Enhanced deployment cleanup (deletes PVCs and stale configs)
@@ -669,6 +672,7 @@ openemr-on-eks/
 │   ├── DEPLOYMENT_GUIDE.md             # Step-by-step deployment guide
 │   ├── AUTOSCALING_GUIDE.md            # Autoscaling configuration and optimization
 │   ├── MANUAL_RELEASES.md              # Guide to the OpenEMR on EKS release system
+│   ├── VERSION_MANAGEMENT.md           # Version awareness and dependency management
 │   ├── TROUBLESHOOTING.md              # Troubleshooting and solutions
 │   ├── BACKUP_RESTORE_GUIDE.md         # Comprehensive backup and restore guide
 │   ├── LOGGING_GUIDE.md                # OpenEMR 7.0.3.4 Enhanced Logging
@@ -682,6 +686,7 @@ openemr-on-eks/
 ├── .yamllint                           # YAML linting configuration (relaxed rules)
 ├── .markdownlint.json                  # Markdown linting configuration (relaxed rules)
 ├── VERSION                             # Current project version
+├── versions.yaml                       # Version awareness configuration
 └── LICENSE                             # Project license
 ```
 
@@ -1173,7 +1178,7 @@ cd scripts && ./backup.sh
 **Environment Variables:**
 
 ```bash
-export CLUSTER_AVAILABILITY_TIMEOUT=1800    # 30 min default
+export CLUSTER_AVAILABILITY_TIMEOUT=1800   # 30 min default
 export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
 export POLLING_INTERVAL=30                 # 30 sec default
 ```
@@ -1204,7 +1209,7 @@ cd scripts && ./restore.sh <backup-bucket> <snapshot-id> [backup-region]
 **Environment Variables:**
 
 ```bash
-export CLUSTER_AVAILABILITY_TIMEOUT=1800    # 30 min default
+export CLUSTER_AVAILABILITY_TIMEOUT=1800   # 30 min default
 export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
 export POLLING_INTERVAL=30                 # 30 sec default
 ```
@@ -1270,7 +1275,6 @@ The Kubernetes manifests are organized for clear separation of concerns:
 
 ### **Application Deployment**
 
-- **`setup-job.yaml`** - Initial OpenEMR configuration job for resilient deployment and setup recovery
 - **`deployment.yaml`** - OpenEMR application with Auto Mode optimization (version: `${OPENEMR_VERSION}`)
 - **`service.yaml`** - Defines OpenEMR service and the load balancer configuration (including optional AWS Certificate Manager and AWS WAF v2 integrations)
 - **`secrets.yaml`** - Database credentials and Redis authentication
@@ -1287,6 +1291,7 @@ The Kubernetes manifests are organized for clear separation of concerns:
 - **`security.yaml`** - RBAC, service accounts, Pod Disruption Budget
 - **`ingress.yaml`** - Ingress controller configuration
 - **`network-policies.yaml`** - Networking policies for our deployment
+
 
 ### **Observability & Operations**
 
@@ -1433,7 +1438,7 @@ export SNAPSHOT_AVAILABILITY_TIMEOUT=1800
 export POLLING_INTERVAL=30
 
 # Example: Set longer timeouts for large databases
-export CLUSTER_AVAILABILITY_TIMEOUT=3600    # 1 hour
+export CLUSTER_AVAILABILITY_TIMEOUT=3600   # 1 hour
 export SNAPSHOT_AVAILABILITY_TIMEOUT=3600  # 1 hour
 export POLLING_INTERVAL=60                 # 1 minute updates
 ```
@@ -1456,7 +1461,7 @@ export POLLING_INTERVAL=60                 # 1 minute updates
 
 ```bash
 # Set in your environment or .bashrc for production
-export CLUSTER_AVAILABILITY_TIMEOUT=7200    # 2 hours for large clusters
+export CLUSTER_AVAILABILITY_TIMEOUT=7200   # 2 hours for large clusters
 export SNAPSHOT_AVAILABILITY_TIMEOUT=7200  # 2 hours for large snapshots
 export POLLING_INTERVAL=60                 # 1 minute updates for production
 
@@ -1920,21 +1925,140 @@ Each directory now includes detailed README.md files with maintenance guidance f
 #### **📖 User Documentation**
 
 - **[Documentation Index](docs/README.md)** - Complete documentation index and maintenance guide
-- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md)
-- [Autoscaling Guide](docs/AUTOSCALING_GUIDE.md)
-- [Troubleshooting Guide](docs/TROUBLESHOOTING.md)
-- [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md)
-- [Manual Releases Guide](docs/MANUAL_RELEASES.md)
+- [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Complete deployment instructions and configuration
+- [Autoscaling Guide](docs/AUTOSCALING_GUIDE.md) - Horizontal Pod Autoscaler configuration and management
+- [Version Management Guide](docs/VERSION_MANAGEMENT.md) - Version awareness and dependency management
+- [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
+- [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
 - [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.3.4 Enhanced Logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
-- [Monitoring Setup](monitoring/README.md)
+- [Monitoring Setup](monitoring/README.md) - Prometheus, Grafana, and monitoring stack configuration
 
 ### **Support**
 
 - [OpenEMR Community Forums Support Section](https://community.open-emr.org/c/support/16)
 - [AWS Support (with support plan)](https://aws.amazon.com/contact-us/)
 - [GitHub Issues for this deployment](../../issues)
+
+## 🔄 Version Awareness
+
+This project includes comprehensive version management and awareness capabilities to help you stay up-to-date with the latest releases and security updates.
+
+### **Quick Start**
+```bash
+# Check for available updates
+./scripts/version-manager.sh check
+
+# Check specific component types
+./scripts/version-manager.sh check --components applications
+./scripts/version-manager.sh check --components terraform_modules
+
+# Show current status
+./scripts/version-manager.sh status
+```
+
+### **Key Features**
+- **📢 Awareness Notifications**: Automated monthly checks via GitHub Actions
+- **🔍 Comprehensive Monitoring**: All dependencies tracked across the entire stack
+- **📝 GitHub Issues**: Automatic issue creation for available updates
+- **🎯 Manual Control**: Read-only awareness system - no automatic updates applied
+- **🔧 Component Selection**: Choose specific component types for targeted checks
+
+### **Automated Version Checking**
+
+The project features a comprehensive version check system that supports both automated and manual runs:
+
+#### **Monthly Automated Runs**
+- **Runs automatically** on the 1st of every month via GitHub Actions
+- **Creates monthly issues** titled "Version Check Report for Month of [Current Month]"
+- **Prevents duplicates** by checking for existing monthly issues
+- **Uses AWS CLI** for definitive version lookups when credentials are available
+- **Gracefully handles** missing AWS credentials with fallback mechanisms
+
+#### **Manual On-Demand Runs**
+- **Triggered manually** via GitHub Actions workflow dispatch
+- **Creates timestamped issues** titled "Manual Version Check Report - [YYYY-MM-DD HH:MM:SS UTC]"
+- **Component selection** - Choose specific component types to check
+- **Flexible reporting** - Option to run checks without creating issues
+- **No duplicate prevention** - Always creates new timestamped issues for manual runs
+
+### **Version Management Components**
+
+The system tracks versions for:
+
+- **Applications**: OpenEMR, Fluent Bit
+- **Infrastructure**: Kubernetes, Terraform, AWS Provider
+- **Terraform Modules**: EKS ([terraform-aws-modules/eks/aws](https://github.com/terraform-aws-modules/terraform-aws-eks)), EKS Pod Identity ([terraform-aws-modules/eks-pod-identity/aws](https://github.com/terraform-aws-modules/terraform-aws-eks-pod-identity)), VPC ([terraform-aws-modules/vpc/aws](https://github.com/terraform-aws-modules/terraform-aws-vpc)), AWS ([hashicorp/aws](https://github.com/hashicorp/terraform-provider-aws)), Kubernetes ([hashicorp/kubernetes](https://github.com/hashicorp/terraform-provider-kubernetes))
+- **GitHub Workflows**: GitHub Actions dependencies and versions
+- **Pre-commit Hooks**: Code quality tools and versions
+- **Semver Packages**: The Python package called ["Semver"](https://pypi.org/project/semver/), Python, Terraform CLI, kubectl
+- **Monitoring**: Prometheus, Loki, Jaeger
+- **Security**: Cert Manager
+- **EKS Add-ons**: EFS CSI Driver, Metrics Server
+
+### **AWS Dependencies**
+
+Some version checks require AWS CLI credentials to be configured:
+
+- **EKS Add-ons**: EFS CSI Driver and Metrics Server versions require AWS CLI to query EKS add-on versions
+- **Aurora MySQL**: (optional) Can use AWS credentials as a redundant source for version lookups
+- **Infrastructure**: EKS versions require AWS access for accurate version checking via AWS CLI
+
+**Note**: The system is designed to work gracefully without AWS credentials. Components that cannot be checked due to missing credentials will be clearly reported, and the system will continue to check all other components.
+
+### **Manual Version Checking**
+
+You can run version checks manually in two ways:
+
+#### **Via GitHub Actions (Recommended)**
+1. Go to **Actions** → **Version Check & Awareness**
+2. Click **Run workflow**
+3. Select component type:
+   - `all` - Check all components (default)
+   - `applications` - OpenEMR, Fluent Bit
+   - `infrastructure` - Kubernetes, Terraform, AWS Provider
+   - `terraform_modules` - EKS, VPC, RDS modules
+   - `github_workflows` - GitHub Actions dependencies
+   - `monitoring` - Prometheus, Loki, Jaeger
+   - `eks_addons` - EFS CSI Driver, Metrics Server
+4. Choose whether to create GitHub issue (default: true)
+5. Click **Run workflow**
+
+#### **Via Command Line**
+```bash
+# Check all components
+./scripts/version-manager.sh check
+
+# Check specific component types
+./scripts/version-manager.sh check --components applications
+./scripts/version-manager.sh check --components eks_addons
+./scripts/version-manager.sh check --components monitoring
+
+# Show current status
+./scripts/version-manager.sh status
+```
+
+### **Update Policies**
+
+- **Stable Only**: OpenEMR uses stable releases (not latest development versions)
+- **Latest Available**: Other components use latest available versions
+- **Security Focus**: Prioritizes security updates and patches
+- **Compatibility**: Ensures component compatibility before suggesting updates
+- **Read-Only System**: Provides awareness only - no automatic updates applied
+
+### **Configuration**
+
+Version information is centrally managed in `versions.yaml`. To configure AWS credentials for enhanced version checking:
+
+1. **Set up AWS CLI credentials** in your environment
+2. **Configure GitHub Secrets** for CI/CD:
+   - `AWS_ACCESS_KEY_ID`
+   - `AWS_SECRET_ACCESS_KEY`
+   - `AWS_REGION` (optional, defaults to us-east-1)
+
+For more details, see the [Version Management Guide](docs/VERSION_MANAGEMENT.md).
 
 ## License and Compliance
 

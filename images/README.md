@@ -196,7 +196,7 @@ A GitHub social banner is a custom image that appears when your repository is sh
 ### **Adding New Images**
 
 1. **Naming Convention**: Use descriptive, lowercase names with underscores
-2. **Format Selection**: 
+2. **Format Selection**:
    - Use JPEG for photographs and complex images
    - Use PNG for graphics with transparency
    - Use SVG for scalable vector graphics

@@ -41,6 +41,18 @@ This directory contains GitHub Actions workflows and configuration for the OpenE
   - [Environment Configuration](#environment-configuration-1)
   - [Permissions](#permissions-1)
 
+### **Version Awareness Pipeline**
+- [Version Check Pipeline (`version-check.yml`)](#version-check-pipeline-version-checkyml)
+  - [Purpose](#purpose-2)
+  - [Triggers](#triggers-2)
+  - [Key Features](#key-features-2)
+  - [Jobs and Dependencies](#jobs-and-dependencies-2)
+    - [Version Check](#1-version-check-version-check)
+    - [Create Issues](#2-create-issues-create-issues)
+  - [Environment Configuration](#environment-configuration-2)
+  - [Permissions](#permissions-2)
+  - [Configuration Dependencies](#configuration-dependencies)
+
 ### **Maintenance & Operations**
 - [Maintenance Guidelines](#maintenance-guidelines)
   - [Adding New Workflows](#adding-new-workflows)
@@ -70,6 +82,7 @@ This directory contains GitHub Actions workflows and configuration for the OpenE
 
 - **`workflows/ci-cd-tests.yml`** - Comprehensive CI/CD testing and validation pipeline
 - **`workflows/manual-releases.yml`** - Manual release management and version control
+- **`workflows/version-check.yml`** - Automated version awareness checking and GitHub issue creation
 
 ## Workflow Dependency Graph
 
@@ -88,20 +101,29 @@ graph TD
     I --> L[Create Release]
     I --> M[Notify Completion]
 
-    N[VERSION] --> I
-    O[scripts/] --> B
-    P[k8s/] --> B
-    Q[terraform/] --> B
-    R[docs/] --> B
+    N[Monthly Schedule] --> O[version-check.yml]
+    O --> P[Version Check]
+    P --> Q[GitHub Issues]
+
+    R[VERSION] --> I
+    S[versions.yaml] --> O
+    T[scripts/] --> B
+    T --> O
+    U[k8s/] --> B
+    V[terraform/] --> B
+    W[docs/] --> B
 
     style A fill:#e1f5fe
     style B fill:#f3e5f5
     style I fill:#e8f5e8
+    style O fill:#fff8e1
     style C fill:#fff3e0
     style D fill:#ffebee
     style E fill:#fce4ec
     style F fill:#f1f8e9
     style G fill:#e0f2f1
+    style P fill:#f3e5f5
+    style Q fill:#e8f5e8
 ```
 
 ## Repository Configuration
@@ -334,6 +356,74 @@ Controlled release management system that allows manual version bumping and rele
 - `pull-requests: write` - Update pull request information
 - `issues: write` - Create issues if needed
 
+### Version Check Pipeline (`version-check.yml`)
+
+#### **Purpose**
+
+Automated version awareness system that monitors all project dependencies and creates GitHub issues when updates are available, ensuring maintainers stay informed about new versions without performing automatic updates.
+
+#### **Triggers**
+
+- **monthly schedule** - Runs every 30 days at 9:00 AM UTC
+- **Manual dispatch** - Can be triggered manually for immediate checks
+- **Workflow dispatch** - Can be triggered by other workflows
+
+#### **Key Features**
+
+- **Comprehensive Monitoring**: Tracks all project dependencies including applications, infrastructure, Terraform modules, GitHub Actions, pre-commit hooks, and all other semver packages (i.e. anything with a version in the GitHub actions workflows that's not a GitHub action.)
+- **GitHub Issue Creation**: Automatically creates detailed GitHub issues for available updates
+- **No Automatic Updates**: Awareness-only system that never performs automatic updates
+- **Centralized Configuration**: Uses `versions.yaml` for all version tracking configuration
+- **Smart Notifications**: Only creates issues for components with `notify_on_update: true`
+
+#### **Jobs and Dependencies**
+
+##### 1. **Version Check** (`version-check`)
+
+- **Purpose**: Check all configured components for available updates
+- **Dependencies**: `scripts/version-manager.sh`, `versions.yaml`
+- **Features**:
+  - Checks Docker images (OpenEMR, Fluent Bit)
+  - Monitors Kubernetes versions
+  - Tracks Terraform modules and AWS provider versions
+  - Monitors GitHub Actions and pre-commit hook versions
+  - Checks semver packages (Python, Terraform CLI, kubectl)
+  - Validates AWS service versions (RDS, ElastiCache)
+  - Monitors monitoring stack versions (Prometheus, Loki, Jaeger)
+- **Outputs**: Update information for all components
+
+##### 2. **Create Issues** (`create-issues`)
+
+- **Purpose**: Create GitHub issues for available updates
+- **Dependencies**: `version-check` job completion
+- **Features**:
+  - Groups updates by component type
+  - Creates detailed issue descriptions with current and latest versions
+  - Applies appropriate labels (`version-update`, `maintenance`, `dependencies`)
+  - Includes priority information based on update type
+  - Provides clear action items for maintainers
+- **Dependencies**: GitHub API, issue creation permissions
+
+#### **Environment Configuration**
+
+- **Terraform**: 1.5.7
+- **Kubectl**: v1.33.0
+- **Operating System**: Ubuntu 24.04
+- **Tools**: `yq`, `jq`, `curl` for API interactions
+
+#### **Permissions**
+
+- `contents: read` - Read repository contents and configuration
+- `actions: read` - Read Github actions contents and configuration
+- `issues: write` - Create GitHub issues for updates
+- `pull-requests: read` - Read pull request information if needed
+
+#### **Configuration Dependencies**
+
+- **`versions.yaml`** - Central configuration for all tracked versions
+- **`scripts/version-manager.sh`** - Core version checking logic
+- **`docs/VERSION_MANAGEMENT.md`** - Documentation for the system
+
 ## Maintenance Guidelines
 
 ### Adding New Workflows
@@ -400,10 +490,11 @@ Controlled release management system that allows manual version bumping and rele
 
 ### Related Directories
 
-- **`scripts/`** - Test scripts and validation tools
+- **`scripts/`** - Test scripts, validation tools, and version management scripts
 - **`k8s/`** - Kubernetes manifests tested by workflows
 - **`terraform/`** - Infrastructure code validated by workflows
 - **`docs/`** - Documentation validated by workflows
+- **`versions.yaml`** - Version management configuration for awareness system
 
 ### External Dependencies
 
@@ -411,6 +502,7 @@ Controlled release management system that allows manual version bumping and rele
 - **Python Packages** - semver, pyyaml for version management
 - **Security Tools** - Trivy for vulnerability scanning
 - **Validation Tools** - ShellCheck, Terraform, kubectl
+- **Version Management Tools** - yq, jq, curl for API interactions and version checking
 
 ## Best Practices
 
