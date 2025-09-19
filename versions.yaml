@@ -4,9 +4,9 @@
 
 project:
   name: "openemr-on-eks"
-  version: "2.1.0"
+  version: "2.2.0"
   description: "OpenEMR deployment on Amazon EKS with comprehensive monitoring and security"
-  last_updated: "2025-09-18"
+  last_updated: "2025-09-19"
   aws_integration: true
 
 # Core Application Versions

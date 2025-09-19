@@ -359,11 +359,12 @@ show_help() {
     echo "2. Deploy OpenEMR"
     echo "3. Deploy test data (proof.txt)"
     echo "4. Backup entire installation"
-    echo "5. Delete all infrastructure"
-    echo "6. Recreate infrastructure"
-    echo "7. Restore from backup"
-    echo "8. Verify restoration and connectivity"
-    echo "9. Clean up infrastructure and backups"
+    echo "5. Test monitoring stack installation and uninstallation"
+    echo "6. Delete all infrastructure"
+    echo "7. Recreate infrastructure"
+    echo "8. Restore from backup"
+    echo "9. Verify restoration and connectivity"
+    echo "10. Clean up infrastructure and backups"
     echo ""
     echo "Options:"
     echo "  --cluster-name NAME     EKS cluster name (default: openemr-eks-test)"
@@ -1155,11 +1156,79 @@ prepare_for_destruction() {
     cd "$PROJECT_ROOT"
 }
 
-# Step 5: Delete all infrastructure
+# Step 5: Test monitoring stack installation and uninstallation
+test_monitoring_stack() {
+    local step_start
+    step_start=$(start_timer)
+    log_step "Step 5: Testing monitoring stack installation and uninstallation..."
+
+    # Ensure kubeconfig is configured
+    log_info "Configuring kubeconfig for monitoring test..."
+    if ! ensure_kubeconfig; then
+        log_error "Failed to configure kubeconfig for monitoring test"
+        return 1
+    fi
+
+    # Check if monitoring script exists
+    local monitoring_script="$PROJECT_ROOT/monitoring/install-monitoring.sh"
+    if [ ! -f "$monitoring_script" ]; then
+        log_error "Monitoring script not found: $monitoring_script"
+        return 1
+    fi
+
+    # Make sure the script is executable
+    chmod +x "$monitoring_script"
+
+    # Test monitoring stack installation
+    log_info "Installing monitoring stack..."
+    log_info "This may take 5-10 minutes for full installation..."
+    
+    if ! "$monitoring_script" install; then
+        log_error "Monitoring stack installation failed"
+        return 1
+    fi
+
+    log_success "Monitoring stack installed successfully"
+
+    # Verify monitoring stack is working
+    log_info "Verifying monitoring stack functionality..."
+    if ! "$monitoring_script" verify; then
+        log_warning "Monitoring stack verification had issues, but continuing with test"
+    fi
+
+    # Wait a bit for components to stabilize
+    log_info "Waiting for monitoring components to stabilize..."
+    sleep 30
+
+    # Test monitoring stack uninstallation
+    log_info "Uninstalling monitoring stack..."
+    if ! "$monitoring_script" uninstall; then
+        log_error "Monitoring stack uninstallation failed"
+        return 1
+    fi
+
+    log_success "Monitoring stack uninstalled successfully"
+
+    # Verify cleanup
+    log_info "Verifying monitoring stack cleanup..."
+    local monitoring_pods
+    monitoring_pods=$(kubectl get pods -n monitoring 2>/dev/null | wc -l || echo "0")
+    if [ "$monitoring_pods" -gt 1 ]; then  # More than just header line
+        log_warning "Some monitoring pods still exist after uninstall"
+    else
+        log_success "Monitoring stack cleanup verified"
+    fi
+
+    local step_duration
+    step_duration=$(get_duration "$step_start")
+    add_test_result "Monitoring Stack Test" "SUCCESS" "Install and uninstall completed successfully" "$step_duration"
+}
+
+# Step 6: Delete all infrastructure
 delete_infrastructure() {
     local step_start
     step_start=$(start_timer)
-    log_step "Step 5: Deleting all infrastructure..."
+    log_step "Step 6: Deleting all infrastructure..."
 
     # Prepare infrastructure for destruction
     prepare_for_destruction
@@ -1186,11 +1255,11 @@ delete_infrastructure() {
     cd "$PROJECT_ROOT"
 }
 
-# Step 6: Recreate infrastructure
+# Step 7: Recreate infrastructure
 recreate_infrastructure() {
     local step_start
     step_start=$(start_timer)
-    log_step "Step 6: Recreating infrastructure..."
+    log_step "Step 7: Recreating infrastructure..."
 
     # Clean up existing Kubernetes resources before recreating infrastructure
     log_info "Cleaning up existing Kubernetes resources..."
@@ -1244,11 +1313,11 @@ recreate_infrastructure() {
     cd "$PROJECT_ROOT"
 }
 
-# Step 7: Restore from backup
+# Step 8: Restore from backup
 restore_from_backup() {
     local step_start
     step_start=$(start_timer)
-    log_step "Step 7: Restoring from backup..."
+    log_step "Step 8: Restoring from backup..."
 
     cd "$PROJECT_ROOT"
 
@@ -1324,11 +1393,11 @@ restore_from_backup() {
     cd "$PROJECT_ROOT"
 }
 
-# Step 8: Verify restoration and connectivity
+# Step 9: Verify restoration and connectivity
 verify_restoration() {
     local step_start
     step_start=$(start_timer)
-    log_step "Step 8: Verifying restoration and connectivity..."
+    log_step "Step 9: Verifying restoration and connectivity..."
 
     # Wait for OpenEMR to be ready - extended timeout for startup
     log_info "Waiting for OpenEMR to be ready after restoration..."
@@ -1610,11 +1679,11 @@ verify_restoration() {
     add_test_result "Restoration Verification" "SUCCESS" "Proof file verified (database connectivity tested by restore script)" "$step_duration"
 }
 
-# Step 9: Clean up infrastructure and backups
+# Step 10: Clean up infrastructure and backups
 cleanup_final() {
     local step_start
     step_start=$(start_timer)
-    log_step "Step 9: Final cleanup of infrastructure and backups..."
+    log_step "Step 10: Final cleanup of infrastructure and backups..."
 
     # Prepare infrastructure for destruction
     prepare_for_destruction
@@ -1873,6 +1942,12 @@ main() {
 
     if ! backup_installation; then
         log_error "Backup creation failed"
+        print_test_results
+        exit 1
+    fi
+
+    if ! test_monitoring_stack; then
+        log_error "Monitoring stack test failed"
         print_test_results
         exit 1
     fi

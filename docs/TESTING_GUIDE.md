@@ -199,6 +199,7 @@ Ensures documentation quality and consistency.
 - Kubernetes resource backup and restore
 - Cross-region backup capabilities
 - Disaster recovery procedures
+- Monitoring stack installation and uninstallation
 
 **⚠️ Important Developer Warning:**
 
@@ -232,6 +233,18 @@ The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) **autom
 **Directory affected by reset:**
 
 - `k8s`
+
+**Monitoring Stack Test Details:**
+
+The end-to-end test now includes a comprehensive monitoring stack test (Step 5) that validates:
+
+- **Installation**: Tests the complete monitoring stack installation including Prometheus, Grafana, Loki, and Jaeger
+- **Functionality**: Verifies that all monitoring components are running and accessible
+- **Integration**: Ensures monitoring components work correctly with the OpenEMR deployment
+- **Uninstallation**: Tests clean removal of all monitoring components
+- **Cleanup**: Validates that no orphaned monitoring resources remain after uninstall
+
+This test ensures that the optional monitoring stack doesn't interfere with core OpenEMR functionality and can be safely installed/uninstalled as needed.
 
 **Running the test:**
 

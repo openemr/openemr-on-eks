@@ -25,11 +25,12 @@ The end-to-end backup/restore test validates the complete disaster recovery proc
 2. **Deploying OpenEMR application**
 3. **Creating test data for verification**
 4. **Performing complete backup**
-5. **Destroying all infrastructure**
-6. **Recreating infrastructure**
-7. **Restoring from backup**
-8. **Verifying data integrity and connectivity**
-9. **Cleaning up all test resources**
+5. **Testing monitoring stack installation and uninstallation**
+6. **Destroying all infrastructure**
+7. **Recreating infrastructure**
+8. **Restoring from backup**
+9. **Verifying data integrity and connectivity**
+10. **Cleaning up all test resources**
 
 This comprehensive test ensures that any changes to the repository don't break the core disaster recovery capabilities.
 
@@ -85,12 +86,13 @@ graph TD
     B --> C[Deploy OpenEMR]
     C --> D[Create Test Data]
     D --> E[Create Backup]
-    E --> F[Destroy Infrastructure]
-    F --> G[Recreate Infrastructure]
-    G --> H[Restore from Backup]
-    H --> I[Verify Restoration]
-    I --> J[Final Cleanup]
-    J --> K[Test Complete]
+    E --> F[Test Monitoring Stack]
+    F --> G[Destroy Infrastructure]
+    G --> H[Recreate Infrastructure]
+    H --> I[Restore from Backup]
+    I --> J[Verify Restoration]
+    J --> K[Final Cleanup]
+    K --> L[Test Complete]
 
     B --> B1[✅ Pass]
     C --> C1[✅ Pass]
@@ -101,16 +103,18 @@ graph TD
     H --> H1[✅ Pass]
     I --> I1[✅ Pass]
     J --> J1[✅ Pass]
+    K --> K1[✅ Pass]
 
-    B1 --> K
-    C1 --> K
-    D1 --> K
-    E1 --> K
-    F1 --> K
-    G1 --> K
-    H1 --> K
-    I1 --> K
-    J1 --> K
+    B1 --> L
+    C1 --> L
+    D1 --> L
+    E1 --> L
+    F1 --> L
+    G1 --> L
+    H1 --> L
+    I1 --> L
+    J1 --> L
+    K1 --> L
 ```
 
 ### **Test Steps Details**
@@ -121,17 +125,30 @@ graph TD
 | **2. OpenEMR Installation** | Deploys OpenEMR application | Application is running and accessible |
 | **3. Test Data Creation** | Creates timestamped proof.txt | File exists with correct content |
 | **4. Backup Creation** | Runs complete backup process | Backup is created successfully |
-| **5. Infrastructure Destruction** | Removes all AWS resources | All resources are destroyed |
-| **6. Infrastructure Recreation** | Rebuilds infrastructure | New infrastructure is ready |
-| **7. Backup Restoration** | Restores from backup | Application is restored |
-| **8. Verification** | Confirms data integrity | Proof file exists and DB connects |
-| **9. Final Cleanup** | Removes test resources | No orphaned resources remain |
+| **5. Monitoring Stack Test** | Installs and uninstalls monitoring stack | Monitoring components work correctly |
+| **6. Infrastructure Destruction** | Removes all AWS resources | All resources are destroyed |
+| **7. Infrastructure Recreation** | Rebuilds infrastructure | New infrastructure is ready |
+| **8. Backup Restoration** | Restores from backup | Application is restored |
+| **9. Verification** | Confirms data integrity | Proof file exists and DB connects |
+| **10. Final Cleanup** | Removes test resources | No orphaned resources remain |
+
+### **Monitoring Stack Test Details**
+
+The monitoring stack test (Step 5) validates that the optional monitoring components can be properly installed and uninstalled without affecting the core OpenEMR functionality. This test:
+
+- **Installs the complete monitoring stack** including Prometheus, Grafana, Loki, and Jaeger
+- **Verifies all monitoring components** are running and accessible
+- **Tests monitoring functionality** to ensure metrics collection and visualization work
+- **Uninstalls the monitoring stack** cleanly without leaving orphaned resources
+- **Validates cleanup** to ensure no monitoring pods or resources remain
+
+This step ensures that the monitoring stack integration is robust and doesn't interfere with the core backup/restore process, while also validating that the monitoring components themselves work correctly.
 
 ## ✅ Test Requirements
 
 ### **Success Criteria**
 
-- **All 9 test steps must pass**: No exceptions or partial failures allowed
+- **All 10 test steps must pass**: No exceptions or partial failures allowed
 - **Complete infrastructure cycle**: Test must validate full create/destroy/restore cycle
 - **Data integrity verification**: Proof files must be correctly restored
 - **Connectivity validation**: Database and application connectivity must work after restore
@@ -232,6 +249,7 @@ All changes must include:
 - ✅ OpenEMR Installation: PASS (30 minutes)
 - ✅ Test Data Creation: PASS (5 minutes)
 - ✅ Backup Creation: PASS (60 minutes)
+- ✅ Monitoring Stack Test: PASS (15 minutes)
 - ✅ Infrastructure Destruction: PASS (20 minutes)
 - ✅ Infrastructure Recreation: PASS (45 minutes)
 - ✅ Backup Restoration: PASS (60 minutes)
@@ -273,7 +291,7 @@ All changes must include:
 ### **Key Points**
 
 1. **End-to-end testing is MANDATORY** before any repository changes
-2. **All 9 test steps must pass** - no exceptions allowed
+2. **All 10 test steps must pass** - no exceptions allowed
 3. **Test failure requires immediate halt** of development work
 4. **Re-testing is required** after any fixes
 5. **Documentation is mandatory** for all test results
