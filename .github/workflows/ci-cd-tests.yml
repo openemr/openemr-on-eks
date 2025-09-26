@@ -1,10 +1,35 @@
+# OpenEMR EKS CI/CD Test Suite Workflow
+# =====================================
+# This workflow provides comprehensive testing and validation for the OpenEMR EKS deployment
+# across multiple dimensions including code quality, Kubernetes manifests, script validation,
+# and documentation. It runs automatically on pushes and pull requests, and can be manually
+# triggered with specific test suite selection.
+#
+# Key Features:
+# - Multi-dimensional testing (code quality, K8s manifests, scripts, documentation)
+# - Matrix strategy for parallel test execution across different test suites
+# - Comprehensive environment setup (Python, Terraform, kubectl, shellcheck)
+# - Security scanning with Trivy vulnerability scanner
+# - Artifact collection and test result reporting
+# - Manual workflow dispatch with test suite selection
+#
+# Test Categories:
+# 1. Code Quality: Shell script syntax validation, common issue detection
+# 2. Kubernetes Manifests: YAML syntax validation, K8s best practices
+# 3. Script Validation: Shell script analysis with shellcheck
+# 4. Documentation: Markdown validation and structure checks
+# 5. Security Scan: Vulnerability scanning with Trivy (secrets, config, vulns)
+
 name: CI/CD Tests
 
+# Workflow triggers - runs on code changes and manual dispatch
 on:
+  # Automatic triggers on main and develop branches
   push:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  # Manual trigger with test suite selection
   workflow_dispatch:
     inputs:
       test_suite:
@@ -19,24 +44,33 @@ on:
         - script_validation
         - documentation
 
+# Required permissions for the workflow
 permissions:
-  contents: read
-  security-events: write
-  actions: read
+  contents: read          # Read repository contents for testing
+  security-events: write  # Write security scan results to GitHub Security tab
+  actions: read           # Read workflow information for reporting
 
+# Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.13.7'
-  TERRAFORM_VERSION: '1.5.7'
-  KUBECTL_VERSION: 'v1.33.4'
+  PYTHON_VERSION: '3.13.7'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.13.3' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.34.1'  # kubectl version for Kubernetes manifest validation
 
 jobs:
+  # Primary test job - runs test suites in parallel using matrix strategy
+  # This job executes the comprehensive test suite across different categories
+  # to validate code quality, Kubernetes manifests, script syntax, and documentation
   test:
     name: Run Test Suite
     runs-on: ubuntu-24.04
+    # Matrix strategy for parallel execution of different test suites
+    # Each test suite runs independently, allowing for faster overall execution
     strategy:
       matrix:
+        # Test suite categories to execute in parallel
         test_suite: [code_quality, kubernetes_manifests, script_validation, documentation]
         include:
+          # Human-readable display names for each test suite category
           - test_suite: code_quality
             display_name: Code Quality Tests
           - test_suite: kubernetes_manifests
@@ -47,34 +81,42 @@ jobs:
             display_name: Documentation Tests
 
     steps:
+      # Step 1: Checkout repository code for testing
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Step 3: Install Python dependencies required for testing
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install pyyaml  # Required for YAML syntax validation
 
+      # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v4.0.1
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
+      # Step 6: Install shellcheck for shell script validation
       - name: Set up shellcheck
         run: |
           sudo apt-get update
           sudo apt-get install -y shellcheck
 
+      # Step 7: Validate environment and dependencies before testing
+      # This step ensures all required tools are properly installed and accessible
       - name: Check environment and dependencies
         run: |
           echo "=== Environment Check ==="
@@ -97,6 +139,8 @@ jobs:
           echo "Terraform files:"
           ls -la terraform/*.tf 2>/dev/null || echo "No terraform files found"
 
+      # Step 8: Execute the specific test suite based on matrix configuration
+      # This step runs the comprehensive test suite with verbose output and debug mode
       - name: Run ${{ matrix.display_name }}
         run: |
           cd scripts
@@ -108,53 +152,66 @@ jobs:
           ls -la run-test-suite.sh
           echo "Running test suite: ${{ matrix.test_suite }}"
           echo "=== Starting Test Execution ==="
-          set -x  # Enable debug mode
+          set -x  # Enable debug mode for detailed output
           ./run-test-suite.sh -s ${{ matrix.test_suite }} -v
           echo "=== Test Execution Complete ==="
 
+      # Step 9: Upload test results as artifacts for analysis and reporting
+      # Results are retained for 7 days and uploaded regardless of test outcome
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: always()
+        if: always()  # Upload artifacts even if tests fail
         with:
           name: test-results-${{ matrix.test_suite }}
           path: test-results/
           retention-days: 7
 
+  # Lint and validation job - performs static analysis and syntax validation
+  # This job runs after the test job and focuses on code quality, syntax validation,
+  # and best practices enforcement across different file types
   lint-and-validate:
     name: Lint and Validate
     runs-on: ubuntu-24.04
-    needs: test
+    needs: test  # Wait for test job to complete before running validation
 
     steps:
+      # Step 1: Checkout repository code for validation
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Step 3: Install Python dependencies for validation
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install pyyaml  # Required for YAML syntax validation
 
+      # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+        uses: hashicorp/setup-terraform@v3.1.2
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
+      # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4
+        uses: azure/setup-kubectl@v4.0.1
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
+      # Step 6: Validate Terraform configuration syntax and structure
       - name: Validate Terraform configuration
         run: |
           cd terraform
-          terraform init -backend=false
-          terraform validate
+          terraform init -backend=false  # Initialize without backend for validation only
+          terraform validate             # Validate Terraform configuration syntax
 
+      # Step 7: Validate Kubernetes manifest YAML syntax
+      # This step ensures all K8s manifests have valid YAML syntax before deployment
       - name: Validate Kubernetes manifests (YAML syntax only)
         run: |
           for file in k8s/*.yaml; do
@@ -163,6 +220,8 @@ jobs:
             echo "✓ $file YAML syntax is valid"
           done
 
+      # Step 8: Validate shell script syntax with shellcheck
+      # This step performs static analysis of shell scripts for common issues and best practices
       - name: Check shell script syntax
         run: |
           echo "Running shellcheck on all shell scripts..."
@@ -180,6 +239,8 @@ jobs:
 
           echo "Shell script syntax check completed"
 
+      # Step 9: Display shellcheck warnings for reference and improvement
+      # This step shows all shellcheck findings (warnings, info) for code quality improvement
       - name: Show shellcheck warnings (for reference)
         run: |
           echo "=== Shellcheck Warnings/Info (for reference) ==="
@@ -194,6 +255,8 @@ jobs:
             fi
           done
 
+      # Step 10: Validate YAML files across multiple directories
+      # This step validates YAML syntax for Kubernetes and monitoring configurations
       - name: Validate YAML files
         run: |
           for file in k8s/*.yaml monitoring/*.yaml; do
@@ -204,37 +267,49 @@ jobs:
             fi
           done
 
+  # Security scanning job - performs comprehensive security analysis
+  # This job runs Trivy vulnerability scanner to detect security issues, secrets,
+  # and misconfigurations across the entire repository
   security-scan:
     name: Security Scan
     runs-on: ubuntu-24.04
-    needs: test
+    needs: test  # Wait for test job to complete before running security scan
 
     steps:
+      # Step 1: Checkout repository code for security scanning
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Step 2: Run Trivy vulnerability scanner in table format
+      # This scan produces human-readable output in the workflow logs
       - name: Run Trivy vulnerability scanner (Table format)
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'table'  # Use table format for better readability in logs
-          output: 'trivy-results.txt'
+          scan-type: 'fs'                       # File system scan of entire repository
+          scan-ref: '.'                         # Scan current directory
+          format: 'table'                       # Use table format for better readability in logs
+          output: 'trivy-results.txt'           # Output file for table format results
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'  # Include all severities for comprehensive scanning
-          scanners: 'vuln,secret,config'  # Enable all scanners
-          exit-code: '0'  # Don't fail the build on findings
+          scanners: 'vuln,secret,config'        # Enable vulnerability, secret, and config scanners
+          exit-code: '0'                        # Don't fail the build on findings (awareness only)
+          skip-db-update: false                 # Allow database updates
+          cache-dir: '.trivycache'              # Use local cache directory
 
+      # Step 3: Run Trivy vulnerability scanner in SARIF format
+      # This scan produces structured output for GitHub Security tab integration
       - name: Run Trivy vulnerability scanner (SARIF format)
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'
-          scan-ref: '.'
-          format: 'sarif'  # SARIF format for GitHub Security tab (if enabled)
-          output: 'trivy-results.sarif'
+          scan-type: 'fs'                       # File system scan of entire repository
+          scan-ref: '.'                         # Scan current directory
+          format: 'sarif'                       # SARIF format for GitHub Security tab (if enabled)
+          output: 'trivy-results.sarif'         # Output file for SARIF format results
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'  # Include all severities for comprehensive scanning
-          scanners: 'vuln,secret,config'  # Enable all scanners
-          exit-code: '0'  # Don't fail the build on findings
+          scanners: 'vuln,secret,config'        # Enable vulnerability, secret, and config scanners
+          exit-code: '0'                        # Don't fail the build on findings (awareness only)
 
+      # Step 4: Display Trivy scan results in workflow logs
+      # This step provides comprehensive visibility into security findings
       - name: Display Trivy results
         run: |
           echo "🔍 Trivy Security Scan Results:"
@@ -262,70 +337,87 @@ jobs:
           echo "- Terraform files: $(find . -name '*.tf' | wc -l | tr -d ' ')"
           echo "- Markdown files: $(find . -name '*.md' | wc -l | tr -d ' ')"
 
+      # Step 5: Upload SARIF results to GitHub Security tab (optional)
+      # This step enables GitHub Advanced Security features if available
       - name: Upload Trivy scan results to GitHub Security tab (Optional)
         uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        continue-on-error: true
+        if: always()  # Upload regardless of scan results
+        continue-on-error: true  # Don't fail workflow if upload fails
         with:
           sarif_file: 'trivy-results.sarif'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  # Code quality job - performs additional code quality checks
+  # This job focuses on detecting common code quality issues, hardcoded secrets,
+  # and ensuring proper file permissions and structure
   code-quality:
     name: Code Quality
     runs-on: ubuntu-24.04
-    needs: test
+    needs: test  # Wait for test job to complete before running quality checks
 
     steps:
+      # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Step 2: Set up Python environment for quality checks
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Step 3: Install Python dependencies for quality analysis
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml
+          pip install pyyaml  # Required for YAML analysis
 
+      # Step 4: Perform comprehensive code quality checks
+      # This step detects common issues that could impact security and maintainability
       - name: Check for common issues
         run: |
           echo "Checking for common code quality issues..."
 
-          # Check for hardcoded secrets
+          # Check for hardcoded secrets in configuration files
           if grep -r "password\|secret\|key" --include="*.sh" --include="*.yaml" --include="*.tf" . | grep -v "example\|template\|test"; then
             echo "Warning: Potential hardcoded secrets found"
           fi
 
-          # Check for TODO/FIXME comments
+          # Check for TODO/FIXME comments that need attention
           if grep -r "TODO\|FIXME" --include="*.sh" --include="*.yaml" --include="*.tf" --include="*.md" .; then
             echo "Info: TODO/FIXME comments found"
           fi
 
-          # Check for proper file permissions
+          # Check for proper file permissions on critical scripts
           if [ -x "scripts/deploy.sh" ]; then
             echo "Info: deploy.sh is executable"
           else
             echo "Warning: deploy.sh should be executable"
           fi
 
+  # Summary job - generates comprehensive test results summary
+  # This job collects results from all previous jobs and provides a unified
+  # overview of the entire CI/CD pipeline execution
   summary:
     name: Test Summary
     runs-on: ubuntu-24.04
-    needs: [test, lint-and-validate, security-scan, code-quality]
-    if: always()
+    needs: [test, lint-and-validate, security-scan, code-quality]  # Wait for all jobs to complete
+    if: always()  # Run summary regardless of job outcomes
 
     steps:
+      # Step 1: Checkout repository code for summary generation
       - name: Checkout code
         uses: actions/checkout@v5
 
+      # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results
         uses: actions/download-artifact@v5
         with:
           path: test-results/
 
+      # Step 3: Generate comprehensive summary report
+      # This step creates a unified view of all test results and job outcomes
       - name: Generate summary report
         run: |
           echo "## 🧪 CI/CD Test Results Summary"

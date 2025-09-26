@@ -7,8 +7,10 @@ set -o errtrace
 # ------------------------------
 # Configuration Management
 # ------------------------------
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_NAME="$(basename "${BASH_SOURCE[0]}")"
+readonly SCRIPT_DIR
+readonly SCRIPT_NAME
 readonly CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/openemr-monitoring.conf}"
 
 # Default namespaces
@@ -29,8 +31,8 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-75.18.1}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.35.1}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-77.11.0}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.41.0}"
 readonly CHART_JAEGER_VERSION="${CHART_JAEGER_VERSION:-3.4.1}"
 
 # Timeouts / retries
@@ -65,7 +67,7 @@ readonly CERT_MANAGER_ISSUER_GROUP="${CERT_MANAGER_ISSUER_GROUP:-cert-manager.io
 # Colors
 readonly RED='\033[0;31m'; readonly GREEN='\033[0;32m'
 readonly YELLOW='\033[1;33m'; readonly BLUE='\033[0;34m'
-readonly PURPLE='\033[0;35m'; readonly CYAN='\033[0;36m'
+readonly CYAN='\033[0;36m'
 readonly NC='\033[0m'
 
 # ------------------------------
@@ -85,7 +87,8 @@ log_audit() { local a="$1" r="$2" res="$3"; local ts; ts="$(date -u '+%Y-%m-%dT%
 # Error Handling
 # ------------------------------
 capture_debug_info() {
-  local f="${SCRIPT_DIR}/debug-$(date +%Y%m%d_%H%M%S).log"
+  local f
+  f="${SCRIPT_DIR}/debug-$(date +%Y%m%d_%H%M%S).log"
   {
     echo "=== Debug Information ==="
     echo "Timestamp: $(date)"
@@ -104,7 +107,18 @@ trap cleanup EXIT
 # ------------------------------
 # Config & Input Validation
 # ------------------------------
-load_config(){ if [[ -f "$CONFIG_FILE" ]]; then log_info "Loading configuration from: $CONFIG_FILE"; source "$CONFIG_FILE"; else log_debug "No configuration file found at: $CONFIG_FILE"; fi; mkdir -p "$CREDENTIALS_DIR" "$BACKUP_DIR"; chmod 700 "$CREDENTIALS_DIR"; validate_inputs; }
+load_config(){ 
+  if [[ -f "$CONFIG_FILE" ]]; then 
+    log_info "Loading configuration from: $CONFIG_FILE"
+    # shellcheck source=/dev/null
+    source "$CONFIG_FILE"
+  else 
+    log_debug "No configuration file found at: $CONFIG_FILE"
+  fi
+  mkdir -p "$CREDENTIALS_DIR" "$BACKUP_DIR"
+  chmod 700 "$CREDENTIALS_DIR"
+  validate_inputs
+}
 validate_inputs(){
   log_step "Validating configuration inputs..."
   local namespaces=("$MONITORING_NAMESPACE" "$OPENEMR_NAMESPACE" "$OBSERVABILITY_NAMESPACE")
@@ -273,7 +287,8 @@ create_secure_password_file(){
 
   # Backup existing file if it exists
   if [[ -f "$f" ]]; then
-    local backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
+    local backup_file
+    backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
     log_info "Backing up existing password file to: $backup_file"
     cp "$f" "$backup_file"
     chmod 600 "$backup_file"
@@ -284,16 +299,72 @@ create_secure_password_file(){
   chmod 600 "$f"
   echo "$f"
 }
-create_grafana_secret(){ local p="$1"; log_info "Creating Grafana admin secret..."; kubectl create secret generic grafana-admin-secret --from-literal=admin-user="admin" --from-literal=admin-password="$p" --namespace="$MONITORING_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -; log_audit "CREATE" "secret:grafana-admin-secret" "SUCCESS"; }
+create_grafana_secret(){
+  local p="$1"
+  
+  # Check if Grafana admin secret already exists
+  if kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+    log_info "Grafana admin secret already exists - preserving existing credentials"
+    log_info "Admin credentials will not be changed - existing credentials remain valid"
+    
+    # Retrieve existing password from secret
+    local existing_password
+    existing_password=$(kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || echo "")
+    
+    if [ -n "$existing_password" ]; then
+      log_success "Retrieved existing Grafana admin password from secret"
+      # Update the password variable to use existing password
+      p="$existing_password"
+    else
+      log_warning "Could not retrieve existing Grafana admin password - using new password"
+    fi
+  else
+    log_info "Creating new Grafana admin secret..."
+  fi
+  
+  # Create or update the secret
+  kubectl create secret generic grafana-admin-secret \
+    --from-literal=admin-user="admin" \
+    --from-literal=admin-password="$p" \
+    --namespace="$MONITORING_NAMESPACE" \
+    --dry-run=client -o yaml | kubectl apply -f -
+  
+  log_audit "CREATE" "secret:grafana-admin-secret" "SUCCESS"
+}
 write_credentials_file(){
   local p="$1" f="$CREDENTIALS_DIR/monitoring-credentials.txt"
 
-  # Backup existing file if it exists
+  # Always get the actual password from the secret to ensure accuracy
+  local actual_password
+  if kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+    actual_password=$(kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || echo "")
+    if [[ -n "$actual_password" ]]; then
+      log_info "Retrieved actual Grafana password from secret"
+      p="$actual_password"
+    else
+      log_warning "Could not retrieve actual password from secret, using provided password"
+    fi
+  else
+    log_warning "Grafana secret not found, using provided password"
+  fi
+
+  # Check if credentials file already exists and contains the same password
   if [[ -f "$f" ]]; then
-    local backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
-    log_info "Backing up existing credentials file to: $backup_file"
-    cp "$f" "$backup_file"
-    chmod 600 "$backup_file"
+    # Try to extract existing password from file
+    local existing_password
+    existing_password=$(grep "Grafana Admin Password: " "$f" | sed 's/.*Grafana Admin Password: //' | head -1)
+    
+    if [[ -n "$existing_password" && "$existing_password" == "$p" ]]; then
+      log_info "Credentials file already exists with correct password - preserving existing file"
+      log_info "Using existing credentials from: $f"
+      return 0
+    else
+      local backup_file
+    backup_file="${f}.backup.$(date +%Y%m%d-%H%M%S)"
+      log_info "Backing up existing credentials file to: $backup_file"
+      cp "$f" "$backup_file"
+      chmod 600 "$backup_file"
+    fi
   fi
 
   umask 077
@@ -609,56 +680,164 @@ install_prometheus_stack(){
   local vf="$1"
   log_step "Installing kube-prometheus-stack (version ${CHART_KPS_VERSION})..."
   log_info "⏱️  Expected duration: ~3 minutes"
-  helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
-    --namespace "$MONITORING_NAMESPACE" --create-namespace \
-    --version "$CHART_KPS_VERSION" \
-    --timeout "$TIMEOUT_HELM" --atomic --wait --wait-for-jobs \
-    --values "$vf" 2>&1 | tee "${SCRIPT_DIR}/helm-install-kps.log"
-  if ! helm status prometheus-stack -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then log_error "Prometheus Stack Helm installation failed. Check ${SCRIPT_DIR}/helm-install-kps.log"; log_audit "INSTALL" "prometheus-stack" "FAILED"; return 1; fi
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL" || true
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL" || true
-  log_success "Prometheus Stack installed"; log_audit "INSTALL" "prometheus-stack" "SUCCESS"
+  
+  # Install with retry logic for network resilience
+  local max_retries=3
+  local retry_delay=30
+  local attempt=1
+  
+  while [ $attempt -le $max_retries ]; do
+    log_info "Attempt $attempt/$max_retries: Installing Prometheus Stack..."
+    
+    # Test cluster connectivity before attempting installation
+    if ! kubectl cluster-info >/dev/null 2>&1; then
+      log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
+      sleep $retry_delay
+      ((attempt++))
+      continue
+    fi
+    
+    # Attempt Helm installation with enhanced timeout and retry settings
+    if helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
+      --namespace "$MONITORING_NAMESPACE" --create-namespace \
+      --version "$CHART_KPS_VERSION" \
+      --timeout "$TIMEOUT_HELM" --atomic --wait --wait-for-jobs \
+      --values "$vf" 2>&1 | tee "${SCRIPT_DIR}/helm-install-kps.log"; then
+      
+      # Verify installation success
+      if helm status prometheus-stack -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Prometheus Stack installed successfully on attempt $attempt"
+        break
+      else
+        log_error "Helm installation appeared successful but status check failed"
+        if [ $attempt -lt $max_retries ]; then
+          log_info "Retrying in ${retry_delay}s..."
+          sleep $retry_delay
+        fi
+      fi
+    else
+      log_error "Helm installation failed on attempt $attempt"
+      if [ $attempt -lt $max_retries ]; then
+        log_info "Retrying in ${retry_delay}s..."
+        sleep $retry_delay
+      fi
+    fi
+    
+    ((attempt++))
+  done
+  
+  if [ $attempt -gt $max_retries ]; then
+    log_error "Prometheus Stack installation failed after $max_retries attempts. Check ${SCRIPT_DIR}/helm-install-kps.log"
+    log_audit "INSTALL" "prometheus-stack" "FAILED"
+    return 1
+  fi
+  
+  # Wait for pods with enhanced timeout - ALL must be ready
+  log_info "Waiting for Prometheus and Grafana pods to be ready..."
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL"; then
+    log_error "Grafana pods not ready within timeout - CRITICAL FAILURE"
+    log_audit "INSTALL" "prometheus-stack" "FAILED"
+    return 1
+  fi
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL"; then
+    log_error "Prometheus pods not ready within timeout - CRITICAL FAILURE"
+    log_audit "INSTALL" "prometheus-stack" "FAILED"
+    return 1
+  fi
+  log_success "Prometheus Stack installed and all pods ready"; log_audit "INSTALL" "prometheus-stack" "SUCCESS"
 }
 install_loki_stack(){
   log_step "Installing Loki (version ${CHART_LOKI_VERSION})..."
   log_info "⏱️  Expected duration: ~3 minutes"
   local sc_loki="$STORAGE_CLASS_RWO" am_loki="$ACCESS_MODE_RWO"
   if [[ -n "$STORAGE_CLASS_RWX" ]] && kubectl get storageclass "$STORAGE_CLASS_RWX" >/dev/null 2>&1; then sc_loki="$STORAGE_CLASS_RWX"; am_loki="$ACCESS_MODE_RWX"; log_info "Using RWX storage for Loki: $sc_loki"; fi
-  helm upgrade --install loki grafana/loki \
-    --namespace "$MONITORING_NAMESPACE" \
-    --version "$CHART_LOKI_VERSION" \
-    --timeout "35m" --atomic --wait --wait-for-jobs \
-    --set deploymentMode=SingleBinary \
-    --set loki.auth_enabled=false \
-    --set loki.storage.type=filesystem \
-    --set loki.storage.filesystem.chunks_directory=/var/loki/chunks \
-    --set loki.storage.filesystem.rules_directory=/var/loki/rules \
-    --set loki.schemaConfig.configs[0].from=2024-01-01 \
-    --set loki.schemaConfig.configs[0].object_store=filesystem \
-    --set loki.schemaConfig.configs[0].store=tsdb \
-    --set loki.schemaConfig.configs[0].schema=v13 \
-    --set loki.schemaConfig.configs[0].index.prefix=loki_index_ \
-    --set loki.schemaConfig.configs[0].index.period=24h \
-    --set singleBinary.persistence.enabled=true \
-    --set singleBinary.persistence.storageClass="$sc_loki" \
-    --set singleBinary.persistence.accessModes="{$am_loki}" \
-    --set singleBinary.persistence.size=100Gi \
-    --set singleBinary.resources.requests.cpu=200m \
-    --set singleBinary.resources.requests.memory=512Mi \
-    --set singleBinary.resources.limits.cpu=1000m \
-    --set singleBinary.resources.limits.memory=1Gi \
-    --set singleBinary.autoscaling.enabled=true \
-    --set singleBinary.autoscaling.minReplicas=1 \
-    --set singleBinary.autoscaling.maxReplicas=3 \
-    --set singleBinary.autoscaling.targetCPUUtilizationPercentage=70 \
-    --set singleBinary.autoscaling.targetMemoryUtilizationPercentage=80 \
-    --set loki.limits_config.retention_period=720h \
-    --set loki.compactor.retention_enabled=false \
-    --set write.replicas=0 --set read.replicas=0 --set backend.replicas=0 \
-    2>&1 | tee "${SCRIPT_DIR}/helm-install-loki.log"
-  if ! helm status loki -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then log_error "Loki Helm installation failed. Check ${SCRIPT_DIR}/helm-install-loki.log"; log_audit "INSTALL" "loki" "FAILED"; return 1; fi
-  kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=single-binary -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL" || true
-  log_success "Loki installed and ready"; log_audit "INSTALL" "loki" "SUCCESS"
+  
+  # Install with retry logic for network resilience
+  local max_retries=3
+  local retry_delay=30
+  local attempt=1
+  
+  while [ $attempt -le $max_retries ]; do
+    log_info "Attempt $attempt/$max_retries: Installing Loki Stack..."
+    
+    # Test cluster connectivity before attempting installation
+    if ! kubectl cluster-info >/dev/null 2>&1; then
+      log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
+      sleep $retry_delay
+      ((attempt++))
+      continue
+    fi
+    
+    # Attempt Helm installation with enhanced timeout and retry settings
+    if helm upgrade --install loki grafana/loki \
+      --namespace "$MONITORING_NAMESPACE" \
+      --version "$CHART_LOKI_VERSION" \
+      --timeout "35m" --atomic --wait --wait-for-jobs \
+      --set deploymentMode=SingleBinary \
+      --set loki.auth_enabled=false \
+      --set loki.storage.type=filesystem \
+      --set loki.storage.filesystem.chunks_directory=/var/loki/chunks \
+      --set loki.storage.filesystem.rules_directory=/var/loki/rules \
+      --set loki.schemaConfig.configs[0].from=2024-01-01 \
+      --set loki.schemaConfig.configs[0].object_store=filesystem \
+      --set loki.schemaConfig.configs[0].store=tsdb \
+      --set loki.schemaConfig.configs[0].schema=v13 \
+      --set loki.schemaConfig.configs[0].index.prefix=loki_index_ \
+      --set loki.schemaConfig.configs[0].index.period=24h \
+      --set singleBinary.persistence.enabled=true \
+      --set singleBinary.persistence.storageClass="$sc_loki" \
+      --set singleBinary.persistence.accessModes="{$am_loki}" \
+      --set singleBinary.persistence.size=100Gi \
+      --set singleBinary.resources.requests.cpu=200m \
+      --set singleBinary.resources.requests.memory=512Mi \
+      --set singleBinary.resources.limits.cpu=1000m \
+      --set singleBinary.resources.limits.memory=1Gi \
+      --set singleBinary.autoscaling.enabled=true \
+      --set singleBinary.autoscaling.minReplicas=1 \
+      --set singleBinary.autoscaling.maxReplicas=3 \
+      --set singleBinary.autoscaling.targetCPUUtilizationPercentage=70 \
+      --set singleBinary.autoscaling.targetMemoryUtilizationPercentage=80 \
+      --set loki.limits_config.retention_period=720h \
+      --set loki.compactor.retention_enabled=false \
+      --set write.replicas=0 --set read.replicas=0 --set backend.replicas=0 \
+      2>&1 | tee "${SCRIPT_DIR}/helm-install-loki.log"; then
+      
+      # Verify installation success
+      if helm status loki -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+        log_success "Loki Stack installed successfully on attempt $attempt"
+        break
+      else
+        log_error "Helm installation appeared successful but status check failed"
+        if [ $attempt -lt $max_retries ]; then
+          log_info "Retrying in ${retry_delay}s..."
+          sleep $retry_delay
+        fi
+      fi
+    else
+      log_error "Helm installation failed on attempt $attempt"
+      if [ $attempt -lt $max_retries ]; then
+        log_info "Retrying in ${retry_delay}s..."
+        sleep $retry_delay
+      fi
+    fi
+    
+    ((attempt++))
+  done
+  
+  if [ $attempt -gt $max_retries ]; then
+    log_error "Loki Stack installation failed after $max_retries attempts. Check ${SCRIPT_DIR}/helm-install-loki.log"
+    log_audit "INSTALL" "loki" "FAILED"
+    return 1
+  fi
+  
+  # Wait for pods with enhanced timeout - MUST be ready
+  log_info "Waiting for Loki pods to be ready..."
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/component=single-binary -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL"; then
+    log_error "Loki pods not ready within timeout - CRITICAL FAILURE"
+    log_audit "INSTALL" "loki" "FAILED"
+    return 1
+  fi
+  log_success "Loki installed and all pods ready"; log_audit "INSTALL" "loki" "SUCCESS"
 }
 
 create_additional_hpa(){
@@ -790,9 +969,25 @@ EOF
 # ------------------------------
 verify_installation(){
   log_step "Verifying monitoring stack installation..."
+  
+  # Wait for critical pods to be ready before verification - ALL must be ready
+  log_info "Waiting for monitoring pods to be ready..."
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus -n "$MONITORING_NAMESPACE" --timeout=300s; then
+    log_error "Prometheus pods not ready within timeout - CRITICAL FAILURE"
+    return 1
+  fi
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout=300s; then
+    log_error "Grafana pods not ready within timeout - CRITICAL FAILURE"
+    return 1
+  fi
+  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=alertmanager -n "$MONITORING_NAMESPACE" --timeout=300s; then
+    log_error "Alertmanager pods not ready within timeout - CRITICAL FAILURE"
+    return 1
+  fi
+  
   local checks=("prometheus:prometheus-stack-kube-prom-prometheus:9090" "grafana:prometheus-stack-grafana:80" "alertmanager:prometheus-stack-kube-prom-alertmanager:9093" "loki:loki:3100" "jaeger:jaeger-query:16686")
   local failed=0
-  for c in "${checks[@]}"; do IFS=':' read -r name svc port <<<"$c"; log_info "Checking $name service..."
+  for c in "${checks[@]}"; do IFS=':' read -r name svc _ <<<"$c"; log_info "Checking $name service..."
     if kubectl get service "$svc" -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
       local eps; eps="$(kubectl get endpoints "$svc" -n "$MONITORING_NAMESPACE" -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || echo "")"
       if [[ -n "$eps" ]]; then log_success "✅ $name service has endpoints"; else log_warn "⚠️ $name service exists but has no endpoints"; ((failed++)); fi
@@ -806,15 +1001,41 @@ verify_installation(){
   failed_p="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || echo 0)"
   log_info "Pods: $running running, $pending pending, $failed_p failed"
   if [[ "$failed_p" -gt 0 ]]; then kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed || true; ((failed++)); fi
-  if [[ $failed -eq 0 ]]; then log_success "🎉 All monitoring components verified successfully!"; log_audit "VERIFY" "monitoring_stack" "SUCCESS"; print_access_help; return 0
-  else log_warn "⚠️ Installation verified with $failed issues"; log_audit "VERIFY" "monitoring_stack" "PARTIAL"; print_troubleshooting_help; return 1; fi
+  if [[ $failed -eq 0 ]]; then 
+    log_success "🎉 All monitoring components verified successfully!"; 
+    log_audit "VERIFY" "monitoring_stack" "SUCCESS"; 
+    print_access_help; 
+    return 0
+  else 
+    log_error "❌ CRITICAL FAILURE: Monitoring installation has $failed issues"; 
+    log_audit "VERIFY" "monitoring_stack" "FAILED"; 
+    print_troubleshooting_help; 
+    log_error "All monitoring components must be working - installation failed"
+    return 1
+  fi
 }
 verify_openemr_monitoring(){
   log_step "Verifying OpenEMR-specific monitoring configuration..."
-  kubectl get servicemonitor openemr-metrics -n "$OPENEMR_NAMESPACE" >/dev/null 2>&1 && log_success "✅ OpenEMR ServiceMonitor configured" || log_warn "⚠️ OpenEMR ServiceMonitor not found"
-  kubectl get prometheusrule openemr-alerts -n "$OPENEMR_NAMESPACE" >/dev/null 2>&1 && log_success "✅ OpenEMR alerting rules configured" || log_warn "⚠️ OpenEMR alerting rules not found"
-  kubectl get configmap grafana-datasources -n "$MONITORING_NAMESPACE" >/dev/null 2>&1 && log_success "✅ Grafana datasources configured" || log_warn "⚠️ Grafana datasources not configured"
-  kubectl get configmap grafana-dashboard-openemr -n "$MONITORING_NAMESPACE" >/dev/null 2>&1 && log_success "✅ OpenEMR dashboard configured" || log_warn "⚠️ OpenEMR dashboard not configured. To configure create configmap called 'grafana-dashboard-openemr' that specifies the custom dashboard configuration you would like."
+  if kubectl get servicemonitor openemr-metrics -n "$OPENEMR_NAMESPACE" >/dev/null 2>&1; then
+    log_success "✅ OpenEMR ServiceMonitor configured"
+  else
+    log_warn "⚠️ OpenEMR ServiceMonitor not found"
+  fi
+  if kubectl get prometheusrule openemr-alerts -n "$OPENEMR_NAMESPACE" >/dev/null 2>&1; then
+    log_success "✅ OpenEMR alerting rules configured"
+  else
+    log_warn "⚠️ OpenEMR alerting rules not found"
+  fi
+  if kubectl get configmap grafana-datasources -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+    log_success "✅ Grafana datasources configured"
+  else
+    log_warn "⚠️ Grafana datasources not configured"
+  fi
+  if kubectl get configmap grafana-dashboard-openemr -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+    log_success "✅ OpenEMR dashboard configured"
+  else
+    log_warn "⚠️ OpenEMR dashboard not configured. To configure create configmap called 'grafana-dashboard-openemr' that specifies the custom dashboard configuration you would like."
+  fi
 }
 
 print_access_help(){
@@ -1196,7 +1417,24 @@ main(){
   case "$cmd" in
     install)
       configure_namespace_security
-      local pw; pw="$(generate_secure_password)"
+      
+      # Check if Grafana secret already exists to determine if we should preserve credentials
+      local pw
+      if kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
+        log_info "Existing Grafana installation detected - preserving existing credentials"
+        # Retrieve existing password from secret
+        pw=$(kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || echo "")
+        if [[ -z "$pw" ]]; then
+          log_warning "Could not retrieve existing password - generating new one"
+          pw="$(generate_secure_password)"
+        else
+          log_success "Retrieved existing Grafana password from secret"
+        fi
+      else
+        log_info "Fresh Grafana installation - generating new credentials"
+        pw="$(generate_secure_password)"
+      fi
+      
       create_grafana_secret "$pw"
       write_credentials_file "$pw"
       create_values_file

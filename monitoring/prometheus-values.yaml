@@ -34,7 +34,7 @@
 # OBSERVABILITY_NAMESPACE="observability"       # Jaeger operator
 
 # Chart Versions (pinned for stability)
-# CHART_KPS_VERSION="75.18.1"                  # kube-prometheus-stack
+# CHART_KPS_VERSION="77.11.0"                  # kube-prometheus-stack
 # CHART_LOKI_VERSION="3.5.3"                   # Loki stack
 # CHART_JAEGER_VERSION="3.4.1"                 # Jaeger
 

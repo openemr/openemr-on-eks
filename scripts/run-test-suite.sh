@@ -1,60 +1,88 @@
 #!/bin/bash
 
 # OpenEMR EKS CI/CD Test Suite Runner
-# This script runs comprehensive tests for code quality, syntax, and validation
-# All tests run locally without requiring AWS access
+# ===================================
+# This script runs comprehensive tests for code quality, syntax validation, and best practices
+# across all components of the OpenEMR EKS deployment.
+#
+# Key Features:
+# - Shell script syntax validation and best practices
+# - YAML file validation and formatting checks
+# - Terraform configuration validation
+# - Kubernetes manifest syntax and best practices
+# - Kubernetes security policy validation
+# - Markdown documentation validation
+# - Parallel test execution for performance
+# - Comprehensive reporting and result tracking
+#
+# Test Categories:
+# - Code Quality: Shell syntax, YAML validation, Terraform validation
+# - Kubernetes: Manifest syntax, best practices, security policies
+# - Documentation: Markdown validation and formatting
+# - Scripts: Individual script validation and testing
 
-# set -e  # Commented out to prevent premature exit on grep commands
+# set -e  # Commented out to prevent premature exit on grep commands that may return non-zero
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and failed tests
+GREEN='\033[0;32m'    # Success messages and passed tests
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+PURPLE='\033[0;35m'   # Test execution messages
+CYAN='\033[0;36m'     # Special test categories
+NC='\033[0m'          # Reset color to default
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-CONFIG_FILE="$SCRIPT_DIR/test-config.yaml"
-TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+# Path resolution and configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
+CONFIG_FILE="$SCRIPT_DIR/test-config.yaml"                   # Test configuration file
+TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"                # Directory for test results
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)                             # Timestamp for result files
 
-# Test parameters
-TEST_SUITE=${TEST_SUITE:-"all"}
-PARALLEL=${PARALLEL:-"true"}
-DRY_RUN=${DRY_RUN:-"false"}
-VERBOSE=${VERBOSE:-"false"}
+# Test execution parameters - can be overridden by environment variables
+TEST_SUITE=${TEST_SUITE:-"all"}     # Test suite to run (all, code-quality, k8s, scripts, docs)
+PARALLEL=${PARALLEL:-"true"}        # Whether to run tests in parallel
+DRY_RUN=${DRY_RUN:-"false"}         # Whether to show what would be tested without executing
+VERBOSE=${VERBOSE:-"false"}         # Whether to show detailed test output
 
-# Test tracking
-TEST_RESULTS=()
-PASSED_TESTS=0
-FAILED_TESTS=0
-SKIPPED_TESTS=0
+# Test result tracking variables
+TEST_RESULTS=()    # Array to store test results
+PASSED_TESTS=0     # Counter for passed tests
+FAILED_TESTS=0     # Counter for failed tests
+SKIPPED_TESTS=0    # Counter for skipped tests
 
-# Initialize test results directory
+# Initialize test results directory for storing output files
 mkdir -p "$TEST_RESULTS_DIR"
 
-# Logging functions
+# Logging functions - provide consistent, color-coded output for different message types
+# These functions ensure all test operations have clear, categorized feedback
 log_info() {
+    # Display informational messages in blue
+    # Used for general information and progress updates
     echo -e "${BLUE}[INFO]${NC} $1"
 }
 
 log_success() {
+    # Display success messages in green
+    # Used for successful operations and passed tests
     echo -e "${GREEN}[SUCCESS]${NC} $1"
 }
 
 log_warning() {
+    # Display warning messages in yellow
+    # Used for cautionary information and non-critical issues
     echo -e "${YELLOW}[WARNING]${NC} $1"
 }
 
 log_error() {
+    # Display error messages in red
+    # Used for critical errors and failed tests
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
 log_test() {
+    # Display test execution messages in purple
+    # Used specifically for test-related operations and progress
     echo -e "${PURPLE}[TEST]${NC} $1"
 }
 
@@ -64,13 +92,15 @@ log_info "Project root: $PROJECT_ROOT"
 log_info "Config file: $CONFIG_FILE"
 log_info "Current working directory: $(pwd)"
 
-# Test result tracking
+# Function to record test results and update counters
+# This function maintains the test result tracking system and provides consistent logging
 record_test_result() {
-    local test_name="$1"
-    local status="$2"
-    local message="$3"
-    local duration="$4"
+    local test_name="$1"   # Name of the test that was executed
+    local status="$2"      # Test result status (PASS, FAIL, SKIP)
+    local message="$3"     # Descriptive message about the test result
+    local duration="$4"    # Time taken to execute the test
 
+    # Store result in array and update counters based on status
     case $status in
         "PASS")
             TEST_RESULTS+=("PASS|$test_name|$message|$duration")
@@ -90,11 +120,12 @@ record_test_result() {
     esac
 }
 
-# Test execution function
+# Generic test execution function
+# This function provides a standardized way to run individual tests with timing and error handling
 run_test() {
-    local test_name="$1"
-    local test_type="$2"
-    local test_files="$3"
+    local test_name="$1"   # Human-readable name of the test
+    local test_type="$2"   # Type of test (syntax, validation, etc.)
+    local test_files="$3"  # Files or patterns to test
 
     log_test "Running $test_name ($test_type)"
     local start_time=$(date +%s)

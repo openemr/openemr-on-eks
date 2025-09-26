@@ -1,3 +1,17 @@
+# =============================================================================
+# OpenEMR Network Security Policies
+# =============================================================================
+# This file defines Kubernetes Network Policies for OpenEMR security.
+#
+# Network Security Strategy:
+# - Least privilege network access
+# - Segregation between namespaces
+# - Allow only necessary traffic flows
+# - Protect against lateral movement
+# =============================================================================
+
+# Monitoring Network Policy
+# Allows monitoring systems to access OpenEMR pods for metrics collection
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -9,29 +23,33 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: openemr
+      app: openemr  # Apply to OpenEMR pods
   policyTypes:
-  - Ingress
+  - Ingress         # Only ingress rules (no egress rules)
   ingress:
+  # Allow access from OpenEMR namespace (internal communication)
   - from:
     - namespaceSelector:
         matchLabels:
           name: openemr
-    - podSelector: {}
+    - podSelector: {}  # Any pod in the openemr namespace
     ports:
     - protocol: TCP
-      port: 80
+      port: 80   # HTTP port for health checks
     - protocol: TCP
-      port: 443
-  # Allow internal cluster communication
+      port: 443  # HTTPS port for secure communication
+      
+  # Allow access from system namespaces for monitoring
   - from:
     - namespaceSelector:
         matchLabels:
-          name: kube-system
+          name: kube-system  # Kubernetes system pods
     - namespaceSelector:
         matchLabels:
-          name: monitoring
+          name: monitoring   # Monitoring namespace (Prometheus, etc.)
 ---
+# Inter-Namespace Communication Policy
+# Allows communication within the OpenEMR namespace and with external load balancers
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -43,21 +61,25 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: openemr
+      app: openemr  # Apply to OpenEMR pods
   policyTypes:
-  - Ingress
+  - Ingress  # Only ingress rules
   ingress:
   # Allow communication within the OpenEMR namespace
+  # This enables pod-to-pod communication for load balancing and health checks
   - from:
     - namespaceSelector:
         matchLabels:
           name: openemr
     ports:
     - protocol: TCP
-      port: 80
+      port: 80   # HTTP port for internal communication
     - protocol: TCP
-      port: 443
+      port: 443  # HTTPS port for secure internal communication
+
 ---
+# Base Access Network Policy
+# Defines fundamental ingress and egress rules for OpenEMR operation
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -69,37 +91,49 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      app: openemr
+      app: openemr  # Apply to OpenEMR pods
   policyTypes:
-  - Ingress
-  - Egress
+  - Ingress  # Ingress rules for incoming traffic
+  - Egress   # Egress rules for outgoing traffic
+  
+  # Ingress Rules (Incoming Traffic)
   ingress:
-  # Always allow basic OpenEMR access (login, main interface)
+  # Allow external access from load balancers and ingress controllers
+  # This is required for users to access OpenEMR through the load balancer
   - from:
-    - namespaceSelector: {}
+    - namespaceSelector: {}  # Allow from any namespace (load balancers, ingress)
     ports:
     - protocol: TCP
-      port: 80
+      port: 80   # HTTP port for user access
     - protocol: TCP
-      port: 443
+      port: 443  # HTTPS port for secure user access
+      
+  # Egress Rules (Outgoing Traffic)
   egress:
-  # Allow database access
-  - to: []
+  # Database Access
+  # Allow connections to Aurora MySQL database
+  - to: []  # Allow to any destination (Aurora is external to cluster)
     ports:
     - protocol: TCP
-      port: 3306
-  # Allow Redis access
-  - to: []
+      port: 3306  # MySQL port
+      
+  # Redis Access
+  # Allow connections to ElastiCache Redis cluster
+  - to: []  # Allow to any destination (Redis is external to cluster)
     ports:
     - protocol: TCP
-      port: 6379
-  # Allow DNS resolution
-  - to: []
+      port: 6379  # Redis port
+      
+  # DNS Resolution
+  # Allow DNS queries for service discovery and external lookups
+  - to: []  # Allow to any destination (DNS servers)
     ports:
     - protocol: UDP
-      port: 53
-  # Allow HTTPS for external services (certificate downloads, etc.)
-  - to: []
+      port: 53    # DNS port
+      
+  # External HTTPS Access
+  # Allow HTTPS connections for certificate downloads, updates, etc.
+  - to: []  # Allow to any destination (external HTTPS services)
     ports:
     - protocol: TCP
-      port: 443
+      port: 443   # HTTPS port

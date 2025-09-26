@@ -288,7 +288,7 @@ Fluent Bit is deployed as a sidecar container within each OpenEMR pod, providing
 
 ```yaml
 - name: fluent-bit-sidecar
-  image: fluent/fluent-bit:4.0.8
+  image: fluent/fluent-bit:4.1.0
   ports:
   - containerPort: 2020
     name: fluent-bit-http

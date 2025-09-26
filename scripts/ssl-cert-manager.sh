@@ -1,18 +1,37 @@
 #!/bin/bash
 
+# OpenEMR SSL Certificate Manager
+# ===============================
+# This script manages SSL certificates for OpenEMR on EKS using AWS Certificate Manager (ACM)
+# and Route53. It provides commands to request, validate, and deploy SSL certificates for
+# secure HTTPS access to the OpenEMR application.
+#
+# Key Features:
+# - Request SSL certificates from AWS Certificate Manager
+# - Automatic Route53 DNS validation record creation
+# - Certificate validation status checking
+# - OpenEMR deployment with SSL certificate configuration
+# - Current SSL configuration status display
+#
+# Prerequisites:
+# - AWS credentials with ACM and Route53 permissions
+# - Domain must be managed by Route53 (for auto-validation)
+# - kubectl configured for the target cluster
+# - Terraform state available for infrastructure details
+
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical issues
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+NC='\033[0m'          # Reset color to default
 
-# Configuration
-AWS_REGION=${AWS_REGION:-"us-west-2"}
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}
-NAMESPACE=${NAMESPACE:-"openemr"}
+# Configuration variables - can be overridden by environment variables
+AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where certificates are managed
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name for deployment
+NAMESPACE=${NAMESPACE:-"openemr"}           # Kubernetes namespace for OpenEMR
 
 show_usage() {
     echo -e "${BLUE}🔐 OpenEMR SSL Certificate Manager${NC}"
@@ -37,10 +56,13 @@ show_usage() {
     echo "Note: For development/testing, you can deploy without a certificate to use self-signed SSL"
 }
 
+# Function to request a new SSL certificate from AWS Certificate Manager
+# This function handles both automatic Route53 DNS validation and manual validation
 request_certificate() {
-    local domain=$1
-    local auto_dns=${2:-"true"}  # Default to auto DNS creation
+    local domain=$1              # Domain name for the certificate
+    local auto_dns=${2:-"true"}  # Whether to automatically create Route53 DNS records
 
+    # Validate required domain parameter
     if [ -z "$domain" ]; then
         echo -e "${RED}Error: Domain name is required${NC}"
         echo "Usage: $0 request <domain> [auto-dns]"

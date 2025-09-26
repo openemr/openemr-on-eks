@@ -1,3 +1,7 @@
+# EKS Cluster Outputs
+# These outputs expose key information about the EKS cluster for use by other modules,
+# scripts, and external systems that need to interact with the cluster.
+
 output "cluster_endpoint" {
   description = "Endpoint for EKS control plane"
   value       = module.eks.cluster_endpoint
@@ -22,6 +26,11 @@ output "cluster_name" {
   description = "The name of the EKS cluster"
   value       = module.eks.cluster_name
 }
+
+# Aurora Database Outputs
+# These outputs expose key information about the Aurora Serverless v2 PostgreSQL cluster
+# that serves as the primary database for OpenEMR. All database-related outputs are marked
+# as sensitive to prevent accidental exposure of connection details.
 
 output "aurora_endpoint" {
   description = "Aurora cluster endpoint"
@@ -56,15 +65,20 @@ output "aurora_password" {
   sensitive   = true
 }
 
+# ElastiCache Redis Outputs
+# These outputs expose key information about the ElastiCache Serverless Redis cluster
+# that serves as the session store and caching layer for OpenEMR. The try() function
+# provides fallback values in case the ElastiCache resources are not yet available.
+
 output "redis_endpoint" {
   description = "Redis Serverless endpoint"
-  value       = aws_elasticache_serverless_cache.openemr.endpoint[0].address
+  value       = try(aws_elasticache_serverless_cache.openemr.endpoint[0].address, "redis-not-available")
   sensitive   = true
 }
 
 output "redis_port" {
   description = "Redis Serverless port"
-  value       = aws_elasticache_serverless_cache.openemr.endpoint[0].port
+  value       = try(aws_elasticache_serverless_cache.openemr.endpoint[0].port, 6379)
 }
 
 output "redis_password" {
@@ -73,10 +87,18 @@ output "redis_password" {
   sensitive   = true
 }
 
+# EFS Storage Outputs
+# These outputs expose key information about the EFS file system that provides
+# persistent storage for OpenEMR application data, user uploads, and configuration files.
+
 output "efs_id" {
   description = "EFS file system ID"
   value       = aws_efs_file_system.openemr.id
 }
+
+# VPC Network Outputs
+# These outputs expose key information about the VPC and subnet configuration
+# that provides the network infrastructure for the EKS cluster and associated resources.
 
 output "vpc_id" {
   description = "ID of the VPC where the cluster is deployed"
@@ -93,10 +115,23 @@ output "public_subnets" {
   value       = module.vpc.public_subnets
 }
 
+# S3 Storage Outputs
+# These outputs expose key information about the S3 buckets used for storing
+# ALB access logs and WAF logs, providing centralized logging capabilities.
+
 output "alb_logs_bucket_name" {
   description = "Name of the S3 bucket for ALB access logs"
   value       = aws_s3_bucket.alb_logs.bucket
 }
+
+output "alb_logs_bucket_arn" {
+  description = "ARN of the S3 bucket for ALB access logs"
+  value       = aws_s3_bucket.alb_logs.arn
+}
+
+# IAM and Security Outputs
+# These outputs expose key information about IAM roles and policies that enable
+# secure access to AWS services from within the EKS cluster using IRSA.
 
 output "oidc_provider_arn" {
   description = "ARN of the EKS OIDC provider for IRSA"
@@ -108,10 +143,10 @@ output "openemr_role_arn" {
   value       = aws_iam_role.openemr.arn
 }
 
-output "alb_logs_bucket_arn" {
-  description = "ARN of the S3 bucket for ALB access logs"
-  value       = aws_s3_bucket.alb_logs.arn
-}
+# CloudWatch Logging Outputs
+# These outputs expose key information about the CloudWatch log groups that collect
+# and store logs from OpenEMR and Fluent Bit, enabling centralized log management
+# and monitoring capabilities.
 
 output "cloudwatch_log_groups" {
   description = "CloudWatch log group names for OpenEMR 7.0.3.4"
@@ -127,11 +162,20 @@ output "cloudwatch_log_groups" {
   }
 }
 
+# EFS CSI Driver Pod Identity Outputs
+# These outputs expose key information about the EFS CSI driver Pod Identity role
+# that enables secure access to EFS from within the EKS cluster.
+
 output "efs_pod_identity_role_arn" {
-  value = module.aws_efs_csi_pod_identity.iam_role_arn
+  description = "ARN of the EFS CSI driver Pod Identity role"
+  value       = module.aws_efs_csi_pod_identity.iam_role_arn
 }
 
 # Note: EFS CSI driver role ARN is now available via efs_pod_identity_role_arn output
+
+# OpenEMR Application Configuration Outputs
+# These outputs expose key configuration parameters for the OpenEMR application,
+# including autoscaling settings, feature flags, and version information.
 
 # OpenEMR Autoscaling Configuration Outputs
 output "openemr_autoscaling_config" {
@@ -165,7 +209,11 @@ output "openemr_features_config" {
   }
 }
 
-# WAF Configuration Outputs
+# WAF Security Configuration Outputs
+# These outputs expose key information about the WAF (Web Application Firewall)
+# configuration that provides protection against common web exploits and attacks.
+# All WAF-related outputs return null when WAF is disabled via the enable_waf variable.
+
 output "waf_web_acl_arn" {
   description = "ARN of the WAF Web ACL (null if WAF is disabled)"
   value       = var.enable_waf ? aws_wafv2_web_acl.openemr[0].arn : null

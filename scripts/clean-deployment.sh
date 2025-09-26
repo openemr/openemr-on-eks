@@ -1,23 +1,44 @@
 #!/bin/bash
 
+# OpenEMR Clean Deployment Script
+# ===============================
+# This script performs a comprehensive cleanup of an OpenEMR deployment on Amazon EKS.
+# It removes Kubernetes resources, cleans the database, and handles orphaned storage
+# to ensure a clean slate for redeployment or troubleshooting.
+#
+# Key Features:
+# - Removes OpenEMR Kubernetes namespace and all resources
+# - Cleans database by dropping all tables and recreating structure
+# - Handles orphaned PersistentVolumeClaims and PersistentVolumes
+# - Restarts EFS CSI controller to refresh storage connections
+# - Cleans up local backup files and temporary data
+# - Provides safety confirmations (unless --force is used)
+#
+# WARNING: This script will permanently delete all OpenEMR data and configurations.
+# Use with caution and ensure you have backups before running.
+
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical warnings
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+NC='\033[0m'          # Reset color to default
 
 # Parse command line arguments
-FORCE=false
+# This section processes command-line options to control script behavior
+# The --force flag bypasses safety confirmations for automated/scripted usage
+FORCE=false  # Flag to skip confirmation prompts (set by --force or -f)
+
 while [[ $# -gt 0 ]]; do
     case $1 in
         -f|--force)
-            FORCE=true
-            shift
+            FORCE=true        # Enable force mode - skip all confirmation prompts
+            shift             # Consume the option
             ;;
         -h|--help)
+            # Display comprehensive help information including usage examples
             echo "Usage: $0 [OPTIONS]"
             echo ""
             echo "Options:"
@@ -33,19 +54,20 @@ while [[ $# -gt 0 ]]; do
         *)
             echo "Unknown option: $1"
             echo "Use --help for usage information"
-            exit 1
+            exit 1            # Exit with error for unknown options
             ;;
     esac
 done
 
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}
-AWS_REGION=${AWS_REGION:-"us-west-2"}
-NAMESPACE=${NAMESPACE:-"openemr"}
+# Configuration variables - can be overridden by environment variables
+NAMESPACE=${NAMESPACE:-"openemr"}             # Kubernetes namespace to clean
 
-# Get the script's directory and project root for path-independent operation
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+# Path resolution for script portability
+# These variables ensure the script works regardless of the current working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
 
+# Display script header and warnings
 echo -e "${GREEN}🧹 OpenEMR Clean Deployment Script${NC}"
 echo -e "${GREEN}===================================${NC}"
 echo ""
@@ -55,8 +77,11 @@ echo -e "${RED}⚠️  DATABASE WARNING: This will DELETE ALL OpenEMR data from 
 echo -e "${RED}⚠️  This action cannot be undone!${NC}"
 echo ""
 
-# Confirm with user (unless force mode is enabled)
+# Safety confirmation mechanism
+# This section ensures users understand the destructive nature of the cleanup
+# Force mode bypasses this for automated/scripted usage scenarios
 if [ "$FORCE" = false ]; then
+    # Interactive confirmation prompt - requires explicit 'y' or 'Y' to proceed
     read -p "Are you sure you want to clean the current deployment? (y/N): " -n 1 -r
     echo
     if [[ ! $REPLY =~ ^[Yy]$ ]]; then
@@ -64,13 +89,15 @@ if [ "$FORCE" = false ]; then
         exit 0
     fi
 else
+    # Force mode: skip confirmation for automated usage
     echo -e "${YELLOW}Force mode enabled - skipping confirmation prompts${NC}"
 fi
 
 echo -e "${YELLOW}Starting cleanup...${NC}"
 echo ""
 
-# Delete OpenEMR namespace (this removes all resources in the namespace)
+# Step 1: Remove Kubernetes namespace and all contained resources
+# Deleting a namespace automatically removes all resources within it (pods, services, secrets, etc.)
 echo -e "${YELLOW}1. Removing OpenEMR namespace and all resources...${NC}"
 if kubectl get namespace "$NAMESPACE" > /dev/null 2>&1; then
     kubectl delete namespace "$NAMESPACE" --timeout=300s
@@ -80,7 +107,8 @@ else
 fi
 echo ""
 
-# Wait for namespace to be fully deleted
+# Step 2: Wait for namespace deletion to complete
+# Kubernetes namespace deletion is asynchronous - we must wait for finalizers to complete
 echo -e "${YELLOW}2. Waiting for namespace deletion to complete...${NC}"
 while kubectl get namespace "$NAMESPACE" > /dev/null 2>&1; do
     echo -e "${BLUE}   Waiting for namespace deletion...${NC}"
@@ -89,13 +117,16 @@ done
 echo -e "${GREEN}✅ Namespace fully deleted${NC}"
 echo ""
 
-# Clean up OpenEMR database to prevent reconfiguration conflicts
+# Step 3: Clean up OpenEMR database to prevent reconfiguration conflicts
+# This step removes all OpenEMR tables and data to ensure a clean database state
+# for fresh deployment without configuration conflicts from previous installations
 echo -e "${YELLOW}3. Cleaning up OpenEMR database...${NC}"
 echo -e "${RED}⚠️  WARNING: This will DELETE ALL OpenEMR data from the database!${NC}"
 echo -e "${RED}⚠️  This action cannot be undone!${NC}"
 echo ""
 
-# Confirm database cleanup (unless force mode is enabled)
+# Additional safety confirmation for database cleanup
+# Database cleanup is more destructive than namespace deletion, so we require explicit confirmation
 if [ "$FORCE" = false ]; then
     read -p "Are you sure you want to DELETE ALL OpenEMR data from the database? (y/N): " -n 1 -r
     echo
@@ -115,20 +146,31 @@ else
     DB_CLEANUP=true
 fi
 
-# Only proceed with database cleanup if DB_CLEANUP is true
+# Execute database cleanup only if user confirmed (or force mode is enabled)
 if [ "$DB_CLEANUP" = true ]; then
-    # Get database details from Terraform
+    # Retrieve database connection details and OpenEMR version from Terraform state
+    # This ensures we connect to the correct database instance and use the right OpenEMR version
     cd "$PROJECT_ROOT/terraform"
     if [ -f "terraform.tfstate" ]; then
-        echo -e "${BLUE}   Getting database details from Terraform...${NC}"
+        echo -e "${BLUE}   Getting database details and OpenEMR version from Terraform...${NC}"
         AURORA_ENDPOINT=$(terraform output -raw aurora_endpoint 2>/dev/null || echo "")
         AURORA_PASSWORD=$(terraform output -raw aurora_password 2>/dev/null || echo "")
+        
+        # Try to get OpenEMR version from terraform.tfvars, fallback to 7.0.3
+        OPENEMR_VERSION="7.0.3"  # Default fallback version
+        if [ -f "terraform.tfvars" ]; then
+            TFVARS_VERSION=$(grep -E '^openemr_version\s*=' terraform.tfvars 2>/dev/null | cut -d'"' -f2 || echo "")
+            if [ -n "$TFVARS_VERSION" ]; then
+                OPENEMR_VERSION="$TFVARS_VERSION"
+            fi
+        fi
+        echo -e "${BLUE}   Using OpenEMR version: $OPENEMR_VERSION${NC}"
 
         if [ -n "$AURORA_ENDPOINT" ] && [ -n "$AURORA_PASSWORD" ]; then
             echo -e "${BLUE}   Database endpoint: $AURORA_ENDPOINT${NC}"
 
-            # Use a temporary MySQL pod to clean the database
-            echo -e "${YELLOW}   Launching temporary MySQL pod to clean database...${NC}"
+            # Use OpenEMR container for database cleanup
+            echo -e "${YELLOW}   Launching temporary OpenEMR database cleanup pod...${NC}"
 
             # Create a temporary namespace for the cleanup pod
             TEMP_NAMESPACE="db-cleanup-temp"
@@ -142,7 +184,7 @@ if [ "$DB_CLEANUP" = true ]; then
                 --from-literal=mysql-password="$AURORA_PASSWORD" \
                 --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
 
-            # Create a temporary MySQL pod for database cleanup
+            # Create a temporary database cleanup pod using OpenEMR container
             cat <<EOF | kubectl apply -f -
 apiVersion: v1
 kind: Pod
@@ -151,18 +193,19 @@ metadata:
   namespace: $TEMP_NAMESPACE
 spec:
   containers:
-  - name: mysql-client
-    image: mysql:8.0
+  - name: db-cleanup
+    image: openemr/openemr:$OPENEMR_VERSION
     command: ['sh', '-c']
     args:
     - |
+      echo "Using OpenEMR container ($OPENEMR_VERSION) for database cleanup..."
       echo "Waiting for MySQL connection..."
       until mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SELECT 1;" >/dev/null 2>&1; do
         sleep 2
       done
       echo "Connected to MySQL, cleaning database..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "DROP DATABASE IF EXISTS openemr; CREATE DATABASE openemr CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
-      echo "Database cleanup completed"
+      echo "Database cleanup completed successfully with OpenEMR container"
     env:
     - name: MYSQL_HOST
       valueFrom:
@@ -213,7 +256,7 @@ EOF
 
             # Check if the pod completed successfully by looking at the logs
             if [ "$cleanup_completed" = true ]; then
-                echo -e "${GREEN}✅ OpenEMR database cleaned successfully via temporary MySQL pod${NC}"
+                echo -e "${GREEN}✅ OpenEMR database cleaned successfully via OpenEMR container${NC}"
                 # Show the logs
                 echo -e "${BLUE}   Cleanup logs:${NC}"
                 kubectl logs db-cleanup-pod -n $TEMP_NAMESPACE
@@ -246,32 +289,17 @@ ORPHANED_PVCS=$(kubectl get pvc --all-namespaces | grep openemr || echo "")
 if [ -n "$ORPHANED_PVCS" ]; then
     echo -e "${YELLOW}Found orphaned PVCs, cleaning up...${NC}"
     kubectl get pvc --all-namespaces | grep openemr | awk '{print $1 " " $2}' | while read -r namespace pvc; do
+        echo -e "${BLUE}   Deleting PVC: $pvc in namespace: $namespace${NC}"
         kubectl delete pvc "$pvc" -n "$namespace" --timeout=60s || echo "Failed to delete $pvc"
     done
+    echo -e "${GREEN}✅ Orphaned PVCs cleaned up${NC}"
 else
     echo -e "${GREEN}✅ No orphaned PVCs found${NC}"
 fi
-
-# Also check for any PVCs in the openemr namespace specifically
-echo -e "${YELLOW}   Checking for any remaining PVCs in openemr namespace...${NC}"
-if kubectl get namespace "$NAMESPACE" > /dev/null 2>&1; then
-    # Namespace still exists, check for PVCs
-    REMAINING_PVCS=$(kubectl get pvc -n "$NAMESPACE" 2>/dev/null | tail -n +2 | awk '{print $1}' || echo "")
-    if [ -n "$REMAINING_PVCS" ]; then
-        echo -e "${YELLOW}   Found remaining PVCs in $NAMESPACE namespace, force deleting...${NC}"
-        echo "$REMAINING_PVCS" | while read -r pvc; do
-            if [ -n "$pvc" ]; then
-                echo -e "${BLUE}   Force deleting PVC: $pvc${NC}"
-                kubectl delete pvc "$pvc" -n "$NAMESPACE" --force --grace-period=0 --timeout=30s 2>/dev/null || true
-            fi
-        done
-    fi
-else
-    echo -e "${BLUE}   Namespace $NAMESPACE no longer exists${NC}"
-fi
 echo ""
 
-# Clean up any orphaned PVs
+# Step 5: Clean up orphaned PersistentVolumes
+# PVs that are no longer bound to PVCs should be removed to free up storage resources
 echo -e "${YELLOW}5. Checking for orphaned PVs...${NC}"
 ORPHANED_PVS=$(kubectl get pv | grep openemr || echo "")
 if [ -n "$ORPHANED_PVS" ]; then
@@ -284,99 +312,20 @@ else
 fi
 echo ""
 
-# Restart EFS CSI controller to clear any cached state
+# Step 6: Restart EFS CSI controller to clear cached state
+# This ensures the CSI driver has a fresh state and can properly handle new PVCs
 echo -e "${YELLOW}6. Restarting EFS CSI controller to clear cached state...${NC}"
 kubectl rollout restart deployment efs-csi-controller -n kube-system
 kubectl rollout status deployment efs-csi-controller -n kube-system --timeout=120s
 echo -e "${GREEN}✅ EFS CSI controller restarted${NC}"
 echo ""
 
-# Clean up any stale OpenEMR configuration files from EFS volumes
-echo -e "${YELLOW}7. Cleaning up stale OpenEMR configuration files from EFS volumes...${NC}"
-# Create a temporary pod to clean up stale configuration files
-TEMP_NAMESPACE="efs-cleanup-temp"
-kubectl create namespace $TEMP_NAMESPACE --dry-run=client -o yaml | kubectl apply -f - 2>/dev/null || true
-
-# Create a temporary pod to clean up stale configuration files
-cat <<EOF | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: efs-cleanup-pod
-  namespace: $TEMP_NAMESPACE
-spec:
-  containers:
-  - name: cleanup
-    image: busybox:1.35
-    command: ['sh', '-c']
-    args:
-    - |
-      echo "Cleaning up stale OpenEMR configuration files..."
-      # Mount the EFS volumes and clean up stale configuration files
-      if [ -d "/mnt/sites" ]; then
-        echo "Cleaning /mnt/sites directory..."
-        rm -rf /mnt/sites/*
-        echo "✅ Sites directory cleaned"
-      fi
-      if [ -d "/mnt/ssl" ]; then
-        echo "Cleaning /mnt/ssl directory..."
-        rm -rf /mnt/ssl/*
-        echo "✅ SSL directory cleaned"
-      fi
-      if [ -d "/mnt/letsencrypt" ]; then
-        echo "Cleaning /mnt/letsencrypt directory..."
-        rm -rf /mnt/letsencrypt/*
-        echo "✅ Let's Encrypt directory cleaned"
-      fi
-      echo "EFS cleanup completed"
-    volumeMounts:
-    - name: sites-volume
-      mountPath: /mnt/sites
-    - name: ssl-volume
-      mountPath: /mnt/ssl
-    - name: letsencrypt-volume
-      mountPath: /mnt/letsencrypt
-  volumes:
-  - name: sites-volume
-    persistentVolumeClaim:
-      claimName: openemr-sites-pvc
-  - name: ssl-volume
-    persistentVolumeClaim:
-      claimName: openemr-ssl-pvc
-  - name: letsencrypt-volume
-    persistentVolumeClaim:
-      claimName: openemr-letsencrypt-pvc
-  restartPolicy: Never
-EOF
-
-# Wait for the cleanup pod to complete
-echo -e "${BLUE}   Waiting for EFS cleanup to complete...${NC}"
-kubectl wait --for=condition=Ready pod/efs-cleanup-pod -n $TEMP_NAMESPACE --timeout=60s 2>/dev/null || true
-
-# Check if the pod completed successfully
-sleep 5
-if kubectl logs efs-cleanup-pod -n $TEMP_NAMESPACE 2>/dev/null | grep -q "EFS cleanup completed"; then
-    echo -e "${GREEN}✅ EFS volumes cleaned successfully${NC}"
-    echo -e "${BLUE}   Cleanup logs:${NC}"
-    kubectl logs efs-cleanup-pod -n $TEMP_NAMESPACE
-else
-    echo -e "${YELLOW}⚠️  EFS cleanup may not have completed successfully${NC}"
-    echo -e "${BLUE}   Pod status:${NC}"
-    kubectl get pod efs-cleanup-pod -n $TEMP_NAMESPACE 2>/dev/null || echo "Pod not found"
-    echo -e "${BLUE}   Pod logs:${NC}"
-    kubectl logs efs-cleanup-pod -n $TEMP_NAMESPACE 2>/dev/null || echo "No logs available"
-fi
-
-# Clean up temporary resources
-echo -e "${BLUE}   Cleaning up temporary EFS cleanup resources...${NC}"
-kubectl delete namespace $TEMP_NAMESPACE --timeout=30s 2>/dev/null || true
-echo ""
-
-# Clean up any backup files from previous deployments
-echo -e "${YELLOW}8. Cleaning up backup files...${NC}"
+# Step 7: Clean up local backup files from previous deployments
+# Remove any .bak files and credential files that may have been generated
+echo -e "${YELLOW}7. Cleaning up backup files...${NC}"
 cd ../k8s
-rm -f ./*.yaml.bak
-rm -f openemr-credentials*.txt
+rm -f ./*.yaml.bak              # Remove backup files created during deployment
+rm -f openemr-credentials*.txt  # Remove any credential files
 echo -e "${GREEN}✅ Backup files cleaned${NC}"
 echo ""
 

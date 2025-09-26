@@ -2,7 +2,7 @@
 
 # OpenEMR EKS Deployment with Auto Mode v2.x.x
 
-*"Democratizing healthcare technology by making enterprise-grade OpenEMR deployments accessible to organizations of any size through automated, cloud-native infrastructure."*
+*Democratizing healthcare technology by making enterprise-grade OpenEMR deployments accessible to organizations of any size through automated, cloud-native infrastructure.*
 
 <img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="300">
 
@@ -37,7 +37,7 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 
 ### **🔒 Security & Compliance**
 
-- [Production Best Practice - Jumpbox Architecture](#-production-best-practice---jumpbox-architecture)
+- [Production Best Practice - Jumpbox Architecture](#%E2%80%8D-production-best-practice---jumpbox-architecture)
 - [Operational Scripts](#%EF%B8%8F-operational-scripts)
 
 ### **📚 Infrastructure**
@@ -65,9 +65,9 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 
 ### **📚 Additional Resources**
 
-- [Additional Resources](#-additional-resources)
+- [Additional Resources](#-additional-resources-1)
 - [Version Awareness](#-version-awareness)
-- [License and Compliance](#-additional-resources-1)
+- [License and Compliance](#license-and-compliance)
 
 ---
 
@@ -129,6 +129,42 @@ graph TB
     - Rust-based, immutable, security-hardened Linux with SELinux enforcement and no SSH access
 
 ## Prerequisites
+
+### **Required Tools and Versions**
+
+#### **Terraform Installation (Required: v1.13.3)**
+
+```bash
+# Option 1: Install via Homebrew (macOS/Linux)
+brew tap hashicorp/tap
+brew install hashicorp/tap/terraform
+
+# Option 2: Download directly from HashiCorp (All platforms)
+# Visit: https://releases.hashicorp.com/terraform/1.13.3/
+# Download the appropriate binary for your OS and architecture
+# Extract and add to your PATH
+
+# Option 3: Use tfenv for version management (Recommended)
+brew install tfenv
+tfenv install 1.13.3
+tfenv use 1.13.3
+
+# Verify installation
+terraform --version  # Should show v1.13.3
+```
+
+#### **Other Required Tools**
+
+```bash
+# Install via Homebrew (macOS/Linux)
+brew install kubectl helm awscli jq
+
+# Verify installations
+kubectl version --client
+helm version
+aws --version  # Must be 2.15.0 or higher
+jq --version
+```
 
 ### **Required AWS Configuration**
 
@@ -205,6 +241,13 @@ cd openemr-on-eks
 # Install required tools on macOS
 brew install terraform kubectl helm awscli jq
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
+
+# Alternative: Install latest Terraform directly from HashiCorp
+# Download from: https://releases.hashicorp.com/terraform/1.13.3/
+# Or use tfenv for version management:
+# brew install tfenv
+# tfenv install 1.13.3
+# tfenv use 1.13.3
 
 # Configure AWS credentials
 aws configure
@@ -325,7 +368,7 @@ Next steps for first-time deployment:
 • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v75.18.1 (metrics & alerting)
+     - Prometheus v77.11.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v3.5.3 (log aggregation)
      - Jaeger v3.4.1 (distributed tracing)
@@ -577,9 +620,9 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v75.18.1 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v77.11.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
-- 📝 **Loki**: v6.35.1 single-binary (log aggregation with 720h retention)
+- 📝 **Loki**: v6.41.0 single-binary (log aggregation with 720h retention)
 - 🔍 **Jaeger**: v3.4.1 (distributed tracing)
 - 🚨 **AlertManager**: Slack integration support with customizable notifications
 - 🎯 **OpenEMR Integration**: Automatically and continually collects a broad set of metrics from the OpenEMR namespace where your application is running so you can precisely monitor the health and performance of your OpenEMR deployment in real-time. (see [monitoring documentation](./monitoring/README.md) guidance for creating custom dashboards)
@@ -664,6 +707,7 @@ openemr-on-eks/
 │   ├── cluster-security-manager.sh     # Cluster access security management
 │   ├── backup.sh                       # Cross-region backup procedures
 │   ├── restore.sh                      # Cross-region disaster recovery (with DB reconfiguration)
+│   ├── destroy.sh                      # Complete infrastructure destruction (bulletproof cleanup)
 │   ├── test-end-to-end-backup-restore.sh # End-to-end backup/restore testing
 │   ├── run-test-suite.sh               # CI/CD test suite runner
 │   └── test-config.yaml                # Test configuration for CI/CD framework
@@ -1121,6 +1165,52 @@ cd scripts && ./restore-defaults.sh [--backup] [--force]
 **Requirements:** Git repository (uses git checkout to restore original files)
 **⚠️ Developer Warning:** Will erase structural changes to YAML files - only use for cleaning deployment artifacts
 
+#### **`destroy.sh`** - Complete Infrastructure Destruction
+
+```bash
+cd scripts && ./destroy.sh [--force]
+```
+
+**Purpose:** Complete and bulletproof destruction of all OpenEMR infrastructure
+**Features:** 
+- Disables RDS deletion protection automatically
+- Deletes all snapshots to prevent automatic restoration
+- Cleans up orphaned resources (security groups, load balancers, WAF)
+- Comprehensive AWS resource cleanup
+- Terraform destroy with retry logic
+- Verification of complete cleanup
+
+**When to use:** 
+- Complete infrastructure teardown
+- Development environment cleanup
+- End-to-end testing preparation
+- Disaster recovery scenarios
+- Cost optimization (removing unused resources)
+
+**Safety Features:**
+- Interactive confirmation prompts (unless `--force` used)
+- AWS credentials validation before execution
+- Prerequisites checking (terraform, aws, kubectl)
+- Retry logic for AWS API calls
+- Comprehensive verification of cleanup completion
+
+**Options:**
+
+- `--force`: Skip confirmation prompts and use force mode
+
+**Examples:**
+
+```bash
+./destroy.sh                              # Interactive destruction with prompts
+./destroy.sh --force                      # Automated destruction (CI/CD) - no prompts
+```
+
+**⚠️ Important Notes:**
+- **Irreversible**: This action completely destroys all infrastructure and cannot be undone
+- **Comprehensive**: Removes ALL resources including Terraform state, RDS clusters, snapshots, S3 buckets
+- **Bulletproof**: Handles edge cases like deletion protection, orphaned resources, and AWS API rate limits
+- **Verification**: Confirms complete cleanup before declaring success
+
 ### **Security Management Scripts**
 
 #### **`cluster-security-manager.sh`** - Cluster Access Control
@@ -1398,28 +1488,31 @@ The `deploy.sh` script orchestrates the deployment in the correct order:
 
 ## 🔄 Backup & Restore System
 
-The OpenEMR deployment includes a **comprehensive cross-region backup and restore system** designed for enterprise disaster recovery:
+The OpenEMR deployment includes a **comprehensive backup and restore system** with enhanced cross-region and cross-account capabilities designed for enterprise disaster recovery:
 
 ### **🚀 Key Features**
 
-- **✅ Cross-Region Backup**: Automatic backup to different AWS regions for geographic redundancy
+- **✅ Multiple Backup Strategies**: Same-region, cross-region, and cross-account backup options
+- **✅ Enhanced RDS Capabilities**: Leverages new Amazon RDS cross-Region/cross-account snapshot copy
 - **✅ Comprehensive Coverage**: Database, EFS, Kubernetes configs, and application data
 - **✅ Automated Metadata**: Rich backup metadata for tracking and restoration
-- **✅ Cost Optimization**: S3 lifecycle policies for storage cost management
+- **✅ Cost Optimization**: Single-step operations eliminate intermediate snapshots
 - **✅ Disaster Recovery**: Full infrastructure restoration capabilities
+- **✅ Strategy Auto-Detection**: Automatically detects restore strategy from backup metadata
 
-### **🌍 Cross-Region Benefits**
+### **🌍 Enhanced Backup Strategies**
 
-- **Disaster Recovery**: Protection against regional outages
-- **Compliance**: Geographic redundancy requirements
-- **Security**: Isolated backup storage
+- **📍 Same-Region**: Fastest backup, lowest cost (development/testing)
+- **🌍 Cross-Region**: Disaster recovery with new RDS single-step copy
+- **🏢 Cross-Account**: Compliance and data sharing between organizations
+- **🚀 Auto-Detection**: Intelligent restore strategy detection from metadata
 
 ### **📋 What Gets Backed Up**
 
-1. **Aurora Database**: RDS cluster snapshots with cross-region copy
+1. **Aurora Database**: RDS cluster snapshots with enhanced cross-region/cross-account copy
 2. **Kubernetes Configs**: All K8s resources (deployments, services, PVCs, configmaps)
 3. **Application Data**: OpenEMR sites directory with compression
-4. **Backup Metadata**: JSON and human-readable reports
+4. **Backup Metadata**: JSON and human-readable reports with strategy tracking
 
 ### **⏱️ Smart Polling & Timeout Management**
 
@@ -1728,31 +1821,37 @@ cat .markdownlint.json
 
 ## Disaster Recovery Procedures
 
-### **🚀 New Comprehensive Backup & Restore System**
+### **🚀 Enhanced Backup & Restore System**
 
-Our enhanced backup and restore system provides **simple, reliable, and comprehensive** data protection:
+Our enhanced backup and restore system provides **simple, reliable, and comprehensive** data protection with new Amazon RDS capabilities:
 
 #### **Quick Backup**
 
 ```bash
-# Create cross-region backup (recommended)
-./scripts/backup.sh --backup-region us-east-1
+# Cross-region backup for disaster recovery (recommended)
+./scripts/backup.sh --strategy cross-region --backup-region us-east-1
 
-# Same-region backup
-./scripts/backup.sh
+# Cross-account backup for compliance
+./scripts/backup.sh --strategy cross-account --target-account 123456789012 --backup-region us-east-1
+
+# Same-region backup (fastest, lowest cost)
+./scripts/backup.sh --strategy same-region
 ```
 
 #### **Quick Restore**
 
 ```bash
-# Simple restore (auto-detects cluster and restores everything)
-./scripts/restore.sh <backup-bucket> <snapshot-id>
-
-# Cross-region restore
+# Auto-detect restore strategy (recommended)
 ./scripts/restore.sh <backup-bucket> <snapshot-id> <backup-region>
 
-# Example
-./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
+# Cross-region restore
+./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-region
+
+# Cross-account restore
+./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-account --source-account 123456789012
+
+# Example with auto-detection
+./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000-us-east-1 us-east-1
 ```
 
 ### **What Gets Protected**
@@ -2061,5 +2160,6 @@ Version information is centrally managed in `versions.yaml`. To configure AWS cr
 For more details, see the [Version Management Guide](docs/VERSION_MANAGEMENT.md).
 
 ## License and Compliance
+MIT License. See full license [here](./LICENSE).
 
 This deployment provides production ready infrastructure. Full HIPAA compliance requires additional organizational policies, procedures, and training. Ensure you have executed a Business Associate Agreement with AWS before processing PHI.

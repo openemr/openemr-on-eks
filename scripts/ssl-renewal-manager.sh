@@ -1,20 +1,38 @@
 #!/bin/bash
 
 # SSL Certificate Renewal Manager for OpenEMR EKS
-# Manages SSL certificate renewal CronJobs and manual operations
+# ===============================================
+# This script manages the Kubernetes CronJob responsible for renewing SSL certificates
+# for OpenEMR on EKS. It provides commands to deploy, monitor, and manage the SSL
+# certificate renewal process, including manual triggers and testing capabilities.
+#
+# Key Features:
+# - Deploy SSL certificate renewal CronJob
+# - Check SSL certificate and CronJob status
+# - Trigger immediate SSL certificate renewal
+# - View logs from renewal operations
+# - Run test jobs to validate renewal process
+# - Clean up old renewal jobs
+# - Display renewal schedule information
+#
+# Prerequisites:
+# - kubectl configured for the target cluster
+# - AWS credentials with ACM and Route53 permissions
+# - SSL certificate renewal CronJob YAML file (ssl-renewal.yaml)
 
 set -e
 
-NAMESPACE="openemr"
-CRONJOB_NAME="ssl-cert-renewal"
-TEST_JOB_NAME="ssl-cert-renewal-test"
+# Configuration variables
+NAMESPACE="openemr"                    # Kubernetes namespace for OpenEMR
+CRONJOB_NAME="ssl-cert-renewal"        # Name of the SSL renewal CronJob
+TEST_JOB_NAME="ssl-cert-renewal-test"  # Name for test jobs
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical issues
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+NC='\033[0m'          # Reset color to default
 
 print_usage() {
     echo "Usage: $0 {deploy|status|run-now|logs|test|cleanup|schedule}"
@@ -34,19 +52,23 @@ print_usage() {
     echo "  $0 run-now"
 }
 
+# Function to validate prerequisites before executing SSL renewal operations
+# This function checks for required tools and AWS credentials
 check_prerequisites() {
+    # Validate kubectl availability
     if ! command -v kubectl &> /dev/null; then
         echo -e "${RED}Error: kubectl is not installed or not in PATH${NC}"
         exit 1
     fi
 
+    # Validate AWS CLI availability
     if ! command -v aws &> /dev/null; then
         echo -e "${RED}Error: AWS CLI is not installed or not in PATH${NC}"
         echo -e "${YELLOW}Install with: brew install awscli (macOS) or pip install awscli${NC}"
         exit 1
     fi
 
-    # Check AWS credentials
+    # Validate AWS credentials and permissions
     echo -e "${BLUE}Checking AWS credentials...${NC}"
     if ! aws sts get-caller-identity &> /dev/null; then
         echo -e "${RED}Error: AWS credentials not configured or invalid${NC}"

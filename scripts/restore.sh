@@ -1,51 +1,87 @@
 #!/bin/bash
 
+# OpenEMR Restore Script
+# =====================
+# This script automates the restoration of an OpenEMR deployment from a backup,
+# including database restoration from RDS snapshots, application data restoration
+# from S3, and reconfiguration of database and Redis connections.
+#
+# Key Features:
+# - Restores RDS Aurora cluster from snapshot
+# - Downloads and restores application data from S3
+# - Reconfigures database connections in OpenEMR
+# - Updates Redis credentials and connections
+# - Validates restore operations and provides status updates
+# - Supports selective restoration (database only, app data only, etc.)
+#
+# Prerequisites:
+# - Valid backup created by backup.sh script
+# - AWS credentials with appropriate permissions
+# - kubectl configured for the target cluster
+# - Terraform state available for infrastructure details
+
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical issues
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+PURPLE='\033[0;35m'   # Restore operation messages
+NC='\033[0m'          # Reset color to default
 
-# Configuration
-AWS_REGION=${AWS_REGION:-"us-west-2"}
-NAMESPACE=${NAMESPACE:-"openemr"}
-BACKUP_BUCKET=""
-SNAPSHOT_ID=""
-BACKUP_REGION=""
-CLUSTER_NAME=""
+# Configuration variables - can be overridden by environment variables or command line arguments
+AWS_REGION=${AWS_REGION:-"us-west-2"}   # AWS region where resources are located
+NAMESPACE=${NAMESPACE:-"openemr"}       # Kubernetes namespace for OpenEMR
+BACKUP_BUCKET=""                        # S3 bucket containing backup data (set by script)
+SNAPSHOT_ID=""                          # RDS snapshot ID to restore from (set by script)
+BACKUP_REGION=""                        # Region where backup is stored (set by script)
+CLUSTER_NAME=""                         # EKS cluster name (detected by script)
 
-# Global variables
-RESTORE_DATABASE=${RESTORE_DATABASE:-"true"}
-RESTORE_APP_DATA=${RESTORE_APP_DATA:-"true"}
-RECONFIGURE_DB=${RECONFIGURE_DB:-"true"}
+# Enhanced restore configuration for new RDS cross-Region/cross-account capabilities
+RESTORE_STRATEGY=${RESTORE_STRATEGY:-"auto-detect"}  # Restore strategy: auto-detect, same-region, cross-region, cross-account
+SOURCE_ACCOUNT_ID=${SOURCE_ACCOUNT_ID:-""}           # Source AWS account ID for cross-account restores (optional)
+KMS_KEY_ID=${KMS_KEY_ID:-""}                         # KMS key ID for encrypted snapshots (optional, uses default if empty)
 
-# Get script directory and project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+# Global control variables for selective restoration
+RESTORE_DATABASE=${RESTORE_DATABASE:-"true"}   # Whether to restore database from snapshot
+RESTORE_APP_DATA=${RESTORE_APP_DATA:-"true"}   # Whether to restore application data from S3
+RECONFIGURE_DB=${RECONFIGURE_DB:-"true"}       # Whether to reconfigure database connections
 
-# Logging functions
+# Path resolution for script portability
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"                      # Terraform configuration directory
+
+# Logging functions - provide consistent, timestamped output for different message types
+# These functions ensure all restore operations have clear, color-coded feedback
 log_info() {
+    # Display informational messages in blue with info emoji
+    # Used for progress updates, status information, and general feedback
     echo -e "${BLUE}[$(date '+%H:%M:%S')] ℹ️  $1${NC}"
 }
 
 log_success() {
+    # Display success messages in green with checkmark emoji
+    # Used for completed operations and positive outcomes
     echo -e "${GREEN}[$(date '+%H:%M:%S')] ✅ $1${NC}"
 }
 
 log_warning() {
+    # Display warning messages in yellow with warning emoji
+    # Used for cautionary information and non-critical issues
     echo -e "${YELLOW}[$(date '+%H:%M:%S')] ⚠️  $1${NC}"
 }
 
 log_error() {
+    # Display error messages in red with X emoji
+    # Used for critical errors and failed operations
     echo -e "${RED}[$(date '+%H:%M:%S')] ❌ $1${NC}"
 }
 
 log_restore() {
+    # Display restore operation messages in purple with restore emoji
+    # Used specifically for restore-related operations and progress
     echo -e "${PURPLE}[$(date '+%H:%M:%S')] 🔄 $1${NC}"
 }
 
@@ -63,6 +99,9 @@ show_help() {
     echo ""
     echo "Options:"
     echo "  --cluster-name NAME    EKS cluster name (auto-detected if not specified)"
+    echo "  --strategy STRATEGY    Restore strategy: auto-detect, same-region, cross-region, cross-account (default: auto-detect)"
+    echo "  --source-account ID    Source AWS account ID for cross-account restores"
+    echo "  --kms-key-id KEY       KMS key ID for encrypted snapshots (optional)"
     echo "  --force, -f            Skip confirmation prompts"
     echo "  --recreate-storage     Recreate storage classes before restore"
     echo "  --help, -h             Show this help message"
@@ -74,13 +113,22 @@ show_help() {
     echo "  RESTORE_DATABASE      Restore database (default: true)"
     echo "  RESTORE_APP_DATA      Restore application data (default: true)"
     echo "  RECONFIGURE_DB        Reconfigure database (default: true)"
+    echo "  RESTORE_STRATEGY      Restore strategy (default: auto-detect)"
+    echo "  SOURCE_ACCOUNT_ID     Source AWS account ID for cross-account restores"
+    echo "  KMS_KEY_ID            KMS key ID for encrypted snapshots"
     echo ""
     echo "Examples:"
-    echo "  # Basic restore"
+    echo "  # Basic restore (auto-detect strategy)"
     echo "  ./restore.sh my-backup-bucket my-snapshot-id"
     echo ""
-    echo "  # Restore with specific cluster"
-    echo "  ./restore.sh my-backup-bucket my-snapshot-id --cluster-name my-cluster"
+    echo "  # Cross-region restore"
+    echo "  ./restore.sh my-backup-bucket my-snapshot-id --strategy cross-region"
+    echo ""
+    echo "  # Cross-account restore"
+    echo "  ./restore.sh my-backup-bucket my-snapshot-id --strategy cross-account --source-account 123456789012"
+    echo ""
+    echo "  # Restore with specific cluster and KMS key"
+    echo "  ./restore.sh my-backup-bucket my-snapshot-id --cluster-name my-cluster --kms-key-id alias/my-key"
     echo ""
     echo "  # Automated restore (skip confirmation prompt)"
     echo "  ./restore.sh my-backup-bucket my-snapshot-id --force"
@@ -197,8 +245,20 @@ parse_arguments() {
                 CLUSTER_NAME="$2"
                 shift 2
                 ;;
+            --strategy)
+                RESTORE_STRATEGY="$2"
+                shift 2
+                ;;
+            --source-account)
+                SOURCE_ACCOUNT_ID="$2"
+                shift 2
+                ;;
+            --kms-key-id)
+                KMS_KEY_ID="$2"
+                shift 2
+                ;;
             --force|-f)
-                # FORCE_RESTORE=true  # Unused variable
+                # FORCE_RESTORE=true     # Unused variable
                 shift
                 ;;
             --recreate-storage)
@@ -222,6 +282,69 @@ parse_arguments() {
     done
 }
 
+# Function to auto-detect restore strategy from backup metadata
+# This function analyzes the backup metadata to determine the appropriate restore strategy
+auto_detect_restore_strategy() {
+    if [ "$RESTORE_STRATEGY" != "auto-detect" ]; then
+        log_info "Using specified restore strategy: $RESTORE_STRATEGY"
+        return 0
+    fi
+
+    log_info "Auto-detecting restore strategy from backup metadata..."
+
+    # Try to download and parse backup metadata
+    local metadata_file
+    metadata_file="/tmp/backup-metadata-$(date +%s).json"
+    
+    if aws s3 cp "s3://$BACKUP_BUCKET/metadata/" "$metadata_file" --region "$BACKUP_REGION" >/dev/null 2>&1; then
+        # Find the most recent metadata file
+        local latest_metadata
+        latest_metadata=$(find /tmp -name "backup-metadata-*.json" -type f -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2- || echo "")
+        
+        if [ -n "$latest_metadata" ] && [ -f "$latest_metadata" ]; then
+            # Parse backup strategy from metadata
+            local detected_strategy
+            local detected_account
+            detected_strategy=$(jq -r '.backup_strategy // "same-region"' "$latest_metadata" 2>/dev/null || echo "same-region")
+            detected_account=$(jq -r '.target_account_id // "none"' "$latest_metadata" 2>/dev/null || echo "none")
+            
+            RESTORE_STRATEGY="$detected_strategy"
+            
+            if [ "$detected_account" != "none" ] && [ -z "$SOURCE_ACCOUNT_ID" ]; then
+                SOURCE_ACCOUNT_ID="$detected_account"
+            fi
+            
+            log_success "Auto-detected restore strategy: $RESTORE_STRATEGY"
+            if [ "$detected_account" != "none" ]; then
+                log_info "Auto-detected source account: $detected_account"
+            fi
+            
+            # Cleanup
+            rm -f "$metadata_file"*
+            return 0
+        fi
+    fi
+
+    # Fallback: determine strategy based on regions and snapshot ID
+    log_warning "Could not parse backup metadata, using fallback detection"
+    
+    if [ "$BACKUP_REGION" != "$AWS_REGION" ]; then
+        if [[ "$SNAPSHOT_ID" == *"-"*"-"* ]]; then
+            # Snapshot ID contains multiple dashes, likely cross-account
+            RESTORE_STRATEGY="cross-account"
+            log_info "Detected cross-account restore based on snapshot ID pattern"
+        else
+            RESTORE_STRATEGY="cross-region"
+            log_info "Detected cross-region restore based on different regions"
+        fi
+    else
+        RESTORE_STRATEGY="same-region"
+        log_info "Detected same-region restore"
+    fi
+    
+    log_success "Fallback restore strategy: $RESTORE_STRATEGY"
+}
+
 # Validate required arguments
 validate_arguments() {
     if [ -z "$BACKUP_BUCKET" ] || [ -z "$SNAPSHOT_ID" ]; then
@@ -232,25 +355,95 @@ validate_arguments() {
     fi
 }
 
-# Restore RDS database from snapshot
+# Function to restore RDS Aurora cluster from snapshot
+# This function handles enhanced cross-region/cross-account snapshot restoration using new RDS capabilities
 restore_database() {
     echo -e "${BLUE}🗄️  Restoring RDS database from snapshot...${NC}"
+    echo -e "${BLUE}📋 Restore Strategy: $RESTORE_STRATEGY${NC}"
 
-    # Check if snapshot exists in target region
-    local snapshot_arn
-    snapshot_arn="arn:aws:rds:${BACKUP_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${SNAPSHOT_ID}"
-
-    if [ "$BACKUP_REGION" != "$AWS_REGION" ]; then
-        # Copy snapshot to target region if needed
-        echo -e "${YELLOW}ℹ️  Copying snapshot to target region...${NC}"
-        aws rds copy-db-cluster-snapshot \
-            --source-db-cluster-snapshot-identifier "$snapshot_arn" \
-            --target-db-cluster-snapshot-identifier "${SNAPSHOT_ID}-${AWS_REGION}" \
-            --source-region "$BACKUP_REGION" \
-            --region "$AWS_REGION" >/dev/null 2>&1 || true
-
-        snapshot_arn="arn:aws:rds:${AWS_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${SNAPSHOT_ID}-${AWS_REGION}"
+    # Determine source account ID for cross-account restores
+    local source_account_id
+    if [ "$RESTORE_STRATEGY" = "cross-account" ] && [ -n "$SOURCE_ACCOUNT_ID" ]; then
+        source_account_id="$SOURCE_ACCOUNT_ID"
+        log_info "Cross-account restore: source account $source_account_id"
+    else
+        source_account_id=$(aws sts get-caller-identity --query 'Account' --output text)
+        log_info "Same-account restore: account $source_account_id"
     fi
+
+    # Construct snapshot ARN for the source region and account
+    local snapshot_arn
+    snapshot_arn="arn:aws:rds:${BACKUP_REGION}:${source_account_id}:cluster-snapshot:${SNAPSHOT_ID}"
+
+    # Enhanced snapshot handling based on restore strategy
+    case "$RESTORE_STRATEGY" in
+        "same-region")
+            log_info "Same-region restore - using snapshot directly"
+            # No copying needed for same-region restores
+            ;;
+        "cross-region")
+            log_info "Cross-region restore - copying snapshot using new RDS capabilities"
+            
+            # Generate target snapshot name
+            local target_snapshot_id="${SNAPSHOT_ID}-${AWS_REGION}"
+            
+            # Build enhanced copy command
+            local copy_cmd="aws rds copy-db-cluster-snapshot"
+            copy_cmd="$copy_cmd --source-db-cluster-snapshot-identifier \"$snapshot_arn\""
+            copy_cmd="$copy_cmd --target-db-cluster-snapshot-identifier \"$target_snapshot_id\""
+            copy_cmd="$copy_cmd --source-region \"$BACKUP_REGION\""
+            copy_cmd="$copy_cmd --region \"$AWS_REGION\""
+            
+            # Add KMS key if specified
+            if [ -n "$KMS_KEY_ID" ]; then
+                copy_cmd="$copy_cmd --kms-key-id \"$KMS_KEY_ID\""
+                log_info "Using specified KMS key: $KMS_KEY_ID"
+            fi
+            
+            # Execute cross-region copy
+            log_info "Executing cross-region snapshot copy..."
+            if eval "$copy_cmd" >/dev/null 2>&1; then
+                log_success "Cross-region snapshot copy initiated: $target_snapshot_id"
+                snapshot_arn="arn:aws:rds:${AWS_REGION}:${source_account_id}:cluster-snapshot:${target_snapshot_id}"
+            else
+                log_warning "Cross-region snapshot copy failed, attempting direct restore"
+            fi
+            ;;
+        "cross-account")
+            log_info "Cross-account restore - copying snapshot using new RDS capabilities"
+            
+            # Generate target snapshot name
+            local target_snapshot_id="${SNAPSHOT_ID}-${AWS_REGION}"
+            
+            # Build enhanced cross-account copy command
+            local copy_cmd="aws rds copy-db-cluster-snapshot"
+            copy_cmd="$copy_cmd --source-db-cluster-snapshot-identifier \"$snapshot_arn\""
+            copy_cmd="$copy_cmd --target-db-cluster-snapshot-identifier \"$target_snapshot_id\""
+            copy_cmd="$copy_cmd --source-region \"$BACKUP_REGION\""
+            copy_cmd="$copy_cmd --region \"$AWS_REGION\""
+            copy_cmd="$copy_cmd --destination-region \"$AWS_REGION\""
+            copy_cmd="$copy_cmd --destination-account-id \"$(aws sts get-caller-identity --query 'Account' --output text)\""
+            
+            # Add KMS key if specified
+            if [ -n "$KMS_KEY_ID" ]; then
+                copy_cmd="$copy_cmd --kms-key-id \"$KMS_KEY_ID\""
+                log_info "Using specified KMS key: $KMS_KEY_ID"
+            fi
+            
+            # Execute cross-account copy
+            log_info "Executing cross-account snapshot copy..."
+            if eval "$copy_cmd" >/dev/null 2>&1; then
+                log_success "Cross-account snapshot copy initiated: $target_snapshot_id"
+                snapshot_arn="arn:aws:rds:${AWS_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${target_snapshot_id}"
+            else
+                log_warning "Cross-account snapshot copy failed, attempting direct restore"
+            fi
+            ;;
+        *)
+            log_error "Invalid restore strategy: $RESTORE_STRATEGY"
+            exit 1
+            ;;
+    esac
 
     # First, delete the existing cluster if it exists
     local cluster_identifier="openemr-eks-aurora"
@@ -375,7 +568,14 @@ restore_application_data() {
 
     # List available backup files to get the exact name
     local exact_backup_file
+    # Look for backup files from today (with any timestamp)
     exact_backup_file=$(aws s3 ls "s3://$BACKUP_BUCKET/application-data/" --region "$AWS_REGION" | grep "app-data-backup-$(date +%Y%m%d)" | awk '{print $4}' | head -1)
+    
+    # If no backup file found for today, try to find the most recent one
+    if [ -z "$exact_backup_file" ]; then
+        echo -e "${YELLOW}ℹ️  No backup file found for today, looking for most recent backup...${NC}"
+        exact_backup_file=$(aws s3 ls "s3://$BACKUP_BUCKET/application-data/" --region "$AWS_REGION" | grep "app-data-backup-" | sort -k1,2 | tail -1 | awk '{print $4}')
+    fi
 
     if [ -n "$exact_backup_file" ]; then
         echo -e "${YELLOW}ℹ️  Found backup file: $exact_backup_file${NC}"
@@ -386,25 +586,38 @@ restore_application_data() {
 
         # Copy to pod and extract with proper error handling
         echo -e "${YELLOW}ℹ️  Copying backup file to pod...${NC}"
-        if kubectl cp "$local_backup_file" "$NAMESPACE/$pod_name:/tmp/backup.tar.gz" -c openemr 2>/dev/null; then
+        local cp_output
+        cp_output=$(kubectl cp "$local_backup_file" "$NAMESPACE/$pod_name:/tmp/backup.tar.gz" -c openemr 2>&1)
+        local cp_exit_code=$?
+        
+        if [ $cp_exit_code -eq 0 ]; then
             echo -e "${GREEN}✅ Backup file copied to pod successfully${NC}"
 
             echo -e "${YELLOW}ℹ️  Extracting backup in pod...${NC}"
-            if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "
+            local extract_output
+            extract_output=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "
                 cd /var/www/localhost/htdocs/openemr && \
                 tar -xzf /tmp/backup.tar.gz && \
                 rm -f /tmp/backup.tar.gz && \
                 echo 'Backup extraction completed successfully'
-            " 2>/dev/null; then
+            " 2>&1)
+            local extract_exit_code=$?
+            
+            if [ $extract_exit_code -eq 0 ]; then
                 echo -e "${GREEN}✅ Backup extracted successfully${NC}"
+                echo -e "${YELLOW}ℹ️  Extract output: $extract_output${NC}"
             else
                 echo -e "${RED}❌ Failed to extract backup in pod${NC}"
+                echo -e "${RED}❌ Extract error: $extract_output${NC}"
+                echo -e "${RED}❌ Extract exit code: $extract_exit_code${NC}"
                 # Clean up the backup file even if extraction failed
                 kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- rm -f /tmp/backup.tar.gz 2>/dev/null || true
                 return 1
             fi
         else
             echo -e "${RED}❌ Failed to copy backup file to pod${NC}"
+            echo -e "${RED}❌ Copy error: $cp_output${NC}"
+            echo -e "${RED}❌ Copy exit code: $cp_exit_code${NC}"
             echo -e "${YELLOW}ℹ️  This might be due to pod not being ready or container not available${NC}"
             return 1
         fi
@@ -564,10 +777,17 @@ main() {
     echo -e "${BLUE}Backup Region: $BACKUP_REGION${NC}"
     echo -e "${BLUE}Backup Bucket: $BACKUP_BUCKET${NC}"
     echo -e "${BLUE}Snapshot ID: $SNAPSHOT_ID${NC}"
+    echo -e "${BLUE}Restore Strategy: $RESTORE_STRATEGY${NC}"
+    if [ -n "$SOURCE_ACCOUNT_ID" ]; then
+        echo -e "${BLUE}Source Account: $SOURCE_ACCOUNT_ID${NC}"
+    fi
     echo ""
 
     # Validate arguments
     validate_arguments
+
+    # Auto-detect restore strategy
+    auto_detect_restore_strategy
 
     # Detect cluster name
     detect_cluster_name

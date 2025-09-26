@@ -2,12 +2,6 @@
 # This file centralizes all version information for awareness and notifications
 # Updated for monthly automated version checking with AWS CLI integration
 
-project:
-  name: "openemr-on-eks"
-  version: "2.2.0"
-  description: "OpenEMR deployment on Amazon EKS with comprehensive monitoring and security"
-  last_updated: "2025-09-19"
-  aws_integration: true
 
 # Core Application Versions
 applications:
@@ -20,7 +14,7 @@ applications:
     description: "Version of OpenEMR docker image we use."
 
   fluent_bit:
-    current: "4.0.8"
+    current: "4.1.0"
     registry: "fluent/fluent-bit"
     notify_on_update: true
     requires_aws_cli: false
@@ -36,7 +30,7 @@ infrastructure:
     description: "Amazon EKS cluster version"
 
   terraform:
-    current: "1.5.7"
+    current: "1.13.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "Terraform version used in documentation"
@@ -72,7 +66,7 @@ eks_addons:
 terraform_modules:
   terraform_aws:
     source: "hashicorp/aws"
-    current: "6.6.0"
+    current: "6.14.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Official AWS provider from Hashicorp for Terraform."
@@ -93,14 +87,14 @@ terraform_modules:
 
   aws_eks:
     source: "terraform-aws-modules/eks/aws"
-    current: "21.0.9"
+    current: "21.3.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS for Terraform."
 
   aws_vpc:
     source: "terraform-aws-modules/vpc/aws"
-    current: "6.0.1"
+    current: "6.2.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for VPCs for Terraform."
@@ -114,19 +108,19 @@ github_workflows:
     description: "Github action for checking out code from a registry."
 
   actions_setup_python:
-    current: "v5"
+    current: "v6.0.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Python version."
 
   actions_setup_terraform:
-    current: "v3"
+    current: "v3.1.2"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Terraform version."
 
   actions_setup_kubectl:
-    current: "v4"
+    current: "v4.0.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Kubectl version (azure/setup-kubectl)."
@@ -143,11 +137,6 @@ github_workflows:
     requires_aws_cli: false
     description: "Github action for downloading an artifact as part of a workflow."
 
-  trivy_action:
-    current: "master"
-    notify_on_update: true
-    requires_aws_cli: false
-    description: "Scans the whole repository for security vulnerabilities."
 
   codeql_action:
     current: "v3"
@@ -170,7 +159,7 @@ pre_commit_hooks:
     description: "https://github.com/pre-commit/pre-commit-hooks"
 
   black:
-    current: "25.1.0"
+    current: "25.9.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/psf/black"
@@ -218,7 +207,7 @@ pre_commit_hooks:
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.8.3"
+    current: "v4.9.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -232,13 +221,13 @@ semver_packages:
     description: "Version of Python used in Github CI/CD workflows."
 
   terraform_version:
-    current: "1.5.7"
+    current: "1.13.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Terraform used in Github CI/CD workflows."
 
   kubectl_version:
-    current: "v1.33.4"
+    current: "v1.34.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Kubectl used in Github CI/CD workflows."
@@ -250,17 +239,18 @@ semver_packages:
     requires_aws_cli: false
     description: "Version of the 'Semver' Python package used in Github CI/CD workflows."
 
+
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "75.18.1"
+    current: "77.11.0"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
     description: "Hosts custom monitoring dashboards for the setup and integrates with pager duty for automated alerting."
 
   loki:
-    current: "6.35.1"
+    current: "6.41.0"
     chart: "loki"
     repository: "grafana"
     notify_on_update: true

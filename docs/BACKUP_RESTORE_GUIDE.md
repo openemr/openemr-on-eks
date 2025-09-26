@@ -19,21 +19,25 @@ This guide covers the comprehensive backup and restore system for OpenEMR on EKS
 
 The OpenEMR backup system provides:
 
-- ✅ **Automated RDS Aurora snapshots** with cross-region support
+- ✅ **Automated RDS Aurora snapshots** with enhanced cross-region/cross-account support
 - ✅ **Kubernetes configuration backup** (all resources, secrets, configs)
 - ✅ **Application data backup** from S3
-- ✅ **Cross-region disaster recovery** capabilities
+- ✅ **Cross-region disaster recovery** capabilities using new RDS features
+- ✅ **Cross-account backup** for compliance and data sharing
 - ✅ **Simple, reliable scripts** with graceful error handling
+- ✅ **Multiple backup strategies** (same-region, cross-region, cross-account)
 
 The restore system has been significantly simplified and improved:
 
 - ✅ **One-command restore** - Simple, reliable restore with auto-detection
 - ✅ **Automatic cluster detection** - No need to specify cluster names manually
-- ✅ **Smart database restore** - Cross-region snapshot copying and cluster restoration
+- ✅ **Smart database restore** - Enhanced cross-region/cross-account snapshot restoration
+- ✅ **Strategy auto-detection** - Automatically detects restore strategy from backup metadata
 - ✅ **Application data restore** - Downloads and extracts data directly to EFS via existing pods
 - ✅ **Auto-reconfiguration** - Automatically updates database and Redis connections
 - ✅ **Manual fallback** - Step-by-step manual instructions if automated process fails
 - ✅ **Modular options** - Restore database, app data, or both as needed
+- ✅ **Cross-account restore** - Support for restoring from different AWS accounts
 
 ### Backup Architecture
 
@@ -90,8 +94,10 @@ graph TB
 ### 🗄️ Database (RDS Aurora)
 
 - **Aurora cluster snapshots** with point-in-time recovery
-- **Cross-region snapshot copying** for disaster recovery
+- **Enhanced cross-region snapshot copying** using new RDS capabilities
+- **Cross-account snapshot sharing** for compliance and collaboration
 - **Automated retention policies** (30 days default)
+- **Multiple backup strategies** (same-region, cross-region, cross-account)
 
 ### ⚙️ Kubernetes Configuration
 
@@ -187,23 +193,32 @@ Your AWS credentials need permissions for:
 ### Create a Backup
 
 ```bash
-# Basic backup to same region
+# Basic backup to same region (default strategy)
 ./scripts/backup.sh
 
 # Cross-region backup for disaster recovery
-./scripts/backup.sh --backup-region us-east-1
+./scripts/backup.sh --strategy cross-region --backup-region us-east-1
 
-# Custom cluster and namespace
-./scripts/backup.sh --cluster-name my-cluster --namespace my-namespace --backup-region us-east-1
+# Cross-account backup for compliance/sharing
+./scripts/backup.sh --strategy cross-account --target-account 123456789012 --backup-region us-east-1
+
+# Custom cluster and namespace with cross-region backup
+./scripts/backup.sh --cluster-name my-cluster --namespace my-namespace --strategy cross-region --backup-region us-east-1
 ```
 
 ### Restore from Backup
 
 ```bash
-# Restore from backup (will prompt for confirmation)
+# Auto-detect restore strategy (recommended)
 ./scripts/restore.sh <backup-bucket> <snapshot-id> <backup-region>
 
-# Example
+# Cross-region restore
+./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-region
+
+# Cross-account restore
+./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-account --source-account 123456789012
+
+# Example with auto-detection
 ./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
 ```
 
@@ -219,6 +234,10 @@ Options:
   --source-region REGION  Source AWS region (default: us-west-2)
   --backup-region REGION  Backup AWS region (default: same as source)
   --namespace NAMESPACE   Kubernetes namespace (default: openemr)
+  --strategy STRATEGY     Backup strategy: same-region, cross-region, cross-account (default: same-region)
+  --target-account ID     Target AWS account ID for cross-account backups
+  --kms-key-id KEY        KMS key ID for encrypted snapshots (optional)
+  --no-copy-tags          Don't copy tags to backup snapshots
   --help                  Show help message
 ```
 
@@ -237,6 +256,8 @@ Options:
    - Detect Aurora cluster automatically
    - Create cluster snapshot with timestamp
    - Handle cluster status gracefully (backing-up, unavailable, etc.)
+   - Use enhanced cross-region/cross-account snapshot copying
+   - Apply selected backup strategy (same-region, cross-region, cross-account)
 
 4. **Kubernetes Configuration Backup**
    - Export all resources from OpenEMR namespace
@@ -253,6 +274,7 @@ Options:
    - Generate human-readable report
    - Capture database configuration for automatic restore
    - Store VPC, security group, and scaling settings
+   - Track backup strategy and target account information
    - Upload both to S3 backup bucket
 
 ### Backup Outputs
@@ -263,15 +285,19 @@ After successful backup, you'll receive:
 ✅ Backup ID: openemr-backup-20250815-120000
 ✅ Backup Bucket: s3://openemr-backups-123456789012-openemr-eks-20250815
 ✅ Backup Region: us-east-1
-✅ Aurora Snapshot: openemr-eks-aurora-backup-20250815-120000
+✅ Backup Strategy: cross-region
+✅ Aurora Snapshot: openemr-eks-aurora-backup-20250815-120000-us-east-1
 
 📋 Backup Results:
-Aurora RDS: SUCCESS (openemr-eks-aurora-backup-20250815-120000)
+Aurora RDS: SUCCESS (openemr-eks-aurora-backup-20250815-120000-us-east-1 (cross-region copy completed))
 Kubernetes Config: SUCCESS (k8s-backup-20250815-120000.tar.gz)
 Application Data: SUCCESS (app-data-backup-20250815-120000.tar.gz)
 
+🚀 Enhanced Features Used:
+✅ Cross-Region Snapshot Copy (New RDS Feature)
+
 🔄 Restore Command:
-   ./restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
+   ./restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000-us-east-1 us-east-1
 ```
 
 ## Restore Operations
@@ -288,6 +314,9 @@ Arguments:
 
 Options:
   --cluster-name NAME    EKS cluster name (auto-detected from Terraform if not specified)
+  --strategy STRATEGY    Restore strategy: auto-detect, same-region, cross-region, cross-account (default: auto-detect)
+  --source-account ID    Source AWS account ID for cross-account restores
+  --kms-key-id KEY       KMS key ID for encrypted snapshots (optional)
   --force, -f            Skip confirmation prompts
   --recreate-storage     Recreate storage classes before restore
   --help, -h             Show help message
@@ -299,26 +328,34 @@ Environment Variables:
   RESTORE_DATABASE      Restore database (default: true)
   RESTORE_APP_DATA      Restore application data (default: true)
   RECONFIGURE_DB        Reconfigure database (default: true)
+  RESTORE_STRATEGY      Restore strategy (default: auto-detect)
+  SOURCE_ACCOUNT_ID     Source AWS account ID for cross-account restores
+  KMS_KEY_ID            KMS key ID for encrypted snapshots
 ```
 
 ### Key Improvements in the New Restore Script
 
 - **🎯 Simplified Usage**: Only requires backup bucket and snapshot ID
 - **🔍 Auto-Detection**: Automatically detects EKS cluster from Terraform output
+- **🚀 Strategy Auto-Detection**: Automatically detects restore strategy from backup metadata
 - **⚡ Faster Execution**: Uses existing OpenEMR pods instead of creating temporary ones
 - **🔧 Auto-Reconfiguration**: Automatically updates database and Redis connections
 - **📋 Manual Fallback**: Provides step-by-step manual instructions if needed
+- **🌍 Enhanced Cross-Region**: Uses new RDS capabilities for faster cross-region restores
+- **🏢 Cross-Account Support**: Full support for restoring from different AWS accounts
 
 ### Restore Process Flow
 
 1. **Auto-Detection & Validation**
    - Auto-detect EKS cluster name from Terraform output
+   - Auto-detect restore strategy from backup metadata
    - Verify AWS credentials and region access
    - Confirm backup bucket exists and is accessible
    - Update kubeconfig for target cluster
 
 2. **Database Restore** (if `RESTORE_DATABASE=true`)
-   - Copy RDS snapshot to target region if needed
+   - Use enhanced RDS capabilities for snapshot copying
+   - Handle cross-region/cross-account restoration automatically
    - Restore Aurora cluster from snapshot
    - Use existing cluster identifier "openemr-eks"
 
@@ -364,16 +401,79 @@ The restore script includes comprehensive error handling:
 - **Detailed Logging**: Color-coded output with timestamps for easy troubleshooting
 - **Manual Fallback**: Built-in manual restore instructions when automated process fails
 
+## Enhanced Backup Strategies
+
+The backup system now supports multiple strategies leveraging new Amazon RDS capabilities:
+
+### 📍 Same-Region Backup (Default)
+
+**Best for**: Development, testing, and cost optimization
+
+```bash
+# Same-region backup (fastest, lowest cost)
+./scripts/backup.sh --strategy same-region
+```
+
+**Benefits**:
+- Fastest backup completion
+- Lowest storage costs
+- No data transfer charges
+- Ideal for regular development backups
+
+### 🌍 Cross-Region Backup
+
+**Best for**: Disaster recovery and compliance requirements
+
+```bash
+# Cross-region backup for disaster recovery
+./scripts/backup.sh --strategy cross-region --backup-region us-east-1
+```
+
+**Benefits**:
+- Uses new RDS single-step cross-region copy
+- Eliminates intermediate snapshots (cost reduction)
+- Faster completion times (improved RPO)
+- Geographic separation for disaster recovery
+
+### 🏢 Cross-Account Backup
+
+**Best for**: Compliance, data sharing, and multi-tenant scenarios
+
+```bash
+# Cross-account backup for compliance/sharing
+./scripts/backup.sh --strategy cross-account --target-account 123456789012 --backup-region us-east-1
+```
+
+**Benefits**:
+- Direct cross-account snapshot sharing
+- Compliance with data residency requirements
+- Secure data sharing between organizations
+- Simplified KMS key management
+
+### Enhanced Features
+
+All strategies now benefit from:
+
+- **Single-Step Operations**: New RDS capabilities eliminate multi-step processes
+- **Cost Reduction**: No intermediate snapshots required
+- **Improved RPO**: Faster backup completion times
+- **Simplified KMS Handling**: Automatic KMS key detection and management
+- **Tag Preservation**: Optional tag copying to backup snapshots
+- **Comprehensive Metadata**: Full backup strategy tracking
+
 ### Restore Examples
 
 #### Basic Restore (Simplified - Most Common Use Case)
 
 ```bash
-# Simple restore - script auto-detects cluster and restores everything
+# Auto-detect restore strategy (recommended)
 ./scripts/restore.sh my-backup-bucket my-snapshot-id
 
 # Cross-region restore
-./scripts/restore.sh my-backup-bucket my-snapshot-id us-east-1
+./scripts/restore.sh my-backup-bucket my-snapshot-id --strategy cross-region
+
+# Cross-account restore
+./scripts/restore.sh my-backup-bucket my-snapshot-id --strategy cross-account --source-account 123456789012
 ```
 
 #### Automated Restore (Skip Confirmations)
@@ -548,11 +648,14 @@ For comprehensive testing of the entire backup and restore process, use the auto
 ### Setup Cross-Region Backups
 
 ```bash
-# Regular backups to disaster recovery region
-./scripts/backup.sh --backup-region us-east-1
+# Regular cross-region backups for disaster recovery
+./scripts/backup.sh --strategy cross-region --backup-region us-east-1
+
+# Cross-account backups for compliance
+./scripts/backup.sh --strategy cross-account --target-account 123456789012 --backup-region us-east-1
 
 # Automated via cron (example)
-0 2 * * * /path/to/scripts/backup.sh --backup-region us-east-1
+0 2 * * * /path/to/scripts/backup.sh --strategy cross-region --backup-region us-east-1
 ```
 
 ### Disaster Recovery Procedure
@@ -568,11 +671,18 @@ For comprehensive testing of the entire backup and restore process, use the auto
 3. **Execute Restore**
 
    ```bash
-   # Restore to disaster recovery region
+   # Restore to disaster recovery region (auto-detect strategy)
    AWS_REGION=us-east-1 ./scripts/restore.sh \
      openemr-backups-123456789012-openemr-eks-20250815 \
-     openemr-eks-aurora-backup-20250815-120000 \
+     openemr-eks-aurora-backup-20250815-120000-us-east-1 \
      us-east-1
+
+   # Cross-account restore (if needed)
+   AWS_REGION=us-east-1 ./scripts/restore.sh \
+     openemr-backups-123456789012-openemr-eks-20250815 \
+     openemr-eks-aurora-backup-20250815-120000-123456789012-us-east-1 \
+     us-east-1 \
+     --strategy cross-account --source-account 123456789012
    ```
 
 4. **Verify and Activate**
@@ -734,21 +844,52 @@ For additional support:
 
 ---
 
+## 🚀 New Amazon RDS Capabilities
+
+The backup and restore system now leverages Amazon RDS's new cross-Region and cross-account snapshot copy functionality:
+
+### Key Benefits
+
+- **Single-Step Operations**: Direct cross-Region and cross-account copying without intermediate steps
+- **Cost Reduction**: Eliminates intermediate snapshots, reducing storage costs
+- **Improved RPO**: Faster backup completion times with better recovery point objectives
+- **Simplified Workflows**: No need for complex multi-step processes or custom monitoring
+- **Enhanced Security**: Direct AWS-managed transfers with proper encryption handling
+
+### Technical Improvements
+
+- **Direct Cross-Region Copy**: Single command for cross-region snapshot copying
+- **Cross-Account Support**: Direct snapshot sharing between AWS accounts
+- **Automatic KMS Handling**: Simplified encryption key management
+- **Tag Preservation**: Optional copying of resource tags to backup snapshots
+- **Comprehensive Metadata**: Full tracking of backup strategies and configurations
+
+### Use Cases
+
+- **Disaster Recovery**: Faster cross-region backup and restore operations
+- **Compliance**: Cross-account backup for regulatory requirements
+- **Data Sharing**: Secure snapshot sharing between organizations
+- **Multi-Region Deployments**: Simplified backup management across regions
+
 ## 🔒 Security Considerations
 
 - All backups are encrypted at rest using S3 server-side encryption
 - RDS snapshots inherit cluster encryption settings
-- Cross-region transfers use AWS secure channels
+- Cross-region transfers use AWS secure channels with new RDS capabilities
+- Cross-account transfers use AWS IAM and resource-based policies
 - Backup metadata includes audit trail information
 - Access to backup buckets should be restricted via IAM policies
+- KMS key management is simplified with automatic detection
 
 ## 📊 Performance Considerations
 
 - Backup duration depends on data size and network speed
 - RDS snapshots are incremental after the first full snapshot
-- Cross-region transfers may take additional time
+- **Enhanced cross-region transfers** are faster with new RDS capabilities
+- **Single-step operations** reduce overall backup and restore times
 - Restore operations for Aurora clusters can take time (sometimes multiple hours)
 - Application data restore is usually the fastest component
+- **Cross-account transfers** use optimized AWS infrastructure
 
 ---
 

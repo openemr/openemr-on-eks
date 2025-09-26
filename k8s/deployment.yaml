@@ -1,75 +1,108 @@
+# =============================================================================
+# OpenEMR Deployment Configuration
+# =============================================================================
+# This file defines the main OpenEMR deployment with robust configuration.
+#
+# Deployment Features:
+# - Rolling update strategy for zero-downtime deployments
+# - Comprehensive health checks (startup, readiness, liveness)
+# - Resource limits and requests for optimal performance
+# - Security context with non-root user execution
+# - Volume mounts for persistent data and SSL certificates
+# - Fluent Bit sidecar for log aggregation
+# - Tolerations and affinity for node placement
+# =============================================================================
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openemr
-  namespace: openemr
+  name: openemr                          # Deployment name - must match selector labels
+  namespace: openemr                     # Target namespace for deployment
   labels:
-    app: openemr
-    version: v1
+    app: openemr                         # Primary application label for service discovery
+    version: v1                          # Version tracking for deployment management
 spec:
-  # replicas managed by HPA - see hpa.yaml
-  progressDeadlineSeconds: 2400  # 40 minutes to accommodate leader pod DB setup (10min) + buffer
+  # Replicas are managed by HPA (Horizontal Pod Autoscaler) - see hpa.yaml
+  # HPA will scale between 1-10 replicas based on CPU/memory usage
+  progressDeadlineSeconds: 3600          # 60 minutes to accommodate long startup times and cluster state variations
+  
+  # Rolling update strategy for zero-downtime deployments
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+      maxSurge: 1                        # Allow 1 extra pod during updates (safety margin)
+      maxUnavailable: 0                  # Never take down existing pods until new ones are ready
+  # Pod selector - must match template labels
   selector:
     matchLabels:
-      app: openemr
+      app: openemr                       # Match pods with this label
+      
+  # Pod template specification
   template:
     metadata:
       labels:
-        app: openemr
-        version: v1
+        app: openemr                       # Primary label for service discovery and HPA targeting
+        version: v1                        # Version label for tracking and rollback capabilities
       annotations:
-        prometheus.io/scrape: "true"
-        prometheus.io/port: "9090"
+        # Prometheus scraping configuration for metrics collection
+        prometheus.io/scrape: "true"       # Enable metrics scraping by Prometheus
+        prometheus.io/port: "9090"         # Metrics endpoint port (if available)
     spec:
-      serviceAccountName: openemr-sa
+      serviceAccountName: openemr-sa       # Service account for AWS IAM role binding (IRSA)
+      restartPolicy: Always                # Always restart failed containers
+      terminationGracePeriodSeconds: 60    # Give containers 60 seconds to shut down gracefully
+      # Pod-level security context
       securityContext:
-        runAsNonRoot: false
+        runAsNonRoot: false                       # OpenEMR requires root access for file permissions and setup
         seccompProfile:
-          type: RuntimeDefault
+          type: RuntimeDefault                    # Use default seccomp profile for security
 
       containers:
+      # Main OpenEMR application container
       - name: openemr
-        image: openemr/openemr:${OPENEMR_VERSION}
-        imagePullPolicy: IfNotPresent
+        image: openemr/openemr:${OPENEMR_VERSION} # OpenEMR Docker image with version from environment
+        imagePullPolicy: IfNotPresent             # Only pull if image not present locally
+        
+        # Container-level security context
         securityContext:
-          allowPrivilegeEscalation: true
-          readOnlyRootFilesystem: false
-          runAsUser: 0
-          runAsGroup: 0
+          allowPrivilegeEscalation: true         # Allow privilege escalation for OpenEMR setup
+          readOnlyRootFilesystem: false          # Allow writes to root filesystem for OpenEMR
+          runAsUser: 0                           # Run as root (required for OpenEMR file permissions)
+          runAsGroup: 0                          # Run as root group
           capabilities:
             drop:
-            - ALL
+            - ALL                                # Drop all capabilities by default
             add:
-            - NET_BIND_SERVICE
-            - CHOWN
-            - SETUID
-            - SETGID
-            - FOWNER
-            - DAC_OVERRIDE
+            - NET_BIND_SERVICE                   # Allow binding to privileged ports (80, 443)
+            - CHOWN                              # Change file ownership
+            - SETUID                             # Set user ID
+            - SETGID                             # Set group ID
+            - FOWNER                             # Override file ownership checks
+            - DAC_OVERRIDE                       # Override discretionary access control
+        # Container port definitions
         ports:
         - containerPort: 80
-          name: http
+          name: http                            # HTTP port for unencrypted traffic
           protocol: TCP
         - containerPort: 443
-          name: https
+          name: https                           # HTTPS port for SSL/TLS encrypted traffic
           protocol: TCP
-        workingDir: /var/www/localhost/htdocs/openemr
+          
+        workingDir: /var/www/localhost/htdocs/openemr  # OpenEMR web root directory
+        # Custom startup command to handle initialization
         command: ["/bin/sh", "-c"]
         args:
         - |
-          # Download AWS root CA certificates for secure connections
+          # Download AWS root CA certificates for secure connections to AWS services
           echo "=== Downloading SSL certificates ==="
+          # Download Redis CA certificate for secure ElastiCache connections
           curl --cacert /swarm-pieces/ssl/certs/ca-certificates.crt -o /root/certs/redis/redis-ca --create-dirs https://www.amazontrust.com/repository/AmazonRootCA1.pem && \
           chown apache /root/certs/redis/redis-ca && \
+          # Download MySQL CA certificate for secure RDS connections
           curl --cacert /swarm-pieces/ssl/certs/ca-certificates.crt -o /root/certs/mysql/server/mysql-ca --create-dirs https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem && \
           chown apache /root/certs/mysql/server/mysql-ca && \
 
-          # Setting up crontab for certificate renewal
+          # Setting up crontab for Apache graceful restart (daily at 11 PM)
           echo "1 23 * * * httpd -k graceful" >> /etc/crontabs/root && \
 
           echo "=== Setting up OpenEMR script ==="
@@ -79,72 +112,78 @@ spec:
           ./openemr.sh && \
 
           echo "=== OpenEMR Ready ==="
-          # Keep the container running
+          # Keep the container running after initialization
           tail -f /dev/null
+        # Environment variables for OpenEMR configuration
         env:
+        # Database connection settings (from Kubernetes secrets)
         - name: MYSQL_HOST
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-host
+              key: mysql-host               # RDS Aurora endpoint
         - name: MYSQL_ROOT_USER
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-user
+              key: mysql-user               # Database root username
         - name: MYSQL_ROOT_PASS
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-password
+              key: mysql-password           # Database root password
         - name: MYSQL_USER
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-user
+              key: mysql-user               # Application database username
         - name: MYSQL_PASS
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-password
+              key: mysql-password           # Application database password
         - name: MYSQL_DATABASE
           valueFrom:
             secretKeyRef:
               name: openemr-db-credentials
-              key: mysql-database
+              key: mysql-database           # Database name for OpenEMR
         - name: MYSQL_PORT
-          value: "3306"
+          value: "3306"                     # Standard MySQL port
+          
+        # Redis/ElastiCache connection settings (from Kubernetes secrets)
         - name: REDIS_SERVER
           valueFrom:
             secretKeyRef:
               name: openemr-redis-credentials
-              key: redis-host
+              key: redis-host               # ElastiCache Redis endpoint
         - name: REDIS_PORT
           valueFrom:
             secretKeyRef:
               name: openemr-redis-credentials
-              key: redis-port
+              key: redis-port               # Redis port (usually 6379 or 6380 for TLS)
         - name: REDIS_USERNAME
-          value: "openemr"
+          value: "openemr"                  # Redis username for authentication
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
               name: openemr-redis-credentials
-              key: redis-password
+              key: redis-password           # Redis password for authentication
         - name: REDIS_TLS
-          value: "yes"
+          value: "yes"                      # Enable TLS for secure Redis connections
+          
+        # OpenEMR application settings
         - name: OE_USER
           valueFrom:
             secretKeyRef:
               name: openemr-app-credentials
-              key: admin-user
+              key: admin-user               # OpenEMR admin username
         - name: OE_PASS
           valueFrom:
             secretKeyRef:
               name: openemr-app-credentials
-              key: admin-password
+              key: admin-password           # OpenEMR admin password
         - name: SWARM_MODE
-          value: "yes"
+          value: "yes"                     # Enable swarm mode for multi-container deployment
         # OpenEMR API Configuration (conditionally set by deploy script)
         # OPENEMR_SETTING_rest_api will be added if API is enabled
         # OPENEMR_SETTING_rest_fhir_api will be added if API is enabled
@@ -153,136 +192,194 @@ spec:
         # OPENEMR_SETTING_portal_onsite_two_enable will be added if portal is enabled
         # OPENEMR_SETTING_ccda_alt_service_enable will be added if portal is enabled
         # OPENEMR_SETTING_rest_portal_api will be added if portal is enabled
+        # Resource requirements and limits for optimal performance
         resources:
           requests:
-            cpu: 250m
-            memory: 512Mi
+            cpu: 500m                          # Minimum CPU required (0.5 cores) - increased for better performance
+            memory: 1Gi                        # Minimum memory required (1 GB) - increased for stability
           limits:
-            cpu: 1000m
-            memory: 1Gi
+            cpu: 2000m                         # Maximum CPU allowed (2 cores) - burst capacity for peak loads
+            memory: 2Gi                        # Maximum memory allowed (2 GB) - prevents OOM kills
+        # Startup probe - allows generous time for initial OpenEMR setup
         startupProbe:
-          tcpSocket:
-            port: 80
-          initialDelaySeconds: 600   # 10 minutes - Apache starts AFTER database setup
-          periodSeconds: 15          # Check frequently once Apache should be starting
-          timeoutSeconds: 10
-          failureThreshold: 40       # Allow 10 more minutes (600s + 40*15s = 1200s = 20min total)
-                                     # Leader: 10min DB setup + Apache start + OpenEMR init + buffer
+          httpGet:
+            path: /interface/login/login.php  # OpenEMR login page endpoint
+            port: 80                          # HTTP port
+            scheme: HTTP                      # Use HTTP (not HTTPS) for internal health checks
+            httpHeaders:
+            - name: User-Agent
+              value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
+          initialDelaySeconds: 300           # 5 minutes - initial grace period
+          periodSeconds: 30                  # Check every 30 seconds during startup
+          timeoutSeconds: 15                 # 15 second timeout per check
+          failureThreshold: 60               # Allow 60 failures (total time: 300s + 60*30s = 2100s = 35min)
+                                             # Accommodates: Fresh cluster + DB setup + Apache start + OpenEMR init + buffer
+        # Readiness probe - determines when pod can receive traffic
         readinessProbe:
           httpGet:
-            path: /interface/login/login.php
-            port: 80
-            scheme: HTTP
+            path: /interface/login/login.php  # OpenEMR login page endpoint
+            port: 80                          # HTTP port
+            scheme: HTTP                      # Use HTTP for internal health checks
             httpHeaders:
             - name: User-Agent
-              value: "Kubernetes-Health-Check/1.0"
-          initialDelaySeconds: 900   # 15 minutes - after Apache starts and OpenEMR initializes
-          periodSeconds: 30          # Check every 30s for OpenEMR readiness
-          timeoutSeconds: 20         # Longer timeout for OpenEMR response
-          failureThreshold: 20       # Allow 10 more minutes (900s + 20*30s = 1500s = 25min total)
-                                     # Leader pod: DB setup → Apache → OpenEMR ready
-          successThreshold: 2        # Require 2 consecutive successes for stability
+              value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
+          initialDelaySeconds: 30             # Wait 30 seconds after startup probe completes
+          periodSeconds: 10                   # Check every 10 seconds for responsive monitoring
+          timeoutSeconds: 10                  # 10 second timeout per check
+          failureThreshold: 3                 # Allow 3 failures (3*10s = 30s) before marking unready
+          successThreshold: 1                 # Single successful check marks pod as ready
+        # Liveness probe - determines when pod needs to be restarted
         livenessProbe:
           httpGet:
-            path: /interface/login/login.php
-            port: 80
-            scheme: HTTP
+            path: /interface/login/login.php  # OpenEMR login page endpoint
+            port: 80                          # HTTP port
+            scheme: HTTP                      # Use HTTP for internal health checks
             httpHeaders:
             - name: User-Agent
-              value: "Kubernetes-Health-Check/1.0"
-          initialDelaySeconds: 1200  # 20 minutes - after readiness probe succeeds
-          periodSeconds: 30          # Check every 30s during normal operation
-          timeoutSeconds: 20         # Longer timeout for OpenEMR response
-          failureThreshold: 10       # Allow more failures before restart (10*30s = 5min)
-          successThreshold: 1        # Fast recovery detection
+              value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
+          initialDelaySeconds: 60                   # Wait 60 seconds after startup/readiness probes complete
+          periodSeconds: 30                         # Check every 30 seconds during normal operation
+          timeoutSeconds: 15                        # 15 second timeout per check
+          failureThreshold: 6                       # Allow 6 failures (6*30s = 3min) before restarting pod
+          successThreshold: 1                       # Single success marks pod as alive
+          
+        # Volume mounts for persistent data and SSL certificates
         volumeMounts:
         - name: openemr-sites
-          mountPath: /var/www/localhost/htdocs/openemr/sites
+          mountPath: /var/www/localhost/htdocs/openemr/sites  # OpenEMR sites directory (EFS)
         - name: openemr-ssl
-          mountPath: /etc/ssl
+          mountPath: /etc/ssl                                 # SSL certificates directory (EFS)
         - name: openemr-letsencrypt
-          mountPath: /etc/letsencrypt
+          mountPath: /etc/letsencrypt                         # Let's Encrypt certificates (EFS)
 
+      # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
-        image: fluent/fluent-bit:4.0.8
+        image: fluent/fluent-bit:4.1.0              # Fluent Bit log processor and forwarder
+        
+        # Container-level security context for Fluent Bit
+        securityContext:
+          allowPrivilegeEscalation: false          # No privilege escalation needed
+          readOnlyRootFilesystem: false            # Allow writes for log processing
+          runAsUser: 0                             # Run as root for system metrics access
+          runAsGroup: 0                            # Run as root group
+          capabilities:
+            add:
+            - SYS_ADMIN                            # Required for accessing /sys filesystem
+            - DAC_READ_SEARCH                      # Required for reading system files
+            
         ports:
         - containerPort: 2020
-          name: fluent-bit-http
+          name: fluent-bit-http                    # HTTP monitoring endpoint
           protocol: TCP
         - containerPort: 24224
-          name: fluent-bit-fwd
+          name: fluent-bit-fwd                     # Forward protocol port
           protocol: TCP
         env:
           - name: AWS_REGION
-            value: "${AWS_REGION}"
+            value: "${AWS_REGION}"                 # AWS region for CloudWatch logs
           - name: CLUSTER_NAME
-            value: "${CLUSTER_NAME}"
+            value: "${CLUSTER_NAME}"               # EKS cluster name for log grouping
           - name: AWS_WEB_IDENTITY_TOKEN_FILE
-            value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+            value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"  # IRSA token path
           - name: AWS_ROLE_ARN
-            value: "${OPENEMR_ROLE_ARN}"
+            value: "${OPENEMR_ROLE_ARN}"           # IAM role ARN for CloudWatch permissions
 
 
+        # Resource limits for Fluent Bit sidecar
         resources:
           limits:
-            cpu: "200m"
-            memory: "256Mi"
+            cpu: "200m"                          # Maximum CPU for log processing
+            memory: "256Mi"                      # Maximum memory for log buffering
           requests:
-            cpu: "50m"
-            memory: "64Mi"
+            cpu: "50m"                           # Minimum CPU for basic log forwarding
+            memory: "64Mi"                       # Minimum memory for log processing
+            
+        # Volume mounts for Fluent Bit configuration and system access
         volumeMounts:
         - name: fluent-bit-config
-          mountPath: /fluent-bit/etc/
+          mountPath: /fluent-bit/etc/            # Fluent Bit configuration files
         - name: tmp
-          mountPath: /tmp
+          mountPath: /tmp                        # Temporary files for log processing
+        - name: openemr-sites
+          mountPath: /var/www/localhost/htdocs/openemr/sites  # OpenEMR sites directory for log access
+          readOnly: true                                      # Read-only access to log files
+        - name: proc
+          mountPath: /host/proc                  # Host /proc for system metrics
+          readOnly: true                         # Read-only access to system files
+        - name: sys
+          mountPath: /host/sys                   # Host /sys for system metrics
+          readOnly: true                         # Read-only access to system files
 
+        # Liveness probe for Fluent Bit sidecar
         livenessProbe:
           httpGet:
-            path: /
-            port: 2020
-          initialDelaySeconds: 30   # Fluent-bit starts quickly
-          periodSeconds: 30
-          timeoutSeconds: 5
-          failureThreshold: 3
+            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.0)
+            port: 2020                  # Fluent Bit HTTP monitoring endpoint
+          initialDelaySeconds: 30       # Fluent Bit starts quickly
+          periodSeconds: 30             # Check every 30 seconds
+          timeoutSeconds: 5             # 5 second timeout
+          failureThreshold: 3           # Allow 3 failures before restart
+        # Readiness probe for Fluent Bit sidecar
         readinessProbe:
           httpGet:
-            path: /api/v1/health
-            port: 2020
-          initialDelaySeconds: 15   # Fluent-bit starts quickly
-          periodSeconds: 15
-          timeoutSeconds: 5
-          failureThreshold: 6
+            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.0)
+            port: 2020                  # Fluent Bit HTTP monitoring port
+          initialDelaySeconds: 15       # Fluent Bit starts quickly
+          periodSeconds: 15             # Check every 15 seconds
+          timeoutSeconds: 5             # 5 second timeout
+          failureThreshold: 6           # Allow 6 failures before marking unready
+          successThreshold: 1           # Single success marks pod as ready
 
+      # Volume definitions for persistent storage and configuration
       volumes:
+      # Database credentials from Kubernetes secrets
       - name: db-credentials
         secret:
           secretName: openemr-db-credentials
+      # Redis credentials from Kubernetes secrets
       - name: redis-credentials
         secret:
           secretName: openemr-redis-credentials
+      # OpenEMR sites directory (EFS persistent storage)
       - name: openemr-sites
         persistentVolumeClaim:
           claimName: openemr-sites-pvc
+      # SSL certificates directory (EFS persistent storage)
       - name: openemr-ssl
         persistentVolumeClaim:
           claimName: openemr-ssl-pvc
+      # Let's Encrypt certificates directory (EFS persistent storage)
       - name: openemr-letsencrypt
         persistentVolumeClaim:
           claimName: openemr-letsencrypt-pvc
+      # Host /proc filesystem for system metrics (Fluent Bit node_exporter_metrics)
+      - name: proc
+        hostPath:
+          path: /proc                           # Host /proc filesystem
+          type: Directory                       # Ensure it's a directory
+      # Host /sys filesystem for system metrics (Fluent Bit node_exporter_metrics)
+      - name: sys
+        hostPath:
+          path: /sys                            # Host /sys filesystem
+          type: Directory                       # Ensure it's a directory
+      # Fluent Bit configuration from ConfigMap
       - name: fluent-bit-config
         configMap:
           name: fluent-bit-sidecar-config
+      # Temporary files for log processing
       - name: tmp
         emptyDir: {}
 
 
+      # Node placement configuration for EKS Auto Mode
       # EKS Auto Mode handles node selection, scheduling, and optimal placement automatically
-      # Add tolerations for EKS Auto Mode nodes
+      
+      # Tolerations for EKS Auto Mode nodes
       tolerations:
-      - key: "CriticalAddonsOnly"
+      - key: "CriticalAddonsOnly"              # Allow scheduling on critical addons nodes
         operator: "Exists"
         effect: "NoSchedule"
-      - key: "eks.amazonaws.com/compute-type"
+      - key: "eks.amazonaws.com/compute-type"  # Allow scheduling on EKS Auto Mode nodes
         operator: "Equal"
         value: "auto-mode"
         effect: "NoSchedule"

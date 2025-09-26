@@ -1,4 +1,7 @@
 ---
+# Fluent Bit Configuration for OpenEMR Log Aggregation
+# This ConfigMap contains the Fluent Bit configuration for collecting and forwarding logs to CloudWatch
+# Fluent Bit runs as a sidecar container alongside the OpenEMR application
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -8,6 +11,8 @@ metadata:
     app: fluent-bit-sidecar
 data:
   fluent-bit.conf: |
+    # Fluent Bit Service Configuration
+    # Core settings for log processing and HTTP monitoring
     [SERVICE]
         Flush         1
         Log_Level     info
@@ -15,12 +20,17 @@ data:
         HTTP_Server   On
         HTTP_Listen   0.0.0.0
         HTTP_Port     2020
+        HTTP_Allow    *
         Health_Check  On
         HC_Errors_Count 5
         HC_Retry_Failure_Count 5
         HC_Period     60
+        # Memory management fixes for Fluent Bit 4.1.0 stability issues
+        storage.backlog.mem_limit 50M
+        storage.pause_on_chunks_overlimit On
 
     # Test log input to verify functionality
+    # Generates test logs to verify Fluent Bit is working correctly
     [INPUT]
         Name              dummy
         Tag               test.logs
@@ -28,60 +38,67 @@ data:
         Rate             1
 
     # Collect Apache access logs
+    # Monitors HTTP access logs for web traffic analysis
     [INPUT]
         Name              tail
         Path              /var/log/apache2/access.log
         Tag               apache.access
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Collect Apache error logs
+    # Monitors Apache error logs for troubleshooting
     [INPUT]
         Name              tail
         Path              /var/log/apache2/error.log
         Tag               apache.error
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Collect OpenEMR application logs
+    # Monitors OpenEMR-specific application logs
     [INPUT]
         Name              tail
         Path              /var/log/openemr/*.log
         Tag               openemr.application
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Collect OpenEMR system logs
+    # Monitors OpenEMR system logs from the sites directory
     [INPUT]
         Name              tail
         Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/system_logs/*.log
         Tag               openemr.system
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Collect OpenEMR audit logs
+    # Monitors OpenEMR audit logs for compliance and security
     [INPUT]
         Name              tail
         Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/audit_logs/*.log
         Tag               openemr.audit
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Collect PHP error logs
+    # Monitors PHP error logs for application debugging
     [INPUT]
         Name              tail
         Path              /var/log/php_errors.log
         Tag               openemr.php_error
         Refresh_Interval  5
-        Mem_Buf_Limit     50MB
+        Buffer_Max_Size   5MB         # Memory limit for this input (Fluent Bit 4.1.0 compatible)
         Skip_Empty_Lines  On
 
     # Forward protocol for external log sources
+    # Allows external systems to send logs to Fluent Bit
     [INPUT]
         Name              forward
         Listen            0.0.0.0
@@ -89,11 +106,17 @@ data:
         Tag               forward.logs
 
     # Fluent Bit Metrics
+    # Collects system metrics for monitoring Fluent Bit performance
+    # Note: Requires privileged access to /sys and /proc for system metrics
     [INPUT]
         Name              node_exporter_metrics
         Tag               fluent-bit.metrics
         Scrape_Interval   30
+        path.procfs       /host/proc
+        path.sysfs        /host/sys
 
+    # Record modifier filter
+    # Adds metadata to all log records for better tracking and filtering
     [FILTER]
         Name                record_modifier
         Match               *
@@ -102,7 +125,8 @@ data:
         Record              openemr_version 7.0.3.4
         Record              pod_name ${HOSTNAME}
 
-    # Test logs output
+    # Test logs output (for verification)
+    # Sends test logs to CloudWatch for verification
     [OUTPUT]
         Name                cloudwatch_logs
         Match               test.logs
@@ -113,6 +137,7 @@ data:
         retry_limit         3
 
     # Apache logs output
+    # Sends Apache access and error logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               apache.*
@@ -123,6 +148,7 @@ data:
         retry_limit         3
 
     # Forward logs output
+    # Sends forwarded logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               forward.logs
@@ -133,6 +159,7 @@ data:
         retry_limit         3
 
     # OpenEMR Application Logs
+    # Sends OpenEMR application logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.application
@@ -143,6 +170,7 @@ data:
         retry_limit         3
 
     # OpenEMR System Logs
+    # Sends OpenEMR system logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.system
@@ -153,6 +181,7 @@ data:
         retry_limit         3
 
     # OpenEMR Audit Logs
+    # Sends OpenEMR audit logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.audit
@@ -163,6 +192,7 @@ data:
         retry_limit         3
 
     # PHP Error Logs
+    # Sends PHP error logs to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.php_error
@@ -173,6 +203,7 @@ data:
         retry_limit         3
 
     # Fluent Bit Metrics
+    # Sends Fluent Bit performance metrics to CloudWatch
     [OUTPUT]
         Name                cloudwatch_logs
         Match               fluent-bit.metrics

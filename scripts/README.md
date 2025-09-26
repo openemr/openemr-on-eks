@@ -17,6 +17,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - [Deployment & Infrastructure](#1-deployment--infrastructure)
   - [clean-deployment.sh](#clean-deploymentsh)
   - [restore-defaults.sh](#restore-defaultssh)
+  - [destroy.sh](#destroysh)
   - [validate-deployment.sh](#validate-deploymentsh)
   - [validate-efs-csi.sh](#validate-efs-csish)
 - [Backup & Restore](#2-backup--restore)
@@ -55,6 +56,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 
 - **`backup.sh`** - Comprehensive backup system for our deployment
 - **`restore.sh`** - Restore system designed to work with the backup script
+- **`destroy.sh`** - Complete infrastructure destruction (bulletproof cleanup)
 - **`validate-deployment.sh`** - Pre-deployment validation and health checks (also can be used to validate a running deployment
 - **`validate-efs-csi.sh`** - EFS CSI driver validation and troubleshooting
 
@@ -108,6 +110,40 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Update placeholder values if template structure changes
   - Ensure all manifest files are included in restoration process
   - Test restoration process after infrastructure changes
+
+#### `destroy.sh`
+
+- **Purpose**: Complete and bulletproof destruction of all OpenEMR infrastructure
+- **Dependencies**: terraform, aws, kubectl
+- **Key Features**:
+  - **Comprehensive cleanup** - Removes ALL infrastructure resources including Terraform state
+  - **RDS deletion protection handling** - Automatically disables deletion protection before destruction
+  - **Snapshot cleanup** - Deletes all snapshots to prevent automatic restoration
+  - **Orphaned resource cleanup** - Removes security groups, load balancers, WAF resources
+  - **AWS API retry logic** - Handles rate limiting and transient failures
+  - **Interactive confirmation** - Safety prompts with automation options
+  - **Complete verification** - Confirms cleanup success before declaring completion
+- **Safety Features**:
+  - Interactive confirmation prompts (unless `--force` used)
+  - AWS credentials validation before execution
+  - Prerequisites checking (terraform, aws, kubectl)
+  - Retry logic for AWS API calls
+  - Comprehensive verification of cleanup completion
+- **Usage Examples**:
+  ```bash
+  ./destroy.sh                              # Interactive destruction with prompts
+  ./destroy.sh --force                      # Automated destruction (CI/CD) - no prompts
+  ```
+- **⚠️ Important Notes**:
+  - **Irreversible**: This action completely destroys all infrastructure and cannot be undone
+  - **Comprehensive**: Removes ALL resources including Terraform state, RDS clusters, snapshots, S3 buckets
+  - **Bulletproof**: Handles edge cases like deletion protection, orphaned resources, and AWS API rate limits
+  - **Verification**: Confirms complete cleanup before declaring success
+- **Maintenance Notes**:
+  - Update resource cleanup logic as infrastructure evolves
+  - Add new resource types to cleanup as they're deployed
+  - Modify retry logic based on AWS API behavior changes
+  - Test cleanup process after infrastructure changes
 
 #### `validate-deployment.sh`
 

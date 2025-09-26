@@ -1,3 +1,17 @@
+# =============================================================================
+# OpenEMR SSL Certificate Renewal Automation
+# =============================================================================
+# This file configures automatic SSL certificate renewal for OpenEMR.
+#
+# SSL Renewal Strategy:
+# - Self-signed certificate generation every 2 days
+# - Atomic certificate replacement to prevent service disruption
+# - Backup and cleanup of old certificates
+# - Proper permissions and ownership
+# =============================================================================
+
+# SSL Certificate Renewal CronJob
+# Automatically generates and installs new self-signed certificates
 apiVersion: batch/v1
 kind: CronJob
 metadata:
@@ -5,12 +19,14 @@ metadata:
   namespace: openemr
   labels:
     app: ssl-cert-renewal
+    component: automation
 spec:
-  # Run every 2 days at 2 AM
+  # Schedule: Run every 2 days at 2 AM UTC
+  # This ensures certificates are always fresh and reduces browser warnings
   schedule: "0 2 */2 * *"
-  concurrencyPolicy: Forbid
-  successfulJobsHistoryLimit: 3
-  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid      # Prevent overlapping renewal jobs
+  successfulJobsHistoryLimit: 3  # Keep history of successful renewals
+  failedJobsHistoryLimit: 3      # Keep history of failed renewals for debugging
   jobTemplate:
     spec:
       template:
@@ -28,23 +44,25 @@ spec:
               type: RuntimeDefault
           serviceAccountName: openemr-sa
           containers:
+          # SSL Renewal Container
+          # Uses OpenEMR image to ensure compatibility with existing certificates
           - name: ssl-renewal
             image: openemr/openemr:7.0.3
             imagePullPolicy: IfNotPresent
             securityContext:
-              allowPrivilegeEscalation: false
-              readOnlyRootFilesystem: false
-              runAsNonRoot: false
-              runAsUser: 0
+              allowPrivilegeEscalation: false  # Security: prevent privilege escalation
+              readOnlyRootFilesystem: false    # Allow writing to SSL directories
+              runAsNonRoot: false              # Required for SSL certificate operations
+              runAsUser: 0                     # Run as root for certificate management
               capabilities:
                 drop:
-                - ALL
+                - ALL                          # Drop all capabilities by default
                 add:
-                - CHOWN
-                - SETUID
-                - SETGID
-                - FOWNER
-                - DAC_OVERRIDE
+                - CHOWN                        # Required for changing file ownership
+                - SETUID                       # Required for user ID operations
+                - SETGID                       # Required for group ID operations
+                - FOWNER                       # Required for file ownership changes
+                - DAC_OVERRIDE                 # Required for permission overrides
             command: ["/bin/sh", "-c"]
             args:
             - |

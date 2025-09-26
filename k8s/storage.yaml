@@ -1,66 +1,103 @@
-# storage.yaml
+# =============================================================================
+# OpenEMR Storage Configuration
+# =============================================================================
+# This file defines storage classes and persistent volume claims for OpenEMR.
+#
+# Storage Strategy:
+# - EFS (Elastic File System) for shared application data (sites, SSL, backups)
+# - EBS gp3 for time-series monitoring data (Prometheus, etc.)
+# - ReadWriteMany access for multi-pod deployments
+# - Encryption at rest for security
+# =============================================================================
 
-# Dynamic EFS StorageClass (primary data)
+# Primary EFS Storage Class for Application Data
+# Used for OpenEMR sites, SSL certificates, and general application data
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: efs-sc
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
+    # Description for maintainability
+    storageclass.kubernetes.io/description: "EFS storage class for OpenEMR application data"
 provisioner: efs.csi.aws.com
 parameters:
+  # EFS Access Point provisioning mode for better performance and security
   provisioningMode: efs-ap
-  fileSystemId: ${EFS_ID}  # Will be replaced by deployment script
+  # EFS File System ID - replaced by deployment script with actual EFS ID
+  fileSystemId: ${EFS_ID}
+  # Directory permissions for OpenEMR (root:root with 755 permissions)
   directoryPerms: "0755"
+  # Base path within the EFS file system for OpenEMR data
   basePath: "/openemr"
+  # User and group IDs (root:root for OpenEMR compatibility)
   uid: "0"
   gid: "0"
 mountOptions:
-  - tls
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
+  - tls  # Enable TLS encryption in transit
+reclaimPolicy: Retain                    # Retain volumes when PVCs are deleted (data preservation)
+volumeBindingMode: WaitForFirstConsumer  # Delay binding until pod is scheduled
+allowVolumeExpansion: true               # Allow volume expansion for growing data needs
 ---
+# OpenEMR Sites Data Persistent Volume Claim
+# Stores patient data, documents, images, and application files
+# Largest volume as it contains all patient records and uploaded files
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openemr-sites-pvc
   namespace: openemr
+  labels:
+    app: openemr
+    component: sites-data
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany   # Allow multiple pods to access simultaneously
   storageClassName: efs-sc
   resources:
     requests:
-      storage: 100Gi
+      storage: 100Gi  # Large storage for patient data and documents
 ---
+# SSL Certificates Persistent Volume Claim
+# Stores OpenEMR's SSL certificates and private keys
+# Separate volume for security isolation and backup purposes
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openemr-ssl-pvc
   namespace: openemr
+  labels:
+    app: openemr
+    component: ssl-certificates
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany  # Shared across pods for consistent SSL configuration
   storageClassName: efs-sc
   resources:
     requests:
-      storage: 10Gi
+      storage: 10Gi  # Sufficient for certificates and private keys
 ---
+# Let's Encrypt Certificates Persistent Volume Claim
+# Stores Let's Encrypt certificates and ACME challenge data
+# Used for automatic SSL certificate renewal
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openemr-letsencrypt-pvc
   namespace: openemr
+  labels:
+    app: openemr
+    component: letsencrypt
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany  # Shared access for certificate renewal processes
   storageClassName: efs-sc
   resources:
     requests:
-      storage: 10Gi
+      storage: 10Gi  # Sufficient for ACME certificates and challenges
 
-# Dynamic EFS StorageClass (backups)
+# Backup EFS Storage Class
+# Dedicated storage class for backup operations and data archival
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -68,34 +105,49 @@ metadata:
   name: efs-sc-backup
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
+    # Description for maintainability
+    storageclass.kubernetes.io/description: "EFS storage class for OpenEMR backups and archival"
 provisioner: efs.csi.aws.com
 parameters:
+  # EFS Access Point provisioning mode for backup operations
   provisioningMode: efs-ap
-  fileSystemId: ${EFS_ID}  # Will be replaced by deployment script
+  # EFS File System ID - replaced by deployment script with actual EFS ID
+  fileSystemId: ${EFS_ID}
+  # Directory permissions for backup data (root:root with 755 permissions)
   directoryPerms: "0755"
+  # Base path within the EFS file system for backup data
   basePath: "/backup"
+  # User and group IDs (root:root for OpenEMR compatibility)
   uid: "0"
   gid: "0"
 mountOptions:
-  - tls
-reclaimPolicy: Retain
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
+  - tls                                  # Enable TLS encryption in transit for backup data
+reclaimPolicy: Retain                    # Retain backup volumes (critical for data recovery)
+volumeBindingMode: WaitForFirstConsumer  # Delay binding until backup job is scheduled
+allowVolumeExpansion: true               # Allow expansion for growing backup requirements
 ---
+# Backup Data Persistent Volume Claim
+# Stores database backups, file system snapshots, and archival data
+# Separate from application data for backup isolation and management
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
   name: openemr-backup-pvc
   namespace: openemr
+  labels:
+    app: openemr
+    component: backup-storage
 spec:
   accessModes:
-    - ReadWriteMany
+    - ReadWriteMany  # Allow backup jobs and restore operations to access
   storageClassName: efs-sc-backup
   resources:
     requests:
-      storage: 50Gi
+      storage: 50Gi  # Sufficient for typical backup storage needs
 
-# Encrypted gp3 EBS StorageClass (monitoring, time-series)
+# Encrypted EBS gp3 Storage Class for Monitoring
+# High-performance storage for time-series monitoring data (Prometheus, etc.)
+# Uses EBS for better performance with time-series workloads
 ---
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
@@ -103,13 +155,15 @@ metadata:
   name: gp3-monitoring-encrypted
   annotations:
     storageclass.kubernetes.io/is-default-class: "false"
+    # Description for maintainability
+    storageclass.kubernetes.io/description: "Encrypted EBS gp3 storage for monitoring time-series data"
 provisioner: ebs.csi.eks.amazonaws.com
 parameters:
-  type: gp3
-  encrypted: "true"
-  iops: "3000"
-  throughput: "125"
-  fsType: ext4
-volumeBindingMode: WaitForFirstConsumer
-allowVolumeExpansion: true
-reclaimPolicy: Delete
+  type: gp3                              # Latest generation EBS volume type with better price/performance
+  encrypted: "true"                      # Enable encryption at rest for monitoring data
+  iops: "3000"                           # Provisioned IOPS for high-performance time-series writes
+  throughput: "125"                      # MB/s throughput for monitoring data ingestion
+  fsType: ext4                           # Standard Linux filesystem for monitoring tools
+volumeBindingMode: WaitForFirstConsumer  # Delay binding until monitoring pod is scheduled
+allowVolumeExpansion: true               # Allow expansion for growing monitoring data
+reclaimPolicy: Delete                    # Delete volumes when PVCs are deleted (monitoring data can be recreated)

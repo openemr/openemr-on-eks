@@ -1,43 +1,75 @@
+# =============================================================================
+# OpenEMR Application Load Balancer (ALB) Ingress Configuration
+# =============================================================================
+# This ingress creates an AWS Application Load Balancer for OpenEMR.
+#
+# ALB Features:
+# - Layer 7 (HTTP/HTTPS) load balancing with advanced routing
+# - SSL termination with AWS Certificate Manager (ACM)
+# - Health checks for automatic failover
+# - WAF integration for security
+# - Access logging to S3 for audit trails
+# =============================================================================
+
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: openemr-ingress
   namespace: openemr
+  labels:
+    app: openemr
+    component: ingress
   annotations:
-    ingressClassName: alb
-    alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: ip
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
-    alb.ingress.kubernetes.io/certificate-arn: "${SSL_CERT_ARN}"
-    alb.ingress.kubernetes.io/backend-protocol: HTTPS
-    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS
-    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    # AWS Load Balancer Controller configuration
+    ingressClassName: alb  # Use AWS Load Balancer Controller
+    
+    # Load Balancer Configuration
+    alb.ingress.kubernetes.io/scheme: internet-facing  # Public internet access
+    alb.ingress.kubernetes.io/target-type: ip          # Route to pod IPs (better for EKS)
+    
+    # SSL/TLS Configuration
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'    # HTTPS only for security
+    alb.ingress.kubernetes.io/certificate-arn: "${SSL_CERT_ARN}"  # ACM certificate ARN
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS             # Backend uses HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS         # Health checks use HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: "443"                 # Redirect HTTP to HTTPS
+    
+    # Health Check Configuration
+    # Custom health check endpoint for OpenEMR login page
     alb.ingress.kubernetes.io/healthcheck-path: /interface/login/login.php
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"  # Check every 30 seconds
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"    # 5 second timeout
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"        # 2 consecutive successes = healthy
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"      # 3 consecutive failures = unhealthy
+    
+    # Advanced Load Balancer Attributes
     alb.ingress.kubernetes.io/load-balancer-attributes: |
-      idle_timeout.timeout_seconds=300,
-      routing.http.drop_invalid_header_fields.enabled=true,
-      routing.http.preserve_host_header.enabled=true,
-      routing.http.x_amzn_tls_version_and_cipher_suite.enabled=true,
-      routing.http.xff_client_port.enabled=true,
-      access_logs.s3.enabled=true,
-      access_logs.s3.bucket=${S3_BUCKET_NAME},
-      access_logs.s3.prefix=alb-logs
+      idle_timeout.timeout_seconds=300,  # 5 minute idle timeout for long sessions
+      routing.http.drop_invalid_header_fields.enabled=true,  # Security: drop invalid headers
+      routing.http.preserve_host_header.enabled=true,  # Preserve original host header
+      routing.http.x_amzn_tls_version_and_cipher_suite.enabled=true,  # TLS information
+      routing.http.xff_client_port.enabled=true,  # Include client port in X-Forwarded-For
+      access_logs.s3.enabled=true,  # Enable access logging for audit trails
+      access_logs.s3.bucket=${S3_BUCKET_NAME},  # S3 bucket for access logs
+      access_logs.s3.prefix=alb-logs  # Log prefix for organization
+    
+    # WAF Integration for Security
+    # Web Application Firewall ACL for protection against common attacks
     alb.ingress.kubernetes.io/wafv2-acl-arn: "${WAF_ACL_ARN}"
+
 spec:
   rules:
+  # Routing Rules
   - http:
       paths:
+      # Catch-all rule - route all traffic to OpenEMR service
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: openemr-service
+            name: openemr-service  # Route to OpenEMR LoadBalancer service
             port:
-              number: 443
+              number: 443          # HTTPS port on the service
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy

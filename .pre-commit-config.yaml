@@ -17,7 +17,7 @@ repos:
       - id: check-executables-have-shebangs
 
   - repo: https://github.com/psf/black
-    rev: 25.1.0
+    rev: 25.9.0
     hooks:
       - id: black
         language_version: python3
@@ -68,7 +68,7 @@ repos:
         args: ["-c", ".yamllint"]
 
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.8.3
+    rev: v4.9.1
     hooks:
       - id: commitizen
         stages: [commit-msg]

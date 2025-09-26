@@ -1,19 +1,48 @@
+# =============================================================================
+# OpenEMR Namespace Configuration
+# =============================================================================
+# This file defines the Kubernetes namespaces used by the OpenEMR deployment.
+# 
+# Namespaces provide:
+# - Resource isolation and organization
+# - Security boundaries with Pod Security Standards
+# - Logical separation of application components
+# =============================================================================
+
+# OpenEMR Application Namespace
+# Contains the main OpenEMR application, services, and supporting resources
 apiVersion: v1
 kind: Namespace
 metadata:
   name: openemr
   labels:
     name: openemr
-    pod-security.kubernetes.io/enforce: baseline
-    pod-security.kubernetes.io/audit: baseline
-    pod-security.kubernetes.io/warn: baseline
+    # Pod Security Standards - Privileged level required for Fluent Bit
+    # which needs SYS_ADMIN and DAC_READ_SEARCH capabilities plus hostPath volumes
+    # for node_exporter_metrics plugin to access /proc and /sys filesystems
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/warn: privileged
+    # Additional labels for organization and monitoring
+    app.kubernetes.io/name: openemr
+    app.kubernetes.io/component: application
+    app.kubernetes.io/part-of: openemr-eks
+
 ---
+# Monitoring Namespace
+# Contains Prometheus, Grafana, and other monitoring components
+# Separate namespace allows for different security policies and resource limits
 apiVersion: v1
 kind: Namespace
 metadata:
   name: monitoring
   labels:
     name: monitoring
+    # Pod Security Standards - Baseline level for monitoring tools
     pod-security.kubernetes.io/enforce: baseline
     pod-security.kubernetes.io/audit: baseline
     pod-security.kubernetes.io/warn: baseline
+    # Additional labels for organization and monitoring
+    app.kubernetes.io/name: monitoring
+    app.kubernetes.io/component: observability
+    app.kubernetes.io/part-of: openemr-eks

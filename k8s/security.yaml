@@ -1,35 +1,72 @@
+# =============================================================================
+# OpenEMR Security Configuration
+# =============================================================================
+# This file defines security-related resources for OpenEMR.
+#
+# Security Components:
+# - Service Account with AWS IAM Role for Service Accounts (IRSA)
+# - RBAC roles and bindings for Kubernetes API access
+# - Least privilege access to required resources
+# =============================================================================
+
+# Service Account for OpenEMR Pods
+# Provides AWS IAM permissions through IRSA (IAM Roles for Service Accounts)
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: openemr-sa
   namespace: openemr
+  labels:
+    app: openemr
+    component: service-account
   annotations:
+    # IRSA Annotation - Links this service account to an AWS IAM role
+    # The role provides permissions for AWS services (S3, CloudWatch, etc.)
     eks.amazonaws.com/role-arn: ${OPENEMR_ROLE_ARN}
-automountServiceAccountToken: true
+automountServiceAccountToken: true  # Mount service account token for AWS SDK
+
 ---
+# RBAC Role for OpenEMR
+# Defines what Kubernetes resources OpenEMR can access
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   namespace: openemr
   name: openemr-role
+  labels:
+    app: openemr
+    component: rbac-role
 rules:
+# Access to ConfigMaps and Secrets
+# Required for reading configuration and credentials
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list"]  # Read-only access for security
+  
+# Access to Pod information
+# Required for health checks and monitoring
 - apiGroups: [""]
   resources: ["pods"]
-  verbs: ["get", "list"]
+  verbs: ["get", "list"]  # Read-only access for pod status
+
 ---
+# Role Binding
+# Associates the Service Account with the Role
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: openemr-rolebinding
   namespace: openemr
+  labels:
+    app: openemr
+    component: rbac-binding
 subjects:
+# Subject: Service Account
 - kind: ServiceAccount
   name: openemr-sa
   namespace: openemr
 roleRef:
+  # Role Reference
   kind: Role
   name: openemr-role
   apiGroup: rbac.authorization.k8s.io

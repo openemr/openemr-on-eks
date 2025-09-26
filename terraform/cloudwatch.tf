@@ -1,3 +1,8 @@
+# CloudWatch Log Groups Configuration
+# This file defines all CloudWatch log groups used for collecting and storing logs
+# from the OpenEMR application, Apache web server, and Fluent Bit logging agent.
+# All log groups are encrypted using KMS and have configurable retention periods.
+
 # CloudWatch Log Groups for Application Logs
 resource "aws_cloudwatch_log_group" "openemr_app" {
   name              = "/aws/eks/${var.cluster_name}/openemr/application"
@@ -38,6 +43,8 @@ resource "aws_cloudwatch_log_group" "openemr_error" {
   }
 }
 
+# Audit logging log group for OpenEMR
+# This log group stores audit logs with extended retention for compliance requirements
 resource "aws_cloudwatch_log_group" "openemr_audit" {
   name              = "/aws/eks/${var.cluster_name}/openemr/audit"
   retention_in_days = var.audit_logs_retention_days
@@ -51,7 +58,11 @@ resource "aws_cloudwatch_log_group" "openemr_audit" {
   }
 }
 
-# New CloudWatch Log Groups for Enhanced OpenEMR 7.0.3.4 Logging
+# Enhanced OpenEMR 7.0.3.4 Logging Groups
+# These log groups provide more granular logging capabilities for better monitoring
+# and troubleshooting of the OpenEMR application.
+
+# Detailed audit logging for compliance and security monitoring
 resource "aws_cloudwatch_log_group" "openemr_audit_detailed" {
   name              = "/aws/eks/${var.cluster_name}/openemr/audit_detailed"
   retention_in_days = var.audit_logs_retention_days
@@ -66,6 +77,7 @@ resource "aws_cloudwatch_log_group" "openemr_audit_detailed" {
   }
 }
 
+# System-level logging for operational monitoring
 resource "aws_cloudwatch_log_group" "openemr_system" {
   name              = "/aws/eks/${var.cluster_name}/openemr/system"
   retention_in_days = var.app_logs_retention_days
@@ -80,6 +92,7 @@ resource "aws_cloudwatch_log_group" "openemr_system" {
   }
 }
 
+# PHP error logging for application debugging
 resource "aws_cloudwatch_log_group" "openemr_php_error" {
   name              = "/aws/eks/${var.cluster_name}/openemr/php_error"
   retention_in_days = var.app_logs_retention_days
@@ -94,7 +107,11 @@ resource "aws_cloudwatch_log_group" "openemr_php_error" {
   }
 }
 
-# CloudWatch Log Group for Fluent Bit Metrics
+# Fluent Bit Logging Infrastructure
+# These log groups support the Fluent Bit logging agent that collects and forwards
+# logs from the OpenEMR application to CloudWatch.
+
+# Fluent Bit operational metrics and health monitoring
 resource "aws_cloudwatch_log_group" "fluent_bit_metrics" {
   name              = "/aws/eks/${var.cluster_name}/fluent-bit/metrics"
   retention_in_days = var.app_logs_retention_days
@@ -104,12 +121,15 @@ resource "aws_cloudwatch_log_group" "fluent_bit_metrics" {
     Name        = "${var.cluster_name}-fluent-bit-metrics"
     Application = "FluentBit"
     LogType     = "Metrics"
-    Version     = "4.0.8"
+    Version     = "4.1.0"
     Description = "Fluent Bit operational metrics and health checks"
   }
 }
 
 # Additional CloudWatch Log Groups for Fluent Bit Sidecar
+# These log groups support additional logging capabilities and testing for the Fluent Bit sidecar
+
+# Test logging for Fluent Bit sidecar verification and debugging
 resource "aws_cloudwatch_log_group" "openemr_test" {
   name              = "/aws/eks/${var.cluster_name}/openemr/test"
   retention_in_days = var.app_logs_retention_days
@@ -124,6 +144,7 @@ resource "aws_cloudwatch_log_group" "openemr_test" {
   }
 }
 
+# Apache web server logging for HTTP access and error monitoring
 resource "aws_cloudwatch_log_group" "openemr_apache" {
   name              = "/aws/eks/${var.cluster_name}/openemr/apache"
   retention_in_days = var.app_logs_retention_days
@@ -138,6 +159,7 @@ resource "aws_cloudwatch_log_group" "openemr_apache" {
   }
 }
 
+# Forward protocol logging for external log sources
 resource "aws_cloudwatch_log_group" "openemr_forward" {
   name              = "/aws/eks/${var.cluster_name}/openemr/forward"
   retention_in_days = var.app_logs_retention_days

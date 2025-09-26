@@ -1,4 +1,15 @@
-# S3 bucket for CloudTrail
+# CloudTrail Configuration for OpenEMR
+# This file defines the CloudTrail configuration for auditing and monitoring
+# AWS API calls and resource changes across the OpenEMR infrastructure.
+# CloudTrail provides comprehensive logging for security, compliance, and troubleshooting.
+
+# Unique suffix for CloudTrail resource names to ensure global uniqueness
+resource "random_id" "cloudtrail_suffix" {
+  byte_length = 4
+}
+
+# S3 bucket for storing CloudTrail logs
+# This bucket receives detailed API call logs from CloudTrail for audit and compliance purposes
 resource "aws_s3_bucket" "cloudtrail" {
   bucket        = "${var.cluster_name}-cloudtrail-logs-${random_id.cloudtrail_suffix.hex}"
   force_destroy = true
@@ -10,11 +21,8 @@ resource "aws_s3_bucket" "cloudtrail" {
   }
 }
 
-resource "random_id" "cloudtrail_suffix" {
-  byte_length = 4
-}
-
-# Enable encryption on the bucket
+# Enable encryption on the CloudTrail S3 bucket
+# Uses KMS encryption with the CloudWatch KMS key for enhanced security
 resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -26,7 +34,8 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cloudtrail" {
   }
 }
 
-# Block public access to the bucket
+# Block public access to the CloudTrail S3 bucket
+# This ensures that audit logs remain private and secure, preventing unauthorized access
 resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -36,7 +45,9 @@ resource "aws_s3_bucket_public_access_block" "cloudtrail" {
   restrict_public_buckets = true
 }
 
-# Attach bucket policy to CloudTrail bucket
+# CloudTrail S3 bucket policy
+# This policy allows CloudTrail to write logs to the S3 bucket while maintaining
+# security through proper conditions and enforcing SSL-only access
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -85,7 +96,8 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
   })
 }
 
-# Versioning for CloudTrail S3 bucket
+# Enable versioning for the CloudTrail S3 bucket
+# This provides protection against accidental deletion and allows for point-in-time recovery
 resource "aws_s3_bucket_versioning" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -94,7 +106,9 @@ resource "aws_s3_bucket_versioning" "cloudtrail" {
   }
 }
 
-# Lifecycle policy for CloudTrail S3 bucket
+# Lifecycle policy for the CloudTrail S3 bucket
+# This manages log retention, version cleanup, and incomplete multipart upload cleanup
+# to optimize storage costs and maintain compliance requirements
 resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
 
@@ -120,7 +134,9 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   }
 }
 
-# CloudTrail for logging
+# CloudTrail configuration for comprehensive AWS API logging
+# This CloudTrail captures all API calls and resource changes across the AWS account
+# for security monitoring, compliance auditing, and operational troubleshooting
 resource "aws_cloudtrail" "openemr" {
   name           = "${var.cluster_name}-cloudtrail"
   s3_bucket_name = aws_s3_bucket.cloudtrail.bucket

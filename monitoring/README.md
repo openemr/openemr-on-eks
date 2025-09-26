@@ -25,10 +25,10 @@ A production-ready monitoring solution for OpenEMR on EKS Auto Mode, featuring a
 graph TB
     subgraph "EKS Auto Mode Cluster"
         subgraph "Monitoring Namespace"
-            PROM[Prometheus<br/>v2.54.1]
-            GRAF[Grafana<br/>v11.2.0]
-            LOKI[Loki<br/>v3.2.0]
-            JAEG[Jaeger<br/>v1.72.0]
+            PROM[Prometheus]
+            GRAF[Grafana]
+            LOKI[Loki]
+            JAEG[Jaeger]
             ALERT[AlertManager]
         end
 
@@ -39,7 +39,7 @@ graph TB
         end
 
         subgraph "Observability"
-            CM[cert-manager<br/>v1.18.2]
+            CM[cert-manager]
             JO[Jaeger Operator]
         end
     end

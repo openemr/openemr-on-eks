@@ -1,5 +1,29 @@
+# OpenEMR EKS Manual Release Workflow
+# ===================================
+# This workflow provides manual release management for the OpenEMR EKS deployment,
+# allowing authorized users to create releases with semantic versioning, automated
+# version bumping, and comprehensive release notes generation.
+#
+# Key Features:
+# - Manual workflow dispatch with release type selection (major, minor, patch)
+# - Semantic versioning with automated version calculation
+# - Comprehensive release notes generation with commit history
+# - Dry run mode for testing release process without creating actual releases
+# - Change detection to prevent unnecessary releases
+# - Automated GitHub release creation with proper tagging
+# - Release statistics and contributor tracking
+#
+# Release Process:
+# 1. Determine release type and validate inputs
+# 2. Check for changes since last release
+# 3. Calculate new version using semantic versioning
+# 4. Generate comprehensive release notes
+# 5. Create Git tag and GitHub release (unless dry run)
+# 6. Provide detailed summary and notifications
+
 name: Manual Releases
 
+# Manual workflow trigger with comprehensive input options
 on:
   workflow_dispatch:
     inputs:
@@ -9,9 +33,9 @@ on:
         default: 'patch'
         type: choice
         options:
-          - major
-          - minor
-          - patch
+          - major  # Breaking changes - increment major version
+          - minor  # New features - increment minor version
+          - patch  # Bug fixes - increment patch version
       release_notes:
         description: 'Release notes (required)'
         required: true
@@ -22,60 +46,74 @@ on:
         default: false
         type: boolean
 
+# Environment variables for consistent tool versions
 env:
-  PYTHON_VERSION: '3.13.7'
-  SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4"
+  PYTHON_VERSION: '3.13.7'                    # Python version for semantic versioning
+  SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4"      # Specific semver package version
 
+# Required permissions for release operations
 permissions:
-  contents: write
-  pull-requests: write
-  issues: write
+  contents: write      # Create releases and tags
+  pull-requests: write # Update pull requests (if needed)
+  issues: write        # Create issues for notifications
 
 jobs:
+  # Job 1: Determine release type and validate inputs
+  # This job processes the workflow inputs and determines the appropriate version bump
   determine-release-type:
     runs-on: ubuntu-24.04
     outputs:
-      release-type: ${{ steps.determine-type.outputs.release-type }}
-      bump-version: ${{ steps.determine-type.outputs.bump-version }}
-      triggered-by: ${{ steps.determine-type.outputs.triggered-by }}
+      release-type: ${{ steps.determine-type.outputs.release-type }}    # Type of release (major/minor/patch)
+      bump-version: ${{ steps.determine-type.outputs.bump-version }}    # Version bump type for semver
+      triggered-by: ${{ steps.determine-type.outputs.triggered-by }}    # User who triggered the release
     steps:
+      # Step 1: Process and validate release type input
       - name: Determine release type
         id: determine-type
         run: |
           echo "release-type=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
           echo "triggered-by=${{ github.actor }}" >> $GITHUB_OUTPUT
 
+          # Validate release type and set appropriate semver bump type
           case "${{ github.event.inputs.release_type }}" in
-            major) echo "bump-version=major" >> $GITHUB_OUTPUT ;;
-            minor) echo "bump-version=minor" >> $GITHUB_OUTPUT ;;
-            patch) echo "bump-version=patch" >> $GITHUB_OUTPUT ;;
-            *) echo "::error::Invalid release type" && exit 1 ;;
+            major) echo "bump-version=major" >> $GITHUB_OUTPUT ;;  # Breaking changes
+            minor) echo "bump-version=minor" >> $GITHUB_OUTPUT ;;  # New features
+            patch) echo "bump-version=patch" >> $GITHUB_OUTPUT ;;  # Bug fixes
+            *) echo "::error::Invalid release type" && exit 1 ;;   # Invalid input
           esac
 
+  # Job 2: Check for changes since last release
+  # This job prevents unnecessary releases by checking if there are actual changes
+  # since the last tagged release
   check-changes:
-    needs: determine-release-type
+    needs: determine-release-type  # Wait for release type determination
     runs-on: ubuntu-24.04
     outputs:
-      has-changes: ${{ steps.check-changes.outputs.has-changes }}
-      last-tag: ${{ steps.check-changes.outputs.last-tag }}
+      has-changes: ${{ steps.check-changes.outputs.has-changes }}  # Boolean indicating if changes exist
+      last-tag: ${{ steps.check-changes.outputs.last-tag }}        # Last release tag for reference
     steps:
+      # Step 1: Checkout repository with full history for change detection
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Fetch complete git history for change detection
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Step 2: Analyze changes since last release
       - name: Check for changes since last tag
         id: check-changes
         run: |
+          # Get the last release tag
           LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
           echo "last-tag=$LAST_TAG" >> $GITHUB_OUTPUT
 
+          # Handle first release scenario
           if [[ -z "$LAST_TAG" ]]; then
             echo "::notice::No previous tags found. This will be the first release."
             echo "has-changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
 
+          # Count commits since last tag
           CHANGES=$(git log --oneline "$LAST_TAG..HEAD" 2>/dev/null | wc -l)
           if [[ $CHANGES -gt 0 ]]; then
             echo "::notice::Found $CHANGES commits since $LAST_TAG"
@@ -85,33 +123,40 @@ jobs:
             echo "has-changes=false" >> $GITHUB_OUTPUT
           fi
 
+  # Job 3: Create the actual release (only if changes exist)
+  # This job handles version calculation, release notes generation, and GitHub release creation
   create-release:
-    needs: [determine-release-type, check-changes]
-    if: needs.check-changes.outputs.has-changes == 'true'
+    needs: [determine-release-type, check-changes]         # Wait for previous jobs
+    if: needs.check-changes.outputs.has-changes == 'true'  # Only run if changes exist
     runs-on: ubuntu-24.04
     outputs:
-      new-version: ${{ steps.new-version.outputs.new-version }}
-      release-url: ${{ steps.create-release.outputs.html_url }}
+      new-version: ${{ steps.new-version.outputs.new-version }}      # Calculated new version
+      release-url: ${{ steps.create-release.outputs.html_url }}      # GitHub release URL
     steps:
+      # Step 1: Checkout repository with full history for release creation
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 0  # Fetch complete git history for release notes
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Step 2: Set up Python environment for semantic versioning
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
+      # Step 3: Install Python dependencies for version management
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install semver==${{ env.SEMVER_PYTHON_PACKAGE_VERSION }}
+          pip install semver==${{ env.SEMVER_PYTHON_PACKAGE_VERSION }}  # Semantic versioning library
 
+      # Step 4: Read and validate current version from VERSION file
       - name: Get current version
         id: current-version
         run: |
-          VERSION=$(cat VERSION | tr -d '\n\r ')
+          VERSION=$(cat VERSION | tr -d '\n\r ')  # Read version and clean whitespace
+          # Validate version format (semantic versioning: major.minor.patch)
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "::error::Invalid version format in VERSION file: $VERSION"
             exit 1
@@ -119,6 +164,8 @@ jobs:
           echo "current-version=$VERSION" >> $GITHUB_OUTPUT
           echo "::notice::Current version: $VERSION"
 
+      # Step 5: Calculate new version using semantic versioning
+      # This step uses Python semver library to properly increment the version
       - name: Calculate new version
         id: new-version
         run: |
@@ -128,15 +175,17 @@ jobs:
           import semver
 
           try:
+              # Parse current version and bump type
               current = semver.Version.parse(os.environ["CURRENT"])
               bump_type = os.environ["BUMP"]
 
+              # Apply semantic versioning bump based on release type
               if bump_type == "major":
-                  new = current.bump_major()
+                  new = current.bump_major()  # Breaking changes
               elif bump_type == "minor":
-                  new = current.bump_minor()
+                  new = current.bump_minor()  # New features
               elif bump_type == "patch":
-                  new = current.bump_patch()
+                  new = current.bump_patch()  # Bug fixes
               else:
                   print(f"::error::Invalid bump type: {bump_type}")
                   sys.exit(1)
@@ -144,6 +193,7 @@ jobs:
               new_str = str(new)
               print(f"::notice::Bumping from {current} to {new_str} ({bump_type})")
 
+              # Output new version for next steps
               with open(os.environ["GITHUB_OUTPUT"], "a") as f:
                   f.write(f"new-version={new_str}\n")
 
@@ -155,11 +205,14 @@ jobs:
           CURRENT: ${{ steps.current-version.outputs.current-version }}
           BUMP: ${{ needs.determine-release-type.outputs.release-type }}
 
+      # Step 6: Update VERSION file with new version
       - name: Update VERSION file
         run: |
           echo "${{ steps.new-version.outputs.new-version }}" > VERSION
           echo "::notice::Updated VERSION file to ${{ steps.new-version.outputs.new-version }}"
 
+      # Step 7: Generate comprehensive release notes
+      # This step creates detailed release notes including commit history and statistics
       - name: Generate release notes
         id: release-notes
         run: |
@@ -169,7 +222,7 @@ jobs:
           RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
           LAST_TAG="${{ needs.check-changes.outputs.last-tag }}"
 
-          # Create release notes file
+          # Create release notes file with header information
           cat > RELEASE_NOTES.md << ENDOFNOTES
           ## Release v${NEW_VERSION}
 
@@ -183,14 +236,16 @@ jobs:
           ### Changes
           ENDOFNOTES
 
-          # Add commit history
+          # Add commit history since last release
           if [[ -z "$LAST_TAG" ]]; then
+            # First release - include all commits
             git log --oneline --reverse --pretty=format:"- %h: %s" >> RELEASE_NOTES.md
           else
+            # Subsequent release - include commits since last tag
             git log --oneline --reverse --pretty=format:"- %h: %s" "$LAST_TAG..HEAD" >> RELEASE_NOTES.md
           fi
 
-          # Add statistics
+          # Add release statistics
           echo -e "\n\n### Statistics" >> RELEASE_NOTES.md
           if [[ -n "$LAST_TAG" ]]; then
             echo "- Commits: $(git rev-list --count $LAST_TAG..HEAD)" >> RELEASE_NOTES.md
@@ -200,35 +255,41 @@ jobs:
             echo "- First release" >> RELEASE_NOTES.md
           fi
 
-          # Output for GitHub Action
+          # Output release notes for GitHub Action
           {
             echo 'release-notes<<EOF'
             cat RELEASE_NOTES.md
             echo 'EOF'
           } >> $GITHUB_OUTPUT
 
+      # Step 8: Commit changes and create Git tag (skip if dry run)
       - name: Commit and tag (Dry Run Check)
         if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
         run: |
           NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
           TRIGGERED_BY="${{ needs.determine-release-type.outputs.triggered-by }}"
 
+          # Configure Git for automated commits
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
 
+          # Commit version file changes
           git add VERSION
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" \
                      -m "Release type: ${{ needs.determine-release-type.outputs.release-type }}" \
                      -m "Triggered by: @$TRIGGERED_BY" \
                      -m "Release notes: ${{ github.event.inputs.release_notes }}"
 
+          # Create annotated tag with release notes
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION" -m "$(cat RELEASE_NOTES.md)"
 
+          # Push changes and tag to repository
           git push origin main
           git push origin "v$NEW_VERSION"
 
           echo "::notice::Successfully created tag v$NEW_VERSION"
 
+      # Step 9: Create GitHub release (skip if dry run)
       - name: Create GitHub Release
         id: create-release
         if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
@@ -242,6 +303,7 @@ jobs:
           generateReleaseNotes: false
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Step 10: Display dry run summary (only if dry run mode)
       - name: Dry Run Summary
         if: ${{ github.event.inputs.dry_run == 'true' }}
         run: |
@@ -257,20 +319,26 @@ jobs:
           cat RELEASE_NOTES.md >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+  # Job 4: Notification and summary generation
+  # This job provides comprehensive feedback about the release process outcome
+  # and generates detailed summaries for both successful and failed releases
   notify-completion:
-    needs: [determine-release-type, check-changes, create-release]
+    needs: [determine-release-type, check-changes, create-release]  # Wait for all previous jobs
     runs-on: ubuntu-24.04
-    if: always()
+    if: always()  # Run regardless of previous job outcomes
     steps:
+      # Step 1: Generate comprehensive workflow summary
       - name: Generate summary
         run: |
           echo "# 📦 Release Workflow Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
+          # Handle different release scenarios
           if [[ "${{ needs.check-changes.outputs.has-changes }}" == "false" ]]; then
             echo "## ⏭️ No Release Created" >> $GITHUB_STEP_SUMMARY
             echo "No changes detected since the last release." >> $GITHUB_STEP_SUMMARY
           elif [[ "${{ needs.create-release.result }}" == "success" ]]; then
+            # Successful release scenario
             if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
               echo "## 🔍 Dry Run Completed Successfully" >> $GITHUB_STEP_SUMMARY
               echo "- **Would create version:** ${{ needs.create-release.outputs.new-version }}" >> $GITHUB_STEP_SUMMARY
@@ -285,6 +353,7 @@ jobs:
             echo "## ⏭️ Release Skipped" >> $GITHUB_STEP_SUMMARY
             echo "No changes found since the last tag." >> $GITHUB_STEP_SUMMARY
           else
+            # Failed release scenario
             echo "## ❌ Release Failed" >> $GITHUB_STEP_SUMMARY
             echo "Please check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
@@ -297,6 +366,7 @@ jobs:
           echo "---" >> $GITHUB_STEP_SUMMARY
           echo "*Workflow run:* [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
 
+      # Step 2: Send failure notification (only for actual releases, not dry runs)
       - name: Send notification on failure
         if: failure() && (github.event.inputs.dry_run != 'true')
         run: |

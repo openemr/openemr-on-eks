@@ -1,44 +1,76 @@
 #!/bin/bash
 
 # OpenEMR EKS Version Management System
-# Comprehensive automated version checking
+# ====================================
+# This script provides comprehensive automated version checking and management
+# for all components in the OpenEMR EKS deployment. It tracks versions across
+# the entire codebase, generates detailed reports, and provides update recommendations.
+#
+# Key Features:
+# - Automated version checking across the entire codebase
+# - Comprehensive version tracking in versions.yaml
+# - Detailed reporting with categorized file locations
+# - Support for multiple component types (containers, actions, modules, etc.)
+# - Automated report generation with update recommendations
+# - Integration with CI/CD pipelines for automated updates
+# - Comprehensive logging and audit trail
+#
+# Component Types Supported:
+# - Docker containers (OpenEMR, monitoring stack, etc.)
+# - GitHub Actions (workflows and reusable actions)
+# - Terraform modules and providers
+# - Helm charts and Kubernetes manifests
+# - Python packages and dependencies
+# - Node.js packages and dependencies
+#
+# Usage:
+#   ./version-manager.sh check-all          # Check all components
+#   ./version-manager.sh check <component>  # Check specific component
+#   ./version-manager.sh report             # Generate version report
+#   ./version-manager.sh update <component> # Update specific component
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical issues
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+PURPLE='\033[0;35m'   # Version management messages
+CYAN='\033[0;36m'     # Special categories and highlights
+NC='\033[0m'          # Reset color to default
 
-# Configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"
-LOG_FILE="$PROJECT_ROOT/version-updates.log"
-TEMP_DIR="/tmp/openemr-version-check-$$"
+# Configuration variables - paths and file locations
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
+VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"                  # File containing version tracking data
+LOG_FILE="$PROJECT_ROOT/version-updates.log"                 # Log file for version update activities
+TEMP_DIR="/tmp/openemr-version-check-$$"                     # Temporary directory for processing
 
-# Create temp directory
+# Create temporary directory for processing and set cleanup trap
 mkdir -p "$TEMP_DIR"
-trap "rm -rf '$TEMP_DIR'" EXIT
+trap "rm -rf '$TEMP_DIR'" EXIT  # Ensure cleanup on script exit
 
-# Logging function
+# Logging function - provides consistent, timestamped logging
+# This function ensures all version management activities are logged with timestamps
+# and appropriate log levels for audit trails and debugging
 log() {
-    local level="$1"
-    shift
-    local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local level="$1"    # Log level (INFO, WARN, ERROR, DEBUG)
+    shift               # Remove first argument (level) from arguments
+    local message="$*"  # Remaining arguments form the log message
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')  # Current timestamp for log entries
+    
+    # Output to both console (stderr) and log file with timestamp and level
     echo -e "${timestamp} [${level}] ${message}" | tee -a "$LOG_FILE" >&2
 }
 
 # Function to search for version strings in the codebase
+# This function performs comprehensive searches for version references across the entire codebase
+# It categorizes results by file type and provides detailed reporting for version updates
 search_version_in_codebase() {
-    local component="$1"
-    local current_version="$2"
-    local latest_version="$3"
+    local component="$1"       # Component name (e.g., "openemr/openemr", "actions/checkout")
+    local current_version="$2" # Current version being tracked
+    local latest_version="$3"  # Latest available version
     
     log "INFO" "Searching for version '$current_version' in codebase for component: $component"
     
@@ -47,37 +79,37 @@ search_version_in_codebase() {
     local sanitized_component=$(echo "$component" | sed 's/[\/\\]/_/g')
     local search_results="$TEMP_DIR/${sanitized_component}_version_search.txt"
     
-    # Search for the current version across the entire codebase
-    # Include documentation, configuration files, scripts, and source code
-    # Only exclude build artifacts, temporary files, and version reports
+    # Define exclusion patterns for the search
+    # Exclude build artifacts, temporary files, and version reports to focus on source code
     local exclude_patterns=(
-        "--exclude-dir=.git"
-        "--exclude-dir=node_modules"
-        "--exclude-dir=.terraform"
-        "--exclude-dir=venv"
-        "--exclude-dir=__pycache__"
-        "--exclude-dir=.pytest_cache"
-        "--exclude-dir=dist"
-        "--exclude-dir=build"
-        "--exclude=*.log"
-        "--exclude=version-update-report-*.md"
-        "--exclude=*.pyc"
-        "--exclude=*.pyo"
-        "--exclude=*.so"
-        "--exclude=*.o"
-        "--exclude=*.a"
-        "--exclude=*.tmp"
-        "--exclude=*.temp"
+        "--exclude-dir=.git"           # Git repository metadata
+        "--exclude-dir=node_modules"   # Node.js dependencies
+        "--exclude-dir=.terraform"     # Terraform state and cache
+        "--exclude-dir=venv"           # Python virtual environment
+        "--exclude-dir=__pycache__"    # Python bytecode cache
+        "--exclude-dir=.pytest_cache"  # Pytest cache
+        "--exclude-dir=dist"           # Distribution files
+        "--exclude-dir=build"          # Build artifacts
+        "--exclude=*.log"              # Log files
+        "--exclude=version-update-report-*.md"  # Previous version reports
+        "--exclude=*.pyc"              # Python compiled files
+        "--exclude=*.pyo"              # Python optimized files
+        "--exclude=*.so"               # Shared object files
+        "--exclude=*.o"                # Object files
+        "--exclude=*.a"                # Archive files
+        "--exclude=*.tmp"              # Temporary files
+        "--exclude=*.temp"             # Temporary files
     )
     
-    # Escape special characters in the version string for grep
+    # Escape special characters in the version string for grep regex
+    # This prevents grep from interpreting version numbers as regex patterns
     local escaped_version=$(printf '%s\n' "$current_version" | sed 's/[[\.*^$()+?{|]/\\&/g')
     
-    # Search for the version string across all file types, but be more specific for GitHub Actions
+    # Determine search pattern based on component type
     local search_pattern="$escaped_version"
     if [[ "$component" == *"actions/"* ]] || [[ "$component" == *"azure/"* ]] || [[ "$component" == *"hashicorp/"* ]]; then
         # For GitHub Actions, search for the full action name with the version
-        # Escape the component name for grep as well
+        # Format: component@version (e.g., actions/checkout@v3)
         local escaped_component=$(printf '%s\n' "$component" | sed 's/[[\.*^$()+?{|]/\\&/g')
         search_pattern="${escaped_component}@${escaped_version}"
     fi
@@ -96,17 +128,19 @@ search_version_in_codebase() {
         echo "**Files containing current version:**" >> "$update_report"
         echo "" >> "$update_report"
         
-        # Categorize files by type for better organization
-        local config_files=()
-        local doc_files=()
-        local script_files=()
-        local terraform_files=()
-        local other_files=()
+        # Categorize files by type for better organization in the report
+        # This helps users understand where versions are referenced across different file types
+        local config_files=()    # Configuration files (YAML, JSON, INI, etc.)
+        local doc_files=()       # Documentation files (Markdown, text)
+        local script_files=()    # Script files (Shell, Python, JavaScript, TypeScript)
+        local terraform_files=() # Terraform configuration files
+        local other_files=()     # Other file types not covered above
         
         # Process and categorize the search results
         while IFS= read -r line; do
             if [ -n "$line" ]; then
-                # Extract file path and line content
+                # Extract file path and line content from grep output
+                # Format: filepath:line_number:content
                 local file_path=$(echo "$line" | cut -d: -f1 | sed "s|^$PROJECT_ROOT/||")
                 local line_content=$(echo "$line" | cut -d: -f2-)
                 
@@ -115,22 +149,28 @@ search_version_in_codebase() {
                     continue
                 fi
                 
-                # Categorize files
+                # Categorize files based on extension and type
                 if [[ "$file_path" == *.yaml ]] || [[ "$file_path" == *.yml ]] || [[ "$file_path" == *.json ]] || [[ "$file_path" == *.cfg ]] || [[ "$file_path" == *.conf ]] || [[ "$file_path" == *.ini ]] || [[ "$file_path" == *.toml ]] || [[ "$file_path" == *.hcl ]] || [[ "$file_path" == *.env* ]]; then
+                    # Configuration files - contain version specifications
                     config_files+=("$file_path:$line_content")
                 elif [[ "$file_path" == *.md ]] || [[ "$file_path" == *.txt ]]; then
+                    # Documentation files - may contain version references
                     doc_files+=("$file_path:$line_content")
                 elif [[ "$file_path" == *.sh ]] || [[ "$file_path" == *.py ]] || [[ "$file_path" == *.js ]] || [[ "$file_path" == *.ts ]]; then
+                    # Script files - may contain version checks or references
                     script_files+=("$file_path:$line_content")
                 elif [[ "$file_path" == *.tf ]]; then
+                    # Terraform files - contain provider and module versions
                     terraform_files+=("$file_path:$line_content")
                 else
+                    # Other file types - catch-all category
                     other_files+=("$file_path:$line_content")
                 fi
             fi
         done < "$search_results"
         
-        # Display categorized results
+        # Display categorized results in the report
+        # Each category is displayed only if it contains files
         if [ ${#config_files[@]} -gt 0 ]; then
             echo "#### 🔧 Configuration Files" >> "$update_report"
             echo '```' >> "$update_report"
@@ -171,9 +211,11 @@ search_version_in_codebase() {
             echo "" >> "$update_report"
         fi
         
+        # Add explanatory note about the search results
         echo "Note: Search results show all files containing $current_version that need updating." >> "$update_report"
         echo "" >> "$update_report"
     else
+        # Handle case where no version occurrences are found in the codebase
         log "WARN" "No occurrences of version '$current_version' found in codebase for component: $component"
         echo "" >> "$update_report"
         echo "### 📍 Version Locations for $component" >> "$update_report"
@@ -185,17 +227,23 @@ search_version_in_codebase() {
         echo "" >> "$update_report"
     fi
     
-    # Clean up
+    # Clean up temporary files
+    # Remove the search results file to prevent accumulation of temporary files
     rm -f "$search_results"
 }
 
-# Normalize version strings for comparison (handles v5 vs v5.0.0)
+# Function to normalize version strings for consistent comparison
+# This function handles different version formats (v5 vs v5.0.0) and ensures
+# consistent comparison by standardizing the format
 normalize_version() {
-    local version="$1"
+    local version="$1"  # Version string to normalize
+    
     # Remove 'v' prefix and normalize version format
+    # This handles versions like "v5.0.0" -> "5.0.0"
     local normalized=$(echo "$version" | sed 's/^v//')
     
     # If it's just a major version (e.g., "5"), treat it as "5.0.0"
+    # This ensures consistent comparison between "5" and "5.0.0"
     if [[ "$normalized" =~ ^[0-9]+$ ]]; then
         normalized="${normalized}.0.0"
     fi
@@ -203,14 +251,17 @@ normalize_version() {
     echo "$normalized"
 }
 
-# Compare two version strings (returns 0 if equal, 1 if different)
+# Function to compare two version strings for equality
+# This function normalizes both versions and compares them, returning 0 if equal, 1 if different
 compare_versions() {
-    local version1="$1"
-    local version2="$2"
+    local version1="$1"  # First version to compare
+    local version2="$2"  # Second version to compare
     
+    # Normalize both versions to ensure consistent comparison
     local norm1=$(normalize_version "$version1")
     local norm2=$(normalize_version "$version2")
     
+    # Compare normalized versions
     if [ "$norm1" = "$norm2" ]; then
         return 0  # Versions are equal
     else
@@ -218,76 +269,96 @@ compare_versions() {
     fi
 }
 
-# Error handling
+# Error handling function
+# This function provides consistent error handling and logging throughout the script
 error_exit() {
-    log "ERROR" "$1"
-    exit 1
+    log "ERROR" "$1"  # Log the error message
+    exit 1            # Exit with error code 1
 }
 
-# Check dependencies
+# Function to check for required dependencies
+# This function validates that all required tools are available before proceeding
 check_dependencies() {
+    # List of required command-line tools
     local deps=("yq" "curl" "jq" "kubectl" "terraform")
-    local missing=()
+    local missing=()  # Array to track missing dependencies
 
+    # Check each dependency
     for dep in "${deps[@]}"; do
         if ! command -v "$dep" >/dev/null 2>&1; then
             missing+=("$dep")
         fi
     done
 
+    # Exit if any dependencies are missing
     if [ ${#missing[@]} -gt 0 ]; then
         error_exit "Missing dependencies: ${missing[*]}. Please install them first."
     fi
 }
 
-# Parse YAML configuration
+# Function to parse YAML configuration file
+# This function reads the versions.yaml file and extracts component information
 parse_config() {
+    # Validate that the versions file exists
     if [ ! -f "$VERSIONS_FILE" ]; then
         error_exit "Version configuration file not found: $VERSIONS_FILE"
     fi
 
     # Extract configuration using yq
+    # Application versions
     OPENEMR_CURRENT=$(yq eval '.applications.openemr.current' "$VERSIONS_FILE")
     OPENEMR_REGISTRY=$(yq eval '.applications.openemr.registry' "$VERSIONS_FILE")
 
+    # Infrastructure versions
     K8S_CURRENT=$(yq eval '.infrastructure.eks.current' "$VERSIONS_FILE")
 
+    # Logging and monitoring versions
     FLUENT_BIT_CURRENT=$(yq eval '.applications.fluent_bit.current' "$VERSIONS_FILE")
     FLUENT_BIT_REGISTRY=$(yq eval '.applications.fluent_bit.registry' "$VERSIONS_FILE")
 
+    # Database versions
     AURORA_CURRENT=$(yq eval '.databases.aurora_mysql.current' "$VERSIONS_FILE")
 
+    # Monitoring stack versions
     PROMETHEUS_CURRENT=$(yq eval '.monitoring.prometheus_operator.current' "$VERSIONS_FILE")
     LOKI_CURRENT=$(yq eval '.monitoring.loki.current' "$VERSIONS_FILE")
     JAEGER_CURRENT=$(yq eval '.monitoring.jaeger.current' "$VERSIONS_FILE")
 }
 
-# Get latest Docker image version
+# Function to get the latest Docker image version from Docker Hub
+# This function queries Docker Hub's API to retrieve the latest available version
 get_latest_docker_version() {
-    local registry="$1"
-    local use_stable="$2"  # Set to "true" for OpenEMR (second-to-latest), "false" for others (latest)
+    local registry="$1"      # Docker registry name (e.g., "openemr/openemr")
+    local use_stable="$2"    # Set to "true" for OpenEMR (second-to-latest), "false" for others (latest)
 
     log "INFO" "Checking latest version for $registry..."
 
+    # Construct Docker Hub API URL for the registry
     local url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100"
     local response=$(curl -s "$url")
 
+    # Check if curl command succeeded
     if [ $? -ne 0 ]; then
         log "ERROR" "Failed to fetch tags from Docker Hub for $registry"
         return 1
     fi
 
     # Parse and filter versions, excluding architecture-specific tags
+    # Only include semantic version numbers (e.g., "7.0.3", not "7.0.3-amd64")
     local versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
 
+    # Handle case where no clean semantic versions are found
     if [ -z "$versions" ]; then
         # If no clean versions found, try to extract base versions from architecture-specific tags
+        # This handles cases where tags include architecture suffixes (e.g., "7.0.3-amd64")
         local arch_versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$' | sed 's/-[a-zA-Z0-9]*$//' | sort -V -r | uniq)
         versions="$arch_versions"
     fi
 
+    # Return appropriate version based on component type
     if [ "$use_stable" = "true" ]; then
         # For OpenEMR, return the second-to-latest version (stable production)
+        # This is because the latest version may be a development/pre-release version
         echo "$versions" | sed -n '2p'
     else
         # For all other dependencies, return the latest version
@@ -295,12 +366,13 @@ get_latest_docker_version() {
     fi
 }
 
-# Get latest Helm chart version from repository index
+# Function to get the latest Helm chart version from repository index
+# This function queries Helm chart repositories to retrieve the latest available version
 get_latest_helm_version() {
-    local chart="$1"
-    local repo_url=""
+    local chart="$1"  # Helm chart name (e.g., "kube-prometheus-stack")
+    local repo_url="" # Repository URL for the chart
     
-    # Determine the correct Helm repository URL
+    # Determine the correct Helm repository URL based on chart name
     case "$chart" in
         "kube-prometheus-stack")
             repo_url="https://prometheus-community.github.io/helm-charts/index.yaml"
@@ -327,8 +399,10 @@ get_latest_helm_version() {
     log "INFO" "Checking latest version for Helm chart: $chart..."
 
     # Get the repository index and extract the latest version
+    # The repository index is a YAML file containing chart metadata
     local index_content=$(curl -s "$repo_url")
     
+    # Check if curl command succeeded and content was retrieved
     if [ $? -ne 0 ] || [ -z "$index_content" ]; then
         log "ERROR" "Failed to fetch repository index for $chart"
         echo "❌ Error"
@@ -336,8 +410,10 @@ get_latest_helm_version() {
     fi
     
     # Extract version from repository index (get the first version entry, not dependencies)
+    # The repository index contains chart entries with version information
     local version=$(echo "$index_content" | grep -A 100 "^  $chart:" | grep -E "^    version:" | head -1 | awk '{print $2}')
     
+    # Validate that version was successfully extracted
     if [ -z "$version" ] || [ "$version" = "null" ]; then
         log "ERROR" "Failed to parse version for $chart"
         echo "❌ Error"
@@ -348,13 +424,15 @@ get_latest_helm_version() {
     echo "$version"
 }
 
-# Get latest Kubernetes version supported by AWS EKS
+# Function to get the latest Kubernetes version supported by AWS EKS
+# This function queries AWS EKS API to retrieve the latest supported Kubernetes version
 get_latest_k8s_version() {
     log "INFO" "Checking latest Kubernetes version supported by AWS EKS..."
     
     # Try to get supported versions from AWS CLI if available
     if command -v aws >/dev/null 2>&1; then
         # Get all supported versions and find the latest one
+        # Using EBS CSI driver as a proxy to get EKS supported versions
         local aws_versions=$(aws eks describe-addon-versions --addon-name aws-ebs-csi-driver --query 'addons[0].addonVersions[].compatibilities[].clusterVersion' --output text 2>/dev/null | tr '\t' '\n' | sort -V | tail -1)
         if [ -n "$aws_versions" ] && [ "$aws_versions" != "None" ]; then
             log "INFO" "Found EKS supported version via AWS CLI: $aws_versions"
@@ -363,21 +441,24 @@ get_latest_k8s_version() {
         fi
     fi
     
-    # No fallback available
+    # No fallback available - AWS CLI is required for EKS version checking
     log "ERROR" "Could not determine latest EKS version via AWS CLI"
     echo "❌ Unable to determine"
     return 1
 }
 
-# Get all supported EKS versions
+# Function to get all supported EKS versions
+# This function retrieves the complete list of Kubernetes versions supported by AWS EKS
 get_eks_supported_versions() {
     log "INFO" "Getting all supported EKS versions..."
     
     # Try to get from AWS CLI if available
     if command -v aws >/dev/null 2>&1; then
+        # Get all supported versions using EBS CSI driver as a proxy
         local aws_versions=$(aws eks describe-addon-versions --addon-name aws-ebs-csi-driver --query 'addons[0].addonVersions[].compatibilities[].clusterVersion' --output text 2>/dev/null | tr '\t' '\n' | sort -V | uniq)
         if [ -n "$aws_versions" ] && [ "$aws_versions" != "None" ]; then
             # Filter out versions older than 1.28 (EKS minimum supported)
+            # This ensures we only return versions that are currently supported by EKS
             local filtered_versions=$(echo "$aws_versions" | awk -F. '$1 == 1 && $2 >= 28 {print $0}' | sort -V)
             if [ -n "$filtered_versions" ]; then
                 log "INFO" "Found EKS supported versions via AWS CLI (filtered): $filtered_versions"
@@ -387,17 +468,18 @@ get_eks_supported_versions() {
         fi
     fi
     
-    # No fallback available
+    # No fallback available - AWS CLI is required for EKS version checking
     log "ERROR" "Could not determine EKS supported versions via AWS CLI"
     echo "❌ Unable to determine"
     return 1
 }
 
 
-# Get latest EKS add-on version
+# Function to get the latest EKS add-on version
+# This function retrieves the latest version of a specific EKS add-on
 get_latest_eks_addon_version() {
-    local addon_name="$1"
-    local cluster_version="$2"
+    local addon_name="$1"      # Name of the EKS add-on (e.g., "aws-ebs-csi-driver")
+    local cluster_version="$2" # Kubernetes cluster version for compatibility check
     
     # Check if AWS CLI is available and configured
     if ! command -v aws >/dev/null 2>&1; then
@@ -416,6 +498,7 @@ get_latest_eks_addon_version() {
     log "INFO" "Checking latest version for EKS add-on: $addon_name (cluster version: $cluster_version)"
     
     # First try to get the latest version for the specific cluster version
+    # This ensures compatibility with the current cluster version
     local latest_version=$(aws eks describe-addon-versions \
         --addon-name "$addon_name" \
         --kubernetes-version "$cluster_version" \
@@ -423,6 +506,7 @@ get_latest_eks_addon_version() {
         --output text 2>/dev/null)
     
     # If that fails, try to get the latest version without specifying cluster version
+    # This provides a fallback when cluster version filtering doesn't work
     if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
         log "INFO" "Trying to get latest version for $addon_name without cluster version filter"
         latest_version=$(aws eks describe-addon-versions \
@@ -432,6 +516,7 @@ get_latest_eks_addon_version() {
     fi
     
     # If still no luck, try to get any available version
+    # This is the final fallback to get any version of the add-on
     if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
         log "INFO" "Trying to get any available version for $addon_name"
         latest_version=$(aws eks describe-addon-versions \
@@ -440,6 +525,7 @@ get_latest_eks_addon_version() {
             --output text 2>/dev/null)
     fi
     
+    # Validate that we successfully retrieved a version
     if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
         log "WARN" "Failed to fetch EKS add-on version for $addon_name"
         echo "❌ Error"
@@ -450,12 +536,14 @@ get_latest_eks_addon_version() {
     echo "$latest_version"
 }
 
-# Get latest Aurora MySQL version
+# Function to get the latest Aurora MySQL version
+# This function retrieves the latest available Aurora MySQL version from AWS
 get_latest_aurora_version() {
     log "INFO" "Checking latest Aurora MySQL version..."
 
     # Try to get the latest version from AWS documentation first
     # Get the latest Aurora MySQL version 3.x.x and construct the full version
+    # This method scrapes the AWS documentation for version information
     local latest_version=$(curl -s "https://docs.aws.amazon.com/AmazonRDS/latest/AuroraMySQLReleaseNotes/AuroraMySQL.Updates.30Updates.html" 2>/dev/null | \
         grep -oE "version [0-9]+\.[0-9]+\.[0-9]+" | \
         awk '{print $2}' | \
@@ -464,6 +552,7 @@ get_latest_aurora_version() {
         tail -1)
     
     # If we got a version, construct the full Aurora MySQL version
+    # Aurora MySQL versions follow the format: 8.0.mysql_aurora.3.x.x
     if [ -n "$latest_version" ]; then
         latest_version="8.0.mysql_aurora.${latest_version}"
         log "INFO" "Latest Aurora MySQL version from documentation: $latest_version"
@@ -472,6 +561,7 @@ get_latest_aurora_version() {
     fi
 
     # If documentation parsing failed, try AWS CLI if available
+    # This provides a fallback method using AWS API
     if command -v aws >/dev/null 2>&1 && aws sts get-caller-identity >/dev/null 2>&1; then
         log "INFO" "Trying AWS CLI to get Aurora MySQL versions..."
         local aws_versions=$(aws rds describe-db-engine-versions \
@@ -492,17 +582,22 @@ get_latest_aurora_version() {
     return 1
 }
 
-# Get latest Terraform module version
+
+# Function to get the latest Terraform module version
+# This function retrieves the latest version of a Terraform module from the registry
 get_latest_terraform_module_version() {
-    local module_source="$1"
+    local module_source="$1"  # Module source (e.g., "terraform-aws-modules/vpc/aws")
 
     log "INFO" "Checking latest version for Terraform module: $module_source..."
 
     # Use Terraform registry API instead of GitHub
+    # The Terraform registry provides a standardized API for module information
     local url="https://registry.terraform.io/v1/modules/${module_source}"
 
+    # Fetch module information from the Terraform registry
     local response=$(curl -s "$url" 2>/dev/null || echo "")
 
+    # Check if the API call was successful
     if [ -z "$response" ]; then
         log "WARN" "Could not fetch module information from Terraform registry"
         echo "❌ Error"
@@ -510,8 +605,10 @@ get_latest_terraform_module_version() {
     fi
 
     # Extract latest version from the versions array
+    # The registry returns a JSON response with version information
     local version=$(echo "$response" | jq -r '.versions[-1]' 2>/dev/null)
     
+    # Validate that we successfully extracted a version
     if [ -z "$version" ] || [ "$version" = "null" ]; then
         log "WARN" "Could not determine latest version for $module_source"
         echo "❌ Unable to determine"
@@ -522,36 +619,45 @@ get_latest_terraform_module_version() {
     echo "$version"
 }
 
-# Get latest GitHub Action version
+# Function to get the latest GitHub Action version
+# This function retrieves the latest version of a GitHub Action from the repository
 get_latest_github_action_version() {
-    local action_name="$1"
+    local action_name="$1"  # GitHub Action name (e.g., "actions/checkout")
 
     log "INFO" "Checking latest version for GitHub Action: $action_name..."
 
     # For GitHub Actions, we'll check the marketplace or repository
+    # GitHub Actions are typically versioned using Git tags
     local url="https://api.github.com/repos/${action_name}/releases/latest"
 
+    # Fetch the latest release information from GitHub API
     local response=$(curl -s "$url" 2>/dev/null || echo "")
 
+    # Check if the API call was successful
     if [ -z "$response" ]; then
         echo "❌ Error"
         return
     fi
 
-    # Extract tag name (version)
+    # Extract tag name (version) from the release information
+    # GitHub releases use tag names for versioning
     echo "$response" | jq -r '.tag_name' 2>/dev/null || echo "❌ Error"
 }
 
-# Get latest GitHub runner version
+# Function to get the latest GitHub runner version
+# This function retrieves the latest version of GitHub Actions runner images
 get_latest_github_runner_version() {
     log "INFO" "Checking latest GitHub runner versions..."
 
     # Use GitHub API to get available runner releases
+    # GitHub Actions runner images are released as part of the actions/runner-images repository
     local releases_url="https://api.github.com/repos/actions/runner-images/releases"
     
     log "INFO" "Fetching runner releases from GitHub API..."
+    # Fetch runner releases from GitHub API
     local response=$(curl -s "$releases_url" 2>/dev/null || echo "")
     
+    # Check if the API call was successful
     if [ -z "$response" ]; then
         log "WARN" "Failed to fetch runner releases from GitHub API"
         echo "❌ Unable to determine"
@@ -562,6 +668,7 @@ get_latest_github_runner_version() {
     # Look for tags that start with "ubuntu" followed by version numbers
     local ubuntu_releases=$(echo "$response" | jq -r '.[] | select(.tag_name | startswith("ubuntu")) | .tag_name' 2>/dev/null || echo "")
     
+    # Validate that Ubuntu releases were found
     if [ -z "$ubuntu_releases" ]; then
         log "WARN" "No Ubuntu runner releases found in API response"
         echo "❌ Unable to determine"
@@ -573,6 +680,7 @@ get_latest_github_runner_version() {
     local latest_ubuntu=""
     local latest_version=""
     
+    # Process each Ubuntu release tag to find the latest version
     while IFS= read -r tag; do
         # Extract version from tag like "ubuntu24/20250915.37" -> "24"
         if [[ "$tag" =~ ubuntu([0-9]+)/ ]]; then
@@ -595,6 +703,7 @@ get_latest_github_runner_version() {
         fi
     done <<< "$ubuntu_releases"
     
+    # Return the latest Ubuntu version found
     if [ -n "$latest_ubuntu" ]; then
         log "INFO" "Latest Ubuntu runner found: $latest_ubuntu"
         echo "$latest_ubuntu"
@@ -604,13 +713,15 @@ get_latest_github_runner_version() {
     fi
 }
 
-# Get latest pre-commit hook version
+# Function to get the latest pre-commit hook version
+# This function retrieves the latest version of a pre-commit hook from the repository
 get_latest_pre_commit_hook_version() {
-    local hook_name="$1"
+    local hook_name="$1"  # Pre-commit hook name (e.g., "pre-commit/pre-commit")
 
     log "INFO" "Checking latest version for pre-commit hook: $hook_name..."
 
     # Map hook names to their repositories
+    # This mapping allows the function to work with common pre-commit hook names
     case "$hook_name" in
         "pre_commit_hooks")
             local repo="pre-commit/pre-commit-hooks"
@@ -650,10 +761,12 @@ get_latest_pre_commit_hook_version() {
     esac
 
     # Try releases first, then tags if releases don't exist
+    # Some repositories use releases, others use tags for versioning
     local url="https://api.github.com/repos/${repo}/releases/latest"
     local response=$(curl -s "$url" 2>/dev/null || echo "")
     local latest_version=""
 
+    # Check if releases exist, otherwise fall back to tags
     if [ -z "$response" ] || echo "$response" | jq -e '.message' >/dev/null 2>&1; then
         # No releases, try tags
         log "INFO" "No releases found for $hook_name, trying tags..."
@@ -668,6 +781,7 @@ get_latest_pre_commit_hook_version() {
         latest_version=$(echo "$response" | jq -r '.tag_name' 2>/dev/null || echo "")
     fi
 
+    # Validate that we successfully retrieved a version
     if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
         log "WARN" "Could not determine latest version for pre-commit hook: $hook_name"
         echo "❌ Unable to determine"
@@ -678,15 +792,18 @@ get_latest_pre_commit_hook_version() {
     echo "$latest_version"
 }
 
-# Get latest semver package version
+# Function to get the latest semver package version
+# This function retrieves the latest version of a package that follows semantic versioning
 get_latest_semver_version() {
-    local package_name="$1"
+    local package_name="$1"  # Package name (e.g., "semver")
 
     log "INFO" "Checking latest version for semver package: $package_name..."
 
+    # Handle different package types with their specific version sources
     case "$package_name" in
         "python_version")
             # For Python, we'll check the official Python tags (no releases)
+            # Python uses Git tags for versioning, not GitHub releases
             local url="https://api.github.com/repos/python/cpython/tags"
             local response=$(curl -s "$url" 2>/dev/null || echo "")
             if [ -z "$response" ] || [ "$response" = "[]" ]; then
@@ -698,6 +815,7 @@ get_latest_semver_version() {
             ;;
         "terraform_version")
             # For Terraform, check HashiCorp releases
+            # Terraform uses GitHub releases for versioning
             local url="https://api.github.com/repos/hashicorp/terraform/releases/latest"
             local response=$(curl -s "$url" 2>/dev/null || echo "")
             if [ -z "$response" ]; then
@@ -708,6 +826,7 @@ get_latest_semver_version() {
             ;;
         "kubectl_version")
             # For kubectl, check Kubernetes releases
+            # kubectl is part of the Kubernetes project and uses GitHub releases
             local url="https://api.github.com/repos/kubernetes/kubernetes/releases/latest"
             local response=$(curl -s "$url" 2>/dev/null || echo "")
             if [ -z "$response" ]; then
@@ -718,6 +837,7 @@ get_latest_semver_version() {
             ;;
         "semver")
             # For semver Python package, check PyPI
+            # Python packages are typically published to PyPI
             local url="https://pypi.org/pypi/semver/json"
             local response=$(curl -s "$url" 2>/dev/null || echo "")
             if [ -z "$response" ]; then
@@ -733,6 +853,7 @@ get_latest_semver_version() {
             ;;
     esac
 
+    # Validate that we successfully retrieved a version
     if [ -z "$latest_version" ] || [ "$latest_version" = "null" ]; then
         log "WARN" "Could not determine latest version for semver package: $package_name"
         echo "❌ Unable to determine"
@@ -743,9 +864,10 @@ get_latest_semver_version() {
     echo "$latest_version"
 }
 
-# Check for updates
+# Function to check for updates across all components
+# This function orchestrates the version checking process for all components
 check_updates() {
-    local components="${1:-all}"
+    local components="${1:-all}"  # Components to check (default: all)
     local create_issue="${2:-false}"
     local month="${3:-}"
     
@@ -1161,6 +1283,7 @@ EOF
         fi
     fi
 
+
     if [ $updates_found -eq 0 ]; then
         log "INFO" "All components are up to date!"
         echo "No updates available." >> "$update_report"
@@ -1177,7 +1300,9 @@ EOF
     cp "$update_report" "$report_file"
     log "INFO" "Update report saved to: $report_file"
 
-    return $updates_found
+    # Return success (0) regardless of whether updates were found
+    # This prevents GitHub Actions from failing when no updates are available
+    return 0
 }
 
 
@@ -1248,15 +1373,17 @@ show_status() {
     echo ""
 }
 
-# Main function
+# Main function - entry point for the script
+# This function handles command-line argument parsing and dispatches to appropriate functions
 main() {
-    local command="${1:-check}"
-    local components="all"
-    local create_issue="false"
-    local month=""
+    # Set default values for command-line options
+    local command="${1:-check}"     # Default command is 'check'
+    local components="all"          # Default to checking all components
+    local create_issue="false"      # Don't create GitHub issues by default
+    local month=""                  # No month filtering by default
 
-    # Parse arguments
-    shift || true
+    # Parse command-line arguments
+    shift || true  # Remove the command from arguments
     while [[ $# -gt 0 ]]; do
         case $1 in
             --components)
@@ -1272,7 +1399,7 @@ main() {
                 shift 2
                 ;;
             --log-level)
-                # Log level - would set logging level
+                # Log level - would set logging level (placeholder for future enhancement)
                 shift 2
                 ;;
             --help)
@@ -1285,19 +1412,22 @@ main() {
         esac
     done
 
-    # Initialize
-    check_dependencies
-    parse_config
+    # Initialize script dependencies and configuration
+    check_dependencies  # Validate required tools are available
+    parse_config       # Load version configuration from YAML file
 
-    # Execute command
+    # Execute the specified command
     case "$command" in
         "check")
+            # Check for version updates across specified components
             check_updates "$components" "$create_issue" "$month"
             ;;
         "status")
+            # Display current version status
             show_status
             ;;
         "help"|"--help")
+            # Show usage information
             show_help
             ;;
         *)

@@ -1,3 +1,15 @@
+# =============================================================================
+# OpenEMR Horizontal Pod Autoscaler (HPA) Configuration
+# =============================================================================
+# This file configures automatic scaling for OpenEMR based on resource utilization.
+#
+# Scaling Strategy:
+# - CPU and memory-based scaling for optimal performance
+# - Conservative scale-down to prevent service disruption
+# - Aggressive scale-up to handle traffic spikes
+# - Pod Disruption Budget for availability during scaling
+# =============================================================================
+
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -5,49 +17,66 @@ metadata:
   namespace: openemr
   labels:
     app: openemr
+    component: autoscaler
 spec:
+  # Target Deployment
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: openemr
-  minReplicas: ${OPENEMR_MIN_REPLICAS}
-  maxReplicas: ${OPENEMR_MAX_REPLICAS}
+    name: openemr  # Scale the OpenEMR deployment
+    
+  # Scaling Boundaries
+  # Configured via Terraform variables for flexibility
+  minReplicas: ${OPENEMR_MIN_REPLICAS}  # Minimum pods (typically 2)
+  maxReplicas: ${OPENEMR_MAX_REPLICAS}  # Maximum pods (typically 10)
+  
+  # Scaling Metrics
   metrics:
+  # CPU-based scaling
   - type: Resource
     resource:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: ${OPENEMR_CPU_THRESHOLD}
+        averageUtilization: ${OPENEMR_CPU_THRESHOLD}  # Scale when CPU exceeds threshold (typically 70%)
+        
+  # Memory-based scaling
   - type: Resource
     resource:
       name: memory
       target:
         type: Utilization
-        averageUtilization: ${OPENEMR_MEMORY_THRESHOLD}
+        averageUtilization: ${OPENEMR_MEMORY_THRESHOLD}  # Scale when memory exceeds threshold (typically 80%)
+  
+  # Scaling Behavior Configuration
   behavior:
+    # Scale Down Behavior (Conservative)
     scaleDown:
-      stabilizationWindowSeconds: ${OPENEMR_SCALE_DOWN_STABILIZATION}
+      stabilizationWindowSeconds: ${OPENEMR_SCALE_DOWN_STABILIZATION}  # Wait before scaling down (typically 300s)
       policies:
       - type: Percent
-        value: 50  # Scale down by max 50% at a time
+        value: 50  # Scale down by maximum 50% at a time
         periodSeconds: 60
       - type: Pods
-        value: 2   # Scale down by max 2 pods at a time
+        value: 2   # Scale down by maximum 2 pods at a time
         periodSeconds: 60
-      selectPolicy: Min  # Use the most conservative policy
+      selectPolicy: Min  # Use the most conservative policy to prevent rapid scale-down
+      
+    # Scale Up Behavior (Aggressive)
     scaleUp:
-      stabilizationWindowSeconds: ${OPENEMR_SCALE_UP_STABILIZATION}
+      stabilizationWindowSeconds: ${OPENEMR_SCALE_UP_STABILIZATION}  # Wait before scaling up (typically 60s)
       policies:
       - type: Percent
-        value: 100  # Scale up by max 100% at a time
+        value: 100  # Scale up by maximum 100% at a time
         periodSeconds: 60
       - type: Pods
-        value: 4    # Scale up by max 4 pods at a time
+        value: 4    # Scale up by maximum 4 pods at a time
         periodSeconds: 60
-      selectPolicy: Max  # Use the most aggressive policy for scaling up
+      selectPolicy: Max  # Use the most aggressive policy for rapid scale-up
+
 ---
-# Pod Disruption Budget to ensure availability during scaling
+# Pod Disruption Budget (PDB)
+# Ensures minimum availability during scaling operations and cluster maintenance
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
@@ -55,8 +84,9 @@ metadata:
   namespace: openemr
   labels:
     app: openemr
+    component: disruption-budget
 spec:
-  minAvailable: 1
+  minAvailable: 1   # Always keep at least 1 pod available
   selector:
     matchLabels:
-      app: openemr
+      app: openemr  # Apply to OpenEMR pods

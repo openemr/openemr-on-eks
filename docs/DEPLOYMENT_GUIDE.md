@@ -468,10 +468,11 @@ terraform show -json tfplan | jq '.resource_changes[] | {address: .address, acti
 # Deploy with approval
 terraform apply tfplan
 
-# Monitor deployment (typically 30-40 minutes)
-# EKS cluster: 10-15 minutes
-# Aurora Serverless: 10-15 minutes
-# Other resources: 10 minutes
+# Monitor deployment (typically 60-65 minutes total)
+# Infrastructure (Terraform): ~32 minutes
+#   - EKS cluster: 15-20 minutes
+#   - Aurora Serverless: 10-15 minutes  
+#   - Other resources: 5-7 minutes
 
 # Save outputs for later use
 terraform output -json > ../terraform-outputs.json
@@ -923,7 +924,7 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v75.18.1 (metrics & alerting)
+     - Prometheus v77.11.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v3.5.3 (log aggregation)
      - Jaeger v3.4.1 (distributed tracing)

@@ -1,20 +1,34 @@
 #!/bin/bash
 
 # OpenEMR Deployment Files Default State Restoration Script
-# This script restores all deployment files to their default state for clean git tracking
+# ==========================================================
+# This script restores all deployment files to their default Git HEAD state,
+# removing deployment artifacts, backup files, and generated credentials.
+# It's designed to clean up the repository for fresh deployments or git operations.
+#
+# Key Features:
+# - Restores Kubernetes YAML files to default template state
+# - Removes backup files (.bak) created during deployment
+# - Cleans up generated credentials and temporary files
+# - Provides safety confirmations and backup options
+# - Preserves user configuration files (terraform.tfvars)
+#
+# WARNING: This script will ERASE any structural changes to YAML files.
+# Only use for cleaning up deployment artifacts, NOT during active development.
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical warnings
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+NC='\033[0m'          # Reset color to default
 
-# Get the script's directory and project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+# Path resolution for script portability
+# These variables ensure the script works regardless of the current working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
 
 # Help function
 show_help() {
@@ -59,7 +73,8 @@ show_help() {
     exit 0
 }
 
-# Function to create backup
+# Function to create backup before restoration
+# This function creates a timestamped backup of the k8s directory for safety
 create_backup() {
     local timestamp
     timestamp=$(date +%Y%m%d_%H%M%S)
@@ -68,17 +83,18 @@ create_backup() {
     echo -e "${YELLOW}Creating backup in $backup_dir...${NC}"
     mkdir -p "$backup_dir"
 
-    # Backup k8s directory
+    # Create a complete backup of the k8s directory
     cp -r "$PROJECT_ROOT/k8s" "$backup_dir/"
 
     echo -e "${GREEN}✅ Backup created successfully${NC}"
 }
 
-# Function to restore deployment.yaml to default state
+# Function to restore deployment.yaml to default Git HEAD state
+# This function uses git checkout to restore the file to its original state
 restore_deployment_yaml() {
     echo -e "${YELLOW}Restoring deployment.yaml to default state...${NC}"
 
-    # Try to restore from git
+    # Attempt to restore from git HEAD state
     cd "$PROJECT_ROOT"
     if git checkout HEAD -- k8s/deployment.yaml 2>/dev/null; then
         echo -e "${GREEN}✅ deployment.yaml restored from git${NC}"
@@ -132,28 +148,31 @@ restore_other_yaml_files() {
     done
 }
 
-# Function to clean up backup files
+# Function to clean up backup files created during deployment
+# This function removes all .bak files that were created as safety backups
 cleanup_backup_files() {
     echo -e "${YELLOW}Cleaning up .bak files...${NC}"
 
+    # Remove backup files from k8s and terraform directories
     find "$PROJECT_ROOT/k8s" -name "*.bak" -delete 2>/dev/null || true
     find "$PROJECT_ROOT/terraform" -name "*.bak" -delete 2>/dev/null || true
 
     echo -e "${GREEN}✅ Backup files cleaned up${NC}"
 }
 
-# Function to clean up generated files
+# Function to clean up generated files and credentials
+# This function removes files that were generated during deployment processes
 cleanup_generated_files() {
     echo -e "${YELLOW}Cleaning up generated files...${NC}"
 
-    # Remove credentials files (various patterns)
+    # Remove credential files with various naming patterns
     rm -f "$PROJECT_ROOT/k8s/openemr-credentials.txt"
     rm -f "$PROJECT_ROOT/k8s/openemr-credentials-"*.txt
 
-    # Remove log files
+    # Remove log files generated during deployment
     rm -f "$PROJECT_ROOT/terraform/openemr-all-logs.txt"
 
-    # Remove any temporary files
+    # Remove any temporary files that may have been created
     find "$PROJECT_ROOT/k8s" -name "*.tmp" -delete 2>/dev/null || true
     find "$PROJECT_ROOT/terraform" -name "*.tmp" -delete 2>/dev/null || true
 

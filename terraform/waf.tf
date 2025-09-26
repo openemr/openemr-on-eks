@@ -1,15 +1,18 @@
-# AWS WAFv2 for OpenEMR (REGIONAL) + S3 Logging
+# AWS WAFv2 Configuration for OpenEMR
+# This file defines the Web Application Firewall (WAF) configuration for protecting
+# the OpenEMR application against common web exploits and attacks. The WAF is
+# configured as a regional resource and can be toggled on/off via the enable_waf variable.
 
-# toggle with var.enable_waf (bool) and set var.cluster_name (string)
-
-# Unique suffix for resource names
+# Unique suffix for WAF resource names to ensure global uniqueness
 resource "random_id" "waf_logs" {
   byte_length = 4
 }
 
 # -----------------------------
-# Regex Pattern Set (UA filter)
+# Regex Pattern Set (User-Agent Filter)
 # -----------------------------
+# This regex pattern set defines suspicious user-agent strings that should be blocked
+# to protect against automated attacks, scrapers, and bots.
 resource "aws_wafv2_regex_pattern_set" "ua_suspicious" {
   count = var.enable_waf ? 1 : 0
 
@@ -32,7 +35,9 @@ resource "aws_wafv2_regex_pattern_set" "ua_suspicious" {
   tags = local.common_tags
 }
 
-# Web ACL
+# Web ACL (Web Access Control List)
+# This is the main WAF configuration that defines rules for protecting the OpenEMR application.
+# It includes AWS managed rule sets and custom rules for comprehensive protection.
 resource "aws_wafv2_web_acl" "openemr" {
   count = var.enable_waf ? 1 : 0
 
@@ -41,6 +46,7 @@ resource "aws_wafv2_web_acl" "openemr" {
   scope       = "REGIONAL"
 
   # Rule 1: AWS Managed Rules - Core Rule Set
+  # This rule provides protection against common web exploits including OWASP Top 10 threats
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
@@ -63,7 +69,8 @@ resource "aws_wafv2_web_acl" "openemr" {
     }
   }
 
-  # Rule 2: AWS Managed Rules - SQL Injection
+  # Rule 2: AWS Managed Rules - SQL Injection Protection
+  # This rule specifically protects against SQL injection attacks targeting the database
   rule {
     name     = "AWSManagedRulesSQLiRuleSet"
     priority = 2
@@ -87,6 +94,7 @@ resource "aws_wafv2_web_acl" "openemr" {
   }
 
   # Rule 3: AWS Managed Rules - Known Bad Inputs
+  # This rule blocks requests containing known malicious input patterns and payloads
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 3
@@ -110,6 +118,8 @@ resource "aws_wafv2_web_acl" "openemr" {
   }
 
   # Rule 4: Rate Limiting
+  # This rule implements rate limiting to protect against DDoS attacks and abuse
+  # by limiting requests to 2000 per 5-minute window per IP address
   rule {
     name     = "RateLimitRule"
     priority = 4
@@ -133,6 +143,8 @@ resource "aws_wafv2_web_acl" "openemr" {
   }
 
   # Rule 5: Suspicious User-Agent via Regex Pattern Set
+  # This rule blocks requests from suspicious user-agents (bots, scrapers, crawlers, spiders)
+  # to prevent automated attacks and unauthorized data collection
   rule {
     name     = "SuspiciousUserAgentRule"
     priority = 5
@@ -165,10 +177,12 @@ resource "aws_wafv2_web_acl" "openemr" {
     }
   }
 
+  # Default action for requests that don't match any rules
   default_action {
     allow {}
   }
 
+  # Global visibility configuration for the Web ACL
   visibility_config {
     cloudwatch_metrics_enabled = true
     metric_name                = "${var.cluster_name}-waf-acl-metric"
@@ -178,7 +192,9 @@ resource "aws_wafv2_web_acl" "openemr" {
   tags = local.common_tags
 }
 
-# Attach WAF Logging to the Web ACL (S3)
+# WAF Logging Configuration
+# This resource configures logging for the Web ACL to send logs to the S3 bucket
+# for security monitoring, compliance, and troubleshooting purposes.
 resource "aws_wafv2_web_acl_logging_configuration" "openemr" {
   count        = var.enable_waf ? 1 : 0
   resource_arn = aws_wafv2_web_acl.openemr[0].arn

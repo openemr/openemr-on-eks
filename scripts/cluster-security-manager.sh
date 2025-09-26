@@ -1,9 +1,26 @@
 #!/bin/bash
 
+# OpenEMR Cluster Security Manager
+# ================================
+# This script manages public access to the EKS cluster endpoint for secure cluster management.
+# It provides commands to enable/disable public access, check status, and schedule automatic
+# disabling to ensure the cluster remains secure when not actively being managed.
+#
+# Key Features:
+# - Enable public access from current IP for cluster management
+# - Disable public access to restrict cluster to private network only
+# - Check current access configuration and IP status
+# - Schedule automatic disabling after a specified time period
+# - Validate IP changes and provide security recommendations
+#
+# Security Best Practice: Always disable public access when not actively managing the cluster
+# to prevent unauthorized access and maintain security compliance.
+
 set -e
 
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}
-REGION=${AWS_REGION:-"us-west-2"}
+# Configuration variables - can be overridden by environment variables
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}  # EKS cluster name to manage
+REGION=${AWS_REGION:-"us-west-2"}            # AWS region where the cluster is located
 
 show_usage() {
     echo "🔐 OpenEMR Cluster Security Manager"
@@ -22,16 +39,21 @@ show_usage() {
     echo "Security Best Practice: Always disable public access when not managing the cluster"
 }
 
+# Utility function to detect current public IP address
+# Uses multiple services for reliability - AWS CheckIP service as primary, Akamai as fallback
 get_current_ip() {
     curl -s https://checkip.amazonaws.com 2>/dev/null || curl -s https://whatismyip.akamai.com/ 2>/dev/null || echo "Unable to detect IP"
 }
 
+# Utility function to retrieve currently allowed IP CIDRs from EKS cluster configuration
+# Returns the first CIDR from the publicAccessCidrs array, or "None" if no public access is configured
 get_allowed_ips() {
-    # Get the first CIDR from the array, handle empty arrays gracefully
-    # Use a more robust approach to handle the output
+    # Query EKS cluster configuration to get public access CIDRs
+    # Handle various response formats (empty arrays, null values, etc.)
     local cidr=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
       --query 'cluster.resourcesVpcConfig.publicAccessCidrs[0]' --output text 2>/dev/null)
 
+    # Validate the CIDR response and handle edge cases
     if [ -n "$cidr" ] && [ "$cidr" != "None" ] && [ "$cidr" != "null" ]; then
         echo "$cidr"
     else
@@ -39,11 +61,14 @@ get_allowed_ips() {
     fi
 }
 
+# Main command dispatcher - routes to appropriate functionality based on first argument
 case "$1" in
   "enable")
+    # Enable public access command - allows cluster management from current IP
     echo "🔓 Enabling public access for cluster management..."
     CURRENT_IP=$(get_current_ip)
 
+    # Validate IP detection before proceeding
     if [ "$CURRENT_IP" = "Unable to detect IP" ]; then
         echo "❌ Unable to detect your current IP address"
         echo "💡 Please check your internet connection and try again"
@@ -52,6 +77,8 @@ case "$1" in
 
     echo "Your current IP: $CURRENT_IP"
 
+    # Update EKS cluster configuration to enable public access from current IP
+    # This allows kubectl commands to work from the current machine
     aws eks update-cluster-config \
       --region $REGION \
       --name $CLUSTER_NAME \
@@ -63,13 +90,14 @@ case "$1" in
         echo "💡 Run: $0 disable"
         echo "🕐 Or set auto-disable: $0 auto-disable"
 
-        # Poll for cluster update completion with progress
+        # Poll for cluster update completion with progress indicators
+        # EKS cluster updates are asynchronous and can take several minutes
         echo "⏳ Waiting for cluster update to complete..."
         echo "📊 This typically takes 2-3 minutes..."
 
-        # Set timeout and polling interval
-        TIMEOUT_MINUTES=${CLUSTER_UPDATE_TIMEOUT:-5}
-        POLLING_INTERVAL=10  # Check every 10 seconds for faster updates
+        # Configure polling parameters for status monitoring
+        TIMEOUT_MINUTES=${CLUSTER_UPDATE_TIMEOUT:-5}  # Default 5-minute timeout
+        POLLING_INTERVAL=10                           # Check every 10 seconds for responsive updates
         TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
         START_TIME=$(date +%s)
 
@@ -184,7 +212,11 @@ case "$1" in
     ;;
 
   "disable")
+    # Disable public access command - restricts cluster to private network only
     echo "🔒 Disabling public access for enhanced security..."
+    
+    # Update EKS cluster configuration to disable public access
+    # This ensures the cluster is only accessible from within the VPC
     aws eks update-cluster-config \
       --region $REGION \
       --name $CLUSTER_NAME \
@@ -284,7 +316,10 @@ case "$1" in
     ;;
 
   "status")
+    # Status command - displays current cluster endpoint configuration
     echo "📊 Current cluster endpoint configuration:"
+    
+    # Query and display cluster endpoint configuration in table format
     aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
       --query 'cluster.resourcesVpcConfig.{PublicAccess:endpointPublicAccess,PrivateAccess:endpointPrivateAccess,AllowedCIDRs:publicAccessCidrs}' \
       --output table

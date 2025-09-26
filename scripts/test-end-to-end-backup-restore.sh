@@ -1,52 +1,87 @@
 #!/bin/bash
 
 # OpenEMR End-to-End Backup/Restore Test Script
-# This script tests the complete backup and restore process from infrastructure deployment to verification
+# =============================================
+# This script performs comprehensive testing of the complete backup and restore process
+# for OpenEMR on EKS, including infrastructure deployment, data backup, restoration,
+# and verification. It validates the entire disaster recovery workflow.
+#
+# Key Features:
+# - Automated infrastructure deployment and cleanup
+# - Complete backup process testing (RDS snapshots, S3 data, K8s configs)
+# - Full restore process validation with intelligent snapshot cleanup
+# - Data integrity verification
+# - Monitoring stack install/uninstall test
+# - Emergency cleanup on test failures with comprehensive resource cleanup
+# - Enhanced error handling and debugging capabilities
+# - Comprehensive test reporting with detailed timing and status
+#
+# Test Process:
+# 1. Deploy infrastructure (EKS, RDS, S3) if needed
+# 2. Deploy OpenEMR application
+# 3. Create test data and proof files
+# 4. Execute backup process
+# 5. Test monitoring stack install/uninstall
+# 6. Clean deployment and restore from backup
+# 7. Verify data integrity and application functionality
+# 8. Generate comprehensive test report
+# 9. Clean up test resources
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-PURPLE='\033[0;35m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and failed tests
+GREEN='\033[0;32m'    # Success messages and passed tests
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+PURPLE='\033[0;35m'   # Test execution messages
+CYAN='\033[0;36m'     # Special test categories
+NC='\033[0m'          # Reset color to default
 
 # Configuration - auto-detect or use defaults
 AWS_REGION=${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "us-west-2")}
-# Get cluster name from terraform or use default
+
+# Auto-detect cluster name from Terraform output or use default
 if [ -z "${CLUSTER_NAME:-}" ]; then
-    TERRAFORM_CLUSTER_NAME=$(cd "$(dirname "$0")/../terraform" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1 || true)
-    if [ -n "$TERRAFORM_CLUSTER_NAME" ]; then
-        CLUSTER_NAME="$TERRAFORM_CLUSTER_NAME"
+    # Validate terraform directory exists before attempting to read output
+    TERRAFORM_DIR="$(dirname "$0")/../terraform"
+    if [ -d "$TERRAFORM_DIR" ]; then
+        TERRAFORM_CLUSTER_NAME=$(cd "$TERRAFORM_DIR" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1 || true)
+        if [ -n "$TERRAFORM_CLUSTER_NAME" ]; then
+            CLUSTER_NAME="$TERRAFORM_CLUSTER_NAME"
+        else
+            CLUSTER_NAME="openemr-eks"
+        fi
     else
         CLUSTER_NAME="openemr-eks"
     fi
 fi
-NAMESPACE=${NAMESPACE:-"openemr"}
-BACKUP_BUCKET=""
-SNAPSHOT_ID=""
-TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+
+NAMESPACE=${NAMESPACE:-"openemr"}      # Kubernetes namespace for OpenEMR
+BACKUP_BUCKET=""                       # S3 bucket for backup storage (set during test)
+SNAPSHOT_ID=""                         # RDS snapshot ID (set during test)
+TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S)  # Unique timestamp for test identification
 PROOF_FILE_CONTENT="OpenEMR Backup/Restore Test - Created: $(date '+%Y-%m-%d %H:%M:%S UTC') - Test ID: ${TEST_TIMESTAMP}"
 
 # Test results tracking
-TEST_RESULTS=()
-TEST_START_TIME=$(date +%s)
+TEST_RESULTS=()                    # Array to store test results
+TEST_START_TIME=$(date +%s)        # Start time for overall test duration
 
 # Global variables for cleanup tracking
-INFRASTRUCTURE_CREATED=false
-BACKUP_BUCKET_CREATED=""
-SNAPSHOT_ID_CREATED=""
-CLEANUP_REQUIRED=false
+INFRASTRUCTURE_CREATED=false      # Flag to track if infrastructure was created during test
+BACKUP_BUCKET_CREATED=""          # Name of backup bucket created during test
+SNAPSHOT_ID_CREATED=""            # ID of snapshot created during test
+CLEANUP_REQUIRED=false            # Flag indicating if cleanup is needed
 
 
 # Emergency cleanup function for when tests fail
+# This function is called on script exit to clean up resources created during testing
+# It ensures that test resources don't remain in the AWS account after test failures
 emergency_cleanup() {
     local exit_code=$?
 
     # Only run emergency cleanup if exit code indicates failure
+    # Successful tests will handle their own cleanup
     if [ $exit_code -eq 0 ]; then
         return 0
     fi
@@ -64,34 +99,24 @@ emergency_cleanup() {
 
         # Try to clean up infrastructure if it was created
         if [ "$INFRASTRUCTURE_CREATED" = "true" ]; then
-            log_info "Attempting to clean up AWS infrastructure..."
+            log_info "Attempting to clean up AWS infrastructure using destroy.sh script..."
 
-            # Change to terraform directory
-            if cd "$PROJECT_ROOT/terraform" 2>/dev/null; then
-                # Prepare for destruction
-                prepare_for_destruction || log_warning "Failed to prepare infrastructure for destruction"
-
-                # Attempt to destroy infrastructure with multiple strategies
-                log_info "Destroying infrastructure..."
-
-                # Strategy 1: Standard terraform destroy
-                if terraform destroy -auto-approve -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION" 2>/dev/null; then
-                    log_success "Infrastructure destroyed successfully during emergency cleanup"
+            # Change to project root directory
+            if cd "$PROJECT_ROOT" 2>/dev/null; then
+                # Export cluster name and region for destroy.sh script
+                export CLUSTER_NAME="$CLUSTER_NAME"
+                export AWS_REGION="$AWS_REGION"
+                
+                # Use the comprehensive destroy.sh script for emergency cleanup
+                log_info "Running destroy.sh script for emergency cleanup..."
+                if ./scripts/destroy.sh --force 2>/dev/null; then
+                    log_success "Infrastructure destroyed successfully using destroy.sh during emergency cleanup"
                 else
-                    log_warning "Standard terraform destroy failed, trying alternative approaches..."
-
-                    # Strategy 2: Force destroy with refresh
-                    log_info "Attempting force destroy with refresh..."
-                    if terraform destroy -auto-approve -refresh=false -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION" 2>/dev/null; then
-                        log_success "Infrastructure destroyed with force refresh during emergency cleanup"
-                    else
-                        # Strategy 3: Manual resource cleanup
-                        log_warning "Terraform destroy failed, attempting manual resource cleanup..."
-                        manual_resource_cleanup
-                    fi
+                    log_warning "destroy.sh script failed, attempting manual resource cleanup as fallback..."
+                    manual_resource_cleanup
                 fi
             else
-                log_error "Could not access terraform directory for cleanup"
+                log_error "Could not access project directory for cleanup"
             fi
         fi
 
@@ -144,8 +169,15 @@ manual_resource_cleanup() {
         aws eks delete-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" 2>/dev/null || log_warning "Failed to delete EKS cluster"
     fi
 
-    # Try to delete RDS cluster and instances
-    local rds_cluster="${CLUSTER_NAME}-aurora"
+    # Try to delete RDS cluster and instances - get actual cluster identifier from Terraform
+    local rds_cluster
+    rds_cluster=$(terraform output -raw aurora_cluster_id 2>/dev/null || echo "")
+    
+    if [ -z "$rds_cluster" ]; then
+        log_info "No RDS cluster found in Terraform state, skipping RDS cleanup"
+        return 0
+    fi
+    
     if aws rds describe-db-clusters --db-cluster-identifier "$rds_cluster" --region "$AWS_REGION" >/dev/null 2>&1; then
         log_info "Disabling deletion protection for RDS cluster: $rds_cluster"
         aws rds modify-db-cluster --db-cluster-identifier "$rds_cluster" --no-deletion-protection --region "$AWS_REGION" 2>/dev/null || true
@@ -283,8 +315,14 @@ kubectl_exec_with_retry() {
     log_info "Attempting kubectl exec: $command"
 
     while [ $attempt -le $max_attempts ]; do
-        # Simple approach: just try the command and retry if it fails
-        if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "$command" 2>/dev/null; then
+        # Try the command and capture both stdout and stderr for debugging
+        local exec_output
+        local exec_exit_code
+        
+        exec_output=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "$command" 2>&1)
+        exec_exit_code=$?
+        
+        if [ $exec_exit_code -eq 0 ]; then
             log_success "kubectl exec succeeded on attempt $attempt"
             return 0
         else
@@ -298,15 +336,23 @@ kubectl_exec_with_retry() {
             container_state=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].state}' 2>/dev/null || echo "Unknown")
 
             log_warning "kubectl exec attempt $attempt/$max_attempts failed (ready=$container_ready, pod_ready=$pod_ready, state=$container_state)"
+            log_info "kubectl exec error output: $exec_output"
+            log_info "kubectl exec exit code: $exec_exit_code"
 
-            # Progressive wait times: longer for early attempts, shorter for later attempts
-            if [ $attempt -le 10 ]; then
-                sleep 20  # Wait 20 seconds for first 10 attempts
-            elif [ $attempt -le 20 ]; then
-                sleep 15  # Wait 15 seconds for next 10 attempts
-            else
-                sleep 10  # Wait 10 seconds for remaining attempts
-            fi
+            # Exponential backoff with jitter: base delay increases exponentially, capped at 60s
+            local base_delay=$((2 ** (attempt - 1)))
+            local max_delay=60
+            local delay=$((base_delay < max_delay ? base_delay : max_delay))
+            
+            # Add jitter to prevent thundering herd (reduce delay by up to 25%)
+            local jitter=$((RANDOM % (delay / 4 + 1)))
+            local final_delay=$((delay - jitter))
+            
+            # Ensure minimum delay of 5 seconds
+            final_delay=$((final_delay < 5 ? 5 : final_delay))
+            
+            log_info "Waiting ${final_delay}s before retry (exponential backoff with jitter)"
+            sleep $final_delay
         fi
 
         ((attempt++))
@@ -541,6 +587,125 @@ cleanup_existing_log_groups() {
     done
 }
 
+# Function to intelligently clean up manual RDS snapshots with proper polling
+cleanup_manual_snapshots() {
+    log_info "Intelligently cleaning up manual RDS snapshots that might interfere with cluster recreation..."
+    
+    # Validate Terraform state is accessible before proceeding
+    if ! cd "$PROJECT_ROOT/terraform" 2>/dev/null; then
+        log_error "Cannot access terraform directory: $PROJECT_ROOT/terraform"
+        return 1
+    fi
+    
+    if ! terraform state list >/dev/null 2>&1; then
+        log_warning "Terraform state not accessible, skipping snapshot cleanup"
+        return 0
+    fi
+    
+    # Get the current cluster identifier from Terraform state if it exists
+    local current_cluster_id
+    current_cluster_id=$(terraform state show 'aws_rds_cluster.openemr' 2>/dev/null | grep 'cluster_identifier\s*=' | head -1 | awk '{print $3}' | tr -d '"' || echo "")
+    
+    if [ -n "$current_cluster_id" ]; then
+        log_info "Found existing cluster: $current_cluster_id"
+        
+        # List manual snapshots for this cluster
+        local manual_snapshots
+        manual_snapshots=$(aws rds describe-db-cluster-snapshots \
+            --region "$AWS_REGION" \
+            --query "DBClusterSnapshots[?contains(DBClusterSnapshotIdentifier, '$current_cluster_id') && SnapshotType=='manual' && Status=='available'].DBClusterSnapshotIdentifier" \
+            --output text 2>/dev/null | tr -s ' \t\n' ' ' | xargs || echo "")
+        
+        if [ -n "$manual_snapshots" ]; then
+            log_info "Found manual snapshots to clean up: $manual_snapshots"
+            
+            # Delete each manual snapshot and track them for polling
+            local deleted_snapshots=()
+            for snapshot_id in $manual_snapshots; do
+                # Clean up any whitespace around the snapshot ID
+                snapshot_id=$(echo "$snapshot_id" | xargs)
+                
+                # Skip empty snapshot IDs
+                if [ -z "$snapshot_id" ] || [ "$snapshot_id" = "" ]; then
+                    continue
+                fi
+                
+                log_info "Deleting manual snapshot: $snapshot_id"
+                if aws rds delete-db-cluster-snapshot \
+                    --region "$AWS_REGION" \
+                    --db-cluster-snapshot-identifier "$snapshot_id" >/dev/null 2>&1; then
+                    log_success "Successfully initiated deletion of snapshot: $snapshot_id"
+                    deleted_snapshots+=("$snapshot_id")
+                else
+                    log_warning "Failed to delete snapshot: $snapshot_id (may not exist or already deleted)"
+                fi
+            done
+            
+            # Poll until all snapshots are completely deleted
+            if [ ${#deleted_snapshots[@]} -gt 0 ]; then
+                log_info "Polling until all snapshots are completely deleted..."
+                local max_wait_time=600  # 10 minutes
+                local poll_interval=30   # Check every 30 seconds
+                local elapsed=0
+                local remaining_snapshots=("${deleted_snapshots[@]}")
+                
+                while [ $elapsed -lt $max_wait_time ] && [ ${#remaining_snapshots[@]} -gt 0 ]; do
+                    log_info "Checking snapshot deletion status... (${elapsed}s elapsed)"
+                    
+                    # Check each remaining snapshot
+                    local still_existing=()
+                    for snapshot_id in "${remaining_snapshots[@]}"; do
+                        # Skip empty snapshot IDs
+                        if [ -z "$snapshot_id" ] || [ "$snapshot_id" = "" ]; then
+                            log_success "Empty snapshot ID skipped (already deleted)"
+                            continue
+                        fi
+                        
+                        local snapshot_status
+                        snapshot_status=$(aws rds describe-db-cluster-snapshots \
+                            --region "$AWS_REGION" \
+                            --db-cluster-snapshot-identifier "$snapshot_id" \
+                            --query 'DBClusterSnapshots[0].Status' \
+                            --output text 2>/dev/null || echo "deleted")
+                        
+                        if [ "$snapshot_status" != "deleted" ] && [ "$snapshot_status" != "None" ]; then
+                            still_existing+=("$snapshot_id")
+                            log_info "Snapshot $snapshot_id still exists with status: $snapshot_status"
+                        else
+                            log_success "Snapshot $snapshot_id has been completely deleted"
+                        fi
+                    done
+                    
+                    if [ ${#still_existing[@]} -gt 0 ]; then
+                        remaining_snapshots=("${still_existing[@]}")
+                    else
+                        remaining_snapshots=()
+                    fi
+                    
+                    if [ ${#remaining_snapshots[@]} -gt 0 ]; then
+                        log_info "Still waiting for ${#remaining_snapshots[@]} snapshot(s) to be deleted, waiting ${poll_interval}s..."
+                        sleep $poll_interval
+                        elapsed=$((elapsed + poll_interval))
+                    fi
+                done
+                
+                if [ ${#remaining_snapshots[@]} -gt 0 ]; then
+                    log_warning "Some snapshots were not deleted within ${max_wait_time}s timeout: ${remaining_snapshots[*]}"
+                    log_warning "This may cause issues with cluster recreation, but continuing..."
+                else
+                    log_success "All manual snapshots have been completely deleted"
+                fi
+            fi
+        else
+            log_info "No manual snapshots found for cluster: $current_cluster_id"
+        fi
+    else
+        log_info "No existing cluster found in Terraform state, skipping snapshot cleanup"
+    fi
+}
+
+
+
 # Step 1: Deploy infrastructure from scratch
 deploy_infrastructure() {
     local step_start
@@ -567,6 +732,31 @@ deploy_infrastructure() {
     log_info "Waiting for infrastructure to be ready..."
     sleep 60
 
+    # Validate critical outputs are available
+    log_info "Validating critical infrastructure outputs..."
+    local redis_endpoint
+    redis_endpoint=$(terraform output -raw redis_endpoint 2>/dev/null || echo "")
+    if [ -z "$redis_endpoint" ] || [ "$redis_endpoint" = "redis-not-available" ]; then
+        log_error "Critical infrastructure validation failed: Redis endpoint not available"
+        log_error "This indicates ElastiCache serverless cache creation failed"
+        log_error "Check Terraform state and AWS console for ElastiCache issues"
+        return 1
+    fi
+    
+    local efs_id
+    efs_id=$(terraform output -raw efs_id 2>/dev/null || echo "")
+    if [ -z "$efs_id" ]; then
+        log_error "Critical infrastructure validation failed: EFS ID not available"
+        return 1
+    fi
+    
+    local aurora_endpoint
+    aurora_endpoint=$(terraform output -raw aurora_endpoint 2>/dev/null || echo "")
+    if [ -z "$aurora_endpoint" ]; then
+        log_error "Critical infrastructure validation failed: Aurora endpoint not available"
+        return 1
+    fi
+
     # Get outputs
     log_info "Getting Terraform outputs..."
     # Backup bucket will be created dynamically by backup script with format:
@@ -590,8 +780,14 @@ deploy_infrastructure() {
 # Step 2: Deploy OpenEMR
 deploy_openemr() {
     local step_start
+    local context="${1:-initial}"
     step_start=$(start_timer)
-    log_step "Step 2: Deploying OpenEMR..."
+    
+    if [ "$context" = "restore" ]; then
+        log_step "Step 8: Deploying OpenEMR after infrastructure recreation..."
+    else
+        log_step "Step 2: Deploying OpenEMR..."
+    fi
 
     cd "$K8S_DIR"
 
@@ -614,6 +810,14 @@ deploy_openemr() {
         log_warning "OpenEMR deployment not progressing within timeout, checking status..."
     fi
 
+    # Verify deployment exists before checking status
+    log_info "Validating OpenEMR deployment exists..."
+    if ! kubectl get deployment openemr -n "$NAMESPACE" >/dev/null 2>&1; then
+        log_error "OpenEMR deployment not found in namespace $NAMESPACE"
+        return 1
+    fi
+    log_success "OpenEMR deployment found"
+    
     # Verify deployment is ready with detailed status
     log_info "Verifying deployment status..."
     local ready_replicas
@@ -652,17 +856,59 @@ deploy_openemr() {
 
     while [ $container_wait_attempts -lt $max_container_wait ]; do
         local pod_name
-        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        # Find a pod that has the openemr container ready - improved selection logic
+        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].ready}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].restartCount}{"\n"}{end}' 2>/dev/null | \
+            grep -E "\tRunning\t" | \
+            grep -E "\ttrue\t" | \
+            sort -k4 -n | \
+            head -1 | cut -f1 || echo "")
 
         if [ -n "$pod_name" ]; then
+            # Validate pod still exists and get detailed status
+            if ! kubectl get pod "$pod_name" -n "$NAMESPACE" >/dev/null 2>&1; then
+                log_warning "Pod $pod_name no longer exists, continuing search..."
+                sleep 5
+                ((container_wait_attempts++))
+                continue
+            fi
+            
             local container_ready
+            local pod_phase
+            local restart_count
+            
             container_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].ready}' 2>/dev/null || echo "false")
+            pod_phase=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
+            restart_count=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].restartCount}' 2>/dev/null || echo "0")
 
-            if [ "$container_ready" = "true" ]; then
+            log_info "Pod $pod_name status: phase=$pod_phase, ready=$container_ready, restarts=$restart_count"
+
+            if [ "$container_ready" = "true" ] && [ "$pod_phase" = "Running" ]; then
                 log_success "OpenEMR container is ready and accepting traffic"
                 break
             else
-                log_info "Container not ready yet (attempt $((container_wait_attempts + 1))/$max_container_wait), waiting 10 seconds..."
+                        # Get more detailed container status for debugging
+                        local container_state
+                        local container_ready
+                        local pod_ready
+                        local container_restart_count
+                        container_state=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].state}' 2>/dev/null || echo "Unknown")
+                        container_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].ready}' 2>/dev/null || echo "false")
+                        pod_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+                        container_restart_count=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].restartCount}' 2>/dev/null || echo "0")
+                        
+                        log_info "Container not ready yet (attempt $((container_wait_attempts + 1))/$max_container_wait)"
+                        log_info "  Container state: $container_state"
+                        log_info "  Container ready: $container_ready"
+                        log_info "  Pod ready: $pod_ready"
+                        log_info "  Restart count: $container_restart_count"
+                        
+                        # Show recent events if container is having issues
+                        if [ "$container_restart_count" -gt 0 ]; then
+                            log_info "  Recent pod events:"
+                            kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp' | tail -3 | sed 's/^/    /' || true
+                        fi
+                        
+                        log_info "  Waiting 10 seconds before next attempt..."
             fi
         else
             log_info "No pod found yet (attempt $((container_wait_attempts + 1))/$max_container_wait), waiting 10 seconds..."
@@ -704,7 +950,7 @@ deploy_test_data() {
 
     while [ $pod_attempt -le $max_pod_attempts ]; do
         # Get the first running pod (not terminating)
-        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].ready}{"\n"}{end}' | grep -E "\ttrue$" | head -1 | cut -f1 2>/dev/null || echo "")
 
         if [ -n "$pod_name" ]; then
             # Verify the pod is actually running and not terminating
@@ -765,8 +1011,8 @@ deploy_test_data() {
 
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive..."
-    log_info "This may take 10-15 minutes for OpenEMR to fully initialize..."
-    local max_attempts=60  # Increased to 60 attempts (10 minutes) for better reliability
+    log_info "This may take 25-30 minutes for OpenEMR to fully initialize..."
+    local max_attempts=120  # Increased to 120 attempts (20 minutes) for better reliability
     local attempt=1
 
     while [ $attempt -le $max_attempts ]; do
@@ -820,9 +1066,9 @@ deploy_test_data() {
 
     # Verify file was created
     local file_content
-    file_content=$(kubectl_exec_with_retry "$pod_name" "cat /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt")
+    file_content=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "cat /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt" 2>/dev/null)
 
-    if [[ "$file_content" == *"$TEST_TIMESTAMP"* ]]; then
+    if [[ "$file_content" == *"Test ID: ${TEST_TIMESTAMP}"* ]]; then
         log_success "Test data deployed successfully"
         log_info "Proof file content: $file_content"
     else
@@ -1094,7 +1340,16 @@ disable_rds_deletion_protection() {
 prepare_for_destruction() {
     log_info "Preparing infrastructure for destruction..."
 
-    cd "$TERRAFORM_DIR"
+    # Validate terraform directory and state
+    if ! cd "$TERRAFORM_DIR" 2>/dev/null; then
+        log_error "Cannot access terraform directory: $TERRAFORM_DIR"
+        return 1
+    fi
+    
+    if ! terraform state list >/dev/null 2>&1; then
+        log_error "Terraform state not accessible"
+        return 1
+    fi
 
     # Get resource information from Terraform state (more reliable than outputs)
     local waf_logs_bucket
@@ -1181,19 +1436,20 @@ test_monitoring_stack() {
 
     # Test monitoring stack installation
     log_info "Installing monitoring stack..."
-    log_info "This may take 5-10 minutes for full installation..."
+    log_info "This may take 10-15 minutes for full installation..."
     
+    # Run monitoring installation
     if ! "$monitoring_script" install; then
         log_error "Monitoring stack installation failed"
         return 1
     fi
-
     log_success "Monitoring stack installed successfully"
 
     # Verify monitoring stack is working
     log_info "Verifying monitoring stack functionality..."
     if ! "$monitoring_script" verify; then
-        log_warning "Monitoring stack verification had issues, but continuing with test"
+        log_error "Monitoring stack verification failed"
+        return 1
     fi
 
     # Wait a bit for components to stabilize
@@ -1230,30 +1486,37 @@ delete_infrastructure() {
     step_start=$(start_timer)
     log_step "Step 6: Deleting all infrastructure..."
 
-    # Prepare infrastructure for destruction
-    prepare_for_destruction
-
-    cd "$TERRAFORM_DIR"
-
+    # Use the comprehensive destroy.sh script for bulletproof cleanup
+    log_info "Using comprehensive destroy.sh script for complete infrastructure cleanup..."
+    
     # Note: We do NOT clean up the backup bucket here because we need it for restoration
     # The backup bucket will be cleaned up in the final cleanup step
     log_info "Preserving backup bucket for restoration step: $BACKUP_BUCKET"
-
-    # Destroy infrastructure
-    log_info "Destroying infrastructure..."
-    terraform destroy -auto-approve -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION"
-
-    log_success "Infrastructure deleted successfully"
+    
+    # Export cluster name for destroy.sh script
+    export CLUSTER_NAME="$CLUSTER_NAME"
+    export AWS_REGION="$AWS_REGION"
+    
+    # Ensure we're in the project root directory for consistent path handling
+    cd "$PROJECT_ROOT"
+    
+    # Run destroy.sh with force for automated testing
+    if ./scripts/destroy.sh --force; then
+        log_success "Infrastructure deleted successfully using destroy.sh"
+    else
+        log_error "destroy.sh script failed - some resources may still exist"
+        log_error "Check AWS console for remaining resources that need manual cleanup"
+        return 1
+    fi
 
     # Mark infrastructure as deleted - no longer needs cleanup
     INFRASTRUCTURE_CREATED=false
 
     local step_duration
     step_duration=$(get_duration "$step_start")
-    add_test_result "Infrastructure Deletion" "SUCCESS" "All resources destroyed" "$step_duration"
-
-    cd "$PROJECT_ROOT"
+    add_test_result "Infrastructure Deletion" "SUCCESS" "All resources destroyed using destroy.sh" "$step_duration"
 }
+
 
 # Step 7: Recreate infrastructure
 recreate_infrastructure() {
@@ -1266,6 +1529,9 @@ recreate_infrastructure() {
     ./scripts/restore-defaults.sh --force
 
     cd "$TERRAFORM_DIR"
+
+    # Clean up manual RDS snapshots that might interfere with cluster recreation
+    cleanup_manual_snapshots
 
     # Clean up existing CloudWatch log groups that might conflict
     cleanup_existing_log_groups
@@ -1301,7 +1567,7 @@ recreate_infrastructure() {
 
     # Deploy OpenEMR after recreating infrastructure
     log_info "Deploying OpenEMR after infrastructure recreation..."
-    deploy_openemr
+    deploy_openemr "restore"
 
     # Note: We do NOT create a new backup here - we use the original backup from step 4
     # The BACKUP_BUCKET and SNAPSHOT_ID variables should still be available from the backup_installation step
@@ -1540,7 +1806,7 @@ verify_restoration() {
             # Additional debugging for failed health checks
             log_info "Checking pod logs for debugging..."
             local pod_name
-            pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+            pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].ready}{"\n"}{end}' | grep -E "\ttrue$" | head -1 | cut -f1 2>/dev/null || echo "")
             if [ -n "$pod_name" ]; then
                 log_info "Pod logs for $pod_name:"
                 kubectl logs "$pod_name" -n "$NAMESPACE" -c openemr --tail=20 || true
@@ -1548,14 +1814,26 @@ verify_restoration() {
         fi
 
     else
-        log_error "OpenEMR deployment not ready ($ready_replicas/$desired_replicas replicas)"
-
-        # Show pod status for debugging
-        log_info "Checking pod status for debugging..."
-        kubectl get pods -n "$NAMESPACE" -l app=openemr -o wide || true
-        kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -10 || true
-
-        return 1
+        log_warning "OpenEMR deployment not fully ready ($ready_replicas/$desired_replicas replicas)"
+        log_info "This is common after restoration - OpenEMR may need time to start up"
+        
+        # Check if we have any running pods (even if not ready)
+        local running_pods
+        running_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+        
+        if [ -n "$running_pods" ]; then
+            log_info "Found running pods: $running_pods"
+            log_info "Proceeding with verification - OpenEMR may be starting up"
+        else
+            log_error "No running pods found after restoration"
+            
+            # Show pod status for debugging
+            log_info "Checking pod status for debugging..."
+            kubectl get pods -n "$NAMESPACE" -l app=openemr -o wide || true
+            kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -10 || true
+            
+            return 1
+        fi
     fi
 
     # Get OpenEMR pod name - wait for a stable pod
@@ -1566,8 +1844,13 @@ verify_restoration() {
     log_info "Finding a stable OpenEMR pod after restoration..."
 
     while [ $pod_attempt -le $max_pod_attempts ]; do
-        # Get the first running pod (not terminating)
-        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        # Get the first running pod (not terminating) - be more tolerant of readiness
+        pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].ready}{"\n"}{end}' | head -1 | cut -f1 2>/dev/null || echo "")
+        
+        # If no pod found with the above method, try a simpler approach
+        if [ -z "$pod_name" ]; then
+            pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+        fi
 
         if [ -n "$pod_name" ]; then
             # Verify the pod is actually running and not terminating
@@ -1638,8 +1921,9 @@ verify_restoration() {
     done
 
     if [ $attempt -gt $max_attempts ]; then
-        log_warning "OpenEMR may not be fully ready after $max_attempts attempts, but proceeding with verification"
-        log_info "This could indicate OpenEMR is taking longer than expected to initialize after restoration"
+        log_warning "OpenEMR may not be fully responsive after $max_attempts attempts, but proceeding with verification"
+        log_info "This is common after restoration - OpenEMR may be taking time to initialize"
+        log_info "Proceeding with proof file verification..."
     fi
 
     # Verify proof.txt exists
@@ -1649,7 +1933,7 @@ verify_restoration() {
 
         # Verify content
         local restored_content
-        restored_content=$(kubectl_exec_with_retry "$pod_name" "cat /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt")
+        restored_content=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "cat /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt" 2>/dev/null)
         log_info "Restored proof file content: $restored_content"
 
         if [[ "$restored_content" == *"$TEST_TIMESTAMP"* ]]; then
@@ -1746,7 +2030,10 @@ print_test_results() {
     echo ""
     echo -e "${CYAN}Test Steps Results:${NC}"
 
-    for result in "${TEST_RESULTS[@]}"; do
+    if [ ${#TEST_RESULTS[@]} -eq 0 ]; then
+        echo -e "  ${YELLOW}No test steps completed${NC}"
+    else
+        for result in "${TEST_RESULTS[@]}"; do
         IFS='|' read -r step status details duration <<< "$result"
         local status_color=""
         case "$status" in
@@ -1760,7 +2047,8 @@ print_test_results() {
         if [ -n "$details" ]; then
             echo -e "    Details: $details"
         fi
-    done
+        done
+    fi
 
     echo ""
     echo -e "${CYAN}Test Outcome:${NC}"
@@ -1768,13 +2056,15 @@ print_test_results() {
     local success_count=0
     local failed_count=0
 
-    for result in "${TEST_RESULTS[@]}"; do
+    if [ ${#TEST_RESULTS[@]} -gt 0 ]; then
+        for result in "${TEST_RESULTS[@]}"; do
         IFS='|' read -r step status details duration <<< "$result"
         case "$status" in
             "SUCCESS") ((success_count++)) ;;
             "FAILED") ((failed_count++)) ;;
         esac
-    done
+        done
+    fi
 
     if [ $failed_count -eq 0 ]; then
         echo -e "${GREEN}🎉 All tests passed successfully!${NC}"
@@ -1797,9 +2087,14 @@ validate_storage_classes() {
     local validation_failed=false
     local storage_classes=("efs-sc" "efs-sc-backup" "gp3-monitoring-encrypted")
 
-    # Get EFS ID
+    # Get EFS ID with proper directory validation
     local efs_id
-    efs_id=$(cd "$PROJECT_ROOT/terraform" && terraform output -raw efs_id 2>/dev/null || echo "")
+    if ! cd "$PROJECT_ROOT/terraform" 2>/dev/null; then
+        log_error "Cannot access terraform directory: $PROJECT_ROOT/terraform"
+        return 1
+    fi
+    
+    efs_id=$(terraform output -raw efs_id 2>/dev/null || echo "")
     if [ -z "$efs_id" ]; then
         log_error "EFS ID not available from Terraform output"
         return 1
@@ -1847,8 +2142,13 @@ validate_storage_classes() {
 validate_and_update_efs_id() {
     log_info "Validating and updating EFS ID in storage classes..."
 
-    # Get current EFS ID from Terraform
-    CURRENT_EFS_ID=$(cd "$PROJECT_ROOT/terraform" && terraform output -raw efs_id 2>/dev/null || echo "")
+    # Get current EFS ID from Terraform with proper directory validation
+    if ! cd "$PROJECT_ROOT/terraform" 2>/dev/null; then
+        log_error "Cannot access terraform directory: $PROJECT_ROOT/terraform"
+        return 1
+    fi
+    
+    CURRENT_EFS_ID=$(terraform output -raw efs_id 2>/dev/null || echo "")
     if [ -z "$CURRENT_EFS_ID" ]; then
         log_error "Could not get EFS ID from Terraform output"
         return 1

@@ -1,34 +1,87 @@
 #!/bin/bash
 
-# OpenEMR Backup Script
-# Simple, reliable, comprehensive backup for OpenEMR data protection
+# OpenEMR EKS Backup Script
+# Comprehensive backup solution for OpenEMR on Amazon EKS
+#
+# This script performs a complete backup of an OpenEMR deployment running on Amazon EKS,
+# including database snapshots, Kubernetes configurations, secrets, and application data.
+# It creates both machine-readable metadata and human-readable reports for disaster recovery.
+#
+# Key Features:
+# - RDS Aurora cluster snapshot creation with availability verification
+# - Kubernetes namespace export (deployments, services, secrets, configmaps, PVCs, PVs)
+# - Application data backup from EFS volumes
+# - S3 backup bucket creation with versioning and encryption
+# - Comprehensive metadata generation for restore operations
+# - Human-readable backup reports with verification steps
+# - Error handling and rollback capabilities
+#
+# Prerequisites:
+# - AWS CLI configured with appropriate permissions
+# - kubectl configured to access the EKS cluster
+# - Terraform state available for infrastructure discovery
+# - Sufficient AWS permissions for RDS, S3, and EFS operations
+#
+# Usage:
+#   ./backup.sh [OPTIONS]
+#
+# Options:
+#   --cluster-name NAME     EKS cluster name (default: openemr-eks)
+#   --source-region REGION  AWS region where resources are located (default: us-west-2)
+#   --backup-region REGION  AWS region for backup storage (default: us-west-2)
+#   --namespace NAMESPACE   Kubernetes namespace (default: openemr)
+#   --help                  Show this help message
+#
+# Environment Variables:
+#   CLUSTER_NAME            EKS cluster name
+#   AWS_REGION              AWS region for source resources
+#   BACKUP_REGION           AWS region for backup storage
+#   NAMESPACE               Kubernetes namespace
+#   CLUSTER_AVAILABILITY_TIMEOUT  Timeout for RDS cluster availability (default: 1800s = 30m)
+#   SNAPSHOT_AVAILABILITY_TIMEOUT Timeout for RDS snapshot availability (default: 1800s = 30m)
+#   POLLING_INTERVAL              Polling interval in seconds (default: 30s)
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual feedback during backup operations
+# These colors help distinguish between different types of messages (info, success, warnings, errors)
+RED='\033[0;31m'      # Error messages and critical failures
+GREEN='\033[0;32m'    # Success messages and completed operations
+YELLOW='\033[1;33m'   # Warning messages and non-critical issues
+BLUE='\033[0;34m'     # Information messages and progress updates
+NC='\033[0m'          # No Color - reset to default terminal color
 
-# Configuration
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}
-AWS_REGION=${AWS_REGION:-"us-west-2"}
-BACKUP_REGION=${BACKUP_REGION:-"$AWS_REGION"}
-NAMESPACE=${NAMESPACE:-"openemr"}
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-BACKUP_ID="openemr-backup-${TIMESTAMP}"
+# Configuration variables with defaults
+# These can be overridden via command-line arguments or environment variables
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}           # EKS cluster name for resource discovery
+AWS_REGION=${AWS_REGION:-"us-west-2"}                 # AWS region where OpenEMR resources are deployed
+BACKUP_REGION=${BACKUP_REGION:-"$AWS_REGION"}         # AWS region where backup data will be stored (defaults to source region)
+NAMESPACE=${NAMESPACE:-"openemr"}                     # Kubernetes namespace containing OpenEMR resources
 
-# Polling configuration (in seconds)
-CLUSTER_AVAILABILITY_TIMEOUT=${CLUSTER_AVAILABILITY_TIMEOUT:-1800}  # 30 minutes default
-SNAPSHOT_AVAILABILITY_TIMEOUT=${SNAPSHOT_AVAILABILITY_TIMEOUT:-1800}  # 30 minutes default
-POLLING_INTERVAL=${POLLING_INTERVAL:-30}  # 30 seconds default
+# Enhanced backup configuration for new RDS cross-Region/cross-account capabilities
+BACKUP_STRATEGY=${BACKUP_STRATEGY:-"same-region"}    # Backup strategy: same-region, cross-region, cross-account
+TARGET_ACCOUNT_ID=${TARGET_ACCOUNT_ID:-""}           # Target AWS account ID for cross-account backups (optional)
+KMS_KEY_ID=${KMS_KEY_ID:-""}                         # KMS key ID for encrypted snapshots (optional, uses default if empty)
+COPY_TAGS=${COPY_TAGS:-"true"}                       # Whether to copy tags to backup snapshots
 
-# Help function
+# Backup identification and organization
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)                     # Timestamp for backup identification and organization
+BACKUP_ID="openemr-backup-${TIMESTAMP}"              # Unique identifier for this backup operation
+
+# Polling configuration for AWS resource availability checks
+# These timeouts prevent the script from hanging indefinitely while waiting for AWS resources
+CLUSTER_AVAILABILITY_TIMEOUT=${CLUSTER_AVAILABILITY_TIMEOUT:-1800}    # 30 minutes - max wait for RDS cluster to be available
+SNAPSHOT_AVAILABILITY_TIMEOUT=${SNAPSHOT_AVAILABILITY_TIMEOUT:-1800}  # 30 minutes - max wait for snapshot to be available
+POLLING_INTERVAL=${POLLING_INTERVAL:-30}                              # 30 seconds - interval between availability checks
+
+# Help function - displays comprehensive usage information and examples
+# This function provides users with clear guidance on how to use the backup script
+# including available options, environment variables, and what gets backed up
 show_help() {
-    echo "OpenEMR Backup Script"
-    echo "====================="
+    echo "OpenEMR EKS Backup Script"
+    echo "=========================="
+    echo ""
+    echo "Comprehensive backup solution for OpenEMR on Amazon EKS"
     echo ""
     echo "Usage: $0 [OPTIONS]"
     echo ""
@@ -37,6 +90,10 @@ show_help() {
     echo "  --source-region REGION  Source AWS region (default: us-west-2)"
     echo "  --backup-region REGION  Backup AWS region (default: same as source)"
     echo "  --namespace NAMESPACE   Kubernetes namespace (default: openemr)"
+    echo "  --strategy STRATEGY     Backup strategy: same-region, cross-region, cross-account (default: same-region)"
+    echo "  --target-account ID     Target AWS account ID for cross-account backups"
+    echo "  --kms-key-id KEY        KMS key ID for encrypted snapshots (optional)"
+    echo "  --no-copy-tags          Don't copy tags to backup snapshots"
     echo "  --help                  Show this help message"
     echo ""
     echo "Environment Variables for Timeouts:"
@@ -45,35 +102,77 @@ show_help() {
     echo "  POLLING_INTERVAL              Polling interval in seconds (default: 30s)"
     echo ""
     echo "What Gets Backed Up:"
-    echo "  ✅ RDS Aurora cluster snapshots"
-    echo "  ✅ Kubernetes configurations and secrets"
-    echo "  ✅ Application data from EFS volumes"
-    echo "  ✅ Backup metadata and restore instructions"
+    echo "  ✅ RDS Aurora cluster snapshots (database state)"
+    echo "  ✅ Kubernetes configurations and secrets (deployment state)"
+    echo "  ✅ Application data from EFS volumes (file system state)"
+    echo "  ✅ Backup metadata and restore instructions (recovery guidance)"
     echo ""
-    echo "Example:"
-    echo "  $0 --backup-region us-east-1"
+    echo "Backup Strategies:"
+    echo "  📍 same-region     - Backup in same region (fastest, lowest cost)"
+    echo "  🌍 cross-region    - Backup to different region (disaster recovery)"
+    echo "  🏢 cross-account   - Backup to different AWS account (compliance/sharing)"
     echo ""
+    echo "Backup Process:"
+    echo "  1. Validate prerequisites and AWS connectivity"
+    echo "  2. Create S3 backup bucket with encryption and versioning"
+    echo "  3. Create RDS Aurora cluster snapshot"
+    echo "  4. Copy snapshot using new RDS cross-Region/cross-account capabilities"
+    echo "  5. Export Kubernetes namespace resources"
+    echo "  6. Backup application data from EFS volumes"
+    echo "  7. Generate comprehensive metadata and reports"
+    echo ""
+    echo "Examples:"
+    echo "  # Same region backup (default)"
+    echo "  $0 --strategy same-region"
+    echo ""
+    echo "  # Cross-region disaster recovery"
+    echo "  $0 --strategy cross-region --backup-region us-east-1"
+    echo ""
+    echo "  # Cross-account backup for compliance"
+    echo "  $0 --strategy cross-account --target-account 123456789012 --backup-region us-east-1"
+    echo ""
+    echo "⚠️  WARNING: This script will create AWS resources (S3 buckets, RDS snapshots)"
+    echo "   Ensure you have proper AWS credentials and permissions."
+    echo "   Backup costs will be incurred for S3 storage and RDS snapshot storage."
     exit 0
 }
 
 # Parse command line arguments
+# This section processes command-line options and overrides default configuration values
+# Each option updates the corresponding configuration variable for the backup operation
 while [[ $# -gt 0 ]]; do
     case $1 in
         --cluster-name)
-            CLUSTER_NAME="$2"
+            CLUSTER_NAME="$2"      # Override default EKS cluster name
             shift 2
             ;;
         --source-region)
-            AWS_REGION="$2"
+            AWS_REGION="$2"        # Override default AWS region for source resources
             shift 2
             ;;
         --backup-region)
-            BACKUP_REGION="$2"
+            BACKUP_REGION="$2"     # Override default AWS region for backup storage
             shift 2
             ;;
         --namespace)
-            NAMESPACE="$2"
+            NAMESPACE="$2"         # Override default Kubernetes namespace
             shift 2
+            ;;
+        --strategy)
+            BACKUP_STRATEGY="$2"   # Set backup strategy (same-region, cross-region, cross-account)
+            shift 2
+            ;;
+        --target-account)
+            TARGET_ACCOUNT_ID="$2" # Set target AWS account ID for cross-account backups
+            shift 2
+            ;;
+        --kms-key-id)
+            KMS_KEY_ID="$2"        # Set KMS key ID for encrypted snapshots
+            shift 2
+            ;;
+        --no-copy-tags)
+            COPY_TAGS="false"      # Disable tag copying to backup snapshots
+            shift
             ;;
         --help)
             show_help
@@ -86,36 +185,53 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Logging functions
+# Logging functions - provide consistent, color-coded output for different message types
+# These functions ensure all backup operations have clear, timestamped feedback
+# Each function uses appropriate colors and emojis for visual distinction
+
 log_info() {
+    # Display informational messages in blue with info emoji
+    # Used for progress updates, status information, and general feedback
     echo -e "${BLUE}[$(date '+%H:%M:%S')] ℹ️  $1${NC}"
 }
 
 log_success() {
+    # Display success messages in green with checkmark emoji
+    # Used when operations complete successfully or milestones are reached
     echo -e "${GREEN}[$(date '+%H:%M:%S')] ✅ $1${NC}"
 }
 
 log_warning() {
+    # Display warning messages in yellow with warning emoji
+    # Used for non-critical issues that don't stop the backup process
     echo -e "${YELLOW}[$(date '+%H:%M:%S')] ⚠️  $1${NC}"
 }
 
 log_error() {
+    # Display error messages in red with X emoji and exit the script
+    # Used for critical failures that prevent backup completion
     echo -e "${RED}[$(date '+%H:%M:%S')] ❌ $1${NC}"
     exit 1
 }
 
-# Polling functions
+# Polling functions - wait for AWS resources to reach desired states
+# These functions prevent the script from proceeding before resources are ready
+# They provide progress feedback and handle timeouts gracefully
+
 wait_for_cluster_availability() {
-    local cluster_id=$1
-    local region=$2
-    local timeout=$3
+    # Wait for an RDS Aurora cluster to become available before proceeding
+    # This ensures the cluster is in a stable state before creating snapshots
+    local cluster_id=$1      # RDS cluster identifier to monitor
+    local region=$2          # AWS region where the cluster is located
+    local timeout=$3         # Maximum time to wait in seconds
     local start_time
-    start_time=$(date +%s)
+    start_time=$(date +%s)   # Record start time for timeout calculation
     local elapsed=0
 
     log_info "Waiting for RDS cluster '$cluster_id' to be available in $region..."
 
     while [ $elapsed -lt "$timeout" ]; do
+        # Query the current status of the RDS cluster
         local status
         status=$(aws rds describe-db-clusters \
             --db-cluster-identifier "$cluster_id" \
@@ -123,19 +239,23 @@ wait_for_cluster_availability() {
             --query 'DBClusters[0].Status' \
             --output text 2>/dev/null || echo "unknown")
 
+        # Check if cluster is available (ready for snapshot operations)
         if [ "$status" = "available" ]; then
             log_success "RDS cluster '$cluster_id' is now available"
             return 0
         fi
 
+        # Calculate elapsed time and remaining timeout
         elapsed=$(($(date +%s) - start_time))
         local remaining=$((timeout - elapsed))
 
+        # Check for timeout condition
         if [ $elapsed -ge "$timeout" ]; then
             log_warning "Timeout waiting for cluster availability after ${timeout}s"
             return 1
         fi
 
+        # Provide progress feedback and wait before next check
         log_info "Cluster status: $status (${remaining}s remaining)"
         sleep "$POLLING_INTERVAL"
     done
@@ -144,16 +264,19 @@ wait_for_cluster_availability() {
 }
 
 wait_for_snapshot_availability() {
-    local snapshot_id=$1
-    local region=$2
-    local timeout=$3
+    # Wait for an RDS Aurora cluster snapshot to become available
+    # This ensures the snapshot is complete and ready for restore operations
+    local snapshot_id=$1     # RDS cluster snapshot identifier to monitor
+    local region=$2          # AWS region where the snapshot is located
+    local timeout=$3         # Maximum time to wait in seconds
     local start_time
-    start_time=$(date +%s)
+    start_time=$(date +%s)   # Record start time for timeout calculation
     local elapsed=0
 
     log_info "Waiting for RDS snapshot '$snapshot_id' to be available in $region..."
 
     while [ $elapsed -lt "$timeout" ]; do
+        # Query the current status of the RDS cluster snapshot
         local status
         status=$(aws rds describe-db-cluster-snapshots \
             --db-cluster-snapshot-identifier "$snapshot_id" \
@@ -161,14 +284,17 @@ wait_for_snapshot_availability() {
             --query 'DBClusterSnapshots[0].Status' \
             --output text 2>/dev/null || echo "unknown")
 
+        # Check if snapshot is available (ready for restore operations)
         if [ "$status" = "available" ]; then
             log_success "RDS snapshot '$snapshot_id' is now available"
             return 0
         fi
 
+        # Calculate elapsed time and remaining timeout
         elapsed=$(($(date +%s) - start_time))
         local remaining=$((timeout - elapsed))
 
+        # Check for timeout condition
         if [ $elapsed -ge "$timeout" ]; then
             log_warning "Timeout waiting for snapshot availability after ${timeout}s"
             return 1
@@ -221,6 +347,54 @@ check_dependencies() {
     fi
 }
 
+# Function to validate backup strategy configuration
+# This function ensures the backup strategy is properly configured and validates required parameters
+validate_backup_strategy() {
+    log_info "Validating backup strategy: $BACKUP_STRATEGY"
+    
+    case "$BACKUP_STRATEGY" in
+        "same-region")
+            # Same region backup - no additional validation needed
+            log_info "Using same-region backup strategy"
+            ;;
+        "cross-region")
+            # Cross-region backup - validate regions are different
+            if [ "$AWS_REGION" = "$BACKUP_REGION" ]; then
+                log_error "Cross-region backup requires different source and backup regions"
+                log_info "Current: source=$AWS_REGION, backup=$BACKUP_REGION"
+                exit 1
+            fi
+            log_info "Using cross-region backup strategy: $AWS_REGION -> $BACKUP_REGION"
+            ;;
+        "cross-account")
+            # Cross-account backup - validate target account ID and regions
+            if [ -z "$TARGET_ACCOUNT_ID" ]; then
+                log_error "Cross-account backup requires --target-account parameter"
+                exit 1
+            fi
+            
+            # Validate account ID format (12 digits)
+            if ! [[ "$TARGET_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
+                log_error "Invalid AWS account ID format: $TARGET_ACCOUNT_ID (must be 12 digits)"
+                exit 1
+            fi
+            
+            if [ "$AWS_REGION" = "$BACKUP_REGION" ]; then
+                log_warning "Cross-account backup with same region - consider using different region for better disaster recovery"
+            fi
+            
+            log_info "Using cross-account backup strategy: account $TARGET_ACCOUNT_ID, region $BACKUP_REGION"
+            ;;
+        *)
+            log_error "Invalid backup strategy: $BACKUP_STRATEGY"
+            log_info "Valid strategies: same-region, cross-region, cross-account"
+            exit 1
+            ;;
+    esac
+    
+    log_success "Backup strategy validated"
+}
+
 # Check prerequisites
 log_info "Checking prerequisites..."
 
@@ -240,6 +414,9 @@ for region in "$AWS_REGION" "$BACKUP_REGION"; do
         exit 1
     fi
 done
+
+# Validate backup strategy
+validate_backup_strategy
 
 log_success "Prerequisites verified"
 
@@ -327,74 +504,109 @@ if [ -n "$AURORA_CLUSTER_ID" ] && [ "$AURORA_CLUSTER_ID" != "None" ]; then
 
             log_success "Aurora snapshot created: ${SNAPSHOT_ID}"
 
-            # If backup region is different from source region, copy the snapshot
-            if [ "$BACKUP_REGION" != "$AWS_REGION" ]; then
-                log_info "Cross-region backup detected - copying snapshot to ${BACKUP_REGION}"
+            # Enhanced snapshot copying using new RDS cross-Region/cross-account capabilities
+            if [ "$BACKUP_STRATEGY" != "same-region" ]; then
+                log_info "Enhanced backup strategy detected - using new RDS cross-Region/cross-account capabilities"
 
-                # Generate backup region snapshot name
+                # Generate backup snapshot name
                 BACKUP_SNAPSHOT_ID="${SNAPSHOT_ID}-${BACKUP_REGION}"
+                if [ "$BACKUP_STRATEGY" = "cross-account" ]; then
+                    BACKUP_SNAPSHOT_ID="${SNAPSHOT_ID}-${TARGET_ACCOUNT_ID}-${BACKUP_REGION}"
+                fi
 
-                # Check if snapshot is encrypted and get KMS key for backup region
+                # Build copy command with new RDS capabilities
+                COPY_CMD="aws rds copy-db-cluster-snapshot"
+                COPY_CMD="$COPY_CMD --source-db-cluster-snapshot-identifier \"arn:aws:rds:${AWS_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${SNAPSHOT_ID}\""
+                COPY_CMD="$COPY_CMD --target-db-cluster-snapshot-identifier \"${BACKUP_SNAPSHOT_ID}\""
+                COPY_CMD="$COPY_CMD --source-region \"${AWS_REGION}\""
+                COPY_CMD="$COPY_CMD --region \"${BACKUP_REGION}\""
+
+                # Add cross-account destination if specified
+                if [ "$BACKUP_STRATEGY" = "cross-account" ]; then
+                    COPY_CMD="$COPY_CMD --destination-region \"${BACKUP_REGION}\""
+                    COPY_CMD="$COPY_CMD --destination-account-id \"${TARGET_ACCOUNT_ID}\""
+                    log_info "Cross-account copy: source account -> account $TARGET_ACCOUNT_ID"
+                fi
+
+                # Handle KMS key for encrypted snapshots
                 KMS_KEY_PARAM=""
-                if aws rds describe-db-cluster-snapshots \
+                if [ -n "$KMS_KEY_ID" ]; then
+                    # Use specified KMS key
+                    KMS_KEY_PARAM="--kms-key-id $KMS_KEY_ID"
+                    log_info "Using specified KMS key: $KMS_KEY_ID"
+                elif aws rds describe-db-cluster-snapshots \
                     --region "$AWS_REGION" \
                     --db-cluster-snapshot-identifier "$SNAPSHOT_ID" \
                     --query 'DBClusterSnapshots[0].StorageEncrypted' \
                     --output text 2>/dev/null | grep -q "True"; then
-
-                    log_info "RDS cluster is encrypted - using default KMS key in backup region"
-                    # Use the default AWS RDS KMS key in the backup region
-                    DEFAULT_KMS_KEY=$(aws kms list-aliases \
-                        --region "$BACKUP_REGION" \
-                        --query "Aliases[?AliasName==\`alias/aws/rds\`].TargetKeyId" \
-                        --output text 2>/dev/null || echo "")
+                    # Auto-detect KMS key for encrypted snapshots
+                    log_info "RDS cluster is encrypted - auto-detecting KMS key"
+                    
+                    if [ "$BACKUP_STRATEGY" = "cross-account" ]; then
+                        # For cross-account, use default KMS key in target account
+                        DEFAULT_KMS_KEY=$(aws kms list-aliases \
+                            --region "$BACKUP_REGION" \
+                            --query "Aliases[?AliasName==\`alias/aws/rds\`].TargetKeyId" \
+                            --output text 2>/dev/null || echo "")
+                    else
+                        # For cross-region, use default KMS key in backup region
+                        DEFAULT_KMS_KEY=$(aws kms list-aliases \
+                            --region "$BACKUP_REGION" \
+                            --query "Aliases[?AliasName==\`alias/aws/rds\`].TargetKeyId" \
+                            --output text 2>/dev/null || echo "")
+                    fi
 
                     if [ -n "$DEFAULT_KMS_KEY" ]; then
                         KMS_KEY_PARAM="--kms-key-id $DEFAULT_KMS_KEY"
-                        log_info "Using KMS key: $DEFAULT_KMS_KEY"
+                        log_info "Using auto-detected KMS key: $DEFAULT_KMS_KEY"
                     else
                         log_warning "No default KMS key found in backup region - copy may fail"
                     fi
                 fi
 
+                # Add copy tags if enabled
+                if [ "$COPY_TAGS" = "true" ]; then
+                    COPY_CMD="$COPY_CMD --copy-tags"
+                    log_info "Copying tags to backup snapshot"
+                fi
+
                 # Wait for snapshot to be available before copying
                 log_info "Waiting for source snapshot to be available before copying..."
                 if wait_for_snapshot_availability "$SNAPSHOT_ID" "$AWS_REGION" "$SNAPSHOT_AVAILABILITY_TIMEOUT"; then
-                    # Copy snapshot to backup region
-                    if aws rds copy-db-cluster-snapshot \
-                        --source-db-cluster-snapshot-identifier "arn:aws:rds:${AWS_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${SNAPSHOT_ID}" \
-                        --target-db-cluster-snapshot-identifier "${BACKUP_SNAPSHOT_ID}" \
-                        --source-region "${AWS_REGION}" \
-                        --region "${BACKUP_REGION}" \
-                        "$KMS_KEY_PARAM"; then
-
-                        log_success "Snapshot copy initiated: ${BACKUP_SNAPSHOT_ID}"
+                    # Execute the enhanced copy command
+                    log_info "Executing enhanced snapshot copy..."
+                    log_info "Command: $COPY_CMD $KMS_KEY_PARAM"
+                    
+                    if eval "$COPY_CMD $KMS_KEY_PARAM" >/dev/null 2>&1; then
+                        log_success "Enhanced snapshot copy initiated: ${BACKUP_SNAPSHOT_ID}"
 
                         # Wait for copy to complete using polling function
-                        log_info "Waiting for snapshot copy to complete..."
+                        log_info "Waiting for enhanced snapshot copy to complete..."
                         if wait_for_snapshot_availability "$BACKUP_SNAPSHOT_ID" "$BACKUP_REGION" "$SNAPSHOT_AVAILABILITY_TIMEOUT"; then
-                            log_success "Snapshot copy completed successfully"
+                            log_success "Enhanced snapshot copy completed successfully"
                             SNAPSHOT_ID="$BACKUP_SNAPSHOT_ID"  # Use the copied snapshot ID
-                            add_result "Aurora RDS" "SUCCESS" "$SNAPSHOT_ID (cross-region copy completed)"
+                            
+                            # Update result based on strategy
+                            case "$BACKUP_STRATEGY" in
+                                "cross-region")
+                                    add_result "Aurora RDS" "SUCCESS" "$SNAPSHOT_ID (cross-region copy completed)"
+                                    ;;
+                                "cross-account")
+                                    add_result "Aurora RDS" "SUCCESS" "$SNAPSHOT_ID (cross-account copy completed)"
+                                    ;;
+                            esac
                         else
-                            log_warning "Snapshot copy did not complete within timeout"
+                            log_warning "Enhanced snapshot copy did not complete within timeout"
                             add_result "Aurora RDS" "WARNING" "$SNAPSHOT_ID (copy timeout)"
                         fi
                     else
-                        log_warning "Failed to initiate snapshot copy to backup region"
-                        log_info "Snapshot exists in source region but copy to backup region failed"
+                        log_warning "Failed to initiate enhanced snapshot copy"
+                        log_info "Snapshot exists in source region but enhanced copy failed"
                         log_info "Manual copy command:"
                         echo ""
-                        echo "aws rds copy-db-cluster-snapshot \\"
-                        echo "    --source-db-cluster-snapshot-identifier arn:aws:rds:${AWS_REGION}:$(aws sts get-caller-identity --query 'Account' --output text):cluster-snapshot:${SNAPSHOT_ID} \\"
-                        echo "    --target-db-cluster-snapshot-identifier ${SNAPSHOT_ID}-${BACKUP_REGION} \\"
-                        echo "    --source-region ${AWS_REGION} \\"
-                        echo "    --region ${BACKUP_REGION}"
-                        if [ -n "$KMS_KEY_PARAM" ]; then
-                            echo "    --kms-key-id $DEFAULT_KMS_KEY"
-                        fi
+                        echo "$COPY_CMD $KMS_KEY_PARAM"
                         echo ""
-                        add_result "Aurora RDS" "WARNING" "$SNAPSHOT_ID (copy failed)"
+                        add_result "Aurora RDS" "WARNING" "$SNAPSHOT_ID (enhanced copy failed)"
                     fi
                 else
                     log_warning "Source snapshot did not become available within timeout"
@@ -599,6 +811,10 @@ cat > "$METADATA_FILE" << EOF
     "aurora_cluster_id": "${AURORA_CLUSTER_ID:-"none"}",
     "aurora_snapshot_id": "${SNAPSHOT_ID:-"none"}",
     "backup_success": ${BACKUP_SUCCESS},
+    "backup_strategy": "${BACKUP_STRATEGY}",
+    "target_account_id": "${TARGET_ACCOUNT_ID:-"none"}",
+    "kms_key_id": "${KMS_KEY_ID:-"auto-detected"}",
+    "copy_tags": ${COPY_TAGS},
     "components": {
         "aurora_rds": $([ -n "$SNAPSHOT_ID" ] && echo "true" || echo "false"),
         "kubernetes_config": true,
@@ -626,11 +842,20 @@ Backup Region: ${BACKUP_REGION}
 Cluster: ${CLUSTER_NAME}
 Namespace: ${NAMESPACE}
 Backup Bucket: s3://${BACKUP_BUCKET}
+Backup Strategy: ${BACKUP_STRATEGY}
+$([ -n "$TARGET_ACCOUNT_ID" ] && echo "Target Account: ${TARGET_ACCOUNT_ID}")
+$([ -n "$KMS_KEY_ID" ] && echo "KMS Key: ${KMS_KEY_ID}" || echo "KMS Key: Auto-detected")
+Copy Tags: ${COPY_TAGS}
 
 Backup Results:
 $(echo -e "$BACKUP_RESULTS")
 
 Overall Status: $([ "$BACKUP_SUCCESS" = true ] && echo "SUCCESS ✅" || echo "PARTIAL FAILURE ⚠️")
+
+Enhanced Features Used:
+$([ "$BACKUP_STRATEGY" = "cross-region" ] && echo "✅ Cross-Region Snapshot Copy (New RDS Feature)")
+$([ "$BACKUP_STRATEGY" = "cross-account" ] && echo "✅ Cross-Account Snapshot Copy (New RDS Feature)")
+$([ "$BACKUP_STRATEGY" = "same-region" ] && echo "✅ Same-Region Backup (Standard)")
 
 Restore Instructions:
 1. Run: ./restore.sh ${BACKUP_BUCKET} ${SNAPSHOT_ID:-none} ${BACKUP_REGION}
@@ -640,6 +865,7 @@ Restore Instructions:
    - Configure security group rules for database access
    - Create the appropriate Aurora instance
    - Reset the master password to match existing credentials
+   - Handle cross-region/cross-account snapshot restoration
 3. Verify data integrity after restore
 
 Next Steps:
@@ -647,11 +873,13 @@ Next Steps:
 - Monitor backup bucket costs
 - Update retention policies as needed
 - Document any custom configurations
+- Consider automated backup scheduling with different strategies
 
 Support:
 - Check logs in S3 bucket for detailed information
 - Verify snapshots in RDS console
 - Test Kubernetes restore in non-production environment
+- Review cross-account permissions if using cross-account strategy
 EOF
 
 # Upload report
@@ -672,6 +900,10 @@ echo -e "${BLUE}=================================${NC}"
 echo -e "${GREEN}✅ Backup ID: ${BACKUP_ID}${NC}"
 echo -e "${GREEN}✅ Backup Bucket: s3://${BACKUP_BUCKET}${NC}"
 echo -e "${GREEN}✅ Backup Region: ${BACKUP_REGION}${NC}"
+echo -e "${GREEN}✅ Backup Strategy: ${BACKUP_STRATEGY}${NC}"
+if [ -n "$TARGET_ACCOUNT_ID" ]; then
+    echo -e "${GREEN}✅ Target Account: ${TARGET_ACCOUNT_ID}${NC}"
+fi
 if [ -n "$SNAPSHOT_ID" ]; then
     echo -e "${GREEN}✅ Aurora Snapshot: ${SNAPSHOT_ID}${NC}"
 fi
@@ -680,6 +912,19 @@ echo -e "${BLUE}📋 Backup Results:${NC}"
 echo -e "$BACKUP_RESULTS"
 echo -e "${BLUE}🔄 Restore Command:${NC}"
 echo -e "${BLUE}   ./restore.sh ${BACKUP_BUCKET} ${SNAPSHOT_ID:-none} ${BACKUP_REGION}${NC}"
+echo ""
+echo -e "${BLUE}🚀 Enhanced Features Used:${NC}"
+case "$BACKUP_STRATEGY" in
+    "cross-region")
+        echo -e "${GREEN}✅ Cross-Region Snapshot Copy (New RDS Feature)${NC}"
+        ;;
+    "cross-account")
+        echo -e "${GREEN}✅ Cross-Account Snapshot Copy (New RDS Feature)${NC}"
+        ;;
+    "same-region")
+        echo -e "${GREEN}✅ Same-Region Backup (Standard)${NC}"
+        ;;
+esac
 echo ""
 
 log_success "Backup process completed"

@@ -1,27 +1,44 @@
 #!/bin/bash
 
 # OpenEMR Feature Manager
-# This script manages OpenEMR API and Patient Portal features via Terraform configuration
+# ======================
+# This script manages OpenEMR API and Patient Portal features by modifying Terraform
+# configuration variables and applying infrastructure changes. It provides a centralized
+# way to enable/disable OpenEMR features without manual configuration file editing.
+#
+# Key Features:
+# - Enable/disable OpenEMR REST API and FHIR endpoints
+# - Enable/disable OpenEMR Patient Portal functionality
+# - Update Terraform variables and apply infrastructure changes
+# - Redeploy OpenEMR with new feature configurations
+# - Display current feature status and configuration
+#
+# Workflow:
+# 1. Updates Terraform variables in terraform.tfvars
+# 2. Applies Terraform changes to update infrastructure outputs
+# 3. Redeploys OpenEMR with new feature configuration
+# 4. Validates feature status and provides feedback
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Color codes for terminal output - provides visual distinction between different message types
+RED='\033[0;31m'      # Error messages and critical issues
+GREEN='\033[0;32m'    # Success messages and positive feedback
+YELLOW='\033[1;33m'   # Warning messages and cautionary information
+BLUE='\033[0;34m'     # Info messages and general information
+NC='\033[0m'          # Reset color to default
 
-# Configuration
-NAMESPACE=${NAMESPACE:-"openemr"}
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}
-AWS_REGION=${AWS_REGION:-"us-west-2"}
+# Configuration variables - can be overridden by environment variables
+NAMESPACE=${NAMESPACE:-"openemr"}           # Kubernetes namespace for OpenEMR
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name
+AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where resources are located
 
-# Get the script's directory and project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-TERRAFORM_DIR="$PROJECT_ROOT/terraform"
-K8S_DIR="$PROJECT_ROOT/k8s"
+# Path resolution for script portability
+# These variables ensure the script works regardless of the current working directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"                      # Terraform configuration directory
+K8S_DIR="$PROJECT_ROOT/k8s"                                  # Kubernetes manifests directory
 
 # Help function
 show_help() {
@@ -58,7 +75,8 @@ show_help() {
     exit 0
 }
 
-# Function to check if terraform.tfvars exists
+# Function to validate Terraform configuration file exists
+# This ensures the script can modify the necessary configuration files
 check_terraform_config() {
     if [ ! -f "$TERRAFORM_DIR/terraform.tfvars" ]; then
         echo -e "${RED}Error: terraform.tfvars not found in $TERRAFORM_DIR${NC}"
@@ -67,21 +85,23 @@ check_terraform_config() {
     fi
 }
 
-# Function to update terraform.tfvars
+# Function to update Terraform variable values in terraform.tfvars
+# This function safely updates or adds variables to the Terraform configuration file
 update_terraform_var() {
-    local var_name="$1"
-    local var_value="$2"
+    local var_name="$1"   # Name of the Terraform variable to update
+    local var_value="$2"  # New value for the variable
 
     echo -e "${YELLOW}Updating $var_name to $var_value in terraform.tfvars...${NC}"
 
     cd "$TERRAFORM_DIR"
 
-    # Check if the variable exists in the file
+    # Check if the variable already exists in the configuration file
     if grep -q "^$var_name" terraform.tfvars; then
-        # Update existing variable - escape special characters in sed
+        # Update existing variable - create backup and modify in place
+        # Uses sed with backup file (.bak) for safety
         sed -i.bak "s/^${var_name}[[:space:]]*=.*/${var_name} = ${var_value}/" terraform.tfvars
     else
-        # Add new variable at the end with proper newline
+        # Add new variable at the end of the file
         echo "" >> terraform.tfvars
         echo "$var_name = $var_value" >> terraform.tfvars
     fi
@@ -89,27 +109,32 @@ update_terraform_var() {
     echo -e "${GREEN}✅ Updated $var_name = $var_value${NC}"
 }
 
-# Function to get current feature status from Terraform
+# Function to retrieve current feature status from Terraform outputs
+# This function queries Terraform to get the current configuration state
 get_feature_status() {
     cd "$TERRAFORM_DIR"
 
+    # Validate that Terraform outputs are available
     if ! terraform output -json openemr_app_config >/dev/null 2>&1; then
         echo -e "${RED}Error: Unable to get Terraform outputs. Run 'terraform apply' first.${NC}"
         exit 1
     fi
 
+    # Extract feature configuration from Terraform JSON output
     local config=$(terraform output -json openemr_app_config)
-    API_ENABLED=$(echo "$config" | jq -r '.api_enabled')
-    PORTAL_ENABLED=$(echo "$config" | jq -r '.patient_portal_enabled')
-    OPENEMR_VERSION=$(echo "$config" | jq -r '.version')
+    API_ENABLED=$(echo "$config" | jq -r '.api_enabled')               # Current API feature status
+    PORTAL_ENABLED=$(echo "$config" | jq -r '.patient_portal_enabled') # Current Portal feature status
+    OPENEMR_VERSION=$(echo "$config" | jq -r '.version')               # Current OpenEMR version
 }
 
-# Function to apply terraform changes
+# Function to apply Terraform configuration changes
+# This function updates the infrastructure to reflect the new feature configuration
 apply_terraform_changes() {
     echo -e "${YELLOW}Applying Terraform changes...${NC}"
     cd "$TERRAFORM_DIR"
 
-    # Only apply the outputs, not the entire infrastructure
+    # Apply changes to specific targets to minimize impact and reduce execution time
+    # Targets: EKS module and RDS cluster (core infrastructure components)
     if terraform apply -target=module.eks -target=aws_rds_cluster.openemr -auto-approve >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Terraform changes applied successfully${NC}"
     else
@@ -118,12 +143,13 @@ apply_terraform_changes() {
     fi
 }
 
-# Function to redeploy OpenEMR
+# Function to redeploy OpenEMR with updated configuration
+# This function triggers a fresh deployment using the updated Terraform outputs
 redeploy_openemr() {
     echo -e "${YELLOW}Redeploying OpenEMR with new configuration...${NC}"
     cd "$K8S_DIR"
 
-    # Run the deployment script
+    # Execute the deployment script to apply new configuration
     if ./deploy.sh >/dev/null 2>&1; then
         echo -e "${GREEN}✅ OpenEMR redeployed successfully${NC}"
     else
