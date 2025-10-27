@@ -27,9 +27,9 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="77.11.0"    # kube-prometheus-stack
-CHART_LOKI_VERSION="3.5.3"     # Loki stack
-CHART_JAEGER_VERSION="3.4.1"   # Jaeger
+CHART_KPS_VERSION="78.3.2"      # kube-prometheus-stack
+CHART_LOKI_VERSION="6.43.0"     # Loki stack
+CHART_JAEGER_VERSION="3.4.1"    # Jaeger
 
 # =============================================================================
 # TIMEOUTS AND RETRIES
@@ -85,8 +85,8 @@ DEBUG="0"                       # Set to "1" for verbose debug output
 # DIRECTORY CONFIGURATION
 # =============================================================================
 # Customize storage directories
-CREDENTIALS_DIR="./credentials"  # Secure credential storage
-BACKUP_DIR="./backups"          # Configuration backups
+CREDENTIALS_DIR="./credentials"         # Secure credential storage
+BACKUP_DIR="./backups"                  # Configuration backups
 VALUES_FILE="./prometheus-values.yaml"  # Generated values file
 
 # =============================================================================

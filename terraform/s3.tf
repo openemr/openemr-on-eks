@@ -1,6 +1,9 @@
-# S3 Storage Configuration
-# This file defines the S3 buckets used for storing ALB access logs and WAF logs,
-# providing centralized logging capabilities for the OpenEMR deployment.
+# =============================================================================
+# S3 STORAGE CONFIGURATION
+# =============================================================================
+# This configuration creates S3 buckets for storing ALB access logs and WAF logs,
+# providing centralized logging capabilities for the OpenEMR deployment with
+# encryption, versioning, and lifecycle policies.
 
 # Data sources for S3 bucket policies
 data "aws_elb_service_account" "main" {}

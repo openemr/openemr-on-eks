@@ -1,6 +1,157 @@
 #!/bin/bash
-# Enhanced OpenEMR monitoring setup with security, reliability, performance, and ingress/auth options
-# Jaeger/cert-manager fixes + optional cert-manager TLS for Grafana
+
+# =============================================================================
+# OpenEMR EKS Monitoring Stack Installation Script
+# =============================================================================
+#
+# Purpose:
+#   Installs and configures a comprehensive monitoring stack for OpenEMR on
+#   Amazon EKS, including Prometheus, Grafana, Loki, and Jaeger. Provides
+#   observability, metrics, logging, and distributed tracing capabilities
+#   with optional ingress and authentication configuration.
+#
+# Key Features:
+#   - Prometheus Operator deployment with kube-prometheus-stack
+#   - Grafana with pre-configured OpenEMR dashboards
+#   - Loki for centralized log aggregation
+#   - Jaeger for distributed tracing
+#   - cert-manager for TLS certificate management
+#   - Ingress configuration with optional authentication
+#   - Storage provisioning with encryption support
+#   - Integration with OpenEMR Fluent Bit sidecars
+#   - CloudWatch metrics integration via Grafana
+#
+# Prerequisites:
+#   - EKS cluster running and accessible via kubectl
+#   - Helm 3.x installed
+#   - AWS CLI configured with appropriate permissions
+#   - Sufficient cluster resources (CPU, memory, storage)
+#   - OpenEMR deployed with Fluent Bit sidecars (for log aggregation)
+#
+# Usage:
+#   ./install-monitoring.sh [OPTIONS]
+#
+# Options:
+#   install                 Install monitoring stack (default operation)
+#   uninstall               Remove monitoring stack and clean up resources
+#   verify                  Verify monitoring stack installation and health
+#   --enable-ingress        Enable ingress with optional authentication (disabled by default)
+#   --grafana-hostname      Hostname for Grafana ingress (e.g., grafana.example.com)
+#   --tls-secret-name       TLS secret name for ingress (optional)
+#   --help                  Show this help message
+#
+# Environment Variables (Grouped by Category):
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Namespace Configuration                                                 │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   MONITORING_NAMESPACE       Namespace for monitoring components (default: monitoring)
+#   OPENEMR_NAMESPACE          Namespace where OpenEMR is deployed (default: openemr)
+#   OBSERVABILITY_NAMESPACE    Namespace for observability tools (default: observability)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Storage Configuration                                                   │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   STORAGE_CLASS_RWO          StorageClass for ReadWriteOnce volumes (default: gp3-monitoring-encrypted)
+#   STORAGE_CLASS_RWX          StorageClass for ReadWriteMany volumes (default: empty/not used)
+#   ACCESS_MODE_RWO            Access mode for RWO volumes (default: ReadWriteOncePod)
+#   ACCESS_MODE_RWX            Access mode for RWX volumes (default: ReadWriteMany)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ File Paths and Directories                                              │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   CONFIG_FILE                Configuration file path (default: ./openemr-monitoring.conf)
+#   CREDENTIALS_DIR            Directory for saved credentials (default: ./credentials)
+#   BACKUP_DIR                 Directory for configuration backups (default: ./backups)
+#   VALUES_FILE                Prometheus values file path (default: ./prometheus-values.yaml)
+#   LOG_FILE                   Log file path (default: ./openemr-monitoring.log)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Helm Chart Versions                                                     │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 78.3.2)
+#   CHART_LOKI_VERSION         Loki chart version (default: 6.43.0)
+#   CHART_JAEGER_VERSION       Jaeger chart version (default: 3.4.1)
+#   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Timeout and Retry Configuration                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   TIMEOUT_HELM               Helm operation timeout (default: 45m)
+#   TIMEOUT_KUBECTL            kubectl operation timeout (default: 600s)
+#   MAX_RETRIES                Maximum retry attempts for operations (default: 3)
+#   BASE_DELAY                 Base delay in seconds for retries (default: 30)
+#   MAX_DELAY                  Maximum delay in seconds for retries (default: 300)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Ingress Configuration                                                   │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   ENABLE_INGRESS             Enable ingress (0 or 1, default: 0)
+#   INGRESS_TYPE               Ingress controller type (default: nginx, only nginx supported)
+#   GRAFANA_HOSTNAME           Grafana hostname for ingress (e.g., grafana.example.com)
+#   TLS_SECRET_NAME            TLS secret name for ingress (optional, auto-generated if empty)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Authentication Configuration                                            │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   ENABLE_BASIC_AUTH          Enable basic authentication (0 or 1, default: 0, nginx only)
+#   BASIC_AUTH_USER            Basic auth username (default: admin)
+#   BASIC_AUTH_PASSWORD        Basic auth password (optional, auto-generated if empty)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Alerting Configuration (Optional)                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   SLACK_WEBHOOK_URL          Slack webhook URL for Alertmanager (optional)
+#   SLACK_CHANNEL              Slack channel for alerts (optional)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ AWS Configuration                                                       │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   AWS_REGION                 AWS region (auto-detected from cluster or default: us-west-2)
+#   AWS_DEFAULT_REGION         Alternative AWS region variable (fallback)
+#   CLUSTER_NAME               EKS cluster name (auto-detected or default: openemr-eks)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ Autoscaling Configuration (HPA)                                         │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   ENABLE_AUTOSCALING         Enable HPA for monitoring components (0 or 1, default: 1)
+#   GRAFANA_MIN_REPLICAS       Grafana min replicas (default: 1)
+#   GRAFANA_MAX_REPLICAS       Grafana max replicas (default: 3)
+#   PROMETHEUS_MIN_REPLICAS    Prometheus min replicas (default: 1)
+#   PROMETHEUS_MAX_REPLICAS    Prometheus max replicas (default: 3)
+#   LOKI_MIN_REPLICAS          Loki min replicas (default: 1)
+#   LOKI_MAX_REPLICAS          Loki max replicas (default: 3)
+#   ALERTMANAGER_MIN_REPLICAS  Alertmanager min replicas (default: 1)
+#   ALERTMANAGER_MAX_REPLICAS  Alertmanager max replicas (default: 3)
+#   JAEGER_MIN_REPLICAS        Jaeger min replicas (default: 1)
+#   JAEGER_MAX_REPLICAS        Jaeger max replicas (default: 3)
+#   HPA_CPU_TARGET             HPA CPU utilization target percentage (default: 70)
+#   HPA_MEMORY_TARGET          HPA memory utilization target percentage (default: 80)
+#
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │ TLS/cert-manager Configuration                                          │
+# └─────────────────────────────────────────────────────────────────────────┘
+#   USE_CERT_MANAGER_TLS       Use cert-manager for Grafana TLS (0 or 1, default: 0)
+#   CERT_MANAGER_ISSUER_NAME   cert-manager Issuer name (required if USE_CERT_MANAGER_TLS=1)
+#   CERT_MANAGER_ISSUER_KIND   cert-manager Issuer kind (default: ClusterIssuer)
+#   CERT_MANAGER_ISSUER_GROUP  cert-manager Issuer group (default: cert-manager.io)
+#
+# Examples:
+#   # Basic installation with Jaeger, Cert-manager, Alertmanager, Prometheus, Jaeger and Grafana
+#   ./install-monitoring.sh
+#
+#   # With ingress and TLS
+#   ./install-monitoring.sh --enable-ingress --grafana-hostname grafana.example.com
+#
+# Notes:
+#   - Installation takes approximately 10 minutes
+#   - Grafana admin credentials are saved to credentials/grafana-credentials.txt
+#   - Default Grafana admin password is auto-generated
+#   - Access Grafana via port-forward: kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 (in browser go to "localhost:3000" and log in with credentials)
+#   - CloudWatch integration requires proper IAM role configuration
+#
+# =============================================================================
+
 set -euo pipefail
 set -o errtrace
 
@@ -31,8 +182,8 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-77.12.0}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.41.1}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-78.3.2}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.43.0}"
 readonly CHART_JAEGER_VERSION="${CHART_JAEGER_VERSION:-3.4.1}"
 
 # Timeouts / retries
@@ -92,7 +243,9 @@ get_aws_region() {
   echo "us-west-2"
 }
 
-readonly AWS_REGION=$(get_aws_region)
+# Declare and assign separately to avoid masking return values
+AWS_REGION=$(get_aws_region)
+readonly AWS_REGION
 
 # Cluster name detection
 get_cluster_name() {
@@ -127,7 +280,7 @@ readonly HPA_CPU_TARGET="${HPA_CPU_TARGET:-70}"
 readonly HPA_MEMORY_TARGET="${HPA_MEMORY_TARGET:-80}"
 
 # ---- cert-manager (pinned) & optional Grafana TLS via cert-manager
-readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.18.2}"
+readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.19.1}"
 readonly USE_CERT_MANAGER_TLS="${USE_CERT_MANAGER_TLS:-0}"
 readonly CERT_MANAGER_ISSUER_NAME="${CERT_MANAGER_ISSUER_NAME:-}"
 readonly CERT_MANAGER_ISSUER_KIND="${CERT_MANAGER_ISSUER_KIND:-ClusterIssuer}"   # or Issuer
@@ -946,11 +1099,11 @@ install_loki_stack(){
       --set singleBinary.resources.requests.memory=512Mi \
       --set singleBinary.resources.limits.cpu=1000m \
       --set singleBinary.resources.limits.memory=1Gi \
-      --set singleBinary.autoscaling.enabled=$ENABLE_AUTOSCALING \
-      --set singleBinary.autoscaling.minReplicas=$LOKI_MIN_REPLICAS \
-      --set singleBinary.autoscaling.maxReplicas=$LOKI_MAX_REPLICAS \
-      --set singleBinary.autoscaling.targetCPUUtilizationPercentage=$HPA_CPU_TARGET \
-      --set singleBinary.autoscaling.targetMemoryUtilizationPercentage=$HPA_MEMORY_TARGET \
+      --set singleBinary.autoscaling.enabled="$ENABLE_AUTOSCALING" \
+      --set singleBinary.autoscaling.minReplicas="$LOKI_MIN_REPLICAS" \
+      --set singleBinary.autoscaling.maxReplicas="$LOKI_MAX_REPLICAS" \
+      --set singleBinary.autoscaling.targetCPUUtilizationPercentage="$HPA_CPU_TARGET" \
+      --set singleBinary.autoscaling.targetMemoryUtilizationPercentage="$HPA_MEMORY_TARGET" \
       --set loki.limits_config.retention_period=720h \
       --set loki.compactor.retention_enabled=false \
       --set write.replicas=0 --set read.replicas=0 --set backend.replicas=0 \
@@ -1663,7 +1816,6 @@ EOF
 # ------------------------------
 # Utilities
 # ------------------------------
-print_access_help(){ log_info "Access the UIs with port-forward (if not using Ingress):"; echo "  kubectl -n ${MONITORING_NAMESPACE} port-forward svc/prometheus-stack-grafana 3000:80        # http://localhost:3000"; echo "  kubectl -n ${MONITORING_NAMESPACE} port-forward svc/prometheus-stack-kube-prom-prometheus 9090:9090"; echo "  kubectl -n ${MONITORING_NAMESPACE} port-forward svc/prometheus-stack-kube-prom-alertmanager 9093:9093"; echo "  kubectl -n ${MONITORING_NAMESPACE} port-forward svc/loki-gateway 3100:80"; echo "  kubectl -n ${MONITORING_NAMESPACE} port-forward svc/jaeger-query 16687:16687"; }
 uninstall_all(){
   log_step "Uninstalling monitoring stack..."
   set +e

@@ -1,3 +1,4 @@
+# ===================================
 # OpenEMR EKS Manual Release Workflow
 # ===================================
 # This workflow provides manual release management for the OpenEMR EKS deployment,
@@ -48,7 +49,7 @@ on:
 
 # Environment variables for consistent tool versions
 env:
-  PYTHON_VERSION: '3.13.7'                    # Python version for semantic versioning
+  PYTHON_VERSION: '3.14.0'                    # Python version for semantic versioning
   SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4"      # Specific semver package version
 
 # Required permissions for release operations

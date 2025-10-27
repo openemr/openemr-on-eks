@@ -1,20 +1,46 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR Version Checker
-# ======================
-# This script queries Docker Hub's API to retrieve and display available OpenEMR Docker image versions.
-# It provides filtering capabilities to show specific version types and helps administrators
-# choose appropriate versions for deployment based on stability recommendations.
+# =============================================================================
+#
+# Purpose:
+#   Queries Docker Hub API to retrieve and display available OpenEMR Docker
+#   image versions with filtering capabilities. Helps administrators choose
+#   appropriate versions for deployment based on stability recommendations.
 #
 # Key Features:
-# - Fetches version data from Docker Hub API v2
-# - Filters versions by semantic versioning patterns
-# - Distinguishes between latest (development) and stable (production) versions
-# - Provides deployment configuration examples
-# - Validates current deployment version against available versions
+#   - Fetches version data from Docker Hub API v2
+#   - Filters versions by semantic versioning patterns
+#   - Distinguishes between latest (development) and stable (production) versions
+#   - Provides deployment configuration examples
+#   - Validates current deployment version against available versions
 #
-# Dependencies: curl (for API calls), jq (for JSON parsing)
-# API Endpoint: Docker Hub REST API v2
+# Prerequisites:
+#   - Internet connectivity to Docker Hub API
+#
+# Usage:
+#   ./check-openemr-versions.sh [OPTIONS]
+#
+# Options:
+#   --count N          Show N most recent versions (default: 10)
+#   --all              Show all available versions
+#   --stable-only      Show only stable release versions
+#   --latest-only      Show only latest/development versions
+#   --check-current    Check current deployment version
+#   --help             Show this help message
+#
+# Dependencies:
+#   - curl (for API calls to Docker Hub)
+#   - jq (for JSON parsing and formatting)
+#
+# Examples:
+#   ./check-openemr-versions.sh
+#   ./check-openemr-versions.sh --count 20
+#   ./check-openemr-versions.sh --stable-only
+#   ./check-openemr-versions.sh --check-current
+#
+# =============================================================================
 
 set -e
 

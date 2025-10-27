@@ -1,7 +1,9 @@
-# AWS WAFv2 Configuration for OpenEMR
-# This file defines the Web Application Firewall (WAF) configuration for protecting
-# the OpenEMR application against common web exploits and attacks. The WAF is
-# configured as a regional resource and can be toggled on/off via the enable_waf variable.
+# =============================================================================
+# AWS WAFV2 CONFIGURATION
+# =============================================================================
+# This configuration creates a Web Application Firewall (WAF) for protecting the
+# OpenEMR application against common web exploits and attacks. The WAF is configured
+# as a regional resource and can be toggled on/off via the enable_waf variable.
 
 # Unique suffix for WAF resource names to ensure global uniqueness
 resource "random_id" "waf_logs" {

@@ -1,31 +1,59 @@
 #!/bin/bash
 
+# =============================================================================
 # SSL Certificate Renewal Manager for OpenEMR EKS
-# ===============================================
-# This script manages the Kubernetes CronJob responsible for renewing SSL certificates
-# for OpenEMR on EKS. It provides commands to deploy, monitor, and manage the SSL
-# certificate renewal process, including manual triggers and testing capabilities.
+# =============================================================================
+#
+# Purpose:
+#   Manages the Kubernetes CronJob responsible for renewing SSL certificates
+#   for OpenEMR on EKS. Provides commands to deploy, monitor, and manage the
+#   SSL certificate renewal process with manual triggers and testing.
 #
 # Key Features:
-# - Deploy SSL certificate renewal CronJob
-# - Check SSL certificate and CronJob status
-# - Trigger immediate SSL certificate renewal
-# - View logs from renewal operations
-# - Run test jobs to validate renewal process
-# - Clean up old renewal jobs
-# - Display renewal schedule information
+#   - Deploy SSL certificate renewal CronJob
+#   - Check SSL certificate and CronJob status
+#   - Trigger immediate SSL certificate renewal
+#   - View logs from renewal operations
+#   - Run test jobs to validate renewal process
+#   - Clean up old renewal jobs
+#   - Display renewal schedule information
 #
 # Prerequisites:
-# - kubectl configured for the target cluster
-# - AWS credentials with ACM and Route53 permissions
-# - SSL certificate renewal CronJob YAML file (ssl-renewal.yaml)
+#   - kubectl configured for the target cluster
+#   - AWS credentials with ACM and Route53 permissions
+#   - SSL certificate renewal CronJob YAML file (ssl-renewal.yaml)
+#
+# Usage:
+#   ./ssl-renewal-manager.sh {deploy|status|run-now|logs|test|cleanup|schedule}
+#
+# Options:
+#   deploy      Deploy SSL certificate renewal CronJob
+#   status      Check SSL certificate and CronJob status
+#   run-now     Trigger immediate SSL certificate renewal
+#   logs        View logs from recent renewal operations
+#   test        Run a test job to validate renewal process
+#   cleanup     Clean up old renewal jobs
+#   schedule    Display renewal schedule information
+#
+# Environment Variables:
+#   NAMESPACE           Kubernetes namespace (default: openemr)
+#   CRONJOB_NAME        CronJob name (default: ssl-cert-renewal)
+#   TEST_JOB_NAME       Test job name (default: ssl-cert-renewal-test)
+#
+# Examples:
+#   ./ssl-renewal-manager.sh deploy
+#   ./ssl-renewal-manager.sh status
+#   ./ssl-renewal-manager.sh run-now
+#   ./ssl-renewal-manager.sh logs
+#
+# =============================================================================
 
 set -e
 
-# Configuration variables
-NAMESPACE="openemr"                    # Kubernetes namespace for OpenEMR
-CRONJOB_NAME="ssl-cert-renewal"        # Name of the SSL renewal CronJob
-TEST_JOB_NAME="ssl-cert-renewal-test"  # Name for test jobs
+# Configuration variables - can be overridden via environment variables
+NAMESPACE=${NAMESPACE:-"openemr"}                          # Kubernetes namespace for OpenEMR
+CRONJOB_NAME=${CRONJOB_NAME:-"ssl-cert-renewal"}           # Name of the SSL renewal CronJob
+TEST_JOB_NAME=${TEST_JOB_NAME:-"ssl-cert-renewal-test"}    # Name for test jobs
 
 # Color codes for terminal output - provides visual distinction between different message types
 RED='\033[0;31m'      # Error messages and critical issues

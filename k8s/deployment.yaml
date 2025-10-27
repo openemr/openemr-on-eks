@@ -16,78 +16,78 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: openemr                          # Deployment name - must match selector labels
-  namespace: openemr                     # Target namespace for deployment
+  name: openemr                                        # Deployment name - must match selector labels
+  namespace: openemr                                   # Target namespace for deployment
   labels:
-    app: openemr                         # Primary application label for service discovery
-    version: v1                          # Version tracking for deployment management
+    app: openemr                                       # Primary application label for service discovery
+    version: v1                                        # Version tracking for deployment management
 spec:
   # Replicas are managed by HPA (Horizontal Pod Autoscaler) - see hpa.yaml
   # HPA will scale between 1-10 replicas based on CPU/memory usage
-  progressDeadlineSeconds: 3600          # 60 minutes to accommodate long startup times and cluster state variations
+  progressDeadlineSeconds: 3600                        # 60 minutes to accommodate long startup times and cluster state variations
   
   # Rolling update strategy for zero-downtime deployments
   strategy:
     type: RollingUpdate
     rollingUpdate:
-      maxSurge: 1                        # Allow 1 extra pod during updates (safety margin)
-      maxUnavailable: 0                  # Never take down existing pods until new ones are ready
+      maxSurge: 1                                      # Allow 1 extra pod during updates (safety margin)
+      maxUnavailable: 0                                # Never take down existing pods until new ones are ready
   # Pod selector - must match template labels
   selector:
     matchLabels:
-      app: openemr                       # Match pods with this label
+      app: openemr                                     # Match pods with this label
       
   # Pod template specification
   template:
     metadata:
       labels:
-        app: openemr                       # Primary label for service discovery and HPA targeting
-        version: v1                        # Version label for tracking and rollback capabilities
+        app: openemr                                   # Primary label for service discovery and HPA targeting
+        version: v1                                    # Version label for tracking and rollback capabilities
       annotations:
         # Prometheus scraping configuration for metrics collection
-        prometheus.io/scrape: "true"       # Enable metrics scraping by Prometheus
-        prometheus.io/port: "9090"         # Metrics endpoint port (if available)
+        prometheus.io/scrape: "true"                   # Enable metrics scraping by Prometheus
+        prometheus.io/port: "9090"                     # Metrics endpoint port (if available)
         # Jaeger distributed tracing configuration
-        sidecar.jaegertracing.io/inject: "true"  # Enable automatic Jaeger sidecar injection for distributed tracing
+        sidecar.jaegertracing.io/inject: "true"        # Enable automatic Jaeger sidecar injection for distributed tracing
     spec:
-      serviceAccountName: openemr-sa       # Service account for AWS IAM role binding (IRSA)
-      restartPolicy: Always                # Always restart failed containers
-      terminationGracePeriodSeconds: 60    # Give containers 60 seconds to shut down gracefully
+      serviceAccountName: openemr-sa                   # Service account for AWS IAM role binding (IRSA)
+      restartPolicy: Always                            # Always restart failed containers
+      terminationGracePeriodSeconds: 60                # Give containers 60 seconds to shut down gracefully
       # Pod-level security context
       securityContext:
-        runAsNonRoot: false                       # OpenEMR requires root access for file permissions and setup
+        runAsNonRoot: false                            # OpenEMR requires root access for file permissions and setup
         seccompProfile:
-          type: RuntimeDefault                    # Use default seccomp profile for security
+          type: RuntimeDefault                         # Use default seccomp profile for security
 
       containers:
       # Main OpenEMR application container
       - name: openemr
-        image: openemr/openemr:${OPENEMR_VERSION} # OpenEMR Docker image with version from environment
-        imagePullPolicy: IfNotPresent             # Only pull if image not present locally
+        image: openemr/openemr:${OPENEMR_VERSION}      # OpenEMR Docker image with version from environment
+        imagePullPolicy: IfNotPresent                  # Only pull if image not present locally
         
         # Container-level security context
         securityContext:
-          allowPrivilegeEscalation: true         # Allow privilege escalation for OpenEMR setup
-          readOnlyRootFilesystem: false          # Allow writes to root filesystem for OpenEMR
-          runAsUser: 0                           # Run as root (required for OpenEMR file permissions)
-          runAsGroup: 0                          # Run as root group
+          allowPrivilegeEscalation: true               # Allow privilege escalation for OpenEMR setup
+          readOnlyRootFilesystem: false                # Allow writes to root filesystem for OpenEMR
+          runAsUser: 0                                 # Run as root (required for OpenEMR file permissions)
+          runAsGroup: 0                                # Run as root group
           capabilities:
             drop:
-            - ALL                                # Drop all capabilities by default
+            - ALL                                      # Drop all capabilities by default
             add:
-            - NET_BIND_SERVICE                   # Allow binding to privileged ports (80, 443)
-            - CHOWN                              # Change file ownership
-            - SETUID                             # Set user ID
-            - SETGID                             # Set group ID
-            - FOWNER                             # Override file ownership checks
-            - DAC_OVERRIDE                       # Override discretionary access control
+            - NET_BIND_SERVICE                         # Allow binding to privileged ports (80, 443)
+            - CHOWN                                    # Change file ownership
+            - SETUID                                   # Set user ID
+            - SETGID                                   # Set group ID
+            - FOWNER                                   # Override file ownership checks
+            - DAC_OVERRIDE                             # Override discretionary access control
         # Container port definitions
         ports:
         - containerPort: 80
-          name: http                            # HTTP port for unencrypted traffic
+          name: http                                   # HTTP port for unencrypted traffic
           protocol: TCP
         - containerPort: 443
-          name: https                           # HTTPS port for SSL/TLS encrypted traffic
+          name: https                                  # HTTPS port for SSL/TLS encrypted traffic
           protocol: TCP
           
         workingDir: /var/www/localhost/htdocs/openemr  # OpenEMR web root directory
@@ -185,7 +185,7 @@ spec:
               name: openemr-app-credentials
               key: admin-password           # OpenEMR admin password
         - name: SWARM_MODE
-          value: "yes"                     # Enable swarm mode for multi-container deployment
+          value: "yes"                      # Enable swarm mode for multi-container deployment
         # OpenEMR API Configuration (conditionally set by deploy script)
         # OPENEMR_SETTING_rest_api will be added if API is enabled
         # OPENEMR_SETTING_rest_fhir_api will be added if API is enabled
@@ -197,45 +197,45 @@ spec:
         # Resource requirements and limits for optimal performance
         resources:
           requests:
-            cpu: 500m                          # Minimum CPU required (0.5 cores) - increased for better performance
-            memory: 1Gi                        # Minimum memory required (1 GB) - increased for stability
+            cpu: 500m                               # Minimum CPU required (0.5 cores) - increased for better performance
+            memory: 1Gi                             # Minimum memory required (1 GB) - increased for stability
           limits:
-            cpu: 2000m                         # Maximum CPU allowed (2 cores) - burst capacity for peak loads
-            memory: 2Gi                        # Maximum memory allowed (2 GB) - prevents OOM kills
+            cpu: 2000m                              # Maximum CPU allowed (2 cores) - burst capacity for peak loads
+            memory: 2Gi                             # Maximum memory allowed (2 GB) - prevents OOM kills
         # Startup probe - allows generous time for initial OpenEMR setup
         startupProbe:
           httpGet:
-            path: /interface/login/login.php  # OpenEMR login page endpoint
-            port: 80                          # HTTP port
-            scheme: HTTP                      # Use HTTP (not HTTPS) for internal health checks
+            path: /interface/login/login.php        # OpenEMR login page endpoint
+            port: 80                                # HTTP port
+            scheme: HTTP                            # Use HTTP (not HTTPS) for internal health checks
             httpHeaders:
             - name: User-Agent
               value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
-          initialDelaySeconds: 300           # 5 minutes - initial grace period
-          periodSeconds: 30                  # Check every 30 seconds during startup
-          timeoutSeconds: 15                 # 15 second timeout per check
-          failureThreshold: 60               # Allow 60 failures (total time: 300s + 60*30s = 2100s = 35min)
-                                             # Accommodates: Fresh cluster + DB setup + Apache start + OpenEMR init + buffer
+          initialDelaySeconds: 300                  # 5 minutes - initial grace period
+          periodSeconds: 30                         # Check every 30 seconds during startup
+          timeoutSeconds: 15                        # 15 second timeout per check
+          failureThreshold: 60                      # Allow 60 failures (total time: 300s + 60*30s = 2100s = 35min)
+                                                    # Accommodates: Fresh cluster + DB setup + Apache start + OpenEMR init + buffer
         # Readiness probe - determines when pod can receive traffic
         readinessProbe:
           httpGet:
-            path: /interface/login/login.php  # OpenEMR login page endpoint
-            port: 80                          # HTTP port
-            scheme: HTTP                      # Use HTTP for internal health checks
+            path: /interface/login/login.php        # OpenEMR login page endpoint
+            port: 80                                # HTTP port
+            scheme: HTTP                            # Use HTTP for internal health checks
             httpHeaders:
             - name: User-Agent
               value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
-          initialDelaySeconds: 30             # Wait 30 seconds after startup probe completes
-          periodSeconds: 10                   # Check every 10 seconds for responsive monitoring
-          timeoutSeconds: 10                  # 10 second timeout per check
-          failureThreshold: 3                 # Allow 3 failures (3*10s = 30s) before marking unready
-          successThreshold: 1                 # Single successful check marks pod as ready
+          initialDelaySeconds: 30                   # Wait 30 seconds after startup probe completes
+          periodSeconds: 10                         # Check every 10 seconds for responsive monitoring
+          timeoutSeconds: 10                        # 10 second timeout per check
+          failureThreshold: 3                       # Allow 3 failures (3*10s = 30s) before marking unready
+          successThreshold: 1                       # Single successful check marks pod as ready
         # Liveness probe - determines when pod needs to be restarted
         livenessProbe:
           httpGet:
-            path: /interface/login/login.php  # OpenEMR login page endpoint
-            port: 80                          # HTTP port
-            scheme: HTTP                      # Use HTTP for internal health checks
+            path: /interface/login/login.php        # OpenEMR login page endpoint
+            port: 80                                # HTTP port
+            scheme: HTTP                            # Use HTTP for internal health checks
             httpHeaders:
             - name: User-Agent
               value: "Kubernetes-Health-Check/1.0"  # Identify health check requests
@@ -256,35 +256,35 @@ spec:
 
       # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
-        image: fluent/fluent-bit:4.1.0              # Fluent Bit log processor and forwarder
+        image: fluent/fluent-bit:4.1.1                                        # Fluent Bit log processor and forwarder
         
         # Container-level security context for Fluent Bit
         securityContext:
-          allowPrivilegeEscalation: false          # No privilege escalation needed
-          readOnlyRootFilesystem: false            # Allow writes for log processing
-          runAsUser: 0                             # Run as root for system metrics access
-          runAsGroup: 0                            # Run as root group
+          allowPrivilegeEscalation: false                                     # No privilege escalation needed
+          readOnlyRootFilesystem: false                                       # Allow writes for log processing
+          runAsUser: 0                                                        # Run as root for system metrics access
+          runAsGroup: 0                                                       # Run as root group
           capabilities:
             add:
-            - SYS_ADMIN                            # Required for accessing /sys filesystem
-            - DAC_READ_SEARCH                      # Required for reading system files
+            - SYS_ADMIN                                                       # Required for accessing /sys filesystem
+            - DAC_READ_SEARCH                                                 # Required for reading system files
             
         ports:
         - containerPort: 2020
-          name: fluent-bit-http                    # HTTP monitoring endpoint
+          name: fluent-bit-http                                               # HTTP monitoring endpoint
           protocol: TCP
         - containerPort: 24224
-          name: fluent-bit-fwd                     # Forward protocol port
+          name: fluent-bit-fwd                                                # Forward protocol port
           protocol: TCP
         env:
           - name: AWS_REGION
-            value: "${AWS_REGION}"                 # AWS region for CloudWatch logs
+            value: "${AWS_REGION}"                                            # AWS region for CloudWatch logs
           - name: CLUSTER_NAME
-            value: "${CLUSTER_NAME}"               # EKS cluster name for log grouping
+            value: "${CLUSTER_NAME}"                                          # EKS cluster name for log grouping
           - name: AWS_WEB_IDENTITY_TOKEN_FILE
             value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"  # IRSA token path
           - name: AWS_ROLE_ARN
-            value: "${OPENEMR_ROLE_ARN}"           # IAM role ARN for CloudWatch permissions
+            value: "${OPENEMR_ROLE_ARN}"                                      # IAM role ARN for CloudWatch permissions
 
 
         # Resource limits for Fluent Bit sidecar
@@ -299,23 +299,23 @@ spec:
         # Volume mounts for Fluent Bit configuration and system access
         volumeMounts:
         - name: fluent-bit-config
-          mountPath: /fluent-bit/etc/            # Fluent Bit configuration files
+          mountPath: /fluent-bit/etc/                         # Fluent Bit configuration files
         - name: tmp
-          mountPath: /tmp                        # Temporary files for log processing
+          mountPath: /tmp                                     # Temporary files for log processing
         - name: openemr-sites
           mountPath: /var/www/localhost/htdocs/openemr/sites  # OpenEMR sites directory for log access
           readOnly: true                                      # Read-only access to log files
         - name: proc
-          mountPath: /host/proc                  # Host /proc for system metrics
-          readOnly: true                         # Read-only access to system files
+          mountPath: /host/proc                               # Host /proc for system metrics
+          readOnly: true                                      # Read-only access to system files
         - name: sys
-          mountPath: /host/sys                   # Host /sys for system metrics
-          readOnly: true                         # Read-only access to system files
+          mountPath: /host/sys                                # Host /sys for system metrics
+          readOnly: true                                      # Read-only access to system files
 
         # Liveness probe for Fluent Bit sidecar
         livenessProbe:
           httpGet:
-            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.0)
+            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.1)
             port: 2020                  # Fluent Bit HTTP monitoring endpoint
           initialDelaySeconds: 30       # Fluent Bit starts quickly
           periodSeconds: 30             # Check every 30 seconds
@@ -324,7 +324,7 @@ spec:
         # Readiness probe for Fluent Bit sidecar
         readinessProbe:
           httpGet:
-            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.0)
+            path: /api/v1/health        # Fluent Bit health check endpoint (Fluent Bit 4.1.1)
             port: 2020                  # Fluent Bit HTTP monitoring port
           initialDelaySeconds: 15       # Fluent Bit starts quickly
           periodSeconds: 15             # Check every 15 seconds

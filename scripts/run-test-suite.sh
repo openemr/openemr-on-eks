@@ -1,25 +1,55 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR EKS CI/CD Test Suite Runner
-# ===================================
-# This script runs comprehensive tests for code quality, syntax validation, and best practices
-# across all components of the OpenEMR EKS deployment.
+# =============================================================================
+#
+# Purpose:
+#   Runs comprehensive tests for code quality, syntax validation, and best
+#   practices across all components of the OpenEMR EKS deployment.
 #
 # Key Features:
-# - Shell script syntax validation and best practices
-# - YAML file validation and formatting checks
-# - Terraform configuration validation
-# - Kubernetes manifest syntax and best practices
-# - Kubernetes security policy validation
-# - Markdown documentation validation
-# - Parallel test execution for performance
-# - Comprehensive reporting and result tracking
+#   - Shell script syntax validation and best practices
+#   - YAML file validation and formatting checks
+#   - Terraform configuration validation
+#   - Kubernetes manifest syntax and best practices
+#   - Kubernetes security policy validation
+#   - Markdown documentation validation
+#   - Parallel test execution for performance
+#   - Comprehensive reporting and result tracking
 #
-# Test Categories:
-# - Code Quality: Shell syntax, YAML validation, Terraform validation
-# - Kubernetes: Manifest syntax, best practices, security policies
-# - Documentation: Markdown validation and formatting
-# - Scripts: Individual script validation and testing
+# Prerequisites:
+#   - shellcheck (for shell script linting)
+#   - yamllint (for YAML validation)
+#   - terraform (for configuration validation)
+#   - kubectl (for Kubernetes manifest validation)
+#   - markdownlint (for documentation validation)
+#
+# Usage:
+#   ./run-test-suite.sh [OPTIONS]
+#
+# Options:
+#   -s, --suite SUITE  Test suite to run (default: all)
+#   -p, --parallel     Enable parallel test execution (default: true)
+#   -d, --dry-run      Show what tests would run without executing them
+#   -v, --verbose      Enable verbose output
+#   -h, --help         Show this help message
+#
+# Test Suites:
+#   all                      Run all test suites (default)
+#   code_quality             Shell syntax, YAML validation, Terraform validation
+#   kubernetes_manifests     Manifest syntax, best practices, security policies
+#   script_validation        Individual script validation and testing
+#   documentation            Markdown validation and formatting
+#
+# Examples:
+#   ./run-test-suite.sh                           # Run all tests with defaults
+#   ./run-test-suite.sh -s code_quality           # Run only code quality tests
+#   ./run-test-suite.sh -s kubernetes_manifests   # Run only K8s manifest tests
+#   ./run-test-suite.sh -v                        # Run all tests with verbose output
+#   ./run-test-suite.sh -d                        # Dry run to see what would be tested
+#
+# =============================================================================
 
 # set -e  # Commented out to prevent premature exit on grep commands that may return non-zero
 

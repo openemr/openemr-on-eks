@@ -181,9 +181,16 @@ chmod +x scripts/version-manager.sh
 ### Kubernetes Version
 
 **Version Source:** AWS EKS supported versions
+**Current Version:** 1.34 (Released: August 27, 2025)
+**Release Notes:** [Kubernetes v1.34 "Of Wind & Will"](https://kubernetes.io/blog/2025/08/27/kubernetes-v1-34-release/)
+
 **Files Updated:**
 - `terraform/terraform.tfvars`
+- `terraform/terraform.tfvars.example`
+- `terraform/variables.tf`
+- `terraform/eks.tf`
 - `versions.yaml`
+- Documentation files (`README.md`, `DEPLOYMENT_GUIDE.md`, `TROUBLESHOOTING.md`)
 
 ### Monitoring Stack
 

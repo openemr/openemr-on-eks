@@ -1,7 +1,9 @@
-# CloudTrail Configuration for OpenEMR
-# This file defines the CloudTrail configuration for auditing and monitoring
-# AWS API calls and resource changes across the OpenEMR infrastructure.
-# CloudTrail provides comprehensive logging for security, compliance, and troubleshooting.
+# =============================================================================
+# CLOUDTRAIL CONFIGURATION
+# =============================================================================
+# This configuration creates CloudTrail for auditing and monitoring AWS API calls
+# and resource changes across the OpenEMR infrastructure. CloudTrail provides
+# comprehensive logging for security, compliance, and troubleshooting.
 
 # Unique suffix for CloudTrail resource names to ensure global uniqueness
 resource "random_id" "cloudtrail_suffix" {

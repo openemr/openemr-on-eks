@@ -2,10 +2,9 @@
 
 This directory contains all the operational scripts for the OpenEMR on EKS deployment. These scripts handle infrastructure management, application deployment, monitoring, security, and maintenance tasks.
 
-## 📋 Table of Contents
-
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
+  - [Script Execution Order for Common Operations](#-script-execution-order-for-common-operations)
   - [Core Deployment Scripts](#core-deployment-scripts)
   - [Infrastructure Management](#infrastructure-management)
   - [Security & Compliance](#security--compliance)
@@ -43,9 +42,45 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - [Updating Existing Scripts](#updating-existing-scripts)
 - [Troubleshooting](#troubleshooting)
 - [Best Practices](#best-practices)
+- [Cross Script Dependencies](#-cross-script-dependencies)
 - [Support](#support)
 
+
+
+---
+
 ## Directory Structure
+
+### 📋 Script Execution Order for Common Operations
+
+#### 🚀 **Fresh Deployment**
+1. `terraform apply` (infrastructure)
+2. `deploy.sh` (application)
+3. `validate-deployment.sh` (verification)
+
+#### 💾 **Backup Operation**
+1. `backup.sh` (creates database snapshot + S3 backup)
+
+#### 🔄 **Restore Operation**
+1. `clean-deployment.sh` (cleanup existing resources)
+2. `restore.sh` (restores from backup)
+   - Calls `clean-deployment.sh --force --skip-db-cleanup`
+   - Calls `restore-defaults.sh --force`
+   - Calls `deploy.sh`
+4. `validate-deployment.sh` (verification)
+
+#### 🧹 **Complete Cleanup**
+1. `clean-deployment.sh` (application cleanup; optional; destroy.sh will also destroy application)
+2. `destroy.sh` (infrastructure cleanup)
+
+#### 🔒 **Security Setup**
+1. `cluster-security-manager.sh` (IP whitelisting)
+2. `ssl-cert-manager.sh` (SSL certificates)
+3. `ssl-renewal-manager.sh` (certificate renewal)
+
+#### 🧪 **Testing**
+1. `run-test-suite.sh` (comprehensive tests)
+2. `test-end-to-end-backup-restore.sh` (backup/restore validation)
 
 ### Core Deployment Scripts
 
@@ -520,6 +555,19 @@ Scripts generate logs in various locations:
    - Regular backup testing
    - Document restore procedures
    - Maintain backup schedules
+
+### 🔗 Cross-Script Dependencies
+
+Some scripts are designed to call other scripts as part of their operations. Below is a table detailing these relationships between scripts:
+
+| Script       | Used By                                                                 |
+|--------------|-------------------------------------------------------------------------|
+| `deploy.sh`  | `restore.sh`, `test-end-to-end-backup-restore.sh`                       |
+| `restore-defaults.sh` | `restore.sh`, `test-end-to-end-backup-restore.sh`, `clean-deployment.sh` |
+| `backup.sh` | `test-end-to-end-backup-restore.sh`                                     |
+| `destroy.sh` | `test-end-to-end-backup-restore.sh`                                     |
+| `restore.sh` | `test-end-to-end-backup-restore.sh`                                     |
+| `clean-deployment.sh` | `restore.sh`, `destroy.sh`                                              |
 
 ## Support
 

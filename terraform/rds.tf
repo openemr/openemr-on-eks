@@ -53,7 +53,7 @@ resource "aws_rds_cluster" "openemr" {
 
   # Aurora MySQL engine configuration
   engine         = "aurora-mysql"              # Aurora MySQL engine
-  engine_version = var.rds_engine_version      # MySQL version (default: 8.0.mysql_aurora.3.10.0)
+  engine_version = var.rds_engine_version      # MySQL version (default: 8.0.mysql_aurora.3.10.1)
 
   # Master user credentials for database access
   master_username = "openemr"                          # Master username

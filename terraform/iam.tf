@@ -84,6 +84,19 @@ resource "aws_iam_policy" "openemr" {
           "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/eks/${var.cluster_name}/fluent-bit/*",
           "arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/eks/${var.cluster_name}/fluent-bit/*:*"
         ]
+      },
+      {
+        # S3 permissions for backup access during restore operations
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",        # Download backup files
+          "s3:ListBucket"        # List backup bucket contents
+        ]
+        Resource = [
+          # Backup bucket - using pattern for backup buckets
+          "arn:aws:s3:::openemr-backups-*",
+          "arn:aws:s3:::openemr-backups-*/*"
+        ]
       }
     ]
   })

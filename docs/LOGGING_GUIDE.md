@@ -1,4 +1,4 @@
-# OpenEMR 7.0.3.4 Logging Guide
+# OpenEMR on EKS Logging Guide
 
 This comprehensive guide covers the enhanced logging configuration for OpenEMR 7.0.3.4 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
 
@@ -23,9 +23,13 @@ OpenEMR 7.0.3.4 includes comprehensive logging capabilities designed for healthc
 - **Multi-layer logging**: Application, system, audit, and infrastructure logs
 - **Real-time processing**: Fluent Bit with 5-second refresh intervals
 - **CloudWatch integration**: Centralized log management with KMS encryption
+- **Loki integration**: Unified log aggregation for Grafana dashboards
+- **Enhanced reliability**: Filesystem buffering with pause-on-chunks-overlimit protection
 - **Compliance ready**: audit trails and retention policies
 - **IRSA authentication**: Secure AWS service integration using IAM Roles for Service Accounts
 - **Sidecar deployment**: Fluent Bit runs as a sidecar container for reliable log collection
+- **Metadata enrichment**: Automatic addition of cluster, region, version, and pod information
+- **Dual outputs**: Logs sent to both CloudWatch and Loki for comprehensive monitoring
 
 ## Logging Architecture
 
@@ -48,6 +52,7 @@ graph TB
     subgraph "Fluent Bit Sidecar"
         G --> J[Fluent Bit Container]
         J --> K[CloudWatch Logs]
+        J --> K2[Loki Logs]
     end
 
     subgraph "AWS CloudWatch"
@@ -58,6 +63,11 @@ graph TB
         K --> P[aws-eks-cluster-openemr-audit]
         K --> Q[aws-eks-cluster-openemr-php_error]
         K --> R[aws-eks-cluster-fluent-bit-metrics]
+    end
+
+    subgraph "Loki / Grafana"
+        K2 --> S[Loki Gateway]
+        S --> T[Grafana Dashboards]
     end
 
     %% Add descriptive labels
@@ -103,12 +113,37 @@ graph TB
 
 The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-config`) and includes:
 
+- **Service configuration**: Enhanced health checks, filesystem buffering, and retry logic
 - **Test logs**: Dummy input for verification
 - **Apache logs**: Access and error logs from `/var/log/apache2/`
-- **OpenEMR logs**: Application, system, and audit logs
+- **OpenEMR logs**: Application, system, and audit logs with advanced filtering
 - **PHP errors**: PHP application error logs
 - **Forward protocol**: External log ingestion via port 24224
 - **Metrics**: Fluent Bit operational metrics using `node_exporter_metrics`
+- **Metadata enrichment**: Record modifier filter adds cluster, region, and version information
+- **Dual outputs**: Logs sent to both CloudWatch and Loki for comprehensive monitoring
+
+### Service Configuration
+
+```yaml
+[SERVICE]
+    Flush                             1
+    Log_Level                         info
+    Daemon                            off
+    HTTP_Server                       On
+    HTTP_Listen                       0.0.0.0
+    HTTP_Port                         2020
+    HTTP_Allow                        *
+    Health_Check                      On
+    HC_Errors_Count                   50
+    HC_Retry_Failure_Count            10
+    HC_Period                         60
+    storage.type                      filesystem
+    storage.path                      /tmp/fluent-bit-buffer
+    storage.backlog.mem_limit         50M
+    storage.pause_on_chunks_overlimit On
+    storage.max_chunks_up             256              
+```
 
 ### Input Configuration
 
@@ -126,7 +161,7 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/log/apache2/access.log
     Tag               apache.access
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
 
 # Collect Apache error logs
@@ -135,7 +170,7 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/log/apache2/error.log
     Tag               apache.error
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
 
 # Collect OpenEMR application logs
@@ -144,8 +179,12 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/log/openemr/*.log
     Tag               openemr.application
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
+    Skip_Long_Lines   On
+    Ignore_Older      24h
+    Path_Key          filename
+    exit_on_eof       false
 
 # Collect OpenEMR system logs
 [INPUT]
@@ -153,8 +192,12 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/system_logs/*.log
     Tag               openemr.system
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
+    Skip_Long_Lines   On
+    Ignore_Older      24h
+    Path_Key          filename
+    exit_on_eof       false
 
 # Collect OpenEMR audit logs
 [INPUT]
@@ -162,8 +205,12 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/audit_logs/*.log
     Tag               openemr.audit
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
+    Skip_Long_Lines   On
+    Ignore_Older      24h
+    Path_Key          filename
+    exit_on_eof       false
 
 # Collect PHP error logs
 [INPUT]
@@ -171,7 +218,7 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Path              /var/log/php_errors.log
     Tag               openemr.php_error
     Refresh_Interval  5
-    Mem_Buf_Limit     50MB
+    Buffer_Max_Size   5MB
     Skip_Empty_Lines  On
 
 # Forward protocol for external log sources
@@ -186,6 +233,8 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     Name              node_exporter_metrics
     Tag               fluent-bit.metrics
     Scrape_Interval   30
+    path.procfs       /host/proc
+    path.sysfs        /host/sys
 ```
 
 ### Output Configuration
@@ -274,6 +323,50 @@ The current configuration uses hardcoded values for reliability:
     retry_limit         3
 ```
 
+### Record Modifier Filter
+
+The configuration includes a record modifier filter that adds metadata to all log records:
+
+```yaml
+[FILTER]
+    Name                record_modifier
+    Match               *
+    Record              cluster_name ${CLUSTER_NAME}
+    Record              region ${AWS_REGION}
+    Record              openemr_version 7.0.3.4
+    Record              pod_name ${HOSTNAME}
+```
+
+This enriches all log records with cluster, region, version, and pod identification information for better tracking and correlation.
+
+### Loki Output Configuration
+
+In addition to CloudWatch, logs are also sent to Loki for unified log aggregation in Grafana. All Loki outputs are configured with graceful failure handling:
+
+```yaml
+# Example: OpenEMR Application logs to Loki
+[OUTPUT]
+    Name                   loki
+    Match                  openemr.application
+    host                   loki-gateway.monitoring.svc.cluster.local
+    port                   80
+    uri                    /loki/api/v1/push
+    labels                 job=openemr, namespace=openemr, log_type=application, cluster=${CLUSTER_NAME}
+    line_format            json
+    auto_kubernetes_labels on
+    Retry_Limit            False
+    net.connect_timeout    5
+    net.keepalive          off
+```
+
+**Key Loki Configuration Features:**
+- **Graceful failure handling**: `Retry_Limit False` retries indefinitely without crashing (buffers to disk)
+- **Connection timeout**: 5-second timeout prevents hanging connections
+- **Keepalive disabled**: Avoids connection persistence issues
+- **Auto Kubernetes labels**: Automatically includes pod, namespace, and other K8s metadata
+- **Structured logs**: JSON format for better parsing and filtering
+- **Apache label keys**: Apache logs include `label_keys $tag` to capture the source log type (access vs error)
+
 ### Sidecar Deployment Pattern
 
 Fluent Bit is deployed as a sidecar container within each OpenEMR pod, providing:
@@ -288,7 +381,7 @@ Fluent Bit is deployed as a sidecar container within each OpenEMR pod, providing
 
 ```yaml
 - name: fluent-bit-sidecar
-  image: fluent/fluent-bit:4.1.0
+  image: fluent/fluent-bit:4.1.1
   ports:
   - containerPort: 2020
     name: fluent-bit-http
@@ -573,6 +666,18 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 
 **Solution**: Check Fluent Bit logs and IAM policy permissions
 
+#### 4. Loki Connection Issues
+
+**Symptoms**: Fluent Bit logs show connection errors to Loki, but CloudWatch logs work fine
+
+**Cause**: Loki service may be unavailable or unreachable
+
+**Solution**: 
+- This is expected behavior when Loki is not installed. The graceful failure handling (`Retry_Limit False`) ensures logs are buffered to disk and will be retried when Loki becomes available
+- Verify Loki is installed: `kubectl get pods -n monitoring | grep loki`
+- Check Loki gateway service: `kubectl get svc -n monitoring | grep loki`
+- Logs will continue to flow to CloudWatch regardless of Loki status
+
 ### Debugging Steps
 
 1. **Check pod status**: Ensure Fluent Bit sidecar is running
@@ -580,8 +685,35 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 3. **Verify IAM permissions**: Check CloudWatch Logs permissions
 4. **Test authentication**: Verify IRSA token and role assumption
 5. **Monitor CloudWatch**: Check if log groups are being created
+6. **Check Loki status**: Verify Loki pods and services are running if using Grafana
+7. **Review buffer status**: Check Fluent Bit buffer usage for any blocks due to downstream issues
 
-## Recent Improvements (August 28, 2025)
+## Recent Improvements
+
+### Enhanced Service Configuration
+
+- **Filesystem buffering**: Added filesystem storage with 50MB backlog memory limit
+- **Pause-on-chunks-overlimit**: Prevents buffer overflow by pausing processing when chunks exceed limit
+- **Health check monitoring**: 50 error count, 10 retry failure count, 60-second period
+- **256 chunk limit**: Maximum chunks limit for better memory management
+
+### Improved Input Configuration
+
+- **Buffer size standardization**: Changed from Mem_Buf_Limit to Buffer_Max_Size (5MB per input)
+- **Smart log handling**: Added Skip_Long_Lines, Ignore_Older (24h), Path_Key, and exit_on_eof for OpenEMR logs
+- **Metrics enhancement**: Added path.procfs and path.sysfs for node_exporter_metrics
+
+### Metadata Enrichment
+
+- **Record modifier filter**: Automatically adds cluster_name, region, openemr_version, and pod_name to all logs
+- **Better traceability**: Enhanced log correlation and identification across distributed environment
+
+### Dual Output Configuration
+
+- **Loki integration**: Added comprehensive Loki outputs for all log types
+- **Graceful failure handling**: Retry_Limit False prevents crashes when Loki is unavailable
+- **Connection optimization**: 5-second connect timeout and disabled keepalive for better reliability
+- **Auto Kubernetes labels**: Automatic inclusion of pod, namespace, and other metadata
 
 ### Enhanced Health Checks
 
@@ -605,10 +737,13 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 
 ### Configuration
 
-- **Use hardcoded values**: Avoid environment variable substitution for critical paths
+- **Service-level configuration**: Enhanced health checks (50 error count, 10 retry failure count, 60s period)
+- **Filesystem buffering**: Use filesystem storage type with 50MB backlog limit and 256 chunk limit
 - **Monitor all inputs**: Include health checks for all log sources
 - **Set appropriate limits**: Configure memory and CPU limits for Fluent Bit
 - **Enable health checks**: Use liveness and readiness probes
+- **Record enrichment**: Add metadata to all logs via record modifier filter
+- **Dual outputs**: Configure both CloudWatch and Loki outputs for comprehensive monitoring
 
 ### Security
 
@@ -618,10 +753,12 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 
 ### Performance
 
-- **Optimize buffer sizes**: Set appropriate `Mem_Buf_Limit` values
+- **Optimize buffer sizes**: Set appropriate `Buffer_Max_Size` values (currently 5MB per input)
 - **Use skip empty lines**: Reduce processing overhead for empty log entries
 - **Monitor metrics**: Track Fluent Bit performance metrics
 - **Set refresh intervals**: Balance real-time processing with resource usage
+- **Filesystem buffering**: 50MB filesystem buffer with 256 chunk limit for reliability
+- **Smart log handling**: Skip long lines and ignore files older than 24h for OpenEMR logs
 
 ### Maintenance
 

@@ -1,20 +1,50 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR Cluster Security Manager
-# ================================
-# This script manages public access to the EKS cluster endpoint for secure cluster management.
-# It provides commands to enable/disable public access, check status, and schedule automatic
-# disabling to ensure the cluster remains secure when not actively being managed.
+# =============================================================================
+#
+# Purpose:
+#   Manages public access to the EKS cluster endpoint for secure cluster
+#   management. Provides commands to enable/disable public access, check
+#   status, and schedule automatic disabling to ensure cluster security.
 #
 # Key Features:
-# - Enable public access from current IP for cluster management
-# - Disable public access to restrict cluster to private network only
-# - Check current access configuration and IP status
-# - Schedule automatic disabling after a specified time period
-# - Validate IP changes and provide security recommendations
+#   - Enable public access from current IP for cluster management
+#   - Disable public access to restrict cluster to private network only
+#   - Check current access configuration and IP status
+#   - Schedule automatic disabling after a specified time period
+#   - Validate IP changes and provide security recommendations
 #
-# Security Best Practice: Always disable public access when not actively managing the cluster
-# to prevent unauthorized access and maintain security compliance.
+# Prerequisites:
+#   - AWS CLI configured with EKS permissions
+#   - Access to modify EKS cluster configuration
+#
+# Usage:
+#   ./cluster-security-manager.sh {enable|disable|status|auto-disable|check-ip}
+#
+# Options:
+#   enable            Enable public access with your current IP
+#   disable           Disable public access (private only)
+#   status            Show current access configuration
+#   auto-disable [N]  Set up automatic disable (default: 120 minutes)
+#   check-ip          Check if your IP has changed
+#
+# Environment Variables:
+#   CLUSTER_NAME              EKS cluster name (default: openemr-eks)
+#   AWS_REGION                AWS region (default: us-west-2)
+#   CLUSTER_UPDATE_TIMEOUT    Timeout for cluster updates in minutes (default: 5)
+#
+# Notes:
+#   🔒 Security Best Practice: Always disable public access when not actively
+#   managing the cluster to prevent unauthorized access and maintain compliance.
+#
+# Examples:
+#   ./cluster-security-manager.sh enable
+#   ./cluster-security-manager.sh auto-disable 60
+#   ./cluster-security-manager.sh disable
+#
+# =============================================================================
 
 set -e
 

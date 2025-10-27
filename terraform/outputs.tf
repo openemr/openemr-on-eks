@@ -1,6 +1,9 @@
-# EKS Cluster Outputs
-# These outputs expose key information about the EKS cluster for use by other modules,
-# scripts, and external systems that need to interact with the cluster.
+# =============================================================================
+# TERRAFORM OUTPUTS
+# =============================================================================
+# This configuration defines outputs that expose key information about the deployed
+# infrastructure for use by other modules, scripts, and external systems that need
+# to interact with the EKS cluster and associated resources.
 
 output "cluster_endpoint" {
   description = "Endpoint for EKS control plane"
@@ -57,6 +60,11 @@ output "aurora_engine_version" {
 output "aurora_cluster_id" {
   description = "Aurora cluster identifier"
   value       = aws_rds_cluster.openemr.cluster_identifier
+}
+
+output "aurora_db_subnet_group_name" {
+  description = "Aurora database subnet group name"
+  value       = aws_db_subnet_group.openemr.name
 }
 
 output "aurora_password" {

@@ -31,10 +31,11 @@ variable "cluster_name" {
 # Kubernetes version for the EKS cluster
 # Use a stable version that supports the features you need
 # Check AWS documentation for supported versions: https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html
+# Release notes: https://kubernetes.io/blog/2025/08/27/kubernetes-v1-34-release/
 variable "kubernetes_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.33"  # Current stable version with good feature support
+  default     = "1.34"  # Latest stable version (DRA GA, Cgroup autoconfiguration GA)
 }
 
 # =============================================================================
@@ -225,7 +226,7 @@ variable "audit_logs_retention_days" {
 variable "rds_engine_version" {
   description = "Aurora MySQL engine version (check AWS docs for available versions)"
   type        = string
-  default     = "8.0.mysql_aurora.3.10.0"  # Stable Aurora MySQL 8.0 version
+  default     = "8.0.mysql_aurora.3.10.1"  # Stable Aurora MySQL 8.0 version
 }
 
 # =============================================================================

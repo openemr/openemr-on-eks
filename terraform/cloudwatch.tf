@@ -1,5 +1,7 @@
-# CloudWatch Log Groups Configuration
-# This file defines all CloudWatch log groups used for collecting and storing logs
+# =============================================================================
+# CLOUDWATCH LOG GROUPS CONFIGURATION
+# =============================================================================
+# This configuration creates CloudWatch log groups for collecting and storing logs
 # from the OpenEMR application, Apache web server, and Fluent Bit logging agent.
 # All log groups are encrypted using KMS and have configurable retention periods.
 
@@ -121,7 +123,7 @@ resource "aws_cloudwatch_log_group" "fluent_bit_metrics" {
     Name        = "${var.cluster_name}-fluent-bit-metrics"
     Application = "FluentBit"
     LogType     = "Metrics"
-    Version     = "4.1.0"
+    Version     = "4.1.1"
     Description = "Fluent Bit operational metrics and health checks"
   }
 }

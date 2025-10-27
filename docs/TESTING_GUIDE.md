@@ -330,7 +330,7 @@ export VERBOSE=true
 # Dry run to see what would be tested
 ./run-test-suite.sh -d
 
-# Run tests sequentially (disable parallel)
+# Disable parallel execution via environment variable
 PARALLEL=false ./run-test-suite.sh
 
 # Custom test suite via environment variable
@@ -393,6 +393,10 @@ pre-commit install --hook-type commit-msg
 - **Documentation** - Markdown linting (relaxed rules)
 - **Shell Scripts** - ShellCheck validation (errors only)
 - **Git** - Commit message formatting
+
+**Python Hooks Rationale:**
+
+The pre-commit configuration includes Python-specific hooks (Black, isort, flake8, Bandit) even though the current codebase is primarily shell scripts and infrastructure-as-code. These are included because any future machine learning or analytics capabilities we add will almost certainly be written in Python. Having these hooks in place from the beginning ensures Python code quality, security, and consistency from day one.
 
 **Note**: The current configuration uses relaxed linting rules to focus on critical issues while avoiding overly strict formatting requirements. Multi-document YAML files are properly supported.
 

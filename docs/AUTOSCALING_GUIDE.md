@@ -85,16 +85,16 @@ spec:
   maxReplicas: 6  # Cost-conscious maximum
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 60  # Quick response
+      stabilizationWindowSeconds: 60   # Quick response
       policies:
       - type: Percent
-        value: 100  # Double capacity quickly
+        value: 100                     # Double capacity quickly
         periodSeconds: 60
     scaleDown:
       stabilizationWindowSeconds: 600  # Avoid thrashing
       policies:
       - type: Percent
-        value: 25  # Gradual scale-down
+        value: 25                      # Gradual scale-down
         periodSeconds: 300
   metrics:
   - type: Resource
@@ -102,7 +102,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 75  # Balance cost/performance
+        averageUtilization: 75         # Balance cost/performance
   - type: Resource
     resource:
       name: memory
@@ -132,17 +132,17 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr
-  minReplicas: 3  # Better load distribution
+  minReplicas: 3   # Better load distribution
   maxReplicas: 12  # Handle seasonal peaks
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 45  # Faster response
       policies:
       - type: Pods
-        value: 2  # Add 2 pods at a time
+        value: 2         # Add 2 pods at a time
         periodSeconds: 60
       - type: Percent
-        value: 50  # Or 50% increase
+        value: 50        # Or 50% increase
         periodSeconds: 60
       selectPolicy: Max  # Use whichever scales more
     scaleDown:
@@ -180,14 +180,14 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr
-  minReplicas: 5  # Always maintain capacity
+  minReplicas: 5   # Always maintain capacity
   maxReplicas: 30  # Handle major incidents
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 30  # Rapid response
       policies:
       - type: Pods
-        value: 4  # Add 4 pods quickly
+        value: 4    # Add 4 pods quickly
         periodSeconds: 30
       - type: Percent
         value: 100  # Or double capacity
@@ -373,7 +373,7 @@ behavior:
   scaleUp:
     policies:
     - type: Pods
-      value: 4  # Increased from 2
+      value: 4           # Increased from 2
       periodSeconds: 30  # Reduced from 60
 ```
 
@@ -470,7 +470,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 80  # Higher threshold
+        averageUtilization: 80         # Higher threshold
   - type: Resource
     resource:
       name: memory
@@ -482,7 +482,7 @@ spec:
       stabilizationWindowSeconds: 600  # Slower scale-down
       policies:
       - type: Percent
-        value: 10  # Gradual reduction
+        value: 10                      # Gradual reduction
         periodSeconds: 300
 ```
 
@@ -550,7 +550,7 @@ spec:
       name: cpu
       target:
         type: Utilization
-        averageUtilization: 50  # Low threshold
+        averageUtilization: 50         # Low threshold
   - type: Resource
     resource:
       name: memory
@@ -559,10 +559,10 @@ spec:
         averageUtilization: 60
   behavior:
     scaleUp:
-      stabilizationWindowSeconds: 30  # Fast response
+      stabilizationWindowSeconds: 30   # Fast response
       policies:
       - type: Percent
-        value: 100  # Double quickly
+        value: 100                     # Double quickly
         periodSeconds: 30
     scaleDown:
       stabilizationWindowSeconds: 900  # Conservative scale-down
@@ -654,7 +654,7 @@ def calculate_capacity(patient_count, visit_duration_min=20,
     pods_needed = concurrent_users / (25 * utilization_target)
 
     return {
-        'min_replicas': max(2, int(pods_needed * 0.5)),  # 50% of peak
+        'min_replicas': max(2, int(pods_needed * 0.5)),             # 50% of peak
         'max_replicas': int(max(2, int(pods_needed * 0.5)) * 1.5),  # 150% of peak for headroom
         'cpu_threshold': int(utilization_target * 100),
         'expected_peak_users': int(concurrent_users)

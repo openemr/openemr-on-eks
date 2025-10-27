@@ -1,29 +1,50 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR Deployment Validation Script
-# ====================================
-# This script performs comprehensive validation of the deployment environment
-# for OpenEMR on Amazon EKS, checking prerequisites, AWS credentials, infrastructure
-# state, and security configuration. It provides detailed feedback and recommendations
-# for both first-time deployments and existing deployments.
+# =============================================================================
+#
+# Purpose:
+#   Performs comprehensive validation of the deployment environment for
+#   OpenEMR on Amazon EKS, checking prerequisites, AWS credentials,
+#   infrastructure state, and security configuration with detailed feedback.
 #
 # Key Features:
-# - Validates required tools and dependencies (kubectl, aws, helm, jq)
-# - Comprehensive AWS credentials validation and source detection
-# - Infrastructure state checking (Terraform, EKS cluster, AWS resources)
-# - Kubernetes resource validation and namespace checking
-# - Security configuration analysis and recommendations
-# - Deployment readiness assessment with actionable next steps
-# - Support for both first-time and existing deployments
+#   - Validates required tools and dependencies (kubectl, aws, helm, jq)
+#   - Comprehensive AWS credentials validation and source detection
+#   - Infrastructure state checking (Terraform, EKS cluster, AWS resources)
+#   - Kubernetes resource validation and namespace checking
+#   - Security configuration analysis and recommendations
+#   - Deployment readiness assessment with actionable next steps
+#   - Support for both first-time and existing deployments
+#
+# Prerequisites:
+#   - AWS CLI installed
+#   - kubectl installed (for cluster validation)
+#   - jq installed (for JSON parsing)
+#
+# Usage:
+#   ./validate-deployment.sh
+#
+# Environment Variables:
+#   CLUSTER_NAME    EKS cluster name to validate (default: openemr-eks)
+#   AWS_REGION      AWS region (default: us-west-2)
+#   NAMESPACE       Kubernetes namespace (default: openemr)
 #
 # Validation Categories:
-# 1. Prerequisites: Required tools and dependencies
-# 2. AWS Credentials: Authentication and authorization
-# 3. Terraform State: Infrastructure configuration and state
-# 4. Cluster Access: EKS cluster connectivity and configuration
-# 5. AWS Resources: VPC, RDS, ElastiCache, EFS validation
-# 6. Kubernetes Resources: Namespace and deployment status
-# 7. Security Configuration: Endpoint access and encryption
+#   1. Prerequisites      Required tools and dependencies
+#   2. AWS Credentials    Authentication and authorization
+#   3. Terraform State    Infrastructure configuration and state
+#   4. Cluster Access     EKS cluster connectivity and configuration
+#   5. AWS Resources      VPC, RDS, ElastiCache, EFS validation
+#   6. Kubernetes         Namespace and deployment status
+#   7. Security Config    Endpoint access and encryption
+#
+# Examples:
+#   ./validate-deployment.sh
+#   CLUSTER_NAME=my-eks ./validate-deployment.sh
+#
+# =============================================================================
 
 set -e
 
@@ -477,9 +498,9 @@ provide_recommendations() {
     echo -e "   • Basic deployment: CloudWatch logs only"
     echo -e "   • Optional: Enhanced monitoring stack: cd $PROJECT_ROOT/monitoring && ./install-monitoring.sh"
     echo -e "   • Enhanced stack includes:"
-    echo -e "     - Prometheus v77.11.0 (metrics & alerting)"
+    echo -e "     - Prometheus v78.3.2 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
-    echo -e "     - Loki v3.5.3 (log aggregation)"
+    echo -e "     - Loki v6.43.0 (log aggregation)"
     echo -e "     - Jaeger v3.4.1 (distributed tracing)"
     echo -e "     - AlertManager (Slack integration support)"
     echo -e "     - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)"
@@ -576,9 +597,9 @@ main() {
         echo -e "${BLUE}   5. cd $PROJECT_ROOT/k8s${NC}"
         echo -e "${BLUE}   6. ./deploy.sh${NC}"
         echo ""
-        echo -e "${YELLOW}⏱️  Expected deployment time: 25-35 minutes total${NC}"
-        echo -e "${YELLOW}   • Infrastructure (Terraform): 15-20 minutes${NC}"
-        echo -e "${YELLOW}   • Application (Kubernetes): 10-15 minutes${NC}"
+        echo -e "${YELLOW}⏱️  Expected deployment time: 40-45 minutes total (measured from E2E tests)${NC}"
+        echo -e "${YELLOW}   • Infrastructure (Terraform): 30-32 minutes${NC}"
+        echo -e "${YELLOW}   • Application (Kubernetes): 7-11 minutes (can spike to 19 min)${NC}"
         echo ""
     elif [ $errors -eq 0 ]; then
         # Existing deployment scenario - all validations passed

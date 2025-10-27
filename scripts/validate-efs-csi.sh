@@ -1,27 +1,48 @@
 #!/bin/bash
 
+# =============================================================================
 # EFS CSI Driver Validation Script
-# ================================
-# This script validates the EFS CSI (Container Storage Interface) driver configuration
-# for OpenEMR on Amazon EKS. It checks controller pods, IAM permissions, EFS file system
-# accessibility, PVC status, and provides troubleshooting guidance.
+# =============================================================================
+#
+# Purpose:
+#   Validates the EFS CSI (Container Storage Interface) driver configuration
+#   for OpenEMR on Amazon EKS, checking controller pods, IAM permissions,
+#   EFS file system accessibility, and PVC status with troubleshooting guidance.
 #
 # Key Features:
-# - Validates EFS CSI controller pod status and health
-# - Checks IAM configuration (IRSA or Pod Identity) for EFS access
-# - Verifies EFS file system accessibility and state
-# - Analyzes PVC (PersistentVolumeClaim) binding status
-# - Monitors OpenEMR pod status and readiness
-# - Provides comprehensive troubleshooting recommendations
-# - Generates validation summary with pass/fail counts
+#   - Validates EFS CSI controller pod status and health
+#   - Checks IAM configuration (IRSA or Pod Identity) for EFS access
+#   - Verifies EFS file system accessibility and state
+#   - Analyzes PVC (PersistentVolumeClaim) binding status
+#   - Monitors OpenEMR pod status and readiness
+#   - Provides comprehensive troubleshooting recommendations
+#   - Generates validation summary with pass/fail counts
+#
+# Prerequisites:
+#   - kubectl configured for the target cluster
+#   - AWS CLI configured with appropriate permissions
+#   - EFS CSI driver installed in the cluster
+#
+# Usage:
+#   ./validate-efs-csi.sh
+#
+# Environment Variables:
+#   CLUSTER_NAME    EKS cluster name for Pod Identity checks (default: openemr-eks)
+#   AWS_REGION      AWS region (default: us-west-2)
 #
 # Validation Categories:
-# 1. EFS CSI Controller: Pod status and health
-# 2. IAM Configuration: Service account permissions (IRSA/Pod Identity)
-# 3. EFS File System: Accessibility and lifecycle state
-# 4. PVC Status: Binding status for essential and backup volumes
-# 5. Pod Status: OpenEMR pod readiness and health
-# 6. Error Analysis: Recent errors in controller logs
+#   1. EFS CSI Controller    Pod status and health
+#   2. IAM Configuration     Service account permissions (IRSA/Pod Identity)
+#   3. EFS File System       Accessibility and lifecycle state
+#   4. PVC Status            Binding status for essential and backup volumes
+#   5. Pod Status            OpenEMR pod readiness and health
+#   6. Error Analysis        Recent errors in controller logs
+#
+# Examples:
+#   ./validate-efs-csi.sh
+#   CLUSTER_NAME=my-eks ./validate-efs-csi.sh
+#
+# =============================================================================
 
 set -e
 

@@ -1,3 +1,4 @@
+# ======================================================
 # OpenEMR EKS Monthly Version Check & Awareness Workflow
 # ======================================================
 # This workflow provides automated version checking and awareness for all components
@@ -15,7 +16,7 @@
 #
 # Component Categories:
 # - Applications: OpenEMR, monitoring stack, etc.
-# - Infrastructure: EKS, RDS, ElastiCache, EFS
+# - Infrastructure: EKS, RDS
 # - Terraform Modules: Infrastructure as Code components
 # - GitHub Workflows: CI/CD pipeline components
 # - Monitoring: Prometheus, Grafana, Loki
@@ -60,8 +61,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true"  # Enable version checking functionality
   LOG_LEVEL: INFO                # Logging level for detailed output
-  TF_VERSION: "1.13.3"           # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.33.0"     # kubectl version for Kubernetes checks
+  TF_VERSION: "1.13.4"           # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.34.1"     # kubectl version for Kubernetes checks
 
 # Required permissions for version checking and issue creation
 permissions:
@@ -267,7 +268,7 @@ jobs:
               echo "### ✅ Updates Available" >> update-report.md
               echo "" >> update-report.md
               
-              # Create a modern table format
+              # Create a properly formatted table
               echo "| Component | Current → Latest | Priority |" >> update-report.md
               echo "|-----------|------------------|----------|" >> update-report.md
               
@@ -478,23 +479,6 @@ jobs:
 
               console.log('Created manual version check issue:', issue.data.html_url);
             } else {
-              // Scheduled run - check for existing monthly issue to avoid duplicates
-              const issues = await github.rest.issues.listForRepo({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                state: 'open',
-                labels: 'version-check,automated,monthly'
-              });
-
-              const existingIssue = issues.data.find(issue =>
-                issue.title.includes(`Version Check Report for Month of`)
-              );
-
-              if (existingIssue) {
-                console.log('Similar monthly issue already exists:', existingIssue.html_url);
-                return;
-              }
-
               // Create new monthly issue
               const issue = await github.rest.issues.create({
                 owner: context.repo.owner,
@@ -513,7 +497,7 @@ jobs:
     name: Send Notifications
     runs-on: ubuntu-24.04
     needs: version-check  # Wait for version-check job to complete
-    if: always()  # Run regardless of version-check outcome
+    if: always()          # Run regardless of version-check outcome
 
     steps:
       # Step 1: Send success notification

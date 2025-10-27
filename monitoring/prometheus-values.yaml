@@ -49,9 +49,9 @@
 # OBSERVABILITY_NAMESPACE="observability"       # Additional observability components
 
 # Chart Versions (pinned for stability)
-# CHART_KPS_VERSION="77.11.0"                  # kube-prometheus-stack
-# CHART_LOKI_VERSION="3.5.3"                   # Loki stack
-# CHART_JAEGER_VERSION="3.4.1"                 # Jaeger
+# CHART_KPS_VERSION="78.3.2"                    # kube-prometheus-stack
+# CHART_LOKI_VERSION="6.43.0"                   # Loki stack
+# CHART_JAEGER_VERSION="3.4.1"                  # Jaeger
 
 # Ingress Configuration (optional)
 # ENABLE_INGRESS="0"                            # Enable NGINX ingress

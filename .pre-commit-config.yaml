@@ -16,6 +16,9 @@ repos:
       - id: check-docstring-first
       - id: check-executables-have-shebangs
 
+  # Python-specific hooks are included for future machine learning and analytics capabilities.
+  # Any ML/analytics features will almost certainly be implemented in Python, so we enforce
+  # Python best practices, code quality, and security from the start.
   - repo: https://github.com/psf/black
     rev: 25.9.0
     hooks:
@@ -24,7 +27,7 @@ repos:
         types: [python]
 
   - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+    rev: 7.0.0
     hooks:
       - id: isort
         args: ["--profile", "black"]
@@ -43,7 +46,7 @@ repos:
         exclude: ^(tests/|test_|.*_test\.py)
 
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.101.0
+    rev: v1.103.0
     hooks:
       - id: terraform_fmt
       - id: terraform_validate

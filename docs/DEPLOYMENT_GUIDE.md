@@ -2,7 +2,7 @@
 
 This comprehensive guide provides step-by-step instructions for deploying a production-ready OpenEMR system on Amazon EKS with Auto Mode.
 
-> **📌 Prerequisites**: This guide assumes you're deploying to AWS region `us-west-2` with EKS version `1.33`. Adjust accordingly for your region.
+> **📌 Prerequisites**: This guide assumes you're deploying to AWS region `us-west-2` with EKS version `1.34`. Adjust accordingly for your region.
 
 ## 📋 Table of Contents
 
@@ -391,7 +391,7 @@ environment  = "production"
 cluster_name = "openemr-eks"
 
 # Kubernetes Configuration (MUST be 1.29+ for Auto Mode)
-kubernetes_version = "1.33"
+kubernetes_version = "1.34"
 
 # OpenEMR Application Configuration
 openemr_version = "7.0.3"  # Latest stable OpenEMR version
@@ -468,11 +468,13 @@ terraform show -json tfplan | jq '.resource_changes[] | {address: .address, acti
 # Deploy with approval
 terraform apply tfplan
 
-# Monitor deployment (typically 60-65 minutes total)
-# Infrastructure (Terraform): ~32 minutes
+# Monitor deployment (typically 40-45 minutes total)
+# Infrastructure (Terraform): ~30-32 minutes (measured from E2E tests)
 #   - EKS cluster: 15-20 minutes
-#   - Aurora Serverless: 10-15 minutes  
-#   - Other resources: 5-7 minutes
+#   - Aurora RDS cluster: 10-12 minutes  
+#   - VPC/NAT gateways: 3-5 minutes
+#   - Other resources (S3, EFS, ElastiCache, KMS, WAF): 5-8 minutes
+# Application deployment: ~7-11 minutes (measured, can spike to 19 min on bad runs)
 
 # Save outputs for later use
 terraform output -json > ../terraform-outputs.json
@@ -488,7 +490,7 @@ aws eks describe-cluster --name openemr-eks \
 # Expected output:
 # {
 #    "Status": "ACTIVE",
-#    "Version": "1.33",
+#    "Version": "1.34",
 #    "ComputeConfig": {
 #        "enabled": true,
 #        "nodePools": [
@@ -595,7 +597,7 @@ The deployment supports configurable OpenEMR versions through Terraform variable
 
 ```hcl
 # In terraform.tfvars
-openemr_version = "7.0.3"  # Latest stable version (recommended)
+openemr_version = "7.0.3"    # Latest stable version (recommended)
 # openemr_version = "7.0.2"  # Previous stable version
 # openemr_version = "latest" # Latest development version (not recommended for production)
 ```
@@ -614,8 +616,8 @@ openemr_version = "7.0.3"  # Latest stable version (recommended)
 ```bash
 # Use the version checker script
 cd scripts
-./check-openemr-versions.sh --latest    # Show stable version (recommended)
-./check-openemr-versions.sh --count 10  # Show latest 10 versions
+./check-openemr-versions.sh --latest     # Show stable version (recommended)
+./check-openemr-versions.sh --count 10   # Show latest 10 versions
 ./check-openemr-versions.sh --search 7.0 # Show all 7.0.x versions
 ```
 
@@ -924,9 +926,9 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v77.11.0 (metrics & alerting)
+     - Prometheus v78.3.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v3.5.3 (log aggregation)
+     - Loki v6.43.0 (log aggregation)
      - Jaeger v3.4.1 (distributed tracing)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
@@ -1262,23 +1264,37 @@ cd scripts
 # Example with actual backup names:
 ./restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
 
-# The enhanced restore process:
-# - Validates backup bucket and snapshot availability
-# - Handles cross-region snapshot copying automatically
-# - Smart VPC and subnet group detection
-# - Creates Aurora cluster from snapshot
-# - Restores Kubernetes configurations
-# - Provides clear next steps and verification
+# The intelligent restore process automatically detects database state:
+# 
+# **When database doesn't exist or is misconfigured:**
+# 1. Restore database - creates database from snapshot (early)
+# 2. Clean deployment - removes existing resources and cleans database
+# 3. Deploy OpenEMR - fresh install (creates proper config files)
+# 4. Restore database - creates database from snapshot (always)
+# 5. Restore data - extracts backup files + updates configuration
+#
+# **When database exists and is properly configured:**
+# 1. Clean deployment - removes existing resources and database
+# 2. Deploy OpenEMR - fresh install (creates proper config files)
+# 3. Restore database - creates database from snapshot
+# 4. Restore data - extracts backup files + updates configuration
+#
+# - OpenEMR automatically starts working once database and config are ready
 ```
 
-**New Enhanced Features:**
+**Intelligent Process Benefits:**
 
-- ✅ **Smart infrastructure detection** - finds existing VPCs and resources
-- ✅ **Cross-region snapshot handling** - automatic copying when needed
-- ✅ **Safety confirmations** - prompts before destructive operations
-- ✅ **Comprehensive logging** - detailed progress and error reporting
-- ✅ **Clear next steps** - provides exact commands for verification
-- ✅ **Graceful error handling** - continues when possible, fails safely
+- ✅ **Smart database detection** - automatically detects if database exists and is properly configured
+- ✅ **Dynamic process order** - adjusts restore order based on actual database state
+- ✅ **Instance validation** - verifies correct cluster and instance names from Terraform
+- ✅ **Early restore capability** - creates database first when needed to avoid connection issues
+- ✅ **Fresh install approach** - OpenEMR creates proper config files during deployment
+- ✅ **Minimal reconfiguration** - only updates database endpoint after restore
+- ✅ **Automatic recovery** - pods start working once database and config are ready
+- ✅ **Cross-region support** - handles snapshot copying automatically
+- ✅ **Comprehensive validation** - checks all prerequisites before starting
+- ✅ **Clear error messages** - provides actionable feedback and suggestions
+- ✅ **Resilient process** - handles edge cases and provides recovery options
 
 **When to Use:**
 

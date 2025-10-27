@@ -77,7 +77,7 @@ readonly PROJECT_ROOT    # Root directory of the OpenEMR project
 # Deployment timeouts - carefully tuned based on OpenEMR's startup characteristics
 # These timeouts account for OpenEMR's complex initialization process which includes
 # database schema creation, configuration setup, and service startup.
-readonly POD_READY_TIMEOUT=1800          # 30 minutes - OpenEMR can take 10-15 minutes to start
+readonly POD_READY_TIMEOUT=1800          # 30 minutes - OpenEMR can take 7-11 minutes normally (can spike to 19 min)
 readonly HEALTH_CHECK_TIMEOUT=600        # 10 minutes - For PVC binding and service readiness
 readonly EFS_CSI_TIMEOUT=300             # 5 minutes - EFS CSI driver operations
 readonly CLEANUP_WAIT_TIME=5             # 5 seconds - Wait after cleanup operations
@@ -334,6 +334,133 @@ generate_password() {
     local length="${1:-32}"  # Password length (default: 32 characters)
     # Generate base64 random data, remove problematic characters, and truncate to desired length
     openssl rand -base64 "$length" | tr -d "=+/" | cut -c1-"$length"
+}
+
+# Check and ensure database exists for OpenEMR deployment
+# This function verifies database connectivity and creates an empty 'openemr' database
+# if it doesn't exist, ensuring OpenEMR can complete its auto-configuration successfully.
+check_and_ensure_database() {
+    local temp_namespace
+    temp_namespace="db-check-temp-$(date +%s)"
+    local max_attempts=5
+    local attempt=1
+    
+    log_info "Verifying database connection and ensuring 'openemr' database exists..."
+    
+    # Create temporary namespace for database check
+    if ! kubectl create namespace "$temp_namespace" --dry-run=client -o yaml | kubectl apply -f -; then
+        log_error "Failed to create namespace for database check"
+        return 1
+    fi
+    
+    # Create database credentials secret
+    if ! kubectl create secret generic temp-db-credentials \
+        --namespace="$temp_namespace" \
+        --from-literal=mysql-host="$AURORA_ENDPOINT" \
+        --from-literal=mysql-user="openemr" \
+        --from-literal=mysql-password="$AURORA_PASSWORD" \
+        --dry-run=client -o yaml | kubectl apply -f -; then
+        log_error "Failed to create database credentials secret"
+        kubectl delete namespace "$temp_namespace" 2>/dev/null || true
+        return 1
+    fi
+    
+    # Create database check pod
+    if ! cat <<EOF | kubectl apply -f -
+apiVersion: v1
+kind: Pod
+metadata:
+  name: db-check-pod
+  namespace: $temp_namespace
+spec:
+  restartPolicy: Never
+  containers:
+  - name: db-check
+    image: openemr/openemr:$OPENEMR_VERSION
+    env:
+    - name: MYSQL_HOST
+      valueFrom:
+        secretKeyRef:
+          name: temp-db-credentials
+          key: mysql-host
+    - name: MYSQL_USER
+      valueFrom:
+        secretKeyRef:
+          name: temp-db-credentials
+          key: mysql-user
+    - name: MYSQL_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: temp-db-credentials
+          key: mysql-password
+    command: ["/bin/sh"]
+    args:
+    - -c
+    - |
+      set -e
+      echo "Using OpenEMR container ($OPENEMR_VERSION) for database check..."
+      echo "Testing MySQL connection to: \${MYSQL_HOST}"
+      
+      # Install MySQL client
+      apk add --no-cache mysql-client
+      
+      # Test connection and check/create database
+      echo "Testing database connection..."
+      mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SELECT 1;" 2>/dev/null || {
+        echo "❌ Failed to connect to MySQL database"
+        exit 1
+      }
+      
+      echo "✅ Successfully connected to MySQL database"
+      
+      # Check if openemr database exists
+      echo "Checking if 'openemr' database exists..."
+      DB_EXISTS=\$(mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SHOW DATABASES LIKE 'openemr';" 2>/dev/null | grep -c "openemr" || echo "0")
+      
+      if [ "\$DB_EXISTS" = "0" ]; then
+        echo "⚠️  'openemr' database does not exist, creating empty database..."
+        mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "CREATE DATABASE openemr CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;" 2>/dev/null || {
+          echo "❌ Failed to create openemr database"
+          exit 1
+        }
+        echo "✅ Empty 'openemr' database created successfully"
+      else
+        echo "✅ 'openemr' database already exists"
+      fi
+      
+      echo "✅ Database check completed successfully"
+EOF
+    then
+        log_error "Failed to create database check pod"
+        kubectl delete namespace "$temp_namespace" 2>/dev/null || true
+        return 1
+    fi
+    
+    # Wait for pod to be ready
+    kubectl wait --for=condition=Ready pod/db-check-pod -n "$temp_namespace" --timeout=60s 2>/dev/null || true
+    
+    # Wait for completion
+    while [ $attempt -le $max_attempts ]; do
+        if kubectl logs db-check-pod -n "$temp_namespace" 2>/dev/null | grep -q "Database check completed successfully"; then
+            log_success "Database check completed successfully"
+            break
+        fi
+        
+        if [ $attempt -eq $max_attempts ]; then
+            log_error "Database check failed after $max_attempts attempts"
+            kubectl logs db-check-pod -n "$temp_namespace" 2>/dev/null || true
+            kubectl delete namespace "$temp_namespace" 2>/dev/null || true
+            return 1
+        fi
+        
+        log_info "Waiting for database check to complete... (attempt $attempt/$max_attempts)"
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+    
+    # Cleanup
+    kubectl delete namespace "$temp_namespace" 2>/dev/null || true
+    log_success "Database is ready for OpenEMR deployment"
 }
 
 # Check if OpenEMR is already installed and running successfully
@@ -1027,6 +1154,7 @@ log_step "Preparing manifests..."
 sed -i.bak "s/\${EFS_ID}/$EFS_ID/g" storage.yaml
 sed -i.bak "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" deployment.yaml
 sed -i.bak "s/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" deployment.yaml
+sed -i.bak "s/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" ssl-renewal.yaml
 sed -i.bak "s/\${DOMAIN_NAME}/$DOMAIN_NAME/g" deployment.yaml
 sed -i.bak "s/\${AWS_REGION}/$AWS_REGION/g" deployment.yaml
 sed -i.bak "s/\${CLUSTER_NAME}/$CLUSTER_NAME/g" deployment.yaml
@@ -1220,6 +1348,12 @@ kubectl create secret generic openemr-app-credentials \
 log_info "Application credentials secret created/updated."
 log_success "All secrets configured."
 
+# Run database check
+if ! check_and_ensure_database; then
+    log_error "Database check failed - deployment cannot proceed"
+    exit 1
+fi
+
 # Display application and feature configuration
 log_info "OpenEMR Application Configuration:"
 log_success "OpenEMR Version: $OPENEMR_VERSION"
@@ -1364,12 +1498,12 @@ fi
 
 # Wait for deployment rollout to complete with enhanced monitoring
 log_step "Waiting for deployment rollout to complete..."
-log_info "This may take 10-15 minutes for first startup..."
-log_info "OpenEMR containers typically take 8-9 minutes to start responding to HTTP requests on first startup"
+log_info "This may take 7-11 minutes for first startup (measured from E2E tests, can spike to 19 min)..."
+log_info "OpenEMR containers typically take 7-11 minutes to start responding to HTTP requests"
 
 # Enhanced monitoring with periodic status updates
 log_info "📊 Monitoring deployment progress..."
-log_info "⏳ Leader pod: ~10 minutes (database setup) | Follower pods: ~8 minutes"
+log_info "⏳ Leader pod: ~9-11 minutes (database setup) | Follower pods: ~7-9 minutes"
 log_info "💡 Startup phases: OpenEMR init → Database setup → Apache start → Ready"
 echo ""
 

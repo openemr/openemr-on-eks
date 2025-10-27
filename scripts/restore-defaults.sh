@@ -1,20 +1,41 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR Deployment Files Default State Restoration Script
-# ==========================================================
-# This script restores all deployment files to their default Git HEAD state,
-# removing deployment artifacts, backup files, and generated credentials.
-# It's designed to clean up the repository for fresh deployments or git operations.
+# =============================================================================
+#
+# Purpose:
+#   Restores all deployment files to their default Git HEAD state, removing
+#   deployment artifacts, backup files, and generated credentials. Designed
+#   to clean up the repository for fresh deployments or git operations.
 #
 # Key Features:
-# - Restores Kubernetes YAML files to default template state
-# - Removes backup files (.bak) created during deployment
-# - Cleans up generated credentials and temporary files
-# - Provides safety confirmations and backup options
-# - Preserves user configuration files (terraform.tfvars)
+#   - Restores Kubernetes YAML files to default template state
+#   - Removes backup files (.bak) created during deployment
+#   - Cleans up generated credentials and temporary files
+#   - Provides safety confirmations and backup options
+#   - Preserves user configuration files (terraform.tfvars)
 #
-# WARNING: This script will ERASE any structural changes to YAML files.
-# Only use for cleaning up deployment artifacts, NOT during active development.
+# Prerequisites:
+#   - Git repository with clean working tree (for safety)
+#
+# Usage:
+#   ./restore-defaults.sh [OPTIONS]
+#
+# Options:
+#   --force    Skip confirmation prompts
+#   --help     Show this help message
+#
+# Notes:
+#   ⚠️  WARNING: This script will ERASE any structural changes to YAML files.
+#   Only use for cleaning up deployment artifacts, NOT during active development.
+#   Always commit your changes before running this script.
+#
+# Examples:
+#   ./restore-defaults.sh
+#   ./restore-defaults.sh --force
+#
+# =============================================================================
 
 set -e
 

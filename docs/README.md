@@ -10,6 +10,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 
 ### **📄 Core Documentation Files**
 - [Deployment Guide](#deployment_guidemd)
+- [Deployment Timings Guide](#deployment_timingsmd)
 - [Backup & Restore Guide](#backup_restore_guidemd)
 - [Autoscaling Guide](#autoscaling_guidemd)
 - [Logging Guide](#logging_guidemd)
@@ -35,9 +36,10 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 ### Core Documentation Files
 
 - **`DEPLOYMENT_GUIDE.md`** - Complete deployment guide with step-by-step instructions
+- **`DEPLOYMENT_TIMINGS.md`** - Measured timing data for deployment operations and performance analysis
 - **`BACKUP_RESTORE_GUIDE.md`** - Comprehensive backup and disaster recovery procedures
 - **`AUTOSCALING_GUIDE.md`** - Autoscaling configuration and optimization guide
-- **`LOGGING_GUIDE.md`** - Logging configuration and CloudWatch integration
+- **`LOGGING_GUIDE.md`** - Logging configuration with CloudWatch and Loki integration
 - **`TESTING_GUIDE.md`** - Testing framework and CI/CD procedures
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
@@ -48,12 +50,14 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 
 ```mermaid
 graph TD
-    A[DEPLOYMENT_GUIDE.md] --> B[BACKUP_RESTORE_GUIDE.md]
+    A[DEPLOYMENT_GUIDE.md] --> A1[DEPLOYMENT_TIMINGS.md]
+    A --> B[BACKUP_RESTORE_GUIDE.md]
     A --> C[AUTOSCALING_GUIDE.md]
     A --> D[LOGGING_GUIDE.md]
     A --> E[TROUBLESHOOTING.md]
 
-    B --> F[END_TO_END_TESTING_REQUIREMENTS.md]
+    A1 --> F[END_TO_END_TESTING_REQUIREMENTS.md]
+    B --> F
     C --> F
     D --> F
     E --> F
@@ -72,6 +76,7 @@ graph TD
     L[scripts/] --> A
 
     style A fill:#e1f5fe
+    style A1 fill:#e3f2fd
     style B fill:#f3e5f5
     style C fill:#e8f5e8
     style D fill:#fff3e0
@@ -102,6 +107,24 @@ graph TD
   - Modify cost estimation formulas as AWS pricing changes
   - Add new deployment options as they become available
   - Update compliance requirements as regulations change
+
+#### `DEPLOYMENT_TIMINGS.md`
+
+- **Purpose**: Comprehensive timing data and performance metrics for deployment operations
+- **Key Features**:
+  - Measured timings for all deployment operations (infrastructure, application, backup, restore)
+  - Performance insights with consistency analysis
+  - Planning guidelines for production deployments and disaster recovery
+  - Timing comparison tables and best practices
+  - Optimization opportunities and troubleshooting guidance
+  - End-to-end test suite timing data
+- **Dependencies**: All deployment operations (`terraform/`, `k8s/`, `scripts/`)
+- **Maintenance Notes**:
+  - Update timing data periodically based on new test runs
+  - Re-measure after significant infrastructure changes
+  - Adjust timing buffers based on observed variations
+  - Update optimization recommendations as AWS services evolve
+  - Document timing changes when process improvements are implemented
 
 #### `BACKUP_RESTORE_GUIDE.md`
 
@@ -140,11 +163,13 @@ graph TD
 
 #### `LOGGING_GUIDE.md`
 
-- **Purpose**: Comprehensive logging configuration and CloudWatch integration
+- **Purpose**: Comprehensive logging configuration with CloudWatch and Loki integration
 - **Key Features**:
   - OpenEMR 7.0.3.4 logging architecture
   - Fluent Bit sidecar configuration
+  - Dual output to CloudWatch and Loki
   - CloudWatch log groups and retention
+  - Loki integration for Grafana dashboards
   - IRSA authentication setup
   - Compliance and security features
 - **Dependencies**: `k8s/logging.yaml`, `k8s/deployment.yaml`
@@ -153,6 +178,7 @@ graph TD
   - Add new log sources as OpenEMR features are added
   - Modify Fluent Bit configuration for new versions
   - Update CloudWatch integration as AWS services evolve
+  - Keep Loki configuration aligned with Grafana monitoring stack
 
 ### Testing and Quality Assurance
 

@@ -1,32 +1,63 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR End-to-End Backup/Restore Test Script
-# =============================================
-# This script performs comprehensive testing of the complete backup and restore process
-# for OpenEMR on EKS, including infrastructure deployment, data backup, restoration,
-# and verification. It validates the entire disaster recovery workflow.
+# =============================================================================
+#
+# Purpose:
+#   Performs comprehensive testing of the complete backup and restore process
+#   for OpenEMR on EKS, including infrastructure deployment, data backup,
+#   restoration, and verification. Validates entire disaster recovery workflow.
 #
 # Key Features:
-# - Automated infrastructure deployment and cleanup
-# - Complete backup process testing (RDS snapshots, S3 data, K8s configs)
-# - Full restore process validation with intelligent snapshot cleanup
-# - Data integrity verification
-# - Monitoring stack install/uninstall test
-# - Emergency cleanup on test failures with comprehensive resource cleanup
-# - Enhanced error handling and debugging capabilities
-# - Comprehensive test reporting with detailed timing and status
+#   - Automated infrastructure deployment and cleanup
+#   - Complete backup process testing (RDS snapshots, S3 data, K8s configs)
+#   - Full restore process validation with intelligent snapshot cleanup
+#   - Data integrity verification
+#   - Monitoring stack install/uninstall test
+#   - Emergency cleanup on test failures with comprehensive resource cleanup
+#   - Enhanced error handling and debugging capabilities
+#   - Comprehensive test reporting with detailed timing and status
+#
+# Prerequisites:
+#   - AWS CLI configured with appropriate permissions
+#   - Terraform installed and initialized
+#   - kubectl configured (will be configured during test)
+#   - Sufficient AWS quotas for EKS, RDS, S3, ElastiCache
+#
+# Usage:
+#   ./test-end-to-end-backup-restore.sh
+#
+# Environment Variables:
+#   AWS_REGION       AWS region for testing (default: us-west-2)
+#   CLUSTER_NAME     EKS cluster name (default: openemr-eks)
+#   NAMESPACE        Kubernetes namespace (default: openemr)
 #
 # Test Process:
-# 1. Deploy infrastructure (EKS, RDS, S3) if needed
-# 2. Deploy OpenEMR application
-# 3. Create test data and proof files
-# 4. Execute backup process
-# 5. Test monitoring stack install/uninstall
-# 6. Delete all infrastructure
-# 7. Recreate infrastructure
-# 8. Restore from backup
-# 9. Verify data integrity and application functionality
-# 10. Clean up test resources
+#   1. Deploy infrastructure (EKS, RDS, S3) if needed
+#   2. Deploy OpenEMR application
+#   3. Create test data and proof files
+#   4. Execute backup process
+#   5. Test monitoring stack install/uninstall
+#   6. Delete all infrastructure
+#   7. Recreate infrastructure
+#   8. Restore from backup
+#   9. Verify data integrity and application functionality
+#   10. Clean up test resources
+#
+# Notes:
+#   ⚠️  WARNING: This is a destructive test that creates and destroys AWS
+#   resources. Only run in development/testing environments. Takes 160-165 minutes
+#   (~2.7 hours). Measured timings from successful runs: Infrastructure deployment
+#   30-32 min, Application deployment 7-11 min (can spike to 19 min), Backup
+#   ~30-35 sec, Monitoring stack ~8 min, Infrastructure deletion 13-16 min, 
+#   Infrastructure recreation 40-42 min, Restore 38-43 min, Final cleanup 13-14 min,
+#   Total: 160-165 min (2.7 hours).
+#
+# Examples:
+#   ./test-end-to-end-backup-restore.sh
+#
+# =============================================================================
 
 set -euo pipefail
 
@@ -453,6 +484,103 @@ check_prerequisites() {
     log_success "All prerequisites satisfied"
 }
 
+# Check for orphaned resources from previous test runs
+check_for_orphaned_resources() {
+    log_info "Checking for orphaned resources from previous test runs..."
+    
+    local orphaned_found=false
+    local orphaned_details=()
+    
+    # Check for orphaned RDS clusters
+    log_info "Checking for orphaned RDS clusters..."
+    local orphaned_clusters
+    orphaned_clusters=$(aws rds describe-db-clusters \
+        --region "$AWS_REGION" \
+        --query "DBClusters[?contains(DBClusterIdentifier, '$CLUSTER_NAME')].DBClusterIdentifier" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$orphaned_clusters" ]; then
+        orphaned_found=true
+        orphaned_details+=("🔴 RDS Clusters:")
+        for cluster in $orphaned_clusters; do
+            local cluster_status
+            cluster_status=$(aws rds describe-db-clusters \
+                --db-cluster-identifier "$cluster" \
+                --region "$AWS_REGION" \
+                --query "DBClusters[0].Status" \
+                --output text 2>/dev/null || echo "unknown")
+            orphaned_details+=("   - $cluster (status: $cluster_status)")
+        done
+    fi
+    
+    # Check for orphaned EKS clusters
+    log_info "Checking for orphaned EKS clusters..."
+    local orphaned_eks
+    orphaned_eks=$(aws eks describe-cluster \
+        --name "$CLUSTER_NAME" \
+        --region "$AWS_REGION" \
+        --query "cluster.status" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$orphaned_eks" ] && [ "$orphaned_eks" != "None" ]; then
+        orphaned_found=true
+        orphaned_details+=("🔴 EKS Cluster:")
+        orphaned_details+=("   - $CLUSTER_NAME (status: $orphaned_eks)")
+    fi
+    
+    # Check for orphaned S3 buckets
+    log_info "Checking for orphaned S3 buckets..."
+    local orphaned_buckets
+    orphaned_buckets=$(aws s3api list-buckets \
+        --query "Buckets[?contains(Name, '$CLUSTER_NAME')].Name" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$orphaned_buckets" ]; then
+        orphaned_found=true
+        orphaned_details+=("🔴 S3 Buckets:")
+        for bucket in $orphaned_buckets; do
+            orphaned_details+=("   - $bucket")
+        done
+    fi
+    
+    # Check for orphaned ElastiCache clusters
+    log_info "Checking for orphaned ElastiCache clusters..."
+    local orphaned_elasticache
+    orphaned_elasticache=$(aws elasticache describe-cache-clusters \
+        --region "$AWS_REGION" \
+        --query "CacheClusters[?contains(CacheClusterId, '$CLUSTER_NAME')].CacheClusterId" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$orphaned_elasticache" ]; then
+        orphaned_found=true
+        orphaned_details+=("🔴 ElastiCache Clusters:")
+        for cache in $orphaned_elasticache; do
+            orphaned_details+=("   - $cache")
+        done
+    fi
+    
+    # Report findings
+    if [ "$orphaned_found" = true ]; then
+        log_error "❌ Orphaned resources detected from previous test runs!"
+        log_error ""
+        log_error "The following resources must be cleaned up before running this test:"
+        log_error ""
+        for detail in "${orphaned_details[@]}"; do
+            log_error "$detail"
+        done
+        log_error ""
+        log_error "⚠️  These orphaned resources will cause the test to fail."
+        log_error ""
+        log_error "To clean up these resources, run:"
+        log_error "    cd $(dirname "$0") && ./destroy.sh"
+        log_error ""
+        log_error "After cleanup completes, re-run this test."
+        exit 1
+    fi
+    
+    log_success "✅ No orphaned resources found - environment is clean"
+}
+
 # Validate configuration
 validate_configuration() {
     log_info "Validating test configuration..."
@@ -804,14 +932,10 @@ deploy_openemr() {
     ./deploy.sh --cluster-name "$CLUSTER_NAME" --aws-region "$AWS_REGION" --namespace "$NAMESPACE"
 
     # Wait for deployment to be ready with extended timeout
-    log_info "Waiting for OpenEMR deployment to be ready..."
-    if kubectl wait --for=condition=progressing --timeout=1200s deployment/openemr -n "$NAMESPACE"; then
-        log_success "OpenEMR deployment is progressing"
-    else
-        log_warning "OpenEMR deployment not progressing within timeout, checking status..."
-    fi
-
-    # Verify deployment exists before checking status
+    # The deploy script may trigger a rolling restart, so we need to wait for it to complete
+    log_info "Waiting for OpenEMR deployment to be ready (this may take 7-15 minutes after rolling restart)..."
+    
+    # First, wait for deployment to exist
     log_info "Validating OpenEMR deployment exists..."
     if ! kubectl get deployment openemr -n "$NAMESPACE" >/dev/null 2>&1; then
         log_error "OpenEMR deployment not found in namespace $NAMESPACE"
@@ -819,36 +943,90 @@ deploy_openemr() {
     fi
     log_success "OpenEMR deployment found"
     
-    # Verify deployment is ready with detailed status
-    log_info "Verifying deployment status..."
-    local ready_replicas
-    ready_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
-    ready_replicas=${ready_replicas:-0}
-    local desired_replicas
-    desired_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
-    desired_replicas=${desired_replicas:-0}
-    local available_replicas
-    available_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
-    available_replicas=${available_replicas:-0}
-
-    log_info "Deployment status: Ready=$ready_replicas, Available=$available_replicas, Desired=$desired_replicas"
-
-    if [ "$ready_replicas" -gt 0 ] && [ "$ready_replicas" -ge "$desired_replicas" ]; then
-        log_success "OpenEMR deployment is ready ($ready_replicas/$desired_replicas replicas)"
+    # Wait for the rollout to complete (handles rolling restarts properly)
+    log_info "Waiting for deployment rollout to complete (up to 20 minutes)..."
+    if kubectl rollout status deployment/openemr -n "$NAMESPACE" --timeout=1200s 2>&1; then
+        log_success "Deployment rollout completed successfully"
     else
-        log_warning "OpenEMR deployment not fully ready ($ready_replicas/$desired_replicas replicas)"
-        log_info "Checking pod status for more details..."
+        log_warning "Deployment rollout status command timed out, checking if pods are ready anyway..."
+    fi
+    
+    # Additional verification: Wait for all replicas to be ready with retry logic
+    log_info "Verifying all replicas are ready..."
+    local max_ready_attempts=60  # 10 minutes (60 * 10 seconds)
+    local ready_attempt=0
+    local all_ready=false
+    
+    while [ $ready_attempt -lt $max_ready_attempts ]; do
+        local ready_replicas
+        ready_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        ready_replicas=${ready_replicas:-0}
+        local desired_replicas
+        desired_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
+        desired_replicas=${desired_replicas:-0}
+        local available_replicas
+        available_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+        available_replicas=${available_replicas:-0}
+
+        log_info "Deployment status: Ready=$ready_replicas/$desired_replicas, Available=$available_replicas (attempt $((ready_attempt + 1))/$max_ready_attempts)"
+
+        if [ "$ready_replicas" -gt 0 ] && [ "$ready_replicas" -ge "$desired_replicas" ] && [ "$available_replicas" -ge "$desired_replicas" ]; then
+            log_success "OpenEMR deployment is fully ready ($ready_replicas/$desired_replicas replicas)"
+            all_ready=true
+            break
+        fi
+        
+        # Show progress every 30 seconds
+        if [ $((ready_attempt % 3)) -eq 0 ]; then
+            log_info "Still waiting for all replicas to be ready... (${ready_replicas}/${desired_replicas} ready)"
+        fi
+        
+        sleep 10
+        ((ready_attempt++))
+    done
+    
+    if [ "$all_ready" = false ]; then
+        log_warning "Not all replicas became ready within timeout, checking if at least one is available..."
         kubectl get pods -n "$NAMESPACE" -l app=openemr -o wide
         kubectl get events -n "$NAMESPACE" --sort-by='.lastTimestamp' | tail -10
 
         # Check if at least one pod is available
-        if [ "$available_replicas" -gt 0 ]; then
-            log_success "At least one OpenEMR pod is available, proceeding with test"
+        local final_available
+        final_available=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
+        final_available=${final_available:-0}
+        
+        if [ "$final_available" -gt 0 ]; then
+            log_warning "Only $final_available replica(s) available, but proceeding with test"
         else
-            log_error "No OpenEMR pods are available"
+            log_error "No OpenEMR pods are available after waiting"
             return 1
         fi
     fi
+    
+    # CRITICAL: Extra stability period to ensure deployment is truly stable
+    # This prevents test data from being deployed during rolling restart pod churn
+    log_info "========================================="
+    log_info "Allowing 90 seconds for deployment to fully stabilize..."
+    log_info "This ensures no ongoing pod churn from rolling restarts"
+    log_info "========================================="
+    sleep 90
+    
+    # Verify no ongoing rollout/restart is in progress
+    log_info "Verifying deployment is stable (no ongoing rollouts)..."
+    local progressing_status
+    progressing_status=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Progressing")].status}' 2>/dev/null)
+    local progressing_reason
+    progressing_reason=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Progressing")].reason}' 2>/dev/null)
+    
+    log_info "Deployment Progressing status: $progressing_status (reason: $progressing_reason)"
+    
+    if [ "$progressing_status" = "True" ] && [ "$progressing_reason" != "NewReplicaSetAvailable" ]; then
+        log_warning "Deployment still progressing (reason: $progressing_reason)"
+        log_info "Waiting additional 60 seconds for rollout to complete..."
+        sleep 60
+    fi
+    
+    log_success "✅ Deployment confirmed stable and ready for test data"
 
     # Additional wait for containers to be fully ready
     log_info "Waiting for OpenEMR containers to be fully ready..."
@@ -887,29 +1065,29 @@ deploy_openemr() {
                 log_success "OpenEMR container is ready and accepting traffic"
                 break
             else
-                        # Get more detailed container status for debugging
-                        local container_state
-                        local container_ready
-                        local pod_ready
-                        local container_restart_count
-                        container_state=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].state}' 2>/dev/null || echo "Unknown")
-                        container_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].ready}' 2>/dev/null || echo "false")
-                        pod_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
-                        container_restart_count=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].restartCount}' 2>/dev/null || echo "0")
-                        
-                        log_info "Container not ready yet (attempt $((container_wait_attempts + 1))/$max_container_wait)"
-                        log_info "  Container state: $container_state"
-                        log_info "  Container ready: $container_ready"
-                        log_info "  Pod ready: $pod_ready"
-                        log_info "  Restart count: $container_restart_count"
-                        
-                        # Show recent events if container is having issues
-                        if [ "$container_restart_count" -gt 0 ]; then
-                            log_info "  Recent pod events:"
-                            kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp' | tail -3 | sed 's/^/    /' || true
-                        fi
-                        
-                        log_info "  Waiting 10 seconds before next attempt..."
+                # Get more detailed container status for debugging
+                local container_state
+                local container_ready
+                local pod_ready
+                local container_restart_count
+                container_state=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].state}' 2>/dev/null || echo "Unknown")
+                container_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].ready}' 2>/dev/null || echo "false")
+                pod_ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || echo "False")
+                container_restart_count=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.containerStatuses[?(@.name=="openemr")].restartCount}' 2>/dev/null || echo "0")
+                
+                log_info "Container not ready yet (attempt $((container_wait_attempts + 1))/$max_container_wait)"
+                log_info "  Container state: $container_state"
+                log_info "  Container ready: $container_ready"
+                log_info "  Pod ready: $pod_ready"
+                log_info "  Restart count: $container_restart_count"
+                
+                # Show recent events if container is having issues
+                if [ "$container_restart_count" -gt 0 ]; then
+                    log_info "  Recent pod events:"
+                    kubectl get events -n "$NAMESPACE" --field-selector involvedObject.name="$pod_name" --sort-by='.lastTimestamp' | tail -3 | sed 's/^/    /' || true
+                fi
+                
+                log_info "  Waiting 10 seconds before next attempt..."
             fi
         else
             log_info "No pod found yet (attempt $((container_wait_attempts + 1))/$max_container_wait), waiting 10 seconds..."
@@ -1010,6 +1188,63 @@ deploy_test_data() {
         return 1
     fi
 
+    # CRITICAL: Wait for OpenEMR swarm mode initialization to complete BEFORE deploying test data
+    # This prevents our test data from being wiped out by swarm mode's sites directory restoration
+    log_info "========================================="
+    log_info "Waiting for OpenEMR swarm mode initialization to complete..."
+    log_info "This prevents test data from being overwritten during swarm init"
+    log_info "May take 10-15 minutes for database setup on fresh deployments"
+    log_info "========================================="
+    
+    local swarm_max_wait=1200  # 20 minutes (allows for database setup)
+    local swarm_elapsed=0
+    local swarm_check_interval=10
+    local swarm_complete=false
+    
+    while [ $swarm_elapsed -lt $swarm_max_wait ]; do
+        # Check for instance-swarm-ready marker in /root/ (container-local, not EFS)
+        # This is more reliable than docker-completed which persists on EFS across pod generations
+        # docker-completed on EFS might be from a previous pod, but instance-swarm-ready is THIS pod's status
+        local instance_swarm_ready
+        local sites_default_exists
+        
+        instance_swarm_ready=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -f /root/instance-swarm-ready && echo 'yes' || echo 'no'" 2>/dev/null)
+        sites_default_exists=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites/default && echo 'yes' || echo 'no'" 2>/dev/null)
+        
+        # Treat empty responses as errors (pod terminating/inaccessible)
+        if [ -z "$instance_swarm_ready" ]; then
+            instance_swarm_ready="error"
+        fi
+        if [ -z "$sites_default_exists" ]; then
+            sites_default_exists="error"
+        fi
+        
+        # Handle pod restarts/inaccessibility
+        if [ "$instance_swarm_ready" = "error" ] || [ "$sites_default_exists" = "error" ]; then
+            log_warning "Pod became inaccessible (instance_swarm_ready='$instance_swarm_ready', sites_default='$sites_default_exists'), waiting..."
+            sleep $swarm_check_interval
+            swarm_elapsed=$((swarm_elapsed + swarm_check_interval))
+            continue
+        fi
+        
+        if [ "$instance_swarm_ready" = "yes" ] && [ "$sites_default_exists" = "yes" ]; then
+            log_success "✅ Swarm mode initialization complete for THIS pod (elapsed: ${swarm_elapsed}s)"
+            log_info "Pod-local swarm marker confirmed - safe to deploy test data"
+            swarm_complete=true
+            break
+        fi
+        
+        log_info "⏳ Waiting for swarm mode... (instance_ready=$instance_swarm_ready, sites/default=$sites_default_exists) - elapsed: ${swarm_elapsed}s"
+        sleep $swarm_check_interval
+        swarm_elapsed=$((swarm_elapsed + swarm_check_interval))
+    done
+    
+    if [ "$swarm_complete" = false ]; then
+        log_error "Timeout waiting for swarm mode initialization (${swarm_elapsed}s)"
+        log_error "OpenEMR may still be initializing - cannot safely deploy test data"
+        return 1
+    fi
+    
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive..."
     log_info "This may take 25-30 minutes for OpenEMR to fully initialize..."
@@ -1057,6 +1292,106 @@ deploy_test_data() {
         log_info "This could indicate OpenEMR is taking longer than expected to initialize"
     fi
 
+    # CRITICAL: Final verification that pod is still running before deploying test data
+    log_info "Re-verifying pod is still running before deploying test data..."
+    local final_pod_phase
+    final_pod_phase=$(kubectl get pod "$pod_name" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
+    
+    if [ "$final_pod_phase" != "Running" ]; then
+        log_error "Pod $pod_name is no longer running (status: $final_pod_phase)"
+        log_error "Pod was likely terminated during rolling restart"
+        log_error "Cannot safely deploy test data"
+        return 1
+    fi
+    
+    log_success "Pod $pod_name confirmed running - safe to deploy test data"
+
+    # CRITICAL: Use Kubernetes built-in readiness probes to wait for ALL pods
+    # If pods pass readiness probes, they're fully initialized and won't overwrite data
+    log_info "========================================="
+    log_info "Waiting for ALL OpenEMR pods to pass readiness probes..."
+    log_info "This ensures all pods are fully initialized"
+    log_info "========================================="
+    
+    # Get all pods
+    local all_pods
+    all_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o name 2>/dev/null)
+    local pod_count=$(echo "$all_pods" | wc -l | tr -d ' ')
+    log_info "Found $pod_count pod(s) to wait for"
+    
+    # Wait for all pods to be ready using a more robust approach
+    log_info "Waiting for all pods to pass readiness checks (timeout: 20 minutes)..."
+    
+    local wait_timeout=1200  # 20 minutes
+    local wait_elapsed=0
+    local check_interval=10
+    local all_ready=false
+    
+    while [ $wait_elapsed -lt $wait_timeout ]; do
+        # Get current pod status
+        local pod_status
+        pod_status=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.status.phase}{"\t"}{.status.containerStatuses[?(@.name=="openemr")].ready}{"\n"}{end}' 2>/dev/null)
+        
+        if [ -z "$pod_status" ]; then
+            log_info "No pods found, waiting... (elapsed: ${wait_elapsed}s)"
+            sleep $check_interval
+            wait_elapsed=$((wait_elapsed + check_interval))
+            continue
+        fi
+        
+        # Check if all pods are running and ready
+        local all_running=true
+        local all_ready_status=true
+        local pod_count=0
+        
+        while IFS=$'\t' read -r pod_name pod_phase container_ready; do
+            if [ -n "$pod_name" ]; then
+                pod_count=$((pod_count + 1))
+                if [ "$pod_phase" != "Running" ]; then
+                    all_running=false
+                    log_info "Pod $pod_name is in phase: $pod_phase (elapsed: ${wait_elapsed}s)"
+                elif [ "$container_ready" != "true" ]; then
+                    all_ready_status=false
+                    log_info "Pod $pod_name container not ready (elapsed: ${wait_elapsed}s)"
+                fi
+            fi
+        done <<< "$pod_status"
+        
+        if [ $pod_count -eq 0 ]; then
+            log_info "No pods found, waiting... (elapsed: ${wait_elapsed}s)"
+        elif [ "$all_running" = true ] && [ "$all_ready_status" = true ]; then
+            log_success "✅ ALL $pod_count pod(s) are ready and fully initialized"
+            log_success "Safe to deploy test data - OpenEMR is stable"
+            all_ready=true
+            break
+        else
+            log_info "Waiting for pods to be ready... ($pod_count pods, elapsed: ${wait_elapsed}s)"
+        fi
+        
+        sleep $check_interval
+        wait_elapsed=$((wait_elapsed + check_interval))
+    done
+    
+    if [ "$all_ready" = false ]; then
+        log_error "Timeout waiting for all pods to become ready (${wait_elapsed}s)"
+        log_info "Current pod status:"
+        kubectl get pods -n "$NAMESPACE" -l app=openemr -o wide || true
+        return 1
+    fi
+    
+    # Additional 30 second buffer for EFS propagation across all pods
+    log_info "Allowing 30 seconds for EFS state to stabilize across all pods..."
+    sleep 30
+
+    # Re-select a pod after multi-pod wait
+    log_info "Re-selecting a pod for test data deployment..."
+    pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    if [ -z "$pod_name" ]; then
+        log_error "No OpenEMR pods found after readiness check"
+        return 1
+    fi
+    log_success "Selected pod for test data: $pod_name"
+
     # Create test data directory
     log_info "Creating test data directory..."
     kubectl_exec_with_retry "$pod_name" "mkdir -p /var/www/localhost/htdocs/openemr/sites/default/documents/test_data"
@@ -1072,6 +1407,19 @@ deploy_test_data() {
     if [[ "$file_content" == *"Test ID: ${TEST_TIMESTAMP}"* ]]; then
         log_success "Test data deployed successfully"
         log_info "Proof file content: $file_content"
+        
+        # Quick EFS sync to ensure data is written
+        log_info "Syncing test data to EFS (30 seconds)..."
+        kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "sync" 2>/dev/null || log_warning "Sync failed, but continuing"
+        sleep 30
+        
+        # Final verification
+        if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -f /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt" 2>/dev/null; then
+            log_success "✅ Test data confirmed stable on EFS"
+        else
+            log_error "❌ Test data disappeared - EFS sync issue!"
+            return 1
+        fi
     else
         log_error "Test data verification failed"
         return 1
@@ -1081,6 +1429,48 @@ deploy_test_data() {
     step_duration=$(get_duration "$step_start")
     log_success "Test data deployment completed in ${step_duration}s"
     add_test_result "Test Data Deployment" "SUCCESS" "Proof file created with timestamp: $TEST_TIMESTAMP" "$step_duration"
+}
+
+# Helper function: Validate backup contains application data
+validate_backup_contains_app_data() {
+    local bucket=$1
+    
+    log_info "Validating backup contains application data..."
+    
+    # Check if application data exists in S3
+    local app_data_exists
+    # Use grep -q to avoid the exit code issue, then count separately
+    if aws s3 ls "s3://${bucket}/application-data/" --region "$AWS_REGION" 2>/dev/null | grep -q "app-data-backup-"; then
+        app_data_exists=1
+    else
+        app_data_exists=0
+    fi
+    
+    if [ "$app_data_exists" -eq 0 ]; then
+        log_error "Application data backup not found in S3"
+        log_error "Expected to find app-data-backup file in s3://${bucket}/application-data/"
+        
+        # Check backup report for failures
+        local report_file
+        report_file=$(aws s3 ls "s3://${bucket}/reports/" --region "$AWS_REGION" 2>/dev/null | grep "backup-report-" | tail -1 | awk '{print $4}')
+        
+        if [ -n "$report_file" ]; then
+            log_info "Checking backup report for details..."
+            local temp_report="/tmp/backup-report-check.txt"
+            if aws s3 cp "s3://${bucket}/reports/${report_file}" "$temp_report" --region "$AWS_REGION" 2>/dev/null; then
+                if grep -q "Application Data.*FAILED" "$temp_report" 2>/dev/null; then
+                    log_error "Backup report confirms application data backup failed:"
+                    grep "Application Data" "$temp_report" | head -5
+                fi
+                rm -f "$temp_report"
+            fi
+        fi
+        
+        return 1
+    fi
+    
+    log_success "Application data backup validated in S3"
+    return 0
 }
 
 # Step 4: Backup entire installation
@@ -1094,17 +1484,31 @@ backup_installation() {
     # Run backup script and capture output with progress feedback
     log_info "Running backup script..."
     log_info "This may take 5-10 minutes for database snapshot and file backup..."
-    local backup_output
-    backup_output=$(./scripts/backup.sh --cluster-name "$CLUSTER_NAME" --source-region "$AWS_REGION" --backup-region "$AWS_REGION" 2>&1)
+    log_info "========================================="
+    log_info "BACKUP SCRIPT OUTPUT (real-time)"
+    log_info "========================================="
+    
+    # Use tee to show output in real-time AND capture it for parsing
+    local backup_output_file="/tmp/backup-output-${TEST_TIMESTAMP}.log"
+    ./scripts/backup.sh --cluster-name "$CLUSTER_NAME" --source-region "$AWS_REGION" --backup-region "$AWS_REGION" 2>&1 | tee "$backup_output_file"
     local backup_exit_code=$?
+    
+    log_info "========================================="
+    log_info "END OF BACKUP SCRIPT OUTPUT"
+    log_info "========================================="
+    
+    # Read captured output for parsing
+    local backup_output
+    backup_output=$(cat "$backup_output_file" 2>/dev/null || echo "")
 
     if [ $backup_exit_code -ne 0 ]; then
         log_error "Backup script failed with exit code $backup_exit_code"
-        log_error "Backup output: $backup_output"
+        rm -f "$backup_output_file"
         return 1
     fi
 
     log_info "Backup completed successfully"
+    rm -f "$backup_output_file"
 
     # Extract backup information from backup script output
     log_info "Extracting backup information..."
@@ -1162,9 +1566,25 @@ backup_installation() {
     log_info "Backup Bucket: $BACKUP_BUCKET"
     log_info "Snapshot ID: $SNAPSHOT_ID"
 
+    # Validate that backup actually backed up application data
+    log_info "Validating backup completeness..."
+    if ! validate_backup_contains_app_data "$BACKUP_BUCKET"; then
+        log_error "Backup validation failed - application data not backed up"
+        log_error "Cannot proceed with restore test - no data to restore"
+        log_error "This typically means the backup ran before OpenEMR was fully initialized"
+        
+        # Mark this as a backup failure
+        local step_duration
+        step_duration=$(get_duration "$step_start")
+        add_test_result "Backup Creation" "FAILED" "Application data not backed up" "$step_duration"
+        return 1
+    fi
+    
+    log_success "Backup validation passed - all expected data backed up"
+
     local step_duration
     step_duration=$(get_duration "$step_start")
-    add_test_result "Backup Creation" "SUCCESS" "Snapshot: $SNAPSHOT_ID" "$step_duration"
+    add_test_result "Backup Creation" "SUCCESS" "Snapshot: $SNAPSHOT_ID, Application data verified" "$step_duration"
 }
 
 # Function to robustly empty S3 bucket (all versions and delete markers)
@@ -1292,7 +1712,7 @@ disable_rds_deletion_protection() {
 
     log_info "Disabling deletion protection for RDS cluster: $db_cluster_id"
 
-        # Check current deletion protection status
+    # Check current deletion protection status
     local current_protection
     current_protection=$(aws rds describe-db-clusters \
             --db-cluster-identifier "$db_cluster_id" \
@@ -1318,7 +1738,7 @@ disable_rds_deletion_protection() {
                 log_warning "Wait for cluster available failed, but continuing..."
             }
 
-            # Verify deletion protection is disabled
+        # Verify deletion protection is disabled
         local new_protection
         new_protection=$(aws rds describe-db-clusters \
                 --db-cluster-identifier "$db_cluster_id" \
@@ -1490,13 +1910,15 @@ delete_infrastructure() {
     # Use the comprehensive destroy.sh script for bulletproof cleanup
     log_info "Using comprehensive destroy.sh script for complete infrastructure cleanup..."
     
-    # Note: We do NOT clean up the backup bucket here because we need it for restoration
-    # The backup bucket will be cleaned up in the final cleanup step
+    # Note: We do NOT clean up the backup bucket OR snapshots here because we need them for restoration
+    # The backup bucket and snapshots will be cleaned up in the final cleanup step
     log_info "Preserving backup bucket for restoration step: $BACKUP_BUCKET"
+    log_info "Preserving backup snapshot for restoration step: $SNAPSHOT_ID"
     
-    # Export cluster name for destroy.sh script
+    # Export cluster name and flags for destroy.sh script
     export CLUSTER_NAME="$CLUSTER_NAME"
     export AWS_REGION="$AWS_REGION"
+    export PRESERVE_BACKUP_SNAPSHOTS="true"  # CRITICAL: Preserve backup snapshots for restore test
     
     # Ensure we're in the project root directory for consistent path handling
     cd "$PROJECT_ROOT"
@@ -1635,11 +2057,24 @@ restore_from_backup() {
     log_info "Using backup bucket: $BACKUP_BUCKET"
     log_info "Using snapshot ID: $SNAPSHOT_ID"
     log_info "Using AWS region: $AWS_REGION"
-    ./scripts/restore.sh "$BACKUP_BUCKET" "$SNAPSHOT_ID" "$AWS_REGION" --force
+    log_info "========================================="
+    log_info "RESTORE SCRIPT OUTPUT (real-time)"
+    log_info "========================================="
+    
+    ./scripts/restore.sh "$BACKUP_BUCKET" "$SNAPSHOT_ID" --region "$AWS_REGION"
+    local restore_exit_code=$?
+    
+    log_info "========================================="
+    log_info "END OF RESTORE SCRIPT OUTPUT"
+    log_info "========================================="
+    
+    if [ $restore_exit_code -ne 0 ]; then
+        log_error "Restore script failed with exit code $restore_exit_code"
+        return 1
+    fi
 
     # Wait for restoration to complete with progress feedback
     log_info "Waiting for restoration to complete..."
-    log_info "This may take 2-3 minutes for restoration to finish..."
     local wait_time=180  # 3 minutes
     local check_interval=10  # Check every 10 seconds
     local elapsed=0
@@ -1927,6 +2362,35 @@ verify_restoration() {
         log_info "Proceeding with proof file verification..."
     fi
 
+    # CRITICAL: Wait for EFS to fully propagate restored files before verification
+    log_info "========================================="
+    log_info "Waiting for EFS to stabilize after restoration (30 seconds)..."
+    log_info "This ensures restored files are visible across all pods"
+    log_info "========================================="
+    sleep 30
+    
+    # Force sync and verify filesystem is stable
+    log_info "Forcing filesystem sync before verification..."
+    if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "sync" 2>/dev/null; then
+        log_success "Filesystem sync completed"
+    else
+        log_warning "Filesystem sync failed, but continuing with verification"
+    fi
+    
+    # Quick sanity check: Verify EFS mount is still working
+    log_info "Verifying EFS mount is accessible..."
+    if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites" 2>/dev/null; then
+        log_success "EFS mount confirmed accessible"
+        
+        # Show what's in sites/ for debugging
+        local sites_contents
+        sites_contents=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "ls -la /var/www/localhost/htdocs/openemr/sites/ 2>/dev/null | head -10" 2>/dev/null || echo "Unable to list")
+        log_info "Contents of sites/ directory:"
+        echo "$sites_contents"
+    else
+        log_error "EFS mount not accessible - this will cause verification to fail"
+    fi
+
     # Verify proof.txt exists
     log_info "Verifying proof.txt file exists..."
     if kubectl_exec_with_retry "$pod_name" "test -f /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/proof.txt"; then
@@ -1948,6 +2412,83 @@ verify_restoration() {
         fi
     else
         log_error "Proof file not found after restoration"
+        
+        # COMPREHENSIVE DEBUGGING - what went wrong?
+        log_error "========================================="
+        log_error "DEBUGGING RESTORATION FAILURE"
+        log_error "========================================="
+        
+        # 1. Check what's in the sites directory
+        log_error "1. Checking sites directory structure:"
+        kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "ls -laR /var/www/localhost/htdocs/openemr/sites/ | head -100" 2>&1 || log_error "Failed to list sites directory"
+        
+        # 2. Check if sites/default exists
+        log_error "2. Checking for sites/default:"
+        if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites/default" 2>/dev/null; then
+            log_error "sites/default EXISTS"
+            kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "ls -la /var/www/localhost/htdocs/openemr/sites/default/ | head -50" 2>&1 || true
+        else
+            log_error "sites/default does NOT EXIST - this is the problem!"
+        fi
+        
+        # 3. Check if test_data directory exists
+        log_error "3. Checking for test_data directory:"
+        if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites/default/documents/test_data" 2>/dev/null; then
+            log_error "test_data directory EXISTS"
+            kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "ls -la /var/www/localhost/htdocs/openemr/sites/default/documents/test_data/" 2>&1 || true
+        else
+            log_error "test_data directory does NOT EXIST"
+        fi
+        
+        # 4. Count total files in sites
+        log_error "4. File count in sites directory:"
+        local file_count
+        file_count=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "find /var/www/localhost/htdocs/openemr/sites/ -type f 2>/dev/null | wc -l" 2>/dev/null || echo "0")
+        log_error "Total files in sites/: $file_count"
+        
+        # 5. Check EFS mount
+        log_error "5. Checking EFS mount status:"
+        kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "df -h | grep -E 'Filesystem|efs'" 2>&1 || log_error "Failed to check EFS mount"
+        kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- sh -c "mount | grep efs" 2>&1 || log_error "No EFS mount found"
+        
+        # 6. Check container logs for errors
+        log_error "6. Recent container logs (last 30 lines):"
+        kubectl logs "$pod_name" -n "$NAMESPACE" -c openemr --tail=30 2>&1 || log_error "Failed to get logs"
+        
+        # 7. Check backup contents in S3
+        log_error "7. Checking what was actually in the backup:"
+        log_error "Application data backups in S3:"
+        aws s3 ls "s3://$BACKUP_BUCKET/application-data/" --region "$AWS_REGION" 2>&1 || log_error "Failed to list S3 backup"
+        
+        # 8. Try to download and inspect the backup locally
+        log_error "8. Attempting to inspect backup contents:"
+        local backup_file
+        backup_file=$(aws s3 ls "s3://$BACKUP_BUCKET/application-data/" --region "$AWS_REGION" | grep "app-data-backup-" | sort -k1,2 | tail -1 | awk '{print $4}')
+        if [ -n "$backup_file" ]; then
+            log_error "Found backup: $backup_file"
+            log_error "Downloading and inspecting..."
+            local temp_backup="/tmp/debug-backup.tar.gz"
+            if aws s3 cp "s3://$BACKUP_BUCKET/application-data/$backup_file" "$temp_backup" --region "$AWS_REGION" 2>/dev/null; then
+                log_error "Backup contents:"
+                tar -tzf "$temp_backup" 2>&1 | head -50 || log_error "Failed to list backup contents"
+                log_error "Checking for proof.txt in backup:"
+                if tar -tzf "$temp_backup" 2>/dev/null | grep -q "proof.txt"; then
+                    log_error "proof.txt IS in the backup!"
+                else
+                    log_error "proof.txt is NOT in the backup - backup itself is incomplete!"
+                fi
+                rm -f "$temp_backup"
+            else
+                log_error "Failed to download backup for inspection"
+            fi
+        else
+            log_error "No backup file found in S3!"
+        fi
+        
+        log_error "========================================="
+        log_error "END DEBUGGING OUTPUT"
+        log_error "========================================="
+        
         local step_duration
         step_duration=$(get_duration "$step_start")
         add_test_result "Restoration Verification" "FAILED" "Proof file not found after restoration" "$step_duration"
@@ -2220,6 +2761,10 @@ main() {
 
     # Check prerequisites
     check_prerequisites
+    
+    # Check for orphaned resources from previous test runs
+    # This prevents cascading failures and provides clear error messages
+    check_for_orphaned_resources
 
     # Validate configuration
     validate_configuration

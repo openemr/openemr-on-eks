@@ -1,14 +1,15 @@
 <div align="center">
 
-# OpenEMR EKS Deployment with Auto Mode v2.x.x
+<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="600">
 
-*Democratizing healthcare technology by making enterprise-grade OpenEMR deployments accessible to organizations of any size through automated, cloud-native infrastructure.*
+<!-- Status Badges -->
+[![CI/CD Tests](../../actions/workflows/ci-cd-tests.yml/badge.svg)](../../actions/workflows/ci-cd-tests.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../../blob/main/LICENSE)
+[![Version](https://img.shields.io/github/v/release/Jmevorach/openemr-on-eks?label=version&color=blue)](../../releases)
 
-<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="300">
+*This deployment provides a production-ready OpenEMR system on Amazon EKS with **EKS Auto Mode** for fully managed EC2 infrastructure with automatic provisioning, configurable autoscaling and a production-ready alerting, monitoring and observability stack.*
 
 </div>
-
-This deployment provides a production-ready OpenEMR system on Amazon EKS with **EKS Auto Mode** for fully managed EC2 infrastructure with automatic provisioning and optimization.
 
 > **⚠️ HIPAA Compliance Notice**: No matter what you're deploying to AWS full HIPAA compliance requires ...
 >
@@ -47,14 +48,10 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 - [Deployment Workflow](#-deployment-workflow)
 - [Backup & Restore System](#-backup--restore-system)
 
-### **⚙️ Operations**
-
+### **⚙️  Workflows & Operations**
 - [Monitoring & Observability](#-monitoring--observability)
 - [Disaster Recovery](#disaster-recovery-procedures)
 - [Troubleshooting](#-troubleshooting-guide)
-
-### **⚙️  Workflows & Operations**
-
 - [Common Workflows](#-common-workflows)
 - [Manual Release System](#-manual-release-system)
 
@@ -62,11 +59,11 @@ This deployment provides a production-ready OpenEMR system on Amazon EKS with **
 
 - [Testing Framework](#-testing-framework)
 - [CI/CD Pipeline](#-cicd-pipeline)
+- [Version Awareness](#-version-awareness)
 
 ### **📚 Additional Resources**
 
 - [Additional Resources](#-additional-resources-1)
-- [Version Awareness](#-version-awareness)
 - [License and Compliance](#license-and-compliance)
 
 ---
@@ -78,7 +75,7 @@ graph TB
     subgraph "AWS Cloud"
         subgraph "VPC - Private Network"
             subgraph "EKS Auto Mode Cluster"
-                AM[Auto Mode Controller<br/>Kubernetes 1.33]
+                AM[Auto Mode Controller<br/>Kubernetes 1.34]
                 BN[Bottlerocket Nodes<br/>SELinux Enforced]
                 OP[OpenEMR Pods<br/>PHI Processing]
             end
@@ -121,8 +118,8 @@ graph TB
   - **Fully Managed Compute**:
     - [AWS EKS Auto Mode Documentation](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
     - EC2 instances provisioned automatically with 12% management fee
-  - **Kubernetes 1.33**:
-    - [Kubernetes v1.33 Octarine Release Blog](https://kubernetes.io/blog/2025/04/23/kubernetes-v1-33-release/)
+  - **Kubernetes 1.34**:
+    - [Kubernetes v1.34 "Of Wind & Will" Release Blog](https://kubernetes.io/blog/2025/08/27/kubernetes-v1-34-release/)
     - Latest stable version with Auto Mode support
   - **Bottlerocket OS**:
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
@@ -132,7 +129,7 @@ graph TB
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.13.3)**
+#### **Terraform Installation (Required: v1.13.4)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -140,17 +137,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.13.3/
+# Visit: https://releases.hashicorp.com/terraform/1.13.4/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.13.3
-tfenv use 1.13.3
+tfenv install 1.13.4
+tfenv use 1.13.4
 
 # Verify installation
-terraform --version  # Should show v1.13.3
+terraform --version  # Should show v1.13.4
 ```
 
 #### **Other Required Tools**
@@ -180,7 +177,7 @@ aws --version  # Must be 2.15.0 or higher
 
 # EKS Auto Mode specific requirements
 - Authentication mode: API or API_AND_CONFIG_MAP
-- Kubernetes version: 1.29 or higher (1.33 configured)
+- Kubernetes version: 1.29 or higher (1.34 configured)
 ```
 
 ### **Repository Configuration (Recommended)**
@@ -243,11 +240,11 @@ brew install terraform kubectl helm awscli jq
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.13.3/
+# Download from: https://releases.hashicorp.com/terraform/1.13.4/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.13.3
-# tfenv use 1.13.3
+# tfenv install 1.13.4
+# tfenv use 1.13.4
 
 # Configure AWS credentials
 aws configure
@@ -341,9 +338,9 @@ Next steps for first-time deployment:
    5. cd /path/to/GitHub/openemr-on-eks/k8s
    6. ./deploy.sh
 
-⏱️  Expected deployment time: 25-35 minutes total
-   • Infrastructure (Terraform): 15-20 minutes
-   • Application (Kubernetes): 10-15 minutes
+⏱️  Expected deployment time: 40-45 minutes total
+   • Infrastructure (Terraform): 30-32 minutes
+   • Application (Kubernetes): 7-11 minutes
 
 📋 Deployment Recommendations
 =============================
@@ -368,9 +365,9 @@ Next steps for first-time deployment:
 • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v77.12.0 (metrics & alerting)
+     - Prometheus v78.3.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v3.5.3 (log aggregation)
+     - Loki v6.43.0 (log aggregation)
      - Jaeger v3.4.1 (distributed tracing)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
@@ -390,11 +387,11 @@ cp terraform.tfvars.example terraform.tfvars
 cat > terraform.tfvars <<EOF
 # Cluster Configuration
 cluster_name = "openemr-eks"
-kubernetes_version = "1.33"  # Latest stable with Auto Mode
+kubernetes_version = "1.34"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.3"  # Latest stable OpenEMR version
+openemr_version = "7.0.3"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -476,7 +473,7 @@ terraform validate
 # Review deployment plan
 terraform plan -out=tfplan
 
-# Deploy infrastructure (~30-40 minutes)
+# Deploy infrastructure (~30-32 minutes)
 terraform apply tfplan
 
 # (OPTIONAL) Deploy infrastructure and measure the time it takes
@@ -539,7 +536,7 @@ cd ../k8s
 # Update kubeconfig
 aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 
-# For testing deployments (~10-15 minutes) (uses self-signed certificates)
+# For testing deployments (~7-11 minutes) (uses self-signed certificates)
 ./deploy.sh
 
 # To time run for testing deployments (uses self-signed certificates)
@@ -593,7 +590,7 @@ cd ../scripts
 cd ../scripts
 ./cluster-security-manager.sh enable
 
-# Install comprehensive monitoring stack (15-25 minutes)
+# Install comprehensive monitoring stack (~8 minutes)
 cd ../monitoring
 ./install-monitoring.sh
 
@@ -620,9 +617,9 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v77.12.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v78.3.2 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
-- 📝 **Loki**: v6.41.1 single-binary (log aggregation with 720h retention)
+- 📝 **Loki**: v6.43.0 single-binary (log aggregation with 720h retention)
 - 🔍 **Jaeger**: v3.4.1 (distributed tracing)
 - 🚨 **AlertManager**: Slack integration support with customizable notifications
 - 🎯 **OpenEMR Integration**: Automatically and continually collects a broad set of metrics from the OpenEMR namespace where your application is running so you can precisely monitor the health and performance of your OpenEMR deployment in real-time. (see [monitoring documentation](./monitoring/README.md) guidance for creating custom dashboards)
@@ -714,6 +711,7 @@ openemr-on-eks/
 ├── docs/                                  # Complete documentation
 │   ├── README.md                          # Complete documentation index and maintenance guide
 │   ├── DEPLOYMENT_GUIDE.md                # Step-by-step deployment guide
+│   ├── DEPLOYMENT_TIMINGS.md              # Measured timing data for all operations (based on E2E test runs)
 │   ├── AUTOSCALING_GUIDE.md               # Autoscaling configuration and optimization
 │   ├── MANUAL_RELEASES.md                 # Guide to the OpenEMR on EKS release system
 │   ├── VERSION_MANAGEMENT.md              # Version awareness and dependency management
@@ -1640,7 +1638,7 @@ The project includes a comprehensive **automated end-to-end backup/restore test 
 #### **⚠️ Test Considerations**
 
 - **Resources**: AWS resources will be created and destroyed during testing
-- **Duration**: 2-4 hours depending on infrastructure size
+- **Duration**: 2.7 hours (160-165 minutes measured in actual test runs)
 - **Resources**: Creates and destroys real AWS resources
 - **Requirements**: Proper AWS credentials and permissions
 
@@ -1967,6 +1965,8 @@ pre-commit install --hook-type commit-msg
 - Documentation (Markdown linting with relaxed rules via `.markdownlint.json`)
 - Shell scripts (ShellCheck)
 
+> **Note:** Python-specific hooks (Black, isort, flake8, Bandit) are included for future machine learning and analytics capabilities, which will almost certainly be implemented in Python. These hooks ensure Python code quality and security from day one.
+
 ### **Test Results**
 
 - **Local Reports** - Stored in `test-results/` directory
@@ -2014,18 +2014,19 @@ Automated testing and quality assurance through GitHub Actions.
 
 Each directory now includes detailed README.md files with maintenance guidance for developers and maintainers:
 
-#### **🏗️ Infrastructure Documentation**
+#### **🏗️ Directory Documentation**
 
 - **[Terraform Directory](terraform/README.md)** - Complete infrastructure documentation with dependency graphs
 - **[Kubernetes Directory](k8s/README.md)** - Kubernetes manifests documentation with deployment workflows
 - **[Scripts Directory](scripts/README.md)** - Operational scripts documentation and maintenance guide
 - **[GitHub Directory](.github/workflows/README.md)** - CI/CD workflows and automation documentation
 - **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
+- **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
 
 #### **📖 User Documentation**
 
-- **[Documentation Index](docs/README.md)** - Complete documentation index and maintenance guide
 - [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) - Complete deployment instructions and configuration
+- [Deployment Timings Guide](docs/DEPLOYMENT_TIMINGS.md) - Measured timing data for all operations (infrastructure, backup, restore, etc.)
 - [Autoscaling Guide](docs/AUTOSCALING_GUIDE.md) - Horizontal Pod Autoscaler configuration and management
 - [Version Management Guide](docs/VERSION_MANAGEMENT.md) - Version awareness and dependency management
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions

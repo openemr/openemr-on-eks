@@ -1,23 +1,53 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR Feature Manager
-# ======================
-# This script manages OpenEMR API and Patient Portal features by modifying Terraform
-# configuration variables and applying infrastructure changes. It provides a centralized
-# way to enable/disable OpenEMR features without manual configuration file editing.
+# =============================================================================
+#
+# Purpose:
+#   Manages OpenEMR API and Patient Portal features by modifying Terraform
+#   configuration variables and applying infrastructure changes. Provides
+#   centralized control to enable/disable features without manual editing.
 #
 # Key Features:
-# - Enable/disable OpenEMR REST API and FHIR endpoints
-# - Enable/disable OpenEMR Patient Portal functionality
-# - Update Terraform variables and apply infrastructure changes
-# - Redeploy OpenEMR with new feature configurations
-# - Display current feature status and configuration
+#   - Enable/disable OpenEMR REST API and FHIR endpoints
+#   - Enable/disable OpenEMR Patient Portal functionality
+#   - Update Terraform variables and apply infrastructure changes
+#   - Redeploy OpenEMR with new feature configurations
+#   - Display current feature status and configuration
+#
+# Prerequisites:
+#   - Terraform installed and initialized
+#   - kubectl configured for the target cluster
+#   - AWS CLI configured with appropriate permissions
+#
+# Usage:
+#   ./openemr-feature-manager.sh {enable-api|disable-api|enable-portal|disable-portal|status}
+#
+# Options:
+#   enable-api       Enable OpenEMR REST API and FHIR endpoints
+#   disable-api      Disable OpenEMR REST API and FHIR endpoints
+#   enable-portal    Enable OpenEMR Patient Portal
+#   disable-portal   Disable OpenEMR Patient Portal
+#   status           Display current feature configuration
+#
+# Environment Variables:
+#   NAMESPACE       Kubernetes namespace (default: openemr)
+#   CLUSTER_NAME    EKS cluster name (default: openemr-eks)
+#   AWS_REGION      AWS region (default: us-west-2)
 #
 # Workflow:
-# 1. Updates Terraform variables in terraform.tfvars
-# 2. Applies Terraform changes to update infrastructure outputs
-# 3. Redeploys OpenEMR with new feature configuration
-# 4. Validates feature status and provides feedback
+#   1. Updates Terraform variables in terraform.tfvars
+#   2. Applies Terraform changes to update infrastructure outputs
+#   3. Redeploys OpenEMR with new feature configuration
+#   4. Validates feature status and provides feedback
+#
+# Examples:
+#   ./openemr-feature-manager.sh status
+#   ./openemr-feature-manager.sh enable-api
+#   ./openemr-feature-manager.sh disable-portal
+#
+# =============================================================================
 
 set -e
 

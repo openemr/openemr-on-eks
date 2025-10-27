@@ -1,33 +1,57 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR EKS Version Management System
-# ====================================
-# This script provides comprehensive automated version checking and management
-# for all components in the OpenEMR EKS deployment. It tracks versions across
-# the entire codebase, generates detailed reports, and provides update recommendations.
+# =============================================================================
+#
+# Purpose:
+#   Provides comprehensive automated version checking and management for all
+#   components in the OpenEMR EKS deployment. Tracks versions across the
+#   entire codebase, generates reports, and provides update recommendations.
 #
 # Key Features:
-# - Automated version checking across the entire codebase
-# - Comprehensive version tracking in versions.yaml
-# - Detailed reporting with categorized file locations
-# - Support for multiple component types (containers, actions, modules, etc.)
-# - Automated report generation with update recommendations
-# - Integration with CI/CD pipelines for automated updates
-# - Comprehensive logging and audit trail
+#   - Automated version checking across the entire codebase
+#   - Comprehensive version tracking in versions.yaml
+#   - Detailed reporting with categorized file locations
+#   - Support for multiple component types (containers, actions, modules, etc.)
+#   - Automated report generation with update recommendations
+#   - Integration with CI/CD pipelines for automated updates
+#   - Comprehensive logging and audit trail
 #
-# Component Types Supported:
-# - Docker containers (OpenEMR, monitoring stack, etc.)
-# - GitHub Actions (workflows and reusable actions)
-# - Terraform modules and providers
-# - Helm charts and Kubernetes manifests
-# - Python packages and dependencies
-# - Node.js packages and dependencies
+# Prerequisites:
+#   - Internet connectivity for version checking
+#   - jq (for JSON parsing)
+#   - yq (for YAML parsing)
+#   - Access to Docker Hub, GitHub, Terraform Registry APIs
 #
 # Usage:
-#   ./version-manager.sh check-all          # Check all components
-#   ./version-manager.sh check <component>  # Check specific component
-#   ./version-manager.sh report             # Generate version report
-#   ./version-manager.sh update <component> # Update specific component
+#   ./version-manager.sh [COMMAND] [OPTIONS]
+#
+# Commands:
+#   check [--components TYPE]  Check for available updates (awareness only)
+#   status                     Show current version status
+#   help                       Show this help message
+#
+# Environment Variables:
+#   None - Script uses fixed paths relative to project root
+#
+# Component Types Supported:
+#   - Docker containers (OpenEMR, monitoring stack, etc.)
+#   - GitHub Actions (workflows and reusable actions)
+#   - Terraform modules and providers
+#   - Helm charts and Kubernetes manifests
+#   - Python packages and dependencies
+#   - Node.js packages and dependencies
+#
+# Examples:
+#   ./version-manager.sh check                                        # Check all components
+#   ./version-manager.sh check --components applications              # Check only applications
+#   ./version-manager.sh check --components terraform_modules         # Check only Terraform modules
+#   ./version-manager.sh check --components eks_addons                # Check only EKS add-ons
+#   ./version-manager.sh check --create-issue --month "January 2025"  # Create GitHub issue
+#   ./version-manager.sh status                                       # Show current status
+#
+# =============================================================================
 
 set -euo pipefail
 
@@ -343,6 +367,13 @@ get_latest_docker_version() {
         return 1
     fi
 
+    # Validate that response is valid JSON before parsing
+    if ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Invalid JSON response from Docker Hub for $registry. API may be rate-limited or changed."
+        log "DEBUG" "Response preview: $(echo "$response" | head -c 200)..."
+        return 1
+    fi
+
     # Parse and filter versions, excluding architecture-specific tags
     # Only include semantic version numbers (e.g., "7.0.3", not "7.0.3-amd64")
     local versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
@@ -597,9 +628,9 @@ get_latest_terraform_module_version() {
     # Fetch module information from the Terraform registry
     local response=$(curl -s "$url" 2>/dev/null || echo "")
 
-    # Check if the API call was successful
-    if [ -z "$response" ]; then
-        log "WARN" "Could not fetch module information from Terraform registry"
+    # Check if the API call was successful and response is valid JSON
+    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
+        log "WARN" "Could not fetch or parse module information from Terraform registry"
         echo "❌ Error"
         return
     fi
@@ -633,10 +664,16 @@ get_latest_github_action_version() {
     # Fetch the latest release information from GitHub API
     local response=$(curl -s "$url" 2>/dev/null || echo "")
 
-    # Check if the API call was successful
-    if [ -z "$response" ]; then
-        echo "❌ Error"
-        return
+    # Check if the API call was successful and response is valid JSON
+    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Failed to fetch or parse GitHub API response for $action_name"
+        return 1
+    fi
+
+    # Check for GitHub API error messages
+    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
+        log "ERROR" "GitHub API error for $action_name: $(echo "$response" | jq -r '.message')"
+        return 1
     fi
 
     # Extract tag name (version) from the release information

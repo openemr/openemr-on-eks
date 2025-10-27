@@ -1,3 +1,4 @@
+# =====================================
 # OpenEMR EKS CI/CD Test Suite Workflow
 # =====================================
 # This workflow provides comprehensive testing and validation for the OpenEMR EKS deployment
@@ -52,8 +53,8 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.13.7'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.13.3' # Terraform version for infrastructure validation
+  PYTHON_VERSION: '3.14.0'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.13.4' # Terraform version for infrastructure validation
   KUBECTL_VERSION: 'v1.34.1'  # kubectl version for Kubernetes manifest validation
 
 jobs:

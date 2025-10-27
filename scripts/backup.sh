@@ -1,26 +1,29 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR EKS Backup Script
-# Comprehensive backup solution for OpenEMR on Amazon EKS
+# =============================================================================
 #
-# This script performs a complete backup of an OpenEMR deployment running on Amazon EKS,
-# including database snapshots, Kubernetes configurations, secrets, and application data.
-# It creates both machine-readable metadata and human-readable reports for disaster recovery.
+# Purpose:
+#   Performs comprehensive backup of an OpenEMR deployment on Amazon EKS,
+#   including RDS database snapshots, Kubernetes configurations, secrets,
+#   and application data from EFS volumes. Creates both machine-readable
+#   metadata and human-readable reports for disaster recovery operations.
 #
 # Key Features:
-# - RDS Aurora cluster snapshot creation with availability verification
-# - Kubernetes namespace export (deployments, services, secrets, configmaps, PVCs, PVs)
-# - Application data backup from EFS volumes
-# - S3 backup bucket creation with versioning and encryption
-# - Comprehensive metadata generation for restore operations
-# - Human-readable backup reports with verification steps
-# - Error handling and rollback capabilities
+#   - RDS Aurora cluster snapshot creation with availability verification
+#   - Kubernetes namespace export (deployments, services, secrets, configmaps, PVCs, PVs)
+#   - Application data backup from EFS volumes
+#   - S3 backup bucket creation with versioning and encryption
+#   - Comprehensive metadata generation for restore operations
+#   - Human-readable backup reports with verification steps
+#   - Error handling and rollback capabilities
 #
 # Prerequisites:
-# - AWS CLI configured with appropriate permissions
-# - kubectl configured to access the EKS cluster
-# - Terraform state available for infrastructure discovery
-# - Sufficient AWS permissions for RDS, S3, and EFS operations
+#   - AWS CLI configured with appropriate permissions
+#   - kubectl configured to access the EKS cluster
+#   - Terraform state available for infrastructure discovery
+#   - Sufficient AWS permissions for RDS, S3, and EFS operations
 #
 # Usage:
 #   ./backup.sh [OPTIONS]
@@ -33,13 +36,24 @@
 #   --help                  Show this help message
 #
 # Environment Variables:
-#   CLUSTER_NAME            EKS cluster name
-#   AWS_REGION              AWS region for source resources
-#   BACKUP_REGION           AWS region for backup storage
-#   NAMESPACE               Kubernetes namespace
-#   CLUSTER_AVAILABILITY_TIMEOUT  Timeout for RDS cluster availability (default: 1800s = 30m)
-#   SNAPSHOT_AVAILABILITY_TIMEOUT Timeout for RDS snapshot availability (default: 1800s = 30m)
-#   POLLING_INTERVAL              Polling interval in seconds (default: 30s)
+#   CLUSTER_NAME                  EKS cluster name (default: openemr-eks)
+#   AWS_REGION                    AWS region for source resources (default: us-west-2)
+#   BACKUP_REGION                 AWS region for backup storage (default: same as AWS_REGION)
+#   NAMESPACE                     Kubernetes namespace (default: openemr)
+#   BACKUP_STRATEGY               Backup strategy: same-region, cross-region, cross-account (default: same-region)
+#   TARGET_ACCOUNT_ID             Target AWS account ID for cross-account backups (optional)
+#   KMS_KEY_ID                    KMS key ID for encrypted snapshots (optional, uses default if empty)
+#   COPY_TAGS                     Whether to copy tags to backup snapshots (default: true)
+#   CLUSTER_AVAILABILITY_TIMEOUT  RDS cluster availability timeout in seconds (default: 1800)
+#   SNAPSHOT_AVAILABILITY_TIMEOUT RDS snapshot availability timeout in seconds (default: 1800)
+#   POLLING_INTERVAL              Polling interval in seconds for status checks (default: 30)
+#
+# Examples:
+#   ./backup.sh
+#   ./backup.sh --cluster-name my-eks --namespace production
+#   ./backup.sh --backup-region us-east-1
+#
+# =============================================================================
 
 set -e
 
@@ -340,6 +354,11 @@ check_dependencies() {
         missing_deps+=("gzip")
     fi
 
+    # Check jq (required for metadata generation)
+    if ! command -v jq >/dev/null 2>&1; then
+        missing_deps+=("jq")
+    fi
+
     if [ ${#missing_deps[@]} -gt 0 ]; then
         log_error "Missing required dependencies: ${missing_deps[*]}"
         log_info "Please install: ${missing_deps[*]}"
@@ -620,8 +639,14 @@ if [ -n "$AURORA_CLUSTER_ID" ] && [ "$AURORA_CLUSTER_ID" != "None" ]; then
             add_result "Aurora RDS" "FAILED" "Snapshot creation failed"
         fi
     else
+        # Get actual cluster status for the error message
+        CLUSTER_STATUS=$(aws rds describe-db-clusters \
+            --db-cluster-identifier "$AURORA_CLUSTER_ID" \
+            --region "$AWS_REGION" \
+            --query 'DBClusters[0].Status' \
+            --output text 2>/dev/null || echo "unknown")
         log_warning "Aurora cluster not available (status: ${CLUSTER_STATUS})"
-        add_result "Aurora RDS" "SKIPPED" "Cluster not available"
+        add_result "Aurora RDS" "SKIPPED" "Cluster not available (status: ${CLUSTER_STATUS})"
     fi
 else
     log_warning "No Aurora cluster found"
@@ -666,58 +691,155 @@ else
     add_result "Kubernetes Config" "SKIPPED" "Cluster not accessible"
 fi
 
+# Helper function: Wait for a Ready OpenEMR pod with EFS volume mounted
+wait_for_ready_pod_with_efs() {
+    local max_attempts=30  # 5 minutes (30 * 10 seconds)
+    local attempt=1
+    
+    # Redirect logs to stderr so only pod name goes to stdout
+    log_info "Waiting for a Ready OpenEMR pod with EFS volume mounted and swarm mode complete..." >&2
+    
+    while [ $attempt -le $max_attempts ]; do
+        # Get ALL running pods, not just the first one
+        local pod_names
+        pod_names=$(kubectl get pods -n "$NAMESPACE" -l app=openemr \
+            -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' 2>/dev/null)
+        
+        # Check each pod to find one that's ready
+        for pod_name in $pod_names; do
+            if [ -n "$pod_name" ]; then
+                # Check if pod is Ready
+                local ready
+                ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
+                    -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
+                
+                if [ "$ready" = "True" ]; then
+                # Check if sites directory exists (indicates EFS is mounted and initialized)
+                if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
+                   sh -c "test -d /var/www/localhost/htdocs/openemr/sites" 2>/dev/null; then
+                    
+                    # CRITICAL: Verify container is fully initialized by checking for tar utility
+                    # This prevents race conditions where pod is "Ready" but container init isn't complete
+                    if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
+                       sh -c "command -v tar" >/dev/null 2>&1; then
+                        
+                        # CRITICAL: Verify OpenEMR swarm mode initialization is complete for THIS pod
+                        # Check /root/instance-swarm-ready (container-local) not docker-completed (EFS-shared)
+                        # This ensures THIS specific pod has completed swarm init, not just a previous pod
+                        local instance_swarm_ready
+                        instance_swarm_ready=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
+                           sh -c "test -f /root/instance-swarm-ready && echo 'yes' || echo 'no'" 2>/dev/null || echo 'no')
+                        
+                        if [ "$instance_swarm_ready" = "yes" ]; then
+                            log_success "Found Ready pod with EFS mounted, container initialized, and swarm mode complete: $pod_name" >&2
+                            echo "$pod_name"
+                            return 0
+                        else
+                            log_info "Pod $pod_name is Ready but swarm mode still initializing (instance-swarm-ready not found)" >&2
+                        fi
+                    else
+                        log_info "Pod $pod_name is Ready but container not fully initialized yet (tar not available)" >&2
+                    fi
+                else
+                    log_info "Pod $pod_name is Ready but EFS sites directory not mounted yet" >&2
+                fi
+            else
+                log_info "Pod $pod_name is Running but not Ready yet" >&2
+            fi
+        fi
+        done
+        
+        log_info "Waiting for Ready pod with swarm mode complete (attempt $attempt/$max_attempts)..." >&2
+        sleep 10
+        ((attempt++))
+    done
+    
+    log_error "No Ready pod with EFS mounted and swarm mode complete found within 5 minutes" >&2
+    return 1
+}
+
+# Note: We no longer wait for sites/default to exist, as in fresh OpenEMR installations
+# this directory is created during the setup wizard. We'll back up whatever exists in
+# the sites/ directory, which is sufficient for backup/restore operations.
+
 # Backup application data
 log_info "📦 Backing up application data..."
 
 if kubectl cluster-info >/dev/null 2>&1; then
-    # Find OpenEMR pods
-    POD_NAME=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
+    # Wait for a Ready OpenEMR pod with EFS mounted
+    POD_NAME=$(wait_for_ready_pod_with_efs)
 
     if [ -n "$POD_NAME" ]; then
-        log_info "Found OpenEMR pod: ${POD_NAME}"
+        log_info "Using OpenEMR pod for backup: ${POD_NAME}"
+        
+        # Re-verify pod is still running before backup
+        pod_phase=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
+        
+        if [ "$pod_phase" != "Running" ]; then
+            log_error "Pod $POD_NAME is no longer running (status: $pod_phase)"
+            log_error "Pod may have been terminated between selection and backup"
+            add_result "Application Data" "FAILED" "Pod terminated before backup"
+        else
+            log_success "Pod confirmed running - proceeding with backup"
 
-        # Create application data backup
+        # Create application data backup (backs up entire sites/ directory)
+        # Note: This will back up whatever exists in sites/, even if sites/default
+        # hasn't been fully initialized yet (which is normal for fresh installations)
         APP_BACKUP_FILE="app-data-backup-${TIMESTAMP}.tar.gz"
 
-        # First, check if the sites directory exists
-        if kubectl exec -n "$NAMESPACE" "$POD_NAME" -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites" 2>/dev/null; then
-            log_info "Sites directory exists, creating backup..."
+        # Note: tar utility availability was already verified in wait_for_ready_pod_with_efs()
+        log_info "Container verified as fully initialized with tar utility available"
 
-            # Check if tar is available
-            if kubectl exec -n "$NAMESPACE" "$POD_NAME" -- sh -c "which tar" 2>/dev/null; then
-                log_info "Tar utility available, creating archive..."
+        # Check if sites directory exists at all (with detailed error handling)
+        log_info "Verifying sites directory exists on pod $POD_NAME..."
+        sites_check_output=$(kubectl exec -n "$NAMESPACE" "$POD_NAME" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites && echo 'EXISTS' || echo 'NOT_FOUND'" 2>&1)
+        sites_check_exit=$?
+        
+        log_info "Sites directory check result: exit=$sites_check_exit, output='$sites_check_output'"
+        
+        if [ $sites_check_exit -eq 0 ] && [[ "$sites_check_output" == *"EXISTS"* ]]; then
+            log_success "Sites directory confirmed accessible"
+            
+            # Create tar archive with error capture
+            log_info "Creating tar archive of sites/ directory..."
+            tar_output=$(kubectl exec -n "$NAMESPACE" "$POD_NAME" -c openemr -- sh -c "tar -czf /tmp/${APP_BACKUP_FILE} -C /var/www/localhost/htdocs/openemr sites/" 2>&1)
+            tar_exit=$?
+            
+            log_info "Tar creation result: exit=$tar_exit"
+            
+            if [ $tar_exit -eq 0 ]; then
+                log_success "Tar archive created successfully"
+                
+                # Copy from pod
+                log_info "Copying tar archive from pod..."
+                kubectl cp "${NAMESPACE}/${POD_NAME}:/tmp/${APP_BACKUP_FILE}" "./${APP_BACKUP_FILE}" -c openemr 2>/dev/null
 
-                if kubectl exec -n "$NAMESPACE" "$POD_NAME" -- sh -c "tar -czf /tmp/${APP_BACKUP_FILE} -C /var/www/localhost/htdocs/openemr sites/" 2>/dev/null; then
-            # Copy from pod
-            kubectl cp "${NAMESPACE}/${POD_NAME}:/tmp/${APP_BACKUP_FILE}" "./${APP_BACKUP_FILE}" 2>/dev/null
+                # Upload to S3
+                if aws s3 cp "${APP_BACKUP_FILE}" "s3://${BACKUP_BUCKET}/application-data/" --region "$BACKUP_REGION"; then
+                    log_success "Application data backed up"
+                    add_result "Application Data" "SUCCESS" "$APP_BACKUP_FILE"
+                else
+                    log_warning "Failed to upload application data"
+                    add_result "Application Data" "FAILED" "Upload failed"
+                fi
 
-            # Upload to S3
-            if aws s3 cp "${APP_BACKUP_FILE}" "s3://${BACKUP_BUCKET}/application-data/" --region "$BACKUP_REGION"; then
-                log_success "Application data backed up"
-                add_result "Application Data" "SUCCESS" "$APP_BACKUP_FILE"
+                # Cleanup
+                rm -f "${APP_BACKUP_FILE}"
+                kubectl exec -n "$NAMESPACE" "$POD_NAME" -c openemr -- sh -c "rm -f /tmp/${APP_BACKUP_FILE}" 2>/dev/null || true
             else
-                log_warning "Failed to upload application data"
-                add_result "Application Data" "FAILED" "Upload failed"
-            fi
-
-            # Cleanup
-            rm -f "${APP_BACKUP_FILE}"
-            kubectl exec -n "$NAMESPACE" "$POD_NAME" -- sh -c "rm -f /tmp/${APP_BACKUP_FILE}" 2>/dev/null || true
-        else
-            log_warning "Failed to create tar archive"
-            add_result "Application Data" "FAILED" "Tar archive creation failed"
-        fi
-            else
-                log_warning "Tar utility not available in container"
-                add_result "Application Data" "FAILED" "Tar utility not found"
+                log_error "Failed to create tar archive"
+                log_error "Tar error output: $tar_output"
+                add_result "Application Data" "FAILED" "Tar archive creation failed"
             fi
         else
-            log_warning "Sites directory not found in container"
+            log_error "Sites directory not accessible on pod $POD_NAME"
+            log_error "Check exit code: $sites_check_exit, output: '$sites_check_output'"
             add_result "Application Data" "FAILED" "Sites directory not found"
         fi
+        fi  # Close the else block from pod running check
     else
-        log_warning "No OpenEMR pods found"
-        add_result "Application Data" "SKIPPED" "No pods found"
+        log_warning "No Ready OpenEMR pod with EFS mounted found"
+        add_result "Application Data" "FAILED" "No Ready pod with EFS available"
     fi
 else
     log_warning "Kubernetes cluster not accessible"

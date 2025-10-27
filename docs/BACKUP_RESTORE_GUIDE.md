@@ -323,14 +323,15 @@ Options:
   --manual-instructions  Show manual restore instructions
 
 Environment Variables:
-  AWS_REGION            Target AWS region (default: us-west-2)
-  NAMESPACE             Kubernetes namespace (default: openemr)
-  RESTORE_DATABASE      Restore database (default: true)
-  RESTORE_APP_DATA      Restore application data (default: true)
-  RECONFIGURE_DB        Reconfigure database (default: true)
-  RESTORE_STRATEGY      Restore strategy (default: auto-detect)
-  SOURCE_ACCOUNT_ID     Source AWS account ID for cross-account restores
-  KMS_KEY_ID            KMS key ID for encrypted snapshots
+  AWS_REGION              Target AWS region (default: us-west-2)
+  NAMESPACE               Kubernetes namespace (default: openemr)
+  RESTORE_DATABASE        Restore database (default: true)
+  RESTORE_APP_DATA        Restore application data (default: true)
+  RECONFIGURE_DB          Reconfigure database (default: true)
+  RESTORE_STRATEGY        Restore strategy (default: auto-detect)
+  SOURCE_ACCOUNT_ID       Source AWS account ID for cross-account restores
+  KMS_KEY_ID              KMS key ID for encrypted snapshots
+  DB_CLEANUP_MAX_ATTEMPTS Maximum attempts to wait for database cleanup pod completion (default: 12)
 ```
 
 ### Key Improvements in the New Restore Script
@@ -343,39 +344,88 @@ Environment Variables:
 - **📋 Manual Fallback**: Provides step-by-step manual instructions if needed
 - **🌍 Enhanced Cross-Region**: Uses new RDS capabilities for faster cross-region restores
 - **🏢 Cross-Account Support**: Full support for restoring from different AWS accounts
+- **🧠 Intelligent Database Detection**: Automatically detects database state and adjusts restore process
+- **🔄 Dynamic Process Order**: Smart 5-step or 4-step process based on database configuration
+- **🛡️ Enhanced Error Handling**: Robust handling of missing databases and cleanup failures
+- **⚙️ Configurable Timeouts**: Environment variables for fine-tuning cleanup operations
 
 ### Restore Process Flow
 
-1. **Auto-Detection & Validation**
+The restore process now features intelligent database detection and dynamic step ordering:
+
+#### **Intelligent Database Detection**
+
+Before starting the restore, the script automatically checks:
+- **Database existence**: Does the expected RDS cluster exist?
+- **Cluster status**: Is the cluster available and ready?
+- **Instance validation**: Are the correct instances present and available?
+- **Configuration validation**: Do instances match Terraform expectations?
+
+#### **Dynamic Restore Process**
+
+The script automatically adjusts the restore order based on database state:
+
+**When database doesn't exist or is misconfigured (5 steps):**
+1. **Early Database Restore** - Creates database from snapshot
+2. **Clean Deployment** - Removes existing resources and cleans database
+3. **Deploy OpenEMR** - Fresh install (creates proper config files)
+4. **Database Restore** - Creates database from snapshot (always)
+5. **Application Data Restore** - Extracts backup files + updates configuration
+
+**When database exists and is properly configured (4 steps):**
+1. **Clean Deployment** - Removes existing resources and database
+2. **Deploy OpenEMR** - Fresh install (creates proper config files)
+3. **Database Restore** - Creates database from snapshot
+4. **Application Data Restore** - Extracts backup files + updates configuration
+
+#### **Detailed Process Steps**
+
+1. **Pre-flight Validation & Database Detection**
    - Auto-detect EKS cluster name from Terraform output
    - Auto-detect restore strategy from backup metadata
    - Verify AWS credentials and region access
    - Confirm backup bucket exists and is accessible
+   - Check database existence and configuration
+   - Determine if early database restore is needed
    - Update kubeconfig for target cluster
 
-2. **Database Restore** (if `RESTORE_DATABASE=true`)
-   - Use enhanced RDS capabilities for snapshot copying
-   - Handle cross-region/cross-account restoration automatically
+2. **Early Database Restore** (if needed)
    - Restore Aurora cluster from snapshot
-   - Use existing cluster identifier "openemr-eks"
+   - Handle cross-region/cross-account restoration automatically
+   - Use enhanced RDS capabilities for snapshot copying
 
-3. **Application Data Restore** (if `RESTORE_APP_DATA=true`)
+3. **Clean Deployment**
+   - Remove existing OpenEMR Kubernetes resources
+   - Clean database (drop tables, recreate structure)
+   - Handle orphaned storage and PVCs
+   - Enhanced error handling for missing databases
+
+4. **Deploy OpenEMR**
+   - Fresh OpenEMR installation
+   - Creates proper configuration files
+   - Establishes correct database connections
+   - Allows OpenEMR to run its initialization
+
+5. **Database Restore** (always)
+   - Restore Aurora cluster from snapshot
+   - Use existing cluster identifier from Terraform
+   - Handle cross-region/cross-account restoration automatically
+
+6. **Application Data Restore**
    - Find existing OpenEMR pod in the cluster
    - Download backup from S3 to local temporary file
    - Copy backup to pod and extract to EFS volume
+   - Update sqlconf.php with correct database connection
+   - Create config.php if missing
+   - Manage docker setup files properly
    - Clean up temporary files
 
-4. **Database Reconfiguration** (if `RECONFIGURE_DB=true`)
-   - Get database credentials from Kubernetes secrets
-   - Update OpenEMR sqlconf.php file with new connection details
-   - Use existing pod to perform configuration updates
-
-5. **Redis/Valkey Reconfiguration**
+7. **Redis/Valkey Reconfiguration**
    - Get Redis cluster details from Terraform output
    - Update Redis credentials secret in Kubernetes
    - Ensure OpenEMR can connect to Redis/Valkey
 
-6. **Completion**
+8. **Completion**
    - Provide restore status and next steps
    - All operations use existing infrastructure (no temporary resources)
 
@@ -482,6 +532,31 @@ All strategies now benefit from:
 # Skip confirmation prompts for automated scripts
 ./scripts/restore.sh my-backup-bucket my-snapshot-id --force
 ```
+
+#### Intelligent Restore Process
+
+The restore script now automatically detects your database state and adjusts the process accordingly:
+
+```bash
+# The script automatically detects if database exists and is properly configured
+# No additional parameters needed - it handles everything intelligently
+./scripts/restore.sh my-backup-bucket my-snapshot-id
+
+# Example output showing intelligent detection:
+# 🔍 Checking database existence and configuration...
+# ✅ Correct database cluster exists and is available
+# ✅ All instances are properly configured
+# 🧹 STEP 1: Running Clean Deployment
+# 🚀 STEP 2: Deploying OpenEMR (Fresh Install)
+# 🔄 STEP 3: Restoring RDS Cluster from Snapshot
+# 📁 STEP 4: Restoring Application Data & Updating Configuration
+```
+
+**What the script automatically detects:**
+- Database cluster existence and status
+- Instance configuration and availability
+- Whether early database restore is needed
+- Optimal restore process order (4 or 5 steps)
 
 #### Selective Restore (Modular Options)
 
@@ -641,7 +716,8 @@ For comprehensive testing of the entire backup and restore process, use the auto
 - This test creates and destroys real AWS resources
 - AWS resources will be created and destroyed during testing
 - Requires proper AWS credentials and permissions
-- Test duration: 2-4 hours depending on infrastructure size
+- Test duration: 160-165 minutes (~2.7 hours, measured from actual test runs)
+- Backup creation: ~30-35 seconds, Restore: 38-43 minutes (comprehensive restore with verification)
 
 ## Cross-Region Disaster Recovery
 
@@ -883,12 +959,30 @@ The backup and restore system now leverages Amazon RDS's new cross-Region and cr
 
 ## 📊 Performance Considerations
 
-- Backup duration depends on data size and network speed
-- RDS snapshots are incremental after the first full snapshot
+### Measured Backup Timings (from E2E tests)
+- **RDS Snapshot Creation:** ~20 seconds (very fast, AWS-managed)
+- **S3 Data Backup:** ~5 seconds (application data)
+- **K8s Config Backup:** ~4 seconds (manifests and configs)
+- **Total Backup Time:** ~30-35 seconds (very consistent)
+
+### Measured Restore Timings (from E2E tests, v3.0)
+- **Clean Deployment:** ~3-5 minutes (EFS wipe, database cleanup, CSI restart)
+- **OpenEMR Deployment:** ~5-6 minutes (fresh deployment with initial setup)
+- **RDS Cluster Destroy:** ~11-13 minutes (delete existing instances and cluster)
+- **RDS Cluster Restoration:** ~11-13 minutes (restore from snapshot, create instances)
+- **Application Data Restoration:** <1 minute (download from S3 and extract to EFS)
+- **Crypto Key Cleanup:** ~40 seconds (delete sixa/sixb, wait for regeneration)
+- **Verification:** ~10 seconds (poll for pod readiness with retry logic)
+- **Total Restore Time:** ~38-43 minutes (very consistent, ±6% variation)
+
+### General Performance Notes
+- **Backup:** Very consistent (~30-35 seconds) and incremental after first snapshot
+- **Restore:** Very predictable with v3.0 process (~38-43 minutes, ±6% variation)
+- RDS cluster destroy and restore are the longest components (~11-13 min each)
 - **Enhanced cross-region transfers** are faster with new RDS capabilities
-- **Single-step operations** reduce overall backup and restore times
-- Restore operations for Aurora clusters can take time (sometimes multiple hours)
-- Application data restore is usually the fastest component
+- **Automatic crypto key cleanup** prevents encryption key mismatches
+- **Verification with retry** ensures reliability (up to 3 attempts with 5-min timeout)
+- Application data restore is the fastest component (<1 minute)
 - **Cross-account transfers** use optimized AWS infrastructure
 
 ---

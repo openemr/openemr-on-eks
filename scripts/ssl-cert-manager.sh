@@ -1,23 +1,51 @@
 #!/bin/bash
 
+# =============================================================================
 # OpenEMR SSL Certificate Manager
-# ===============================
-# This script manages SSL certificates for OpenEMR on EKS using AWS Certificate Manager (ACM)
-# and Route53. It provides commands to request, validate, and deploy SSL certificates for
-# secure HTTPS access to the OpenEMR application.
+# =============================================================================
+#
+# Purpose:
+#   Manages SSL certificates for OpenEMR on EKS using AWS Certificate Manager
+#   (ACM) and Route53. Provides commands to request, validate, and deploy SSL
+#   certificates for secure HTTPS access to the OpenEMR application.
 #
 # Key Features:
-# - Request SSL certificates from AWS Certificate Manager
-# - Automatic Route53 DNS validation record creation
-# - Certificate validation status checking
-# - OpenEMR deployment with SSL certificate configuration
-# - Current SSL configuration status display
+#   - Request SSL certificates from AWS Certificate Manager
+#   - Automatic Route53 DNS validation record creation
+#   - Certificate validation status checking
+#   - OpenEMR deployment with SSL certificate configuration
+#   - Current SSL configuration status display
 #
 # Prerequisites:
-# - AWS credentials with ACM and Route53 permissions
-# - Domain must be managed by Route53 (for auto-validation)
-# - kubectl configured for the target cluster
-# - Terraform state available for infrastructure details
+#   - AWS credentials with ACM and Route53 permissions
+#   - Domain must be managed by Route53 (for auto-validation)
+#   - kubectl configured for the target cluster
+#   - Terraform state available for infrastructure details
+#
+# Usage:
+#   ./ssl-cert-manager.sh {request|list|validate|auto-validate|deploy|status|help}
+#
+# Options:
+#   request          Request a new SSL certificate for a domain
+#   list             List all certificates in ACM
+#   validate         Check validation status of a certificate
+#   auto-validate    Automatically validate certificate with Route53 DNS
+#   deploy           Deploy OpenEMR with SSL certificate
+#   status           Show current SSL configuration
+#   help             Show this help message
+#
+# Environment Variables:
+#   AWS_REGION       AWS region for ACM (default: us-west-2)
+#   CLUSTER_NAME     EKS cluster name (default: openemr-eks)
+#   NAMESPACE        Kubernetes namespace (default: openemr)
+#
+# Examples:
+#   ./ssl-cert-manager.sh request
+#   ./ssl-cert-manager.sh auto-validate arn:aws:acm:...
+#   ./ssl-cert-manager.sh deploy arn:aws:acm:...
+#   ./ssl-cert-manager.sh status
+#
+# =============================================================================
 
 set -e
 

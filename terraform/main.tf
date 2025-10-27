@@ -6,17 +6,16 @@
 # provisioning across different environments and team members.
 terraform {
   # Minimum Terraform version required for this configuration
-  # Version 1.0+ provides stable API and improved error handling
-  required_version = ">= 1.0"
+  required_version = ">= 1.13.4"
 
   # Provider version constraints to ensure consistent behavior
   # Pinning to specific versions prevents unexpected breaking changes
   required_providers {
     # AWS Provider - Core infrastructure provider for AWS services
-    # Version 6.14.0 provides support for latest AWS services and features
+    # Version 6.16.0 provides support for latest AWS services and features
     aws = {
       source  = "hashicorp/aws"
-      version = "6.14.0"
+      version = "6.16.0"
     }
     # Kubernetes Provider - For managing Kubernetes resources
     # Version 2.38.0 supports latest Kubernetes API versions and features

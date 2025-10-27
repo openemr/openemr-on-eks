@@ -255,28 +255,28 @@ resource "aws_kms_key" "s3" {
 # Aliases provide stable, human-readable names that can be used instead of key IDs
 
 resource "aws_kms_alias" "s3" {
-  name          = "alias/${var.cluster_name}-s3"        # Human-readable alias for S3 key
-  target_key_id = aws_kms_key.s3.key_id                 # Reference to the actual KMS key
+  name          = "alias/${var.cluster_name}-s3"          # Human-readable alias for S3 key
+  target_key_id = aws_kms_key.s3.key_id                   # Reference to the actual KMS key
 }
 
 resource "aws_kms_alias" "eks" {
-  name          = "alias/${var.cluster_name}-eks"       # Human-readable alias for EKS key
-  target_key_id = aws_kms_key.eks.key_id                # Reference to the actual KMS key
+  name          = "alias/${var.cluster_name}-eks"         # Human-readable alias for EKS key
+  target_key_id = aws_kms_key.eks.key_id                  # Reference to the actual KMS key
 }
 
 resource "aws_kms_alias" "efs" {
-  name          = "alias/${var.cluster_name}-efs"       # Human-readable alias for EFS key
-  target_key_id = aws_kms_key.efs.key_id                # Reference to the actual KMS key
+  name          = "alias/${var.cluster_name}-efs"         # Human-readable alias for EFS key
+  target_key_id = aws_kms_key.efs.key_id                  # Reference to the actual KMS key
 }
 
 resource "aws_kms_alias" "cloudwatch" {
-  name          = "alias/${var.cluster_name}-cloudwatch" # Human-readable alias for CloudWatch key
-  target_key_id = aws_kms_key.cloudwatch.key_id          # Reference to the actual KMS key
+  name          = "alias/${var.cluster_name}-cloudwatch"  # Human-readable alias for CloudWatch key
+  target_key_id = aws_kms_key.cloudwatch.key_id           # Reference to the actual KMS key
 }
 
 resource "aws_kms_alias" "rds" {
-  name          = "alias/${var.cluster_name}-rds"       # Human-readable alias for RDS key
-  target_key_id = aws_kms_key.rds.key_id                # Reference to the actual KMS key
+  name          = "alias/${var.cluster_name}-rds"         # Human-readable alias for RDS key
+  target_key_id = aws_kms_key.rds.key_id                  # Reference to the actual KMS key
 }
 
 resource "aws_kms_alias" "elasticache" {
