@@ -64,8 +64,14 @@ env:
   TF_VERSION: "1.13.4"           # Terraform version for infrastructure checks
   KUBECTL_VERSION: "v1.34.1"     # kubectl version for Kubernetes checks
 
+# Authentication Note:
+# This repository now prefers GitHub OIDC → AWS IAM role.
+# If OIDC is not configured yet, the workflow will fall back to static AWS credentials.
+# See docs/GITHUB_AWS_CREDENTIALS.md for details.
+
 # Required permissions for version checking and issue creation
 permissions:
+  id-token: write       # Required for OIDC authentication (more secure than and preferred over static credentials)
   contents: read        # Read repository contents for version analysis
   issues: write         # Create GitHub issues for update notifications
   pull-requests: read   # Read pull request information
@@ -109,17 +115,35 @@ jobs:
           sudo chmod +x /usr/local/bin/yq
 
 
-      # Step 5: Configure AWS credentials (optional for enhanced version checking)
-      # This step enables AWS API access for more comprehensive version checking
-      - name: Configure AWS credentials (optional)
+      # Step 5: Set credential environment variables for conditional logic
+      # These are set as empty strings if secrets don't exist, allowing safe conditional checks
+      - name: Set credential environment variables
+        run: |
+          echo "AWS_OIDC_ROLE_ARN=${{ secrets.AWS_OIDC_ROLE_ARN || '' }}" >> $GITHUB_ENV
+          echo "AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID || '' }}" >> $GITHUB_ENV
+
+      # Step 6: Configure AWS credentials (OIDC preferred)
+      # This step enables AWS API access for enhanced version checking via OIDC
+      - name: Configure AWS credentials (OIDC preferred)
+        if: env.AWS_OIDC_ROLE_ARN != ''
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
+        continue-on-error: true  # Don't fail if OIDC is not configured yet
+
+      # Step 7: Configure AWS credentials (static fallback)
+      # This step falls back to static credentials if OIDC is not configured
+      - name: Configure AWS credentials (static fallback)
+        if: env.AWS_OIDC_ROLE_ARN == '' && env.AWS_ACCESS_KEY_ID != ''
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
         continue-on-error: true  # Don't fail if AWS credentials are not available
 
-      # Step 6: Execute comprehensive version awareness check
+      # Step 8: Execute comprehensive version awareness check
       # This step runs the version-manager.sh script with appropriate parameters
       - name: Run Version Awareness Check
         id: version_check
@@ -214,7 +238,7 @@ jobs:
           # Ensure updates_found status is set for downstream jobs
           echo "Final updates_found status: $(grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log && echo 'true' || echo 'false')" | tee -a scripts/version-check.log
 
-      # Step 7: Upload version check logs as artifacts
+      # Step 9: Upload version check logs as artifacts
       # This step preserves detailed logs for analysis and troubleshooting
       - name: Upload Version Check Logs
         uses: actions/upload-artifact@v4
@@ -227,7 +251,7 @@ jobs:
           retention-days: 30  # Retain logs for 30 days
           if-no-files-found: warn
 
-      # Step 8: Generate comprehensive version awareness report
+      # Step 10: Generate comprehensive version awareness report
       # This step creates detailed reports for both manual and scheduled runs
       - name: Create Version Awareness Report
         if: always()  # Generate report regardless of job outcome
@@ -354,7 +378,7 @@ jobs:
             echo "*This monthly awareness report was generated automatically by the OpenEMR EKS Version Awareness system.*" >> update-report.md
           fi
 
-      # Step 9: Create detailed report for artifact download
+      # Step 11: Create detailed report for artifact download
       # This step generates a comprehensive report with all version information
       - name: Create Detailed Report
         if: always()  # Generate report regardless of job outcome
@@ -444,7 +468,7 @@ jobs:
           # Re-enable exit on error for the rest of the workflow
           set -e
 
-      # Step 10: Upload detailed report as artifact
+      # Step 12: Upload detailed report as artifact
       - name: Upload Detailed Report
         uses: actions/upload-artifact@v4
         if: always()  # Upload regardless of job outcome
@@ -455,7 +479,7 @@ jobs:
           retention-days: 30  # Retain report for 30 days
           if-no-files-found: warn
 
-      # Step 11: Create GitHub issue for update awareness (if enabled)
+      # Step 13: Create GitHub issue for update awareness (if enabled)
       - name: Create GitHub Issue
         if: always() && (github.event_name == 'schedule' || github.event.inputs.create_issue == 'true')
         uses: actions/github-script@v7

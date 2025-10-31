@@ -70,7 +70,7 @@ The version awareness system provides:
 - **GitHub Actions integration** for continuous awareness
 - **Centralized configuration** for all version dependencies
 - **Manual control** - no automatic updates applied
-- **AWS CLI integration** for accurate version checking when credentials are available
+- **AWS CLI integration** for accurate version checking when credentials are available (prefers OIDC authentication)
 - **Graceful fallback** when AWS credentials are not available
 - **Comprehensive codebase search** to locate version strings in files
 - **Dual run modes** for both automated monthly and manual on-demand checks
@@ -124,7 +124,7 @@ Automated CI/CD integration with dual run support:
 - **Comprehensive search**: Includes codebase search for version locations
 - **Artifact storage**: Version check logs and reports
 - **Notification system**: Success/failure notifications
-- **AWS CLI integration**: Uses AWS credentials when available for accurate version checking
+- **AWS CLI integration**: Uses AWS credentials when available for accurate version checking (prefers OIDC authentication)
 - **Graceful fallback**: Works without AWS credentials with clear reporting
 
 ## 🚀 Quick Start
@@ -238,6 +238,12 @@ chmod +x scripts/version-manager.sh
 
 The version checking workflow uses AWS CLI commands to fetch the latest versions of AWS services when credentials are available. The workflow gracefully handles missing credentials by falling back to documentation scraping.
 
+> **⚠️ IMPORTANT**: This repository now prefers GitHub OIDC → AWS IAM role for AWS authentication in GitHub Actions workflows.
+>
+> **Use OIDC whenever possible.** Static AWS access keys are still supported for backward compatibility.
+>
+> See [`GITHUB_AWS_CREDENTIALS.md`](GITHUB_AWS_CREDENTIALS.md) for complete setup instructions, or use the automated setup in `oidc_provider/`.
+
 #### Required AWS Services
 
 The workflow interacts with the following AWS services:
@@ -282,7 +288,28 @@ Here's the minimum IAM policy that provides read-only access to the required ser
 }
 ```
 
-#### IAM User Setup
+#### Option 1: GitHub OIDC (Recommended)
+
+**Preferred method** - No long-lived credentials stored in GitHub:
+
+1. **Deploy OIDC provider** using the Terraform module:
+   ```bash
+   cd oidc_provider
+   terraform init
+   terraform apply
+   ```
+
+2. **Configure GitHub Secret**:
+   - Add `AWS_OIDC_ROLE_ARN` secret with the role ARN from Terraform outputs
+   - The role ARN is displayed in the Terraform outputs after deployment
+
+3. **The workflow automatically uses OIDC** - no access keys needed!
+
+The OIDC provider creates an IAM role with the exact minimum permissions shown above. See [`GITHUB_AWS_CREDENTIALS.md`](GITHUB_AWS_CREDENTIALS.md) for detailed setup instructions.
+
+#### Option 2: IAM User with Static Credentials (Legacy/Fallback)
+
+**For backward compatibility** - Only use if OIDC cannot be configured:
 
 1. **Create IAM User:**
    ```bash
@@ -307,12 +334,15 @@ Here's the minimum IAM policy that provides read-only access to the required ser
    Add the following secrets to your GitHub repository:
    - `AWS_ACCESS_KEY_ID`: The access key ID from step 3
    - `AWS_SECRET_ACCESS_KEY`: The secret access key from step 3
-   - `AWS_REGION`: The AWS region (e.g., `us-east-1`)
+   - `AWS_REGION`: The AWS region (optional, defaults to `us-west-2`)
+
+**Note**: The workflow will automatically prefer OIDC if configured, falling back to static credentials if needed.
 
 #### Security Considerations
 
 - **Read-only access only**: No write, create, update, or delete permissions
 - **Fallback behavior**: Workflow continues to function without AWS credentials
+- **OIDC preferred**: Short-lived tokens reduce exposure risk compared to static access keys
 
 #### Testing Permissions
 

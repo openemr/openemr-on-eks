@@ -180,6 +180,8 @@ aws --version  # Must be 2.15.0 or higher
 - Kubernetes version: 1.29 or higher (1.34 configured)
 ```
 
+**(Recommended) Configure GitHub OIDC → AWS IAM role for CI/CD.** See `docs/GITHUB_AWS_CREDENTIALS.md`.
+
 ### **Repository Configuration (Recommended)**
 
 For production deployments, configure **branch rulesets** to ensure code quality and enable proper code review:
@@ -659,6 +661,15 @@ openemr-on-eks/
 │   ├── terraform.tfvars.example           # Example variable values with autoscaling configs
 │   ├── terraform-testing.tfvars           # Testing configuration (deletion protection disabled)
 │   └── terraform-production.tfvars        # Production configuration reference (deletion protection enabled)
+├── oidc_provider/                         # Terraform + scripts for GitHub → AWS OIDC (preferred)
+│   ├── README.md                          # OIDC provider setup and configuration guide
+│   ├── main.tf                            # GitHub OIDC provider and IAM role definitions
+│   ├── variables.tf                       # OIDC provider input variables (repository, branch, etc.)
+│   ├── outputs.tf                         # OIDC provider outputs (role ARN, provider ARN)
+│   └── scripts/                           # OIDC provider management scripts
+│       ├── deploy.sh                      # Deploy OIDC provider and IAM roles
+│       ├── destroy.sh                     # Destroy OIDC provider and IAM roles
+│       └── validate.sh                    # Validate OIDC provider configuration
 ├── k8s/                                   # Kubernetes manifests
 │   ├── README.md                          # Complete Kubernetes manifests documentation
 │   ├── deploy.sh                          # Main deployment script (deploys OpenEMR to the EKS cluster)
@@ -719,7 +730,8 @@ openemr-on-eks/
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
 │   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.3.4 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
-│   └── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
+│   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
+│   └── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
 ├── images/                                # Visual assets and branding materials
 │   ├── README.md                          # Complete images documentation and usage guidelines
 │   ├── openemr_on_eks_logo.png            # Main project logo for documentation and branding (optimized for web)
@@ -2020,6 +2032,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Kubernetes Directory](k8s/README.md)** - Kubernetes manifests documentation with deployment workflows
 - **[Scripts Directory](scripts/README.md)** - Operational scripts documentation and maintenance guide
 - **[GitHub Directory](.github/workflows/README.md)** - CI/CD workflows and automation documentation
+- **[OIDC Provider Directory](oidc_provider/README.md)** - GitHub → AWS OIDC provider setup and configuration
 - **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
 - **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
 
@@ -2035,6 +2048,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.3.4 Enhanced Logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
+- [GitHub → AWS Credentials Guide](docs/GITHUB_AWS_CREDENTIALS.md) - GitHub → AWS OIDC setup and credential management
 - [Monitoring Setup](monitoring/README.md) - Prometheus, Grafana, and monitoring stack configuration
 
 ### **Support**
@@ -2075,7 +2089,7 @@ The project features a comprehensive version check system that supports both aut
 - **Runs automatically** on the 1st of every month via GitHub Actions
 - **Creates monthly issues** titled "Version Check Report for Month of [Current Month]"
 - **Prevents duplicates** by checking for existing monthly issues
-- **Uses AWS CLI** for definitive version lookups when credentials are available
+- **Uses AWS CLI** for definitive version lookups when credentials are available (prefers OIDC authentication)
 - **Gracefully handles** missing AWS credentials with fallback mechanisms
 
 #### **Manual On-Demand Runs**
@@ -2106,6 +2120,14 @@ Some version checks require AWS CLI credentials to be configured:
 - **EKS Add-ons**: EFS CSI Driver and Metrics Server versions require AWS CLI to query EKS add-on versions
 - **Aurora MySQL**: (optional) Can use AWS credentials as a redundant source for version lookups
 - **Infrastructure**: EKS versions require AWS access for accurate version checking via AWS CLI
+
+**Authentication Method:**
+
+> **⚠️ IMPORTANT**: This repository now prefers GitHub OIDC → AWS IAM role for AWS authentication in GitHub Actions workflows.
+>
+> **Use OIDC whenever possible.** Static AWS access keys are still supported for backward compatibility.
+>
+> See [`docs/GITHUB_AWS_CREDENTIALS.md`](docs/GITHUB_AWS_CREDENTIALS.md) for complete setup instructions, or use the automated setup in `oidc_provider/`.
 
 **Note**: The system is designed to work gracefully without AWS credentials. Components that cannot be checked due to missing credentials will be clearly reported, and the system will continue to check all other components.
 
@@ -2153,11 +2175,33 @@ You can run version checks manually in two ways:
 
 Version information is centrally managed in `versions.yaml`. To configure AWS credentials for enhanced version checking:
 
+#### **Recommended: GitHub OIDC (Preferred)**
+
+1. **Deploy OIDC provider** using the Terraform module in `oidc_provider/`:
+   ```bash
+   cd oidc_provider
+   terraform init
+   terraform apply
+   ```
+
+2. **Configure GitHub Secret**:
+   - Add `AWS_OIDC_ROLE_ARN` secret with the role ARN from Terraform outputs
+
+3. **The workflow will automatically use OIDC** - no access keys needed!
+
+See [`docs/GITHUB_AWS_CREDENTIALS.md`](docs/GITHUB_AWS_CREDENTIALS.md) for detailed setup instructions.
+
+#### **Legacy: Static AWS Credentials (Fallback)**
+
+For backward compatibility, static credentials are still supported:
+
 1. **Set up AWS CLI credentials** in your environment
 2. **Configure GitHub Secrets** for CI/CD:
    - `AWS_ACCESS_KEY_ID`
    - `AWS_SECRET_ACCESS_KEY`
-   - `AWS_REGION` (optional, defaults to us-east-1)
+   - `AWS_REGION` (optional, defaults to us-west-2)
+
+**Note**: The workflow will automatically prefer OIDC if configured, falling back to static credentials if needed.
 
 For more details, see the [Version Management Guide](docs/VERSION_MANAGEMENT.md).
 
