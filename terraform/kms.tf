@@ -246,6 +246,62 @@ resource "aws_kms_key" "s3" {
   }
 }
 
+# AWS Backup KMS Key - Encrypts all AWS Backup operations
+# This key has a custom policy to support AWS Backup service access
+resource "aws_kms_key" "backup" {
+  description             = "AWS Backup Encryption Key" # Key description for identification
+  deletion_window_in_days = 7                           # 7-day deletion window for safety
+  enable_key_rotation     = true                        # Enable automatic key rotation
+
+  # Custom policy for AWS Backup service
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        # Root account access - allows account administrators to manage the key
+        Sid    = "Enable IAM User Permissions"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*" # All KMS operations
+        Resource = "*"
+      },
+      {
+        # AWS Backup service access - allows AWS Backup to encrypt backup data
+        Sid    = "Allow AWS Backup Service"
+        Effect = "Allow"
+        Principal = {
+          Service = "backup.amazonaws.com"
+        }
+        Action = [
+          "kms:Decrypt",          # Decrypt backup data
+          "kms:Encrypt",          # Encrypt backup data
+          "kms:ReEncrypt*",       # Re-encrypt backup data with different keys
+          "kms:GenerateDataKey*", # Generate data keys for encryption
+          "kms:DescribeKey"       # Describe key metadata
+        ]
+        Resource = "*"
+        # Condition restricts access to current account and region
+        Condition = {
+          StringEquals = {
+            "aws:SourceAccount" = "${data.aws_caller_identity.current.account_id}"
+          }
+          ArnLike = {
+            "aws:SourceArn" = "arn:aws:backup:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.cluster_name}-backup-encryption"
+    Purpose     = "AWS Backup Encryption"
+    Environment = var.environment
+  }
+}
+
 # =============================================================================
 # KMS KEY ALIASES
 # =============================================================================
@@ -282,4 +338,9 @@ resource "aws_kms_alias" "rds" {
 resource "aws_kms_alias" "elasticache" {
   name          = "alias/${var.cluster_name}-elasticache" # Human-readable alias for ElastiCache key
   target_key_id = aws_kms_key.elasticache.key_id          # Reference to the actual KMS key
+}
+
+resource "aws_kms_alias" "backup" {
+  name          = "alias/${var.cluster_name}-backup" # Human-readable alias for backup key
+  target_key_id = aws_kms_key.backup.key_id          # Reference to the actual KMS key
 }

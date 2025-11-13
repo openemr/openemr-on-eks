@@ -834,7 +834,9 @@ The real return on investment often comes from time gains and the reliability of
 | EFS Storage | 100GB | $30          | N/A |
 | NAT Gateway | 3 gateway (static cost; add $0.045 price per GB processed) | $99          | N/A |
 | WAFv2 | 5 rules + 1 ACL | $10          | N/A |
-| **Total** | | **$385**     | |
+| AWS Backup | 200 GB backup size (first month) | $18          | N/A |
+| KMS Keys | 7 keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup) | $7          | N/A |
+| **Total** | | **$410**     | |
 
 ### **Mid-Size Hospital (average 100s of users concurrently) (thousands of patients served)**
 
@@ -847,7 +849,9 @@ The real return on investment often comes from time gains and the reliability of
 | EFS Storage | 500GB | $150         | N/A |
 | NAT Gateway | 3 gateway (static cost; add $0.045 price per GB processed) | $99          | N/A |
 | WAFv2 | 5 rules + 1 ACL | $10          | N/A |
-| **Total** | | **$816**     | |
+| AWS Backup | 500 GB backup size (first month) | $40          | N/A |
+| KMS Keys | 7 keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup) | $7          | N/A |
+| **Total** | | **$863**     | |
 
 ### **Large Hospital (average 1000s of users concurrently) (millions of patients served)**
 
@@ -856,11 +860,13 @@ The real return on investment often comes from time gains and the reliability of
 | EKS Control Plane | 1 cluster | $73          | N/A |
 | EC2 Compute (Auto Mode) | ~8 m5.xlarge equiv. ($0.192/hr) | $1,121       | $135 |
 | Aurora Serverless V2 | 0.5-16 ACUs (AVG of 6 ACU) | $522         | N/A |
-| Valkey Serverless | 1GB (AVG data stored; mostly user sessions), 6000 ECPUs | $76         | N/A |
+| Valkey Serverless | 1GB (AVG data stored; mostly user sessions), 6000 ECPUs | $76          | N/A |
 | EFS Storage | 2TB | $600         | N/A |
-| NAT Gateway | 3 gateways (static cost; add $0.045 price per GB processed) | $99         | N/A |
+| NAT Gateway | 3 gateways (static cost; add $0.045 price per GB processed) | $99          | N/A |
 | WAFv2 | 5 rules + 1 ACL | $10          | N/A |
-| **Total** | | **$2636**   | |
+| AWS Backup | 900 GB backup size (first month) | $75          | N/A |
+| KMS Keys | 7 keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup) | $7           | N/A |
+| **Total** | | **$2718**    | |
 
 ### Pricing Documentation
 
@@ -879,6 +885,8 @@ The real return on investment often comes from time gains and the reliability of
   - [Amazon VPC/NAT Gateway Pricing](https://aws.amazon.com/vpc/pricing/)
 - Web Application Security Pricing
   - [AWS WAF Pricing](https://aws.amazon.com/waf/pricing/)
+- Backup & Recovery Pricing
+  - [AWS Backup Pricing](https://aws.amazon.com/backup/pricing/)
 
 ### **🔒 WAFv2 Pricing Breakdown**
 

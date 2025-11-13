@@ -574,6 +574,8 @@ check_for_orphaned_resources() {
         log_error ""
         log_error "To clean up these resources, run:"
         log_error "    cd $(dirname "$0") && ./destroy.sh"
+        log_error "Then manually delete any backup buckets."
+        log_error "Note: As a safety measure against accidental data loss destroy.sh is designed not to delete backup buckets."
         log_error ""
         log_error "After cleanup completes, re-run this test."
         exit 1
@@ -1759,81 +1761,6 @@ disable_rds_deletion_protection() {
         fi
 }
 
-# Function to prepare infrastructure for destruction
-prepare_for_destruction() {
-    log_info "Preparing infrastructure for destruction..."
-
-    # Validate terraform directory and state
-    if ! cd "$TERRAFORM_DIR" 2>/dev/null; then
-        log_error "Cannot access terraform directory: $TERRAFORM_DIR"
-        return 1
-    fi
-    
-    if ! terraform state list >/dev/null 2>&1; then
-        log_error "Terraform state not accessible"
-        return 1
-    fi
-
-    # Get resource information from Terraform state (more reliable than outputs)
-    local waf_logs_bucket
-    waf_logs_bucket=$(terraform state show 'aws_s3_bucket.waf_logs[0]' 2>/dev/null | grep 'bucket\s*=' | awk '{print $3}' | tr -d '"' || echo "")
-    local alb_logs_bucket
-    alb_logs_bucket=$(terraform state show 'aws_s3_bucket.alb_logs' 2>/dev/null | grep 'bucket\s*=' | awk '{print $3}' | tr -d '"' || echo "")
-    local db_cluster_id
-    db_cluster_id=$(terraform state show 'aws_rds_cluster.openemr' 2>/dev/null | grep 'cluster_identifier\s*=' | awk '{print $3}' | tr -d '"' || echo "")
-
-    # Fallback to outputs if state show fails
-    if [ -z "$waf_logs_bucket" ]; then
-        waf_logs_bucket=$(terraform output -raw waf_logs_bucket_name 2>/dev/null || echo "")
-    fi
-    if [ -z "$alb_logs_bucket" ]; then
-        alb_logs_bucket=$(terraform output -raw alb_logs_bucket_name 2>/dev/null || echo "")
-    fi
-    if [ -z "$db_cluster_id" ]; then
-        db_cluster_id=$(terraform output -raw aurora_cluster_id 2>/dev/null || echo "")
-    fi
-
-    log_info "Found resources to clean up:"
-    log_info "  WAF logs bucket: $waf_logs_bucket"
-    log_info "  ALB logs bucket: $alb_logs_bucket"
-    log_info "  RDS cluster: $db_cluster_id"
-
-    # Empty S3 buckets with validation
-    if [ -n "$waf_logs_bucket" ]; then
-        log_info "Emptying WAF logs bucket: $waf_logs_bucket"
-        if empty_s3_bucket "$waf_logs_bucket" "$AWS_REGION"; then
-            log_success "WAF logs bucket emptied successfully"
-        else
-            log_warning "Failed to empty WAF logs bucket, but continuing..."
-        fi
-    fi
-
-    if [ -n "$alb_logs_bucket" ]; then
-        log_info "Emptying ALB logs bucket: $alb_logs_bucket"
-        if empty_s3_bucket "$alb_logs_bucket" "$AWS_REGION"; then
-            log_success "ALB logs bucket emptied successfully"
-        else
-            log_warning "Failed to empty ALB logs bucket, but continuing..."
-        fi
-    fi
-
-    # Disable RDS deletion protection with validation
-    if [ -n "$db_cluster_id" ]; then
-        log_info "Disabling RDS deletion protection for: $db_cluster_id"
-        if disable_rds_deletion_protection "$db_cluster_id" "$AWS_REGION"; then
-            log_success "RDS deletion protection disabled successfully"
-        else
-            log_warning "Failed to disable RDS deletion protection, but continuing..."
-        fi
-    fi
-
-    # Add a small delay to allow AWS operations to propagate
-    log_info "Waiting for AWS operations to propagate..."
-    sleep 10
-
-    cd "$PROJECT_ROOT"
-}
-
 # Step 5: Test monitoring stack installation and uninstallation
 test_monitoring_stack() {
     local step_start
@@ -2513,19 +2440,25 @@ cleanup_final() {
     step_start=$(start_timer)
     log_step "Step 10: Final cleanup of infrastructure and backups..."
 
-    # Prepare infrastructure for destruction
-    prepare_for_destruction
-
-    cd "$TERRAFORM_DIR"
-
-    # Destroy infrastructure
-    log_info "Destroying infrastructure..."
-    terraform destroy -auto-approve -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION"
-
-    # Clean up Terraform state files to ensure fresh random IDs on next run
-    log_info "Cleaning up Terraform state files..."
-    rm -f terraform.tfstate* .terraform.lock.hcl
-    log_info "Terraform state files cleaned up - random IDs will regenerate on next run"
+    # Use the comprehensive destroy.sh script for bulletproof cleanup
+    log_info "Using comprehensive destroy.sh script for final infrastructure cleanup..."
+    
+    # Export cluster name and region for destroy.sh script
+    export CLUSTER_NAME="$CLUSTER_NAME"
+    export AWS_REGION="$AWS_REGION"
+    
+    # Ensure we're in the project root directory for consistent path handling
+    cd "$PROJECT_ROOT"
+    
+    # Run destroy.sh with force for automated testing
+    # Note: destroy.sh will handle all infrastructure cleanup including S3 buckets, RDS, EKS, etc.
+    if ./scripts/destroy.sh --force; then
+        log_success "Infrastructure deleted successfully using destroy.sh"
+    else
+        log_error "destroy.sh script failed - some resources may still exist"
+        log_error "Check AWS console for remaining resources that need manual cleanup"
+        return 1
+    fi
 
     # Clean up backup bucket if it exists
     if [ -n "$BACKUP_BUCKET" ]; then

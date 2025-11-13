@@ -137,10 +137,26 @@ check_prerequisites() {
         exit 1
     fi
     
-    # Verify AWS credentials
+    # Verify AWS credentials with helpful error messages
     if ! aws sts get-caller-identity &>/dev/null; then
         log_error "AWS credentials not configured or invalid"
-        log_error "Please configure AWS credentials and try again"
+        echo ""
+        log_info "To configure AWS credentials, you can:"
+        log_info "  1. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY environment variables"
+        log_info "  2. Configure AWS CLI: aws configure"
+        log_info "  3. Use AWS SSO: aws sso login"
+        log_info "  4. Use IAM roles (if running on EC2/ECS/Lambda)"
+        echo ""
+        
+        # Check if there's any Terraform state - if not, maybe credentials aren't needed
+        if [ ! -f "$TERRAFORM_DIR/terraform.tfstate" ] && [ ! -f "$TERRAFORM_DIR/.terraform/terraform.tfstate" ]; then
+            log_warning "No Terraform state found - there may be no infrastructure to destroy"
+            log_info "If you're sure there's no infrastructure, you can skip this check"
+            log_info "Otherwise, please configure AWS credentials and try again"
+        else
+            log_error "Terraform state exists - AWS credentials are required to destroy infrastructure"
+        fi
+        
         exit 1
     fi
     
@@ -156,12 +172,30 @@ check_prerequisites() {
     log_success "All required tools found and configured"
 }
 
-# Get AWS account ID
+# Get AWS account ID with better error handling
 get_aws_account_id() {
-    aws sts get-caller-identity --query Account --output text 2>/dev/null || {
-        log_error "Failed to get AWS account ID. Check your AWS credentials."
+    local account_id
+    local error_output
+    
+    # Try to get account ID and capture any errors
+    account_id=$(aws sts get-caller-identity --query Account --output text 2>&1)
+    local exit_code=$?
+    
+    if [ $exit_code -ne 0 ]; then
+        error_output=$(echo "$account_id" | grep -i "error\|invalid\|credentials" || echo "$account_id")
+        log_error "Failed to get AWS account ID"
+        log_error "Error: $error_output"
+        echo ""
+        log_info "Common causes:"
+        log_info "  • AWS credentials not configured (run 'aws configure')"
+        log_info "  • AWS credentials expired (run 'aws sso login' if using SSO)"
+        log_info "  • Insufficient permissions (check IAM policies)"
+        log_info "  • Wrong AWS region configured"
+        echo ""
         exit 1
-    }
+    fi
+    
+    echo "$account_id"
 }
 
 # Get cluster name from Terraform, fallback to default
@@ -174,10 +208,23 @@ get_cluster_name() {
             cd "$TERRAFORM_DIR"
             local terraform_cluster_name
             # Suppress terraform warnings and only capture the actual output
-            terraform_cluster_name=$(terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | head -1 || echo "")
+            terraform_cluster_name=$(terraform output -raw cluster_name 2>/dev/null | \
+                grep -v "Warning:" | \
+                grep -v "No outputs found" | \
+                grep -v "^╷" | \
+                grep -v "^│" | \
+                grep -v "^╵" | \
+                xargs || echo "")
             cd - >/dev/null
             
-            if [ -n "$terraform_cluster_name" ] && [ "$terraform_cluster_name" != "╷" ]; then
+            # Validate cluster name is valid (not empty, not null, and doesn't contain terraform warning characters)
+            if [ -n "$terraform_cluster_name" ] && \
+               [ "$terraform_cluster_name" != "null" ] && \
+               [ "$terraform_cluster_name" != "" ] && \
+               [[ ! "$terraform_cluster_name" == *"Warning"* ]] && \
+               [[ ! "$terraform_cluster_name" == *"No outputs found"* ]] && \
+               [[ ! "$terraform_cluster_name" == *"╷"* ]] && \
+               [[ ! "$terraform_cluster_name" == *"│"* ]]; then
                 CLUSTER_NAME="$terraform_cluster_name"
                 log_info "Found cluster name from Terraform: $CLUSTER_NAME"
             else
@@ -538,7 +585,7 @@ empty_s3_bucket() {
 cleanup_s3_buckets() {
     log_step "Cleaning up Terraform-managed S3 buckets..."
     
-    # Get bucket names from Terraform outputs (only buckets created by Terraform)
+    # Get bucket names from Terraform state (more reliable than outputs)
     local terraform_buckets=()
     cd "$TERRAFORM_DIR" || {
         log_warning "Cannot access Terraform directory, skipping S3 bucket cleanup"
@@ -546,28 +593,66 @@ cleanup_s3_buckets() {
         return 0
     }
     
-    # Get ALB logs bucket
-    local alb_bucket
-    alb_bucket=$(terraform output -raw alb_logs_bucket_name 2>/dev/null || echo "")
-    if [ -n "$alb_bucket" ] && [ "$alb_bucket" != "null" ]; then
-        terraform_buckets+=("$alb_bucket")
-        log_info "Found ALB logs bucket from Terraform: $alb_bucket"
+    # Get bucket names from Terraform state directly
+    # Check if Terraform state exists
+    if [ -f "terraform.tfstate" ] || [ -f ".terraform/terraform.tfstate" ]; then
+        # Get bucket names from Terraform state directly
+        local s3_resources
+        s3_resources=$(terraform state list 2>/dev/null | grep "aws_s3_bucket\." || echo "")
+        
+        if [ -n "$s3_resources" ]; then
+            for resource in $s3_resources; do
+                # Get bucket name from state
+                local bucket_name
+                bucket_name=$(terraform state show "$resource" 2>/dev/null | \
+                    grep -E "^\s*bucket\s*=" | \
+                    awk -F'"' '{print $2}' | \
+                    xargs || echo "")
+                
+                if [ -n "$bucket_name" ] && [ "$bucket_name" != "" ]; then
+                    # Skip backup buckets - they should be preserved for restore operations
+                    if [[ "$bucket_name" == *"backup"* ]] || [[ "$bucket_name" == *"openemr-backups"* ]]; then
+                        log_info "Skipping backup bucket: $bucket_name (preserved for restore operations)"
+                        continue
+                    fi
+                    
+                    terraform_buckets+=("$bucket_name")
+                    log_info "Found S3 bucket from Terraform state: $bucket_name"
+                fi
+            done
+        fi
     fi
     
-    # Get WAF logs bucket (may not exist if WAF is disabled)
-    local waf_bucket
-    waf_bucket=$(terraform output -raw waf_logs_bucket_name 2>/dev/null || echo "")
-    if [ -n "$waf_bucket" ] && [ "$waf_bucket" != "null" ]; then
-        terraform_buckets+=("$waf_bucket")
-        log_info "Found WAF logs bucket from Terraform: $waf_bucket"
-    fi
-    
-    # Get Loki storage bucket
-    local loki_bucket
-    loki_bucket=$(terraform output -raw loki_s3_bucket_name 2>/dev/null || echo "")
-    if [ -n "$loki_bucket" ] && [ "$loki_bucket" != "null" ]; then
-        terraform_buckets+=("$loki_bucket")
-        log_info "Found Loki storage bucket from Terraform: $loki_bucket"
+    # Fallback: Try to get from outputs if state method didn't work
+    if [ ${#terraform_buckets[@]} -eq 0 ]; then
+        log_info "No buckets found in state, trying Terraform outputs..."
+        
+        # Get ALB logs bucket
+        local alb_bucket
+        alb_bucket=$(terraform output -raw alb_logs_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$alb_bucket" ] && [ "$alb_bucket" != "null" ] && [ "$alb_bucket" != "" ]; then
+            terraform_buckets+=("$alb_bucket")
+            log_info "Found ALB logs bucket from Terraform output: $alb_bucket"
+        fi
+        
+        # Get WAF logs bucket (may not exist if WAF is disabled)
+        local waf_bucket
+        waf_bucket=$(terraform output -raw waf_logs_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$waf_bucket" ] && [ "$waf_bucket" != "null" ] && [ "$waf_bucket" != "" ]; then
+            terraform_buckets+=("$waf_bucket")
+            log_info "Found WAF logs bucket from Terraform output: $waf_bucket"
+        fi
+        
+        # Get Loki storage bucket
+        local loki_bucket
+        loki_bucket=$(terraform output -raw loki_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$loki_bucket" ] && [ "$loki_bucket" != "null" ] && [ "$loki_bucket" != "" ]; then
+            terraform_buckets+=("$loki_bucket")
+            log_info "Found Loki storage bucket from Terraform output: $loki_bucket"
+        fi
     fi
     
     cd - >/dev/null
@@ -644,7 +729,230 @@ cleanup_cloudwatch_logs() {
     fi
 }
 
+# =============================================================================
+# AWS BACKUP CLEANUP
+# =============================================================================
 
+cleanup_aws_backup_resources() {
+    log_step "Cleaning up AWS Backup resources..."
+    
+    # Get backup vault name from Terraform output
+    local backup_vault_name
+    cd "$TERRAFORM_DIR" || {
+        log_warning "Cannot access Terraform directory, skipping AWS Backup cleanup"
+        cd - >/dev/null
+        return 0
+    }
+    
+    # Get terraform output, suppressing warnings and checking for valid output
+    backup_vault_name=$(terraform output -raw backup_vault_name 2>/dev/null | grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+    cd - >/dev/null
+    
+    # Check if output is valid (not empty, not null, and doesn't contain terraform warning characters)
+    if [ -z "$backup_vault_name" ] || \
+       [ "$backup_vault_name" = "null" ] || \
+       [[ "$backup_vault_name" == *"Warning"* ]] || \
+       [[ "$backup_vault_name" == *"No outputs found"* ]] || \
+       [[ "$backup_vault_name" == *"╷"* ]] || \
+       [[ "$backup_vault_name" == *"│"* ]]; then
+        log_info "No AWS Backup vault found in Terraform outputs, skipping AWS Backup cleanup"
+        log_info "This is expected if no infrastructure has been deployed or Terraform state is empty"
+        return 0
+    fi
+    
+    log_info "Found backup vault: $backup_vault_name"
+    
+    # Get backup plan IDs from Terraform
+    cd "$TERRAFORM_DIR"
+    local daily_plan_id
+    local weekly_plan_id
+    local monthly_plan_id
+    
+    # Get plan IDs, filtering out terraform warnings and invalid output
+    daily_plan_id=$(terraform output -raw backup_plan_daily_id 2>/dev/null | grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+    weekly_plan_id=$(terraform output -raw backup_plan_weekly_id 2>/dev/null | grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+    monthly_plan_id=$(terraform output -raw backup_plan_monthly_id 2>/dev/null | grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+    cd - >/dev/null
+    
+    # Validate plan IDs are not empty or invalid
+    local valid_plans=0
+    for plan_id in "$daily_plan_id" "$weekly_plan_id" "$monthly_plan_id"; do
+        if [ -n "$plan_id" ] && \
+           [ "$plan_id" != "null" ] && \
+           [ "$plan_id" != "" ] && \
+           [[ ! "$plan_id" == *"Warning"* ]] && \
+           [[ ! "$plan_id" == *"No outputs found"* ]] && \
+           [[ ! "$plan_id" == *"╷"* ]]; then
+            ((valid_plans++))
+        fi
+    done
+    
+    if [ $valid_plans -eq 0 ]; then
+        log_info "No valid backup plans found in Terraform outputs, skipping AWS Backup cleanup"
+        return 0
+    fi
+    
+    # Delete backup selections first (they reference plans)
+    log_info "Deleting backup selections..."
+    
+    # List all backup selections for the plans
+    for plan_id in "$daily_plan_id" "$weekly_plan_id" "$monthly_plan_id"; do
+        if [ -n "$plan_id" ] && [ "$plan_id" != "null" ] && [ "$plan_id" != "" ]; then
+            # Get selection IDs for this plan
+            local selection_ids
+            selection_ids=$(aws backup list-backup-selections \
+                --backup-plan-id "$plan_id" \
+                --region "$AWS_REGION" \
+                --query "BackupSelectionsList[].SelectionId" \
+                --output text 2>/dev/null || echo "")
+            
+            if [ -n "$selection_ids" ]; then
+                for selection_id in $selection_ids; do
+                    # Clean up whitespace
+                    selection_id=$(echo "$selection_id" | xargs)
+                    
+                    if [ -n "$selection_id" ] && [ "$selection_id" != "" ]; then
+                        # Get selection name for logging
+                        local selection_name
+                        selection_name=$(aws backup list-backup-selections \
+                            --backup-plan-id "$plan_id" \
+                            --region "$AWS_REGION" \
+                            --query "BackupSelectionsList[?SelectionId=='$selection_id'].SelectionName" \
+                            --output text 2>/dev/null | head -1 || echo "$selection_id")
+                        
+                        log_info "Deleting backup selection: $selection_name (ID: $selection_id)"
+                        safe_aws "delete backup selection: $selection_name" \
+                            aws backup delete-backup-selection \
+                                --backup-plan-id "$plan_id" \
+                                --selection-id "$selection_id" \
+                                --region "$AWS_REGION" \
+                                --no-cli-pager
+                    fi
+                done
+            fi
+        fi
+    done
+    
+    # Delete backup plans (they reference vaults)
+    log_info "Deleting backup plans..."
+    
+    for plan_id in "$daily_plan_id" "$weekly_plan_id" "$monthly_plan_id"; do
+        if [ -n "$plan_id" ] && [ "$plan_id" != "null" ] && [ "$plan_id" != "" ]; then
+            # Get plan name
+            local plan_name
+            plan_name=$(aws backup get-backup-plan \
+                --backup-plan-id "$plan_id" \
+                --region "$AWS_REGION" \
+                --query "BackupPlan.BackupPlanName" \
+                --output text 2>/dev/null || echo "")
+            
+            if [ -n "$plan_name" ]; then
+                log_info "Deleting backup plan: $plan_name"
+                safe_aws "delete backup plan: $plan_name" \
+                    aws backup delete-backup-plan \
+                        --backup-plan-id "$plan_id" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager
+            fi
+        fi
+    done
+    
+    # Delete recovery points in the vault (if any exist)
+    log_info "Deleting recovery points in vault: $backup_vault_name"
+    
+    # List all recovery points in the vault
+    local recovery_point_arns
+    recovery_point_arns=$(aws backup list-recovery-points-by-backup-vault \
+        --backup-vault-name "$backup_vault_name" \
+        --region "$AWS_REGION" \
+        --query "RecoveryPoints[].RecoveryPointArn" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$recovery_point_arns" ]; then
+        local count
+        count=$(echo "$recovery_point_arns" | wc -w)
+        log_info "Found $count recovery point(s) to delete"
+        
+        for recovery_point_arn in $recovery_point_arns; do
+            log_info "Deleting recovery point: $recovery_point_arn"
+            safe_aws "delete recovery point: $recovery_point_arn" \
+                aws backup delete-recovery-point \
+                    --backup-vault-name "$backup_vault_name" \
+                    --recovery-point-arn "$recovery_point_arn" \
+                    --region "$AWS_REGION" \
+                    --no-cli-pager
+        done
+    else
+        log_info "No recovery points found in vault"
+    fi
+    
+    # Delete backup vault
+    log_info "Deleting backup vault: $backup_vault_name"
+    safe_aws "delete backup vault: $backup_vault_name" \
+        aws backup delete-backup-vault \
+            --backup-vault-name "$backup_vault_name" \
+            --region "$AWS_REGION" \
+            --no-cli-pager
+    
+    # Clean up IAM role and policies
+    # Get IAM role name from Terraform (if available)
+    log_info "Cleaning up AWS Backup IAM role..."
+    
+    # List IAM roles with backup in the name
+    local backup_role_names
+    backup_role_names=$(aws iam list-roles \
+        --query "Roles[?contains(RoleName, '$CLUSTER_NAME') && contains(RoleName, 'backup')].RoleName" \
+        --output text 2>/dev/null || echo "")
+    
+    if [ -n "$backup_role_names" ]; then
+        for role_name in $backup_role_names; do
+            log_info "Cleaning up IAM role: $role_name"
+            
+            # Detach managed policies
+            local attached_policies
+            attached_policies=$(aws iam list-attached-role-policies \
+                --role-name "$role_name" \
+                --query "AttachedPolicies[].PolicyArn" \
+                --output text 2>/dev/null || echo "")
+            
+            for policy_arn in $attached_policies; do
+                log_info "Detaching policy: $policy_arn"
+                safe_aws "detach policy from role: $role_name" \
+                    aws iam detach-role-policy \
+                        --role-name "$role_name" \
+                        --policy-arn "$policy_arn" \
+                        --no-cli-pager
+            done
+            
+            # Delete inline policies
+            local inline_policies
+            inline_policies=$(aws iam list-role-policies \
+                --role-name "$role_name" \
+                --query "PolicyNames" \
+                --output text 2>/dev/null || echo "")
+            
+            for policy_name in $inline_policies; do
+                log_info "Deleting inline policy: $policy_name"
+                safe_aws "delete inline policy: $policy_name" \
+                    aws iam delete-role-policy \
+                        --role-name "$role_name" \
+                        --policy-name "$policy_name" \
+                        --no-cli-pager
+            done
+            
+            # Delete the role
+            log_info "Deleting IAM role: $role_name"
+            safe_aws "delete IAM role: $role_name" \
+                aws iam delete-role \
+                    --role-name "$role_name" \
+                    --no-cli-pager
+        done
+    else
+        log_info "No AWS Backup IAM roles found"
+    fi
+    
+    log_success "AWS Backup resources cleaned up"
+}
 
 # =============================================================================
 # TERRAFORM CLEANUP
@@ -730,14 +1038,12 @@ terraform_destroy() {
     # Retry logic for Terraform destroy (handles AWS API eventual consistency issues)
     local max_attempts=3
     local attempt=1
-    local destroy_success=false
     
     while [ $attempt -le $max_attempts ]; do
         log_info "Terraform destroy attempt $attempt/$max_attempts..."
         
         if terraform destroy "${destroy_args[@]}"; then
             log_success "Terraform destroy completed successfully"
-            destroy_success=true
             
             # Only clean up state files if destroy succeeded
             log_info "Cleaning up Terraform state files..."
@@ -828,6 +1134,7 @@ show_help() {
     echo "    • Deletes all snapshots to prevent automatic restoration"
     echo "    • Disables RDS deletion protection for clean terraform destroy"
     echo "    • Handles S3 bucket versioning issues (delete markers, versions)"
+    echo "    • Cleans up AWS Backup resources (selections, plans, vaults, recovery points, IAM)"
     echo "    • Runs terraform destroy (handles ElastiCache, EKS, and other resources)"
     echo "    • Verifies complete cleanup"
     echo ""
@@ -886,7 +1193,11 @@ main() {
         fi
     fi
     
-    # Get AWS account ID for verification
+    # Execute cleanup steps - only handle critical issues that prevent terraform destroy
+    # Check prerequisites first (includes AWS credentials check with helpful error messages)
+    check_prerequisites
+    
+    # Get AWS account ID for verification (after credentials are verified)
     local aws_account_id
     aws_account_id=$(get_aws_account_id)
     
@@ -897,9 +1208,6 @@ main() {
     log_info "AWS Region: $AWS_REGION"
     log_info "Cluster Name: $CLUSTER_NAME"
     log_info "Force Mode: $FORCE"
-    
-    # Execute cleanup steps - only handle critical issues that prevent terraform destroy
-    check_prerequisites
     cleanup_rds_snapshots
     
     # Disable RDS deletion protection - this is critical for terraform destroy to succeed
@@ -929,6 +1237,7 @@ main() {
     
     cleanup_s3_buckets
     cleanup_cloudwatch_logs
+    cleanup_aws_backup_resources
     
     # Run terraform destroy - must succeed for cleanup to be considered complete
     if ! terraform_destroy; then

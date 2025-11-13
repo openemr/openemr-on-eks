@@ -123,7 +123,7 @@ resource "time_sleep" "wait_for_compute" {
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "metrics-server"    # Essential for autoscaling
-  addon_version               = "v0.8.0-eksbuild.2" # Stable version for Kubernetes 1.34
+  addon_version               = "v0.8.0-eksbuild.3" # Latest stable version for Kubernetes 1.34
   resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
 

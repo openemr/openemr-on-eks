@@ -237,8 +237,10 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
     # Base costs (USD/month)
     eks_control_plane = 73
     nat_gateway = 47
-    kms_keys = 6
+    kms_keys = 7  # 7 keys: EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup
     waf = 10
+    # AWS Backup costs vary by deployment size and usage patterns (estimated for different sizes below)
+    # See here for detailed backup pricing information: https://aws.amazon.com/backup/pricing/
 
     # Variable costs based on user tiers
     if users <= 50:  # Small clinic
@@ -246,16 +248,19 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
         aurora = 87
         valkey = 22
         efs = 30
+        aws_backup = 18  # Small deployment: ~200 GB backup 
     elif users <= 200:  # Medium practice
         ec2_compute = 135
         aurora = 173
         valkey = 55
         efs = 150
+        aws_backup = 40  # Medium deployment: ~500 GB backup
     else:  # Large hospital
         ec2_compute = 1104
         aurora = 518
         valkey = 138
         efs = 600
+        aws_backup = 75  # Large deployment: ~900 GB backup
 
     auto_mode_fee = ec2_compute * 0.12  # 12% of EC2
 
@@ -269,6 +274,7 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
         + nat_gateway
         + kms_keys
         + waf
+        + aws_backup
     )
 
     env = environment.lower().strip()
@@ -295,6 +301,7 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
             "NAT Gateway": nat_gateway,
             "KMS Keys": kms_keys,
             "WAFv2 Static Costs (doesn't include variable request-based pricing)": waf,
+            "AWS Backup Storage (first month; reduces after cold storage transition)": aws_backup,
         },
     }
 
@@ -310,7 +317,6 @@ if __name__ == "__main__":
     print(f"Estimated Monthly Cost (Development): ${result['total']:.2f}")
     for service, cost in result["breakdown"].items():
         print(f"  {service}: ${cost:.2f}")
-
 ```
 
 ## Phase 2: Infrastructure Deployment

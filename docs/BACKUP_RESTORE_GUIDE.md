@@ -5,6 +5,7 @@ This guide covers the comprehensive backup and restore system for OpenEMR on EKS
 ## 📋 Table of Contents
 
 - [Overview](#overview)
+- [Backup System](#backup-system)
 - [What Gets Backed Up](#what-gets-backed-up)
 - [Prerequisites](#prerequisites)
 - [Quick Start](#quick-start)
@@ -17,8 +18,9 @@ This guide covers the comprehensive backup and restore system for OpenEMR on EKS
 
 ## Overview
 
-The OpenEMR backup system provides:
+The OpenEMR backup system provides a comprehensive, multi-layered backup strategy:
 
+- ✅ **AWS Backup Integration** - Automated, centralized backups of all infrastructure components
 - ✅ **Automated RDS Aurora snapshots** with enhanced cross-region/cross-account support
 - ✅ **Kubernetes configuration backup** (all resources, secrets, configs)
 - ✅ **Application data backup** from S3
@@ -26,6 +28,7 @@ The OpenEMR backup system provides:
 - ✅ **Cross-account backup** for compliance and data sharing
 - ✅ **Simple, reliable scripts** with graceful error handling
 - ✅ **Multiple backup strategies** (same-region, cross-region, cross-account)
+- ✅ **7-year retention** for compliance and long-term recovery needs
 
 The restore system has been significantly simplified and improved:
 
@@ -88,6 +91,97 @@ graph TB
         H --> I
     end
 ```
+
+## Backup System
+
+### AWS Backup Integration
+
+The OpenEMR deployment includes a comprehensive AWS Backup configuration that automatically backs up all critical infrastructure components. This system provides centralized backup management, encryption, and retention policies that complement the existing script-based backup process.
+
+#### What AWS Backup Covers
+
+AWS Backup automatically backs up the following resources on scheduled intervals:
+
+- **All S3 Buckets**: ALB logs, WAF logs, Loki storage, CloudTrail logs
+- **EFS File System**: Application data and configuration files
+- **RDS Aurora Cluster**: Database snapshots with point-in-time recovery
+- **EKS Cluster**: Cluster configuration and metadata (using AWS Backup support for EKS)
+
+#### Backup Plans
+
+Three backup plans are configured to provide comprehensive coverage:
+
+1. **Daily Backups** - Runs every day at 2:00 AM UTC
+   - Retention: 7 years (2555 days)
+   - Cold storage transition: After 30 days
+   - Purpose: Frequent backups for recent recovery needs
+
+2. **Weekly Backups** - Runs every Sunday at 3:00 AM UTC
+   - Retention: 7 years (2555 days)
+   - Cold storage transition: After 90 days
+   - Purpose: Weekly snapshots for intermediate recovery needs
+
+3. **Monthly Backups** - Runs on the 1st of each month at 4:00 AM UTC
+   - Retention: 7 years (2555 days)
+   - Cold storage transition: After 180 days
+   - Purpose: Monthly snapshots for long-term retention
+
+#### Encryption and Security
+
+- **Dedicated KMS Key**: All backups are encrypted using a dedicated KMS key specifically for AWS Backup
+- **Automatic Key Rotation**: KMS key rotation is enabled for enhanced security
+- **Access Control**: IAM role-based access control for backup operations
+- **Compliance**: 7-year retention meets most healthcare compliance requirements
+
+#### Integration with Existing Backup Process
+
+The AWS Backup system complements the existing script-based backup process:
+
+- **AWS Backup**: Provides automated, scheduled backups of all infrastructure components
+- **Script-Based Backups**: Provides on-demand backups, cross-region replication, and application-specific data backups
+- **Dual Strategy**: Both systems work together to provide comprehensive backup coverage
+
+#### Benefits of AWS Backup Integration
+
+- **Centralized Management**: All backups managed in a single AWS Backup vault
+- **Automated Scheduling**: No manual intervention required for scheduled backups
+- **Long-Term Retention**: 7-year retention for compliance requirements
+- **Cost Optimization**: Automatic transition to cold storage reduces costs
+- **EKS Support**: Native support for EKS cluster backups (see: https://aws.amazon.com/about-aws/whats-new/2025/11/aws-backup-supports-amazon-eks/)
+- **Recovery Point Management**: Easy recovery point selection and restoration
+
+#### Monitoring and Management
+
+- **AWS Backup Console**: Monitor backup jobs, recovery points, and restore operations
+- **CloudWatch Integration**: Backup job status and metrics in CloudWatch
+- **Recovery Point Tags**: Automatic tagging for backup organization and cost allocation
+- **Backup Reports**: Comprehensive backup reports for compliance and auditing
+
+#### Backup Storage Costs
+
+AWS Backup storage costs vary by service and storage tier. Pricing is based on the [AWS Backup pricing page](https://aws.amazon.com/backup/pricing/):
+
+**Standard (Warm) Storage Pricing:**
+- **EFS**: $0.05 per GB-month
+- **RDS/Aurora**: $0.095 per GB-month
+- **S3**: $0.05 per GB-month (for objects ≥128 KB; smaller objects billed as 128 KB)
+- **EKS**: One-time backup creation fee per backup (per namespace) + storage charges for cluster state data
+- **EBS**: $0.05 per GB-month (for persistent storage attached to EKS cluster)
+
+**Cold Storage Pricing:**
+- **Cold Storage**: $0.01 per GB-month for EFS (Note: cold storage as of Nov 2025 is only supported for EBS, EFS, DynamoDB, Timestream, SAP HANA, and VMware)
+- **Minimum Retention**: Backups transitioned to cold storage must be retained for a minimum of 90 days
+
+**Additional Considerations:**
+- **S3 Additional Charges**: GET/LIST requests on S3 objects and EventBridge events (for S3 backups)
+- **Data Transfer**: No charges for data transfer within the same region
+- **EKS Backup**: Additional charges apply for EKS cluster backups (varies by cluster size and namespace count)
+
+**Estimated Monthly Storage Costs (for 500 GB of backup data):**
+
+- Warm storage at ~$0.05/GB-month → ~$25/month (depending on service mix maybe $30-40).
+- If you transition all 500 GB to cold storage at ~$0.01/GB-month → ~$5/month (after transition).
+- Thus: First month (warm) ~$30-40, after transition ~$5-10/month.
 
 ## What Gets Backed Up
 
@@ -776,24 +870,42 @@ For comprehensive testing of the entire backup and restore process, use the auto
 
 Monitor backup success through:
 
-- **S3 bucket contents** - Verify regular backup uploads
+- **AWS Backup Console** - Monitor backup jobs, recovery points, and restore operations
+- **CloudWatch Metrics** - Backup job status and metrics in CloudWatch
+- **Backup Reports** - Comprehensive backup reports for compliance and auditing
+- **S3 bucket contents** - Verify regular backup uploads (script-based backups)
 - **RDS snapshots** - Check snapshot creation and retention
 - **CloudWatch logs** - Monitor backup script execution
 - **Test reports** - Regular restore testing results
+
+#### AWS Backup Monitoring
+
+- **Backup Jobs**: Monitor backup job status and completion in AWS Backup console
+- **Recovery Points**: Track recovery points and retention periods
+- **Backup Vault**: Monitor storage usage and costs in backup vault
+- **Backup Plans**: Verify backup plans are running on schedule
+- **Backup Selections**: Confirm all resources are being backed up
+- **CloudWatch Alarms**: Set up alarms for backup job failures
+- **Backup Reports**: Generate backup reports for compliance and auditing
 
 ### Maintenance Tasks
 
 #### Weekly
 
+- Review AWS Backup job status and recovery points
 - Review backup reports for any failures
 - Verify S3 bucket lifecycle policies
 - Check RDS snapshot retention
+- Monitor backup vault storage usage
 
 #### Monthly
 
 - Run full backup/restore test cycle
 - Review and update disaster recovery procedures
 - Audit cross-region backup costs
+- Review AWS Backup storage costs and optimize
+- Verify backup plans are running as expected
+- Test restore operations from AWS Backup vault
 
 #### Quarterly
 
@@ -803,6 +915,9 @@ Monitor backup success through:
 
 ### Cost Optimization
 
+- **AWS Backup Cold Storage** - Automatic transition to cold storage after 30-180 days
+- **Backup Retention Policies** - Review and optimize retention periods
+- **Backup Frequency** - Adjust backup frequency based on recovery point objectives
 - **S3 Lifecycle Policies** - Automatic transition to cheaper storage classes
 - **RDS Snapshot Cleanup** - Automated deletion of old snapshots
 - **Cross-Region Optimization** - Balance cost vs. recovery requirements

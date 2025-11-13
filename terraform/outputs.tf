@@ -266,3 +266,47 @@ output "waf_enabled" {
   description = "Whether WAF is enabled"
   value       = var.enable_waf
 }
+
+# AWS Backup Configuration Outputs
+# These outputs expose key information about the AWS Backup configuration
+# that provides centralized backup management for all infrastructure components.
+
+output "backup_vault_name" {
+  description = "Name of the AWS Backup vault"
+  value       = aws_backup_vault.openemr.name
+}
+
+output "backup_vault_arn" {
+  description = "ARN of the AWS Backup vault"
+  value       = aws_backup_vault.openemr.arn
+}
+
+output "backup_kms_key_id" {
+  description = "ID of the KMS key used for AWS Backup encryption"
+  value       = aws_kms_key.backup.key_id
+}
+
+output "backup_kms_key_arn" {
+  description = "ARN of the KMS key used for AWS Backup encryption"
+  value       = aws_kms_key.backup.arn
+}
+
+output "backup_plan_daily_id" {
+  description = "ID of the daily backup plan"
+  value       = aws_backup_plan.daily.id
+}
+
+output "backup_plan_weekly_id" {
+  description = "ID of the weekly backup plan"
+  value       = aws_backup_plan.weekly.id
+}
+
+output "backup_plan_monthly_id" {
+  description = "ID of the monthly backup plan"
+  value       = aws_backup_plan.monthly.id
+}
+
+output "backup_role_arn" {
+  description = "ARN of the IAM role used by AWS Backup"
+  value       = aws_iam_role.backup.arn
+}

@@ -56,7 +56,7 @@ eks_addons:
     description: "EFS CSI Driver for persistent storage"
 
   metrics_server:
-    current: "v0.8.0-eksbuild.2"
+    current: "v0.8.0-eksbuild.3"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "metrics-server"

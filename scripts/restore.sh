@@ -65,7 +65,7 @@ readonly EFS_PROPAGATION_WAIT=${EFS_PROPAGATION_WAIT:-30}                 # 30 s
 readonly HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-10}               # 10 seconds
 readonly VERIFICATION_TIMEOUT=${VERIFICATION_TIMEOUT:-300}                # 5 minutes for final verification
 readonly VERIFICATION_INTERVAL=${VERIFICATION_INTERVAL:-10}               # 10 seconds between verification checks
-readonly VERIFICATION_MAX_ATTEMPTS=${VERIFICATION_MAX_ATTEMPTS:-3}        # 3 attempts with crypto key cleanup retry
+readonly VERIFICATION_MAX_ATTEMPTS=${VERIFICATION_MAX_ATTEMPTS:-6}        # 6 attempts with crypto key cleanup retry
 
 # Temp pod resource configuration
 readonly TEMP_POD_MEMORY_REQUEST=${TEMP_POD_MEMORY_REQUEST:-1Gi}         # Memory request
