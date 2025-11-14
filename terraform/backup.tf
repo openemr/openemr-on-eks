@@ -55,8 +55,8 @@ resource "aws_backup_vault" "openemr" {
 # Backup plans define when backups are created and how long they are retained.
 # Three backup plans are created:
 # - Daily: Frequent backups for recent recovery needs (EFS backup transitioned to cold storage after 30 days)
-# - Weekly: Weekly backups for intermediate recovery needs (EFS backup transitioned to cold storage after 60 days)
-# - Monthly: Monthly backups for long-term retention (EFS backup transitioned to cold storage after 90 days)
+# - Weekly: Weekly backups for intermediate recovery needs (EFS backup transitioned to cold storage after 90 days)
+# - Monthly: Monthly backups for long-term retention (EFS backup transitioned to cold storage after 180 days)
 # All of these plans create backups that last 7 years by default.
 # You can alter the retention of each of these plans individually by changing "2555" to a number of days you'd prefer.
 
