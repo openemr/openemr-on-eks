@@ -177,7 +177,7 @@ output "loki_s3_role_arn" {
 # and monitoring capabilities.
 
 output "cloudwatch_log_groups" {
-  description = "CloudWatch log group names for OpenEMR 7.0.3.4"
+  description = "CloudWatch log group names for OpenEMR 7.0.4"
   value = {
     application    = aws_cloudwatch_log_group.openemr_app.name
     access         = aws_cloudwatch_log_group.openemr_access.name

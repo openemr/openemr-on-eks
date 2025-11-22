@@ -78,7 +78,7 @@ readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}           # Stora
 # Default configuration values
 readonly DEFAULT_NAMESPACE="openemr"
 readonly DEFAULT_AWS_REGION="us-west-2"
-readonly DEFAULT_OPENEMR_VERSION="7.0.3"
+readonly DEFAULT_OPENEMR_VERSION="7.0.4"
 
 # Script directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1723,7 +1723,7 @@ spec:
       
       # Install required tools
       echo "Installing required tools..."
-      # OpenEMR 7.0.3 uses Alpine Linux, so we use apk
+      # OpenEMR 7.0.4 uses Alpine Linux, so we use apk
       echo "Installing AWS CLI..."
       apk add --no-cache aws-cli
       

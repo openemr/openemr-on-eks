@@ -281,7 +281,7 @@ graph TD
 
 - **Purpose**: CloudWatch log groups
 - **Key Components**:
-  - 10+ log groups for OpenEMR 7.0.3.4
+  - 10+ log groups for OpenEMR 7.0.4
   - Fluent Bit metrics log group
   - Different retention periods for different log types
   - KMS encryption for all log groups

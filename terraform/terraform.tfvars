@@ -113,7 +113,7 @@ openemr_scale_up_stabilization_seconds   = 60  # Wait 1 minute before scaling up
 # openemr_scale_up_stabilization_seconds   = 90   # 1.5 minutes
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.3" # OpenEMR version to deploy
+openemr_version = "7.0.4" # OpenEMR version to deploy
 
 # OpenEMR Feature Configuration (SECURITY: Disabled by default)
 # Only enable these features if specifically needed for your use case

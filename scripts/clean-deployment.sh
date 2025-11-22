@@ -140,7 +140,7 @@ echo ""
 # Get OpenEMR version from Terraform for use in cleanup pods
 echo -e "${BLUE}Getting OpenEMR version from Terraform...${NC}"
 cd "$PROJECT_ROOT/terraform"
-OPENEMR_VERSION="7.0.3"  # Default fallback version
+OPENEMR_VERSION="7.0.4"  # Default fallback version
 if [ -f "terraform.tfvars" ]; then
     TFVARS_VERSION=$(grep -E '^openemr_version\s*=' terraform.tfvars 2>/dev/null | cut -d'"' -f2 || echo "")
     if [ -n "$TFVARS_VERSION" ]; then

@@ -6,7 +6,7 @@
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.3"
+    current: "7.0.4"
     registry: "openemr/openemr"
     release_notes_url: "https://github.com/openemr/openemr/releases"
     notify_on_update: true

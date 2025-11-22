@@ -375,13 +375,13 @@ get_latest_docker_version() {
     fi
 
     # Parse and filter versions, excluding architecture-specific tags
-    # Only include semantic version numbers (e.g., "7.0.3", not "7.0.3-amd64")
+    # Only include semantic version numbers (e.g., "7.0.4", not "7.0.4-amd64")
     local versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
 
     # Handle case where no clean semantic versions are found
     if [ -z "$versions" ]; then
         # If no clean versions found, try to extract base versions from architecture-specific tags
-        # This handles cases where tags include architecture suffixes (e.g., "7.0.3-amd64")
+        # This handles cases where tags include architecture suffixes (e.g., "7.0.4-amd64")
         local arch_versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$' | sed 's/-[a-zA-Z0-9]*$//' | sort -V -r | uniq)
         versions="$arch_versions"
     fi

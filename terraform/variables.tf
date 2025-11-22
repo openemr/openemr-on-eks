@@ -335,12 +335,12 @@ variable "openemr_scale_up_stabilization_seconds" {
 variable "openemr_version" {
   description = "OpenEMR Docker image version to deploy (use specific versions for production)"
   type        = string
-  default     = "7.0.3" # Stable OpenEMR version
+  default     = "7.0.4" # Stable OpenEMR version
 
   # Validation ensures proper version format
   validation {
     condition     = can(regex("^(latest|[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9]+)?)$", var.openemr_version))
-    error_message = "OpenEMR version must be 'latest' or follow semantic versioning (e.g., '7.0.3', '7.0.2-dev')."
+    error_message = "OpenEMR version must be 'latest' or follow semantic versioning (e.g., '7.0.4', '7.0.4-dev')."
   }
 }
 
