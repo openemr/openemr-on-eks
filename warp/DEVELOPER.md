@@ -387,9 +387,8 @@ class TestClassName(unittest.TestCase):
 
 - Use parallel processing where possible
 - Batch operations for efficiency
-- Use connection pooling for database access
 - Cache data when appropriate
-- Direct database writes only (no API overhead)
+- Direct database/filesystem writes only (no API overhead)
 
 ### Testing Requirements
 
@@ -401,4 +400,3 @@ class TestClassName(unittest.TestCase):
 ## License
 
 MIT License
-
