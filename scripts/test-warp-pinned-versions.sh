@@ -52,6 +52,13 @@ if [ ! -d "$WARP_DIR" ]; then
     exit 1
 fi
 
+# Function to normalize Python version to major.minor format (e.g., "3.14.0" -> "3.14")
+normalize_python_version() {
+    local version=$1
+    # Extract major.minor (first two components) using awk or cut
+    echo "$version" | awk -F. '{print $1"."$2}'
+}
+
 # Function to read version from versions.yaml
 # Fails if version cannot be read from versions.yaml (no fallback to defaults)
 read_version() {
@@ -124,7 +131,10 @@ if command -v "python${PYTHON_VERSION_REQUIRED}" >/dev/null 2>&1; then
 elif command -v python3 >/dev/null 2>&1; then
     PYTHON_CMD="python3"
     PYTHON_ACTUAL_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
-    if [ "$PYTHON_ACTUAL_VERSION" != "$PYTHON_VERSION_REQUIRED" ]; then
+    # Compare only major.minor versions
+    PYTHON_ACTUAL_NORMALIZED=$(normalize_python_version "$PYTHON_ACTUAL_VERSION")
+    PYTHON_REQUIRED_NORMALIZED=$(normalize_python_version "$PYTHON_VERSION_REQUIRED")
+    if [ "$PYTHON_ACTUAL_NORMALIZED" != "$PYTHON_REQUIRED_NORMALIZED" ]; then
         echo -e "${YELLOW}Warning: Python $PYTHON_VERSION_REQUIRED not found, using $PYTHON_ACTUAL_VERSION${NC}"
         echo -e "${YELLOW}Note: Production uses Python $PYTHON_VERSION_REQUIRED (from versions.yaml)${NC}"
         echo ""
@@ -156,7 +166,10 @@ if ! python -c "import sys; exit(0 if sys.version_info >= (3, 8) else 1)"; then
     echo -e "${RED}ERROR: Python 3.8+ required${NC}"
     exit 1
 fi
-if [ "$PYTHON_VERSION" != "$PYTHON_VERSION_REQUIRED" ]; then
+# Compare only major.minor versions
+PYTHON_VERSION_NORMALIZED=$(normalize_python_version "$PYTHON_VERSION")
+PYTHON_REQUIRED_NORMALIZED=$(normalize_python_version "$PYTHON_VERSION_REQUIRED")
+if [ "$PYTHON_VERSION_NORMALIZED" != "$PYTHON_REQUIRED_NORMALIZED" ]; then
     echo -e "${YELLOW}⚠ Using Python $PYTHON_VERSION (production uses $PYTHON_VERSION_REQUIRED)${NC}"
     echo -e "${YELLOW}  Consider testing with Python $PYTHON_VERSION_REQUIRED for exact compatibility${NC}"
 else
@@ -331,7 +344,10 @@ echo ""
 echo "Versions tested match versions.yaml:"
 echo "  ✓ All package versions verified"
 echo ""
-if [ "$PYTHON_VERSION" != "$PYTHON_VERSION_REQUIRED" ]; then
+# Compare only major.minor versions for summary
+PYTHON_VERSION_NORMALIZED=$(normalize_python_version "$PYTHON_VERSION")
+PYTHON_REQUIRED_NORMALIZED=$(normalize_python_version "$PYTHON_VERSION_REQUIRED")
+if [ "$PYTHON_VERSION_NORMALIZED" != "$PYTHON_REQUIRED_NORMALIZED" ]; then
     echo "=============================================================================="
     echo "For production compatibility testing with Python $PYTHON_VERSION_REQUIRED:"
     echo "=============================================================================="
