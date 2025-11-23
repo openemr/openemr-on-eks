@@ -2069,6 +2069,8 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Terraform Directory](terraform/README.md)** - Complete infrastructure documentation with dependency graphs
 - **[Kubernetes Directory](k8s/README.md)** - Kubernetes manifests documentation with deployment workflows
 - **[Scripts Directory](scripts/README.md)** - Operational scripts documentation and maintenance guide
+- **[Monitoring Directory](Monitoring/README.md)** - Optional monitoring stack documentation and also a maintenance and configuration guide
+- **[Warp Directory](warp/README.md)** - Main readme for the Warp project for rapid data uploads to OpenEMR on EKS
 - **[GitHub Directory](.github/workflows/README.md)** - CI/CD workflows and automation documentation
 - **[OIDC Provider Directory](oidc_provider/README.md)** - GitHub → AWS OIDC provider setup and configuration
 - **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
