@@ -6,7 +6,7 @@
 
 **High-performance direct database import for OpenEMR on EKS - Database access required**
 
-[![CI/CD Tests](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
+[![CI/CD Tests](https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
 [![Version](https://img.shields.io/badge/version-0.1.0-blue)](../warp/setup.py#L12)
 
 </div>
