@@ -97,6 +97,22 @@ resource "aws_iam_policy" "openemr" {
           "arn:aws:s3:::openemr-backups-*",
           "arn:aws:s3:::openemr-backups-*/*"
         ]
+      },
+      {
+        # S3 permissions for Warp dataset access (OMOP/CCDA data sources)
+        # Default: synpuf-omop bucket (public OMOP dataset)
+        # To add additional dataset buckets, add more Resource entries
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject", # Download dataset files
+          "s3:ListBucket" # List dataset bucket contents
+        ]
+        Resource = [
+          # synpuf-omop bucket (https://registry.opendata.aws/cmsdesynpuf-omop/)
+          # Public OMOP dataset for testing and development
+          "arn:aws:s3:::synpuf-omop",
+          "arn:aws:s3:::synpuf-omop/*"
+        ]
       }
     ]
   })

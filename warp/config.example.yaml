@@ -1,0 +1,31 @@
+# Warp CCDA Data Uploader Configuration Example
+# Copy this file to config.yaml and update with your values
+
+openemr:
+  url: "https://openemr.example.com"
+  user: "admin"
+  password: "your-password-here"
+
+data_source:
+  # S3 path (recommended)
+  s3_path: "s3://synpuf-omop/1k/"
+  # OR local path
+  # local_path: "/path/to/omop/data"
+  
+  dataset_size: "1k"  # Options: 1k, 100k, 2.3m
+  aws_region: "us-east-1"
+
+processing:
+  batch_size: 100
+  max_records: null  # null = process all records
+  start_from: 0
+
+logging:
+  level: "INFO"  # Options: DEBUG, INFO, WARNING, ERROR
+
+# Optional: AWS credentials (if not using IAM role/service account)
+aws:
+  access_key_id: ""
+  secret_access_key: ""
+  region: "us-east-1"
+

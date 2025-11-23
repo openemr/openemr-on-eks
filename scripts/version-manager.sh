@@ -339,6 +339,10 @@ parse_config() {
     # Logging and monitoring versions
     FLUENT_BIT_CURRENT=$(yq eval '.applications.fluent_bit.current' "$VERSIONS_FILE")
     FLUENT_BIT_REGISTRY=$(yq eval '.applications.fluent_bit.registry' "$VERSIONS_FILE")
+    
+    # Python Docker image version (for Warp)
+    PYTHON_CURRENT=$(yq eval '.applications.python.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+    PYTHON_REGISTRY=$(yq eval '.applications.python.registry' "$VERSIONS_FILE" 2>/dev/null || echo "library/python")
 
     # Database versions
     AURORA_CURRENT=$(yq eval '.databases.aurora_mysql.current' "$VERSIONS_FILE")
@@ -950,6 +954,36 @@ EOF
             updates_found=1
         else
             log "INFO" "Fluent Bit is up to date: $FLUENT_BIT_CURRENT"
+        fi
+
+        # Check Python Docker image version
+        PYTHON_CURRENT=$(yq eval '.applications.python.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        PYTHON_REGISTRY=$(yq eval '.applications.python.registry' "$VERSIONS_FILE" 2>/dev/null || echo "library/python")
+        PYTHON_AUTO_DETECT=$(yq eval '.applications.python.auto_detect_latest' "$VERSIONS_FILE" 2>/dev/null || echo "false")
+        
+        if [ -n "$PYTHON_CURRENT" ] && [ "$PYTHON_AUTO_DETECT" = "true" ]; then
+            log "INFO" "Checking Python Docker image version (auto-detect enabled)..."
+            # Get latest Python 3.xx version from Docker Hub
+            local python_tags_url="https://registry.hub.docker.com/v2/repositories/${PYTHON_REGISTRY}/tags?page_size=100&name=3."
+            local python_response=$(curl -s "$python_tags_url" 2>/dev/null || echo "")
+            
+            if [ -n "$python_response" ]; then
+                # Extract latest 3.xx version (excluding RC/beta)
+                local python_latest=$(echo "$python_response" | jq -r '.results[].name' 2>/dev/null | \
+                    grep -E "^3\.[0-9]+(-slim)?$" | \
+                    sed 's/-slim$//' | \
+                    sort -V -r | \
+                    head -1 || echo "")
+                
+                if [ -n "$python_latest" ] && [ "$python_latest" != "$PYTHON_CURRENT" ]; then
+                    log "INFO" "Python Docker image update available: $PYTHON_CURRENT -> $python_latest"
+                    echo "- **Python Docker Image**: $PYTHON_CURRENT → $python_latest (latest 3.xx)" >> "$update_report"
+                    search_version_in_codebase "Python Docker Image" "$PYTHON_CURRENT" "$python_latest"
+                    updates_found=1
+                else
+                    log "INFO" "Python Docker image is up to date: $PYTHON_CURRENT"
+                fi
+            fi
         fi
     fi
 

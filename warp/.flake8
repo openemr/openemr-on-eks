@@ -1,0 +1,13 @@
+[flake8]
+max-line-length = 127
+extend-ignore = E203
+exclude =
+    .git,
+    __pycache__,
+    .pytest_cache,
+    htmlcov,
+    .eggs,
+    *.egg-info,
+    build,
+    dist
+

@@ -26,6 +26,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Kubernetes Documentation](../k8s/README.md)
 - [Scripts Documentation](../scripts/README.md)
 - [Monitoring Documentation](../monitoring/README.md)
+- [Warp Project Documentation](../warp/README.md)
 
 ### **📖 Documentation Maintenance**
 - [Maintenance Guidelines](#maintenance-guidelines)

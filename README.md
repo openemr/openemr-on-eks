@@ -643,9 +643,9 @@ openemr-on-eks/
 ├── .github/                               # GitHub Actions and workflows
 │   ├── README.md                          # Comprehensive GitHub workflows documentation
 │   └── workflows/                         # CI/CD automation workflows
-│       ├── ci-cd-tests.yml                # Automated testing and quality assurance
+│       ├── ci-cd-tests.yml                # Automated testing and quality assurance (includes Warp CI/CD)
 │       ├── manual-releases.yml            # Manual release workflow for version management
-│       └── version-check.yml              # Automated version awareness checking
+│       └── monthly-version-check.yml      # Automated version awareness checking
 ├── terraform/                             # Infrastructure as Code (Modular Structure)
 │   ├── README.md                          # Complete Terraform infrastructure documentation
 │   ├── main.tf                            # Terraform providers and data sources
@@ -709,6 +709,7 @@ openemr-on-eks/
 │   ├── README.md                          # Complete scripts documentation and maintenance guide
 │   ├── check-openemr-versions.sh          # OpenEMR version discovery and management
 │   ├── version-manager.sh                 # Comprehensive version awareness checking
+│   ├── get-python-image-version.sh        # Python Docker image version retrieval and auto-detection
 │   ├── validate-deployment.sh             # Pre-deployment validation and health checks
 │   ├── validate-efs-csi.sh                # EFS CSI driver validation and troubleshooting
 │   ├── clean-deployment.sh                # Enhanced deployment cleanup (deletes PVCs and stale configs)
@@ -736,6 +737,31 @@ openemr-on-eks/
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
 │   └── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
+├── warp/                                  # Warp - OpenEMR Data Upload Accelerator
+│   ├── README.md                          # Warp project documentation
+│   ├── DEVELOPER.md                       # Warp developer guide and architecture
+│   ├── setup.py                           # Python package configuration
+│   ├── requirements.txt                   # Python dependencies
+│   ├── pytest.ini                         # Pytest configuration
+│   ├── Makefile                           # Build and test commands
+│   ├── Dockerfile                         # Container image definition
+│   ├── .flake8                            # Flake8 linting configuration
+│   ├── config.example.yaml                # Example configuration file
+│   ├── k8s-job.yaml                       # Kubernetes job manifest (custom image)
+│   ├── k8s-job-test.yaml                  # Kubernetes job manifest (build-inside-pod)
+│   ├── k8s-job-benchmark.yaml             # Kubernetes job manifest for performance benchmarking
+│   ├── logo/                              # Warp project logo and branding
+│   │   └── warp_logo.png                  # Warp project logo
+│   ├── images/                            # Warp visual assets
+│   │   └── warp-imports-in-openemr.png    # Screenshot showing Warp imports in OpenEMR
+│   ├── benchmark-data/                    # Benchmark dataset verification tools
+│   │   ├── README.md                      # Documentation for downloading and verifying dataset counts
+│   │   └── verify-counts.sh               # Script to verify OMOP dataset record counts
+│   ├── warp/                              # Warp Python package source
+│   │   ├── cli.py                         # Command-line interface
+│   │   ├── commands/                      # Command implementations
+│   │   └── core/                          # Core functionality modules
+│   └── tests/                             # Test suite
 ├── images/                                # Visual assets and branding materials
 │   ├── README.md                          # Complete images documentation and usage guidelines
 │   ├── openemr_on_eks_logo.png            # Main project logo for documentation and branding (optimized for web)

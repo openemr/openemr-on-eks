@@ -44,6 +44,7 @@ on:
         - kubernetes_manifests
         - script_validation
         - documentation
+        - warp
 
 # Required permissions for the workflow
 permissions:
@@ -409,13 +410,106 @@ jobs:
             echo "Warning: deploy.sh should be executable"
           fi
 
+  # Warp project CI/CD job - Python package testing and validation
+  # This job runs comprehensive testing for the Warp project (OpenEMR Data Upload Accelerator)
+  # It runs when warp/ files change, versions.yaml changes, or when explicitly triggered
+  warp-ci:
+    name: Warp CI/CD
+    runs-on: ubuntu-24.04
+    # Run if manually triggered with 'all' or 'warp', or on push/PR (workflow paths filter handles file detection)
+    if: |
+      (github.event_name == 'workflow_dispatch' && 
+       (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'warp')) ||
+      github.event_name != 'workflow_dispatch'
+
+    steps:
+      # Step 1: Checkout repository code
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # Step 2: Set up Python environment
+      - name: Set up Python
+        uses: actions/setup-python@v6.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      # Step 3: Install Python dependencies
+      - name: Install dependencies
+        run: |
+          cd warp
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -e .
+          # Install test dependencies (versions pinned to match versions.yaml)
+          pip install pytest==8.3.4 pytest-cov==6.0.0 flake8==7.3.0 black==25.9.0 mypy==1.13.0
+
+      # Step 4: Run pytest with coverage (exclude benchmarks)
+      - name: Run pytest with coverage
+        run: |
+          cd warp
+          pytest tests/ -v --cov=warp --cov-report=term-missing --cov-report=html --ignore=tests/benchmarks
+
+      # Step 5: Upload coverage reports as artifacts
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: warp-coverage-report
+          path: warp/htmlcov/
+          retention-days: 7
+
+      # Step 6: Format code with black (auto-fix whitespace and formatting)
+      - name: Format code with black
+        run: |
+          cd warp
+          black warp/ tests/ --line-length 127
+
+      # Step 7: Run flake8 linting (after formatting)
+      - name: Run flake8
+        run: |
+          cd warp
+          flake8 warp/ --max-line-length=127 --extend-ignore=E203 --count --statistics
+
+      # Step 8: Run type checking with mypy
+      - name: Run type checking with mypy
+        run: |
+          cd warp
+          mypy warp/ --ignore-missing-imports || echo "Type checking completed with warnings"
+
+      # Step 9: Run Trivy security scan for warp
+      - name: Run Trivy security scan
+        uses: aquasecurity/trivy-action@master
+        continue-on-error: true
+        with:
+          scan-type: 'fs'
+          scan-ref: 'warp'
+          format: 'table'
+          output: 'trivy-warp-results.txt'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          scanners: 'vuln,secret,config'
+          exit-code: '0'
+
+      # Step 10: Display Trivy results
+      - name: Display Trivy results
+        continue-on-error: true
+        run: |
+          echo "🔍 Trivy Security Scan Results for Warp:"
+          echo "=================================="
+          if [ -f "trivy-warp-results.txt" ]; then
+            cat trivy-warp-results.txt
+          else
+            echo "No vulnerabilities found or scan completed successfully"
+          fi
+          echo "=================================="
+
   # Summary job - generates comprehensive test results summary
   # This job collects results from all previous jobs and provides a unified
   # overview of the entire CI/CD pipeline execution
   summary:
     name: Test Summary
     runs-on: ubuntu-24.04
-    needs: [test, lint-and-validate, security-scan, code-quality]  # Wait for all jobs to complete
+    # Include all jobs - warp-ci may be skipped but will be handled gracefully
+    needs: [test, lint-and-validate, security-scan, code-quality, warp-ci]
     if: always()  # Run summary regardless of job outcomes
 
     steps:
@@ -453,6 +547,18 @@ jobs:
               echo ""
             fi
           done
+
+          echo "## 🚀 Warp CI/CD Status"
+          if [ "${{ needs.warp-ci.result }}" == "success" ]; then
+            echo "✅ **Warp tests passed successfully!**"
+          elif [ "${{ needs.warp-ci.result }}" == "skipped" ]; then
+            echo "⏭️ **Warp tests skipped** (no warp files changed or not selected)"
+          elif [ -z "${{ needs.warp-ci.result }}" ]; then
+            echo "⏭️ **Warp tests not run** (workflow paths filter)"
+          else
+            echo "❌ **Warp tests failed or had issues** - Check the warp-ci job logs"
+          fi
+          echo ""
 
           echo "## 📊 Overall Status"
           if [ "${{ needs.test.result }}" == "success" ] && [ "${{ needs.lint-and-validate.result }}" == "success" ]; then

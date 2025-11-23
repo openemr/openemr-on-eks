@@ -20,6 +20,15 @@ applications:
     requires_aws_cli: false
     description: "Version of Fluent Bit sidecar for OpenEMR that sends logs to CloudWatch Log Groups."
 
+  python:
+    current: "3.14"
+    registry: "library/python"
+    tag_pattern: "3\\.[0-9]+(-slim)?"
+    auto_detect_latest: true
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Python Docker image version for Warp Kubernetes jobs. Automatically detects latest 3.xx version."
+
 # Infrastructure Versions
 infrastructure:
   eks:
@@ -238,6 +247,64 @@ semver_packages:
     requires_aws_cli: false
     description: "Version of the 'Semver' Python package used in Github CI/CD workflows."
 
+# Python Package Dependencies (Warp Project)
+python_packages:
+  pymysql:
+    current: "1.1.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Direct database access library for Warp - ONLY METHOD for uploading data (maximum speed and reliability)"
+    min_version: "1.1.0"
+
+  boto3:
+    current: "1.28.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "AWS SDK for Python - for S3 data access in Warp (already used in project)"
+    min_version: "1.28.0"
+
+  pytest:
+    current: "8.3.4"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Testing framework for Warp project"
+    min_version: "8.0.0"
+
+  pytest_cov:
+    current: "6.0.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Pytest coverage plugin for Warp test suite"
+    min_version: "6.0.0"
+
+  flake8:
+    current: "7.3.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Linting tool for Warp code quality checks"
+    min_version: "7.0.0"
+
+  black:
+    current: "25.9.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Code formatter for Warp project"
+    min_version: "25.0.0"
+
+  mypy:
+    current: "1.13.0"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Static type checker for Warp project"
+    min_version: "1.0.0"
+
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
@@ -276,14 +343,15 @@ notifications:
     enabled: true
     labels: ["version-update", "maintenance", "dependencies", "monthly-check"]
     create_for:
-      - "applications"
-      - "infrastructure"
-      - "terraform_modules"
-      - "github_workflows"
-      - "pre_commit_hooks"
-      - "semver_packages"
-      - "monitoring"
-      - "eks_addons"
+      - "applications"              # Core application Docker images (OpenEMR, Fluent Bit, Python)
+      - "infrastructure"            # Infrastructure components (EKS cluster version, Terraform)
+      - "terraform_modules"         # Terraform provider modules and AWS modules (AWS provider, Kubernetes provider, EKS module, VPC module, Pod Identity module)
+      - "github_workflows"          # GitHub Actions dependencies used in CI/CD workflows (checkout, setup-python, setup-terraform, setup-kubectl, upload/download artifacts, CodeQL, Trivy, GitHub runner)
+      - "pre_commit_hooks"          # Pre-commit hook tools for code quality (pre-commit-hooks, black, isort, flake8, bandit, terraform hooks, shellcheck, markdownlint, yamllint, commitizen)
+      - "semver_packages"           # Semantic version packages used in workflows (Python version, Terraform version, kubectl version, semver Python package)
+      - "python_packages"           # Python package dependencies for the Warp project (pymysql, boto3, pytest, pytest-cov, flake8, black, mypy)
+      - "monitoring"                # Monitoring stack components (Prometheus Operator, Loki, Jaeger, cert-manager)
+      - "eks_addons"                # EKS cluster add-ons managed outside of Auto Mode (EFS CSI Driver, Metrics Server)
     priority_threshold: "medium" # low, medium, high, critical
     monthly_schedule: true
     issue_title_template: "Version Check Report for Month of {month}"

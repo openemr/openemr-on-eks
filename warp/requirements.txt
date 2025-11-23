@@ -1,0 +1,12 @@
+# Minimal dependencies - only essential, well-maintained packages
+# Direct database import only - no API/web interface fallback
+# Versions pinned to match versions.yaml for consistency
+
+# Direct database access
+pymysql==1.1.0
+
+# AWS SDK - for S3 data access
+boto3==1.28.0
+
+# Note: We avoid pandas, lxml, requests, etc. to minimize dependencies
+# Using standard library alternatives where possible
