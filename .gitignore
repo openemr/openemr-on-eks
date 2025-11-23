@@ -8,3 +8,13 @@ terraform.tfstate
 .idea/*
 backups/*
 test-results/
+
+# Python virtual environments
+.venv/
+venv/
+.env/
+.ENV/
+env/
+ENV/
+.test-venv/
+*.venv/

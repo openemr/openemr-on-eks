@@ -433,7 +433,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      # Step 3: Install Python dependencies
+      # Step 3: Install yq for reading versions.yaml
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      # Step 4: Test pinned versions compatibility
+      - name: Test pinned versions compatibility
+        run: |
+          ./scripts/test-warp-pinned-versions.sh
+
+      # Step 5: Install Python dependencies
       - name: Install dependencies
         run: |
           cd warp
@@ -443,13 +454,13 @@ jobs:
           # Install test dependencies (versions pinned to match versions.yaml)
           pip install pytest==8.3.4 pytest-cov==6.0.0 flake8==7.3.0 black==25.9.0 mypy==1.13.0
 
-      # Step 4: Run pytest with coverage (exclude benchmarks)
+      # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
         run: |
           cd warp
           pytest tests/ -v --cov=warp --cov-report=term-missing --cov-report=html --ignore=tests/benchmarks
 
-      # Step 5: Upload coverage reports as artifacts
+      # Step 7: Upload coverage reports as artifacts
       - name: Upload coverage reports
         uses: actions/upload-artifact@v4
         if: always()
@@ -458,25 +469,25 @@ jobs:
           path: warp/htmlcov/
           retention-days: 7
 
-      # Step 6: Format code with black (auto-fix whitespace and formatting)
+      # Step 8: Format code with black (auto-fix whitespace and formatting)
       - name: Format code with black
         run: |
           cd warp
           black warp/ tests/ --line-length 127
 
-      # Step 7: Run flake8 linting (after formatting)
+      # Step 9: Run flake8 linting (after formatting)
       - name: Run flake8
         run: |
           cd warp
           flake8 warp/ --max-line-length=127 --extend-ignore=E203 --count --statistics
 
-      # Step 8: Run type checking with mypy
+      # Step 10: Run type checking with mypy
       - name: Run type checking with mypy
         run: |
           cd warp
           mypy warp/ --ignore-missing-imports || echo "Type checking completed with warnings"
 
-      # Step 9: Run Trivy security scan for warp
+      # Step 11: Run Trivy security scan for warp
       - name: Run Trivy security scan
         uses: aquasecurity/trivy-action@master
         continue-on-error: true
@@ -489,7 +500,7 @@ jobs:
           scanners: 'vuln,secret,config'
           exit-code: '0'
 
-      # Step 10: Display Trivy results
+      # Step 12: Display Trivy results
       - name: Display Trivy results
         continue-on-error: true
         run: |

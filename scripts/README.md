@@ -34,6 +34,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - [Testing & Validation](#6-testing--validation)
   - [run-test-suite.sh](#run-test-suitesh)
   - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
+  - [test-warp-pinned-versions.sh](#test-warp-pinned-versionssh)
   - [test-config.yaml](#test-configyaml)
 
 ### **🔧 Maintenance & Operations**
@@ -114,6 +115,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 
 - **`run-test-suite.sh`** - Comprehensive test suite runner
 - **`test-end-to-end-backup-restore.sh`** - End-to-end backup/restore testing (this script MUST run successfully to test new additions)
+- **`test-warp-pinned-versions.sh`** - Tests that Warp Python package dependencies match versions.yaml (automatically runs in CI/CD)
 - **`test-config.yaml`** - Test configuration for CI/CD pipeline
 
 ## Script Categories
@@ -389,6 +391,26 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Maintenance Notes**:
   - Update test data as needed
   - Modify test validation criteria as needed
+
+#### `test-warp-pinned-versions.sh`
+
+- **Purpose**: Tests that Warp Python package dependencies match versions.yaml
+- **Dependencies**: yq, Python 3.8+ (Python 3.14 recommended)
+- **Key Features**:
+  - Automatically reads version numbers from versions.yaml
+  - Verifies pinned versions are installed correctly
+  - Runs Warp unit tests with pinned versions
+  - Tests code quality tools (flake8, black, mypy)
+  - Validates basic functionality
+- **Usage**:
+  ```bash
+  ./scripts/test-warp-pinned-versions.sh
+  ```
+- **CI/CD Integration**: Automatically runs in warp-ci job before other tests
+- **Maintenance Notes**:
+  - Versions are automatically read from versions.yaml (no manual updates needed)
+  - Script validates that versions.yaml and actual installed packages match
+  - If Python 3.14 is not available locally, script will use available Python version with warning
 
 #### `test-config.yaml`
 

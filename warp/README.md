@@ -612,10 +612,20 @@ mypy warp/ --ignore-missing-imports
 ### CI/CD
 
 The project uses GitHub Actions for CI/CD (integrated into main CI/CD pipeline):
+- **Pinned versions test**: Automatically validates that Python package versions match versions.yaml
 - Automated testing with pytest
 - Code quality checks (flake8, black, mypy)
 - Security scanning (Trivy)
 - Coverage reporting
+
+The CI/CD pipeline includes a step (`test-warp-pinned-versions.sh`) that:
+- Reads Python package versions from `versions.yaml`
+- Installs exact pinned versions
+- Verifies versions match expectations
+- Runs all Warp tests with pinned versions
+- Ensures consistency between versions.yaml and actual dependencies
+
+This ensures that the versions specified in `versions.yaml` are always tested and validated before code is merged.
 
 ## Advanced Topics
 
