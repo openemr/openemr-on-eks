@@ -44,16 +44,15 @@ Warp is a high-performance tool for uploading data to OpenEMR installations. It 
 
 ### Why Warp?
 
-Warp provides **10-100x faster** imports compared to API/web interface methods by:
+Warp provides horizontally scalable accelerated imports to OpenEMR by:
 - Writing directly to OpenEMR's MySQL database
 - No API authentication or web session overhead
 - Parallel processing with optimized batch sizes
-- Matching OpenEMR's exact database structure
 
 ## Features
 
 - **🚀 Direct Database Import**: Writes directly to OpenEMR database (ONLY METHOD)
-- **⚡ Maximum Performance**: 50-100 records/second (vs 1-10 for API methods)
+- **⚡ Maximum Performance**: Horizontally scalable workers write directly to the database
 - **🔒 Reliable**: No API authentication or web session dependencies
 - **📦 Kubernetes-Native**: Designed to run as a resource-intensive pod
 - **🌐 Multiple Data Sources**: Supports S3, local files, and other sources
@@ -230,16 +229,6 @@ Warp writes directly to OpenEMR's MySQL database using:
 
 ## Performance
 
-### Performance Metrics
-
-| Method | Records/Second | Notes |
-|--------|----------------|-------|
-| **Direct DB Import** (Warp) | 7.5-50 | Single worker: ~7.5 rec/s, Multi-worker: up to 50 rec/s |
-| API Upload | 5-10 | HTTP overhead, authentication delays |
-| Web Interface | 1-2 | Manual process, browser limitations |
-
-Warp uses direct database import exclusively for maximum performance and reliability.
-
 ### Benchmark Results
 
 **Full Dataset Import (synpuf-omop 1k dataset)**:
@@ -255,20 +244,7 @@ Warp uses direct database import exclusively for maximum performance and reliabi
 **Performance Notes**:
 - Single worker configuration provides stable, reliable imports
 - Multi-worker configuration can achieve higher throughput but requires careful database connection management
-- Batch size of 100 provides optimal balance between performance and memory usage
 - Processing time includes data loading from S3, transformation, and database insertion
-
-### Performance Optimization
-
-- **Batch Size**: Larger batches = better performance (default: auto-calculated)
-  - Recommended: 50-100 for optimal performance
-  - Larger batches reduce database round-trips but increase memory usage
-- **Workers**: More workers = parallel processing (default: CPU count)
-  - **Note**: Single worker recommended for stability (avoids database connection issues)
-  - Multi-worker can achieve higher throughput but requires proper connection pooling
-- **Resources**: Generous CPU/memory allocation recommended
-  - Minimum: 2 CPU, 4Gi memory
-  - Recommended: 4 CPU, 8Gi memory for large imports
 
 ### Kubernetes Resource Recommendations
 
@@ -282,34 +258,8 @@ resources:
     cpu: "4"
     memory: "8Gi"
 ```
-- **Performance**: ~7.5 records/second
+- **Performance**: ~7.5 patients imported per second
 - **Tested**: Successfully imported 1,000 patients in 2.22 minutes
-
-**High Performance Configuration**:
-```yaml
-resources:
-  requests:
-    cpu: "4"
-    memory: "8Gi"
-  limits:
-    cpu: "8"
-    memory: "16Gi"
-```
-- **Expected**: Up to 15-20 records/second with single worker
-- **Use case**: Large dataset imports (>10,000 records)
-
-**Maximum Performance Configuration**:
-```yaml
-resources:
-  requests:
-    cpu: "8"
-    memory: "16Gi"
-  limits:
-    cpu: "16"
-    memory: "32Gi"
-```
-- **Expected**: Up to 30-50 records/second (with proper connection pooling)
-- **Use case**: Very large dataset imports (>100,000 records)
 
 ## Kubernetes Deployment
 
@@ -487,9 +437,9 @@ Uploads patient data to OpenEMR from OMOP format datasets using direct database 
 | `--db-password` | Database password | Auto-discovered |
 | `--db-name` | Database name | openemr |
 | `--data-source` | Data source (S3 path or local directory) | Required |
-| `--dataset-size` | Dataset size (1k, 100k, 2.3m) | Required |
+| `--dataset-size` | Dataset size (i.e. 1000, 100000, 2300000, etc. etc.) | Required |
 | `--batch-size` | Records per batch | Auto-calculated |
-| `--workers` | Number of parallel workers | CPU count |
+| `--workers` | Number of parallel workers (for a single task) | CPU count |
 | `--max-records` | Maximum records to process | All records |
 | `--start-from` | Start processing from record number | 0 |
 | `--dry-run` | Dry run mode (no actual import) | False |
@@ -543,9 +493,8 @@ kubectl exec -n openemr <pod> -- nc -zv <db-host> 3306
 **Problem**: Import is slower than expected.
 
 **Solution**:
-- Increase batch size: `--batch-size 1000`
-- Increase workers: `--workers 16`
-- Check database connection pool settings
+- Experiment with changing batch size
+- Experiment with changing worker count
 - Monitor database CPU/memory usage
 - Verify network latency to database
 
