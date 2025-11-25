@@ -26,8 +26,7 @@ def test_ccda_conversion_speed(benchmark):
 
     try:
         converter = OMOPToCCDAConverter(
-            data_source=temp_dir,
-            dataset_size="1k"
+            data_source=temp_dir
         )
 
         person_data = {
@@ -63,8 +62,7 @@ def test_csv_parsing_speed(benchmark):
 
     try:
         converter = OMOPToCCDAConverter(
-            data_source=temp_dir,
-            dataset_size="1k"
+            data_source=temp_dir
         )
 
         csv_content = "person_id,first_name,last_name\n" + \

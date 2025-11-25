@@ -51,8 +51,6 @@ spec:
         # Data source configuration
         - name: DATA_SOURCE
           value: "s3://synpuf-omop/cmsdesynpuf1k/"  # S3 path to OMOP data
-        - name: DATASET_SIZE
-          value: "1k"  # Options: 1k, 100k, 2.3m
         - name: AWS_REGION
           value: "us-west-2"
         
@@ -81,8 +79,6 @@ spec:
         - "$(DB_NAME)"
         - "--data-source"
         - "$(DATA_SOURCE)"
-        - "--dataset-size"
-        - "$(DATASET_SIZE)"
         - "--batch-size"
         - "$(BATCH_SIZE)"
         - "--workers"

@@ -7,11 +7,11 @@
 **High-performance direct database import for OpenEMR on EKS - Database access required**
 
 [![CI/CD Tests](https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
-[![Version](https://img.shields.io/badge/version-0.1.0-blue)](../warp/setup.py#L12)
+[![Version](https://img.shields.io/badge/version-0.1.1-blue)](../warp/setup.py#L12)
 
 </div>
 
-> **⚠️ Beta Status**: Warp is currently in **beta** (version 0.1.0) and should **not be considered production-ready**. While we welcome development contributions and feedback, please use this tool with caution in non-production environments. The project is actively being developed and may undergo significant changes. **Warp will be considered production-ready upon the release of version 1.0.0.**
+> **⚠️ Beta Status**: Warp is currently in **beta** (version 0.1.1) and should **not be considered production-ready**. While we welcome development contributions and feedback, please use this tool with caution in non-production environments. The project is actively being developed and may undergo significant changes. **Warp will be considered production-ready upon the release of version 1.0.0.**
 
 <div align="center">
 
@@ -99,7 +99,6 @@ Warp automatically discovers credentials from Kubernetes secrets or Terraform:
 # No credentials needed - auto-discovered!
 warp ccda_data_upload \
   --data-source s3://synpuf-omop/cmsdesynpuf1k/ \
-  --dataset-size 1k \
   --max-records 100
 ```
 
@@ -113,7 +112,6 @@ warp ccda_data_upload \
   --db-user openemr \
   --db-password password \
   --data-source s3://synpuf-omop/cmsdesynpuf1k/ \
-  --dataset-size 1k \
   --max-records 100
 ```
 
@@ -133,7 +131,6 @@ Warp automatically discovers database credentials from:
 # Auto-discover all credentials
 warp ccda_data_upload \
   --data-source s3://synpuf-omop/cmsdesynpuf1k/ \
-  --dataset-size 1k \
   --max-records 1000
 ```
 
@@ -406,8 +403,6 @@ spec:
         args:
           - "--data-source"
           - "s3://synpuf-omop/cmsdesynpuf1k/"
-          - "--dataset-size"
-          - "1k"
           - "--max-records"
           - "10000"
         resources:
@@ -437,7 +432,6 @@ Uploads patient data to OpenEMR from OMOP format datasets using direct database 
 | `--db-password` | Database password | Auto-discovered |
 | `--db-name` | Database name | openemr |
 | `--data-source` | Data source (S3 path or local directory) | Required |
-| `--dataset-size` | Dataset size (i.e. 1000, 100000, 2300000, etc. etc.) | Required |
 | `--batch-size` | Records per batch | Auto-calculated |
 | `--workers` | Number of parallel workers (for a single task) | CPU count |
 | `--max-records` | Maximum records to process | All records |

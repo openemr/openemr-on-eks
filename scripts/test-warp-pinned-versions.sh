@@ -313,7 +313,7 @@ import os
 # Test converter initialization
 temp_dir = tempfile.mkdtemp()
 try:
-    converter = OMOPToCCDAConverter(data_source=temp_dir, dataset_size='1k')
+    converter = OMOPToCCDAConverter(data_source=temp_dir)
     print('✓ OMOPToCCDAConverter initialized')
     
     # Test gender mapping

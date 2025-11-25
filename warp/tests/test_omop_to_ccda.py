@@ -21,8 +21,7 @@ class TestOMOPToCCDAConverter(unittest.TestCase):
         
         # Create converter with local path
         self.converter = OMOPToCCDAConverter(
-            data_source=self.temp_dir,
-            dataset_size="1k"
+            data_source=self.temp_dir
         )
     
     def tearDown(self):

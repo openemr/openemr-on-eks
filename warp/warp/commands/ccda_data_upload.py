@@ -65,12 +65,6 @@ class CCDADataUploadCommand:
             required=True,
             help="Data source: S3 path (s3://bucket/path) or local directory",
         )
-        parser.add_argument(
-            "--dataset-size",
-            default="1k",
-            choices=["1k", "100k", "2.3m"],
-            help="Dataset size (default: 1k)",
-        )
 
         # Processing options
         parser.add_argument(
@@ -178,7 +172,6 @@ class CCDADataUploadCommand:
         logger.info("Initializing OMOP to CCDA converter")
         converter = OMOPToCCDAConverter(
             data_source=args.data_source,
-            dataset_size=args.dataset_size,
             aws_region=args.aws_region,
         )
 

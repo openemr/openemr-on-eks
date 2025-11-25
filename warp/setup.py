@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="warp",
-    version="0.1.0",
+    version="0.1.1",
     author="OpenEMR on EKS",
     description="Warp - OpenEMR Data Upload Accelerator",
     long_description=long_description,

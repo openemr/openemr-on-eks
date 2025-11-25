@@ -26,18 +26,16 @@ class OMOPToCCDAConverter:
     }
 
     def __init__(
-        self, data_source: str, dataset_size: str = "1k", aws_region: str = "us-east-1"
+        self, data_source: str, aws_region: str = "us-east-1"
     ):
         """
         Initialize converter
 
         Args:
             data_source: S3 path (s3://bucket/path) or local directory path
-            dataset_size: Dataset size ('1k', '100k', or '2.3m')
             aws_region: AWS region for S3 access
         """
         self.data_source = data_source
-        self.dataset_size = dataset_size
         self.aws_region = aws_region
         self.s3_client = None
 

@@ -12,7 +12,6 @@ data_source:
   # OR local path
   # local_path: "/path/to/omop/data"
   
-  dataset_size: "1k"  # Options: 1k, 100k, 2.3m
   aws_region: "us-east-1"
 
 processing:
