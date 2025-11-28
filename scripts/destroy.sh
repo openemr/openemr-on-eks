@@ -43,6 +43,12 @@
 #   PRESERVE_BACKUP_SNAPSHOTS   Set to "true" to preserve RDS backup snapshots
 #                               during cleanup (useful for backup/restore testing)
 #                               Default: false
+#   BACKUP_JOB_WAIT_TIMEOUT     Maximum seconds to wait for active backup jobs
+#                               to complete before attempting vault deletion.
+#                               Some resource types (like Aurora) cannot be stopped.
+#                               Default: 180 (3 minutes)
+#   BACKUP_JOB_POLL_INTERVAL    Seconds between checks for backup job completion.
+#                               Default: 15
 #
 # Notes:
 #   ⚠️  WARNING: This action completely destroys all AWS infrastructure and
@@ -90,6 +96,10 @@ TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 FORCE=false
 CLUSTER_NAME=""
 AWS_REGION="us-west-2"
+
+# Backup job handling configuration (some jobs like Aurora cannot be stopped)
+BACKUP_JOB_WAIT_TIMEOUT="${BACKUP_JOB_WAIT_TIMEOUT:-180}"      # Max seconds to wait for backup jobs
+BACKUP_JOB_POLL_INTERVAL="${BACKUP_JOB_POLL_INTERVAL:-15}"     # Seconds between job status checks
 
 # =============================================================================
 # LOGGING FUNCTIONS
@@ -760,6 +770,13 @@ cleanup_aws_backup_resources() {
         return 0
     fi
     
+    # Verify the vault actually exists in AWS (Terraform state may be stale)
+    if ! aws backup describe-backup-vault --backup-vault-name "$backup_vault_name" --region "$AWS_REGION" >/dev/null 2>&1; then
+        log_info "Backup vault $backup_vault_name not found in AWS (may have been already deleted)"
+        log_info "Skipping AWS Backup cleanup - vault does not exist"
+        return 0
+    fi
+    
     log_info "Found backup vault: $backup_vault_name"
     
     # Get backup plan IDs from Terraform
@@ -856,6 +873,57 @@ cleanup_aws_backup_resources() {
             fi
         fi
     done
+    
+    # Stop or wait for active backup jobs - vault cannot be deleted while jobs are running
+    # Note: Some resource types (like Aurora) don't support stopping backup jobs
+    log_info "Checking for active backup jobs..."
+    
+    local max_wait_time="$BACKUP_JOB_WAIT_TIMEOUT"
+    local wait_interval="$BACKUP_JOB_POLL_INTERVAL"
+    local waited=0
+    
+    while [ "$waited" -lt "$max_wait_time" ]; do
+        local has_active_jobs=false
+        
+        for state in "RUNNING" "PENDING" "CREATED"; do
+            local jobs
+            jobs=$(aws backup list-backup-jobs \
+                --by-backup-vault-name "$backup_vault_name" \
+                --by-state "$state" \
+                --region "$AWS_REGION" \
+                --query "BackupJobs[].BackupJobId" \
+                --output text 2>/dev/null || echo "")
+            
+            for job_id in $jobs; do
+                if [ -n "$job_id" ] && [ "$job_id" != "None" ]; then
+                    has_active_jobs=true
+                    log_info "Found active backup job: $job_id (state: $state) - attempting to stop..."
+                    
+                    # Try to stop the job (may fail for certain resource types like Aurora)
+                    if aws backup stop-backup-job --backup-job-id "$job_id" --region "$AWS_REGION" 2>/dev/null; then
+                        log_success "Stopped backup job: $job_id"
+                    else
+                        log_warning "Cannot stop job $job_id (resource type may not support stopping)"
+                    fi
+                fi
+            done
+        done
+        
+        if [ "$has_active_jobs" = false ]; then
+            log_success "No active backup jobs - vault is ready for deletion"
+            break
+        fi
+        
+        # Wait and check again
+        log_info "Waiting for backup jobs to complete... (${waited}s/${max_wait_time}s)"
+        sleep "$wait_interval"
+        waited=$((waited + wait_interval))
+    done
+    
+    if [ "$waited" -ge "$max_wait_time" ]; then
+        log_warning "Timed out waiting for backup jobs after ${max_wait_time}s"
+        log_info "Will attempt to delete vault anyway - may fail if jobs are still running"
+    fi
     
     # Delete recovery points in the vault (if any exist)
     # Must handle composite recovery points specially - they need to be disassociated first
