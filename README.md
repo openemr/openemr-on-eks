@@ -27,8 +27,11 @@
 **Deploy OpenEMR with a full monitoring stack on EKS in a single command:**
 
 ```bash
-# Run the quick deployment script (Duration: ~45-60 minutes)
 # Requires: aws, helm, jq, kubectl, terraform
+# Duration: ~45-60 minutes
+```
+
+```bash
 ./scripts/quick-deploy.sh
 ```
 
@@ -42,8 +45,11 @@
 **Deploy a training OpenEMR setup with 100 synthetic patients:**
 
 ```bash
-# To deploy a training setup populated with synthetic patient data (Duration: ~35-50 minutes)
 # Requires: aws, jq, kubectl, terraform
+# Duration: ~35-50 minutes
+```
+
+```bash
 ./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100
 ```
 
@@ -54,9 +60,14 @@
 
 !["Terminal output after running deploy-training-openemr-setup.sh"](./images/deploy-training-setup.png)
 
+**Clean up the deployment with a single command:**
+
 ```bash
-# Clean up the deployment with a single command (Duration: ~15-20 minutes)
 # Requires: aws, kubectl, terraform
+# Duration: ~15-20 minutes
+```
+
+```bash
 ./scripts/destroy.sh
 ```
 
