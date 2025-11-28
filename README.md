@@ -20,13 +20,57 @@
 
 > **⚠️ End-to-End Test Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete AWS resources (including backup buckets and RDS snapshots) and automatically reset Kubernetes manifests to their default state. **Only run in development AWS accounts** and commit/stash any uncommitted changes to `k8s/` manifests before testing.
 
+---
+
+## ⚡ Quick Start 
+
+**Deploy OpenEMR with a full monitoring stack on EKS in a single command:**
+
+```bash
+# Run the quick deployment script (Duration: ~45-60 minutes)
+# Requires: aws, helm, jq, kubectl, terraform
+./scripts/quick-deploy.sh
+```
+
+**What you get:**
+- 🌐 OpenEMR URL and admin credentials
+- 📊 Grafana URL and admin credentials  
+- 📈 Full observability stack ready to use
+
+!["Terminal output after running quick-deploy.sh"](./images/quick-deploy.png)
+
+**Deploy a training OpenEMR setup with 100 synthetic patients:**
+
+```bash
+# To deploy a training setup populated with synthetic patient data (Duration: ~35-50 minutes)
+# Requires: aws, jq, kubectl, terraform
+./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100
+```
+
+**What you get:**
+- 🌐 OpenEMR URL and admin credentials
+- 👥 Number of synthetic patients equal to the argument to "--max-records" (example above would upload 100 synthetic patients)
+- 🛜 Setup populated by synthetic patient data stored in an S3 bucket in OMOP format (default is https://registry.opendata.aws/cmsdesynpuf-omop/)
+
+!["Terminal output after running deploy-training-openemr-setup.sh"](./images/deploy-training-setup.png)
+
+```bash
+# Clean up the deployment with a single command (Duration: ~15-20 minutes)
+# Requires: aws, kubectl, terraform
+./scripts/destroy.sh
+```
+
+!["Terminal output after running destroy.sh"](./images/destroy.png)
+
+---
+
 ## 📋 Table of Contents
 
 ### **🚀 Getting Started**
 
 - [Architecture Overview](#architecture-overview)
 - [Prerequisites](#prerequisites)
-- [Quick Start](#-quick-start)
+- [Quick Start (Manual Deployment)](#-quick-start-1)
 - [Directory Structure](#directory-structure)
 
 ### **💰 Cost Analysis**
@@ -722,6 +766,9 @@ openemr-on-eks/
 │   ├── restore.sh                         # Cross-region disaster recovery (with DB reconfiguration)
 │   ├── destroy.sh                         # Complete infrastructure destruction (bulletproof cleanup)
 │   ├── test-end-to-end-backup-restore.sh  # End-to-end backup/restore testing
+│   ├── test-warp-end-to-end.sh            # Warp end-to-end test with automatic cleanup
+│   ├── deploy-training-openemr-setup.sh   # Training setup deployment with synthetic patient data
+│   ├── quick-deploy.sh                    # Quick deployment with monitoring stack
 │   ├── run-test-suite.sh                  # CI/CD test suite runner
 │   └── test-config.yaml                   # Test configuration for CI/CD framework
 ├── docs/                                  # Complete documentation

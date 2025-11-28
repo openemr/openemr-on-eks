@@ -240,7 +240,7 @@ class CCDADataUploadCommand:
             logger.info("")
             logger.info("📋 Next Steps:")
             logger.info("   1. Login to OpenEMR")
-            logger.info("   2. Navigate to Patients → Patient List")
+            logger.info("   2. Navigate to Finder → Patient Finder")
             logger.info("   3. Verify imported patients appear")
         return 0
 

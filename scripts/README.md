@@ -35,6 +35,9 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - [run-test-suite.sh](#run-test-suitesh)
   - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
   - [test-warp-pinned-versions.sh](#test-warp-pinned-versionssh)
+  - [test-warp-end-to-end.sh](#test-warp-end-to-endsh)
+  - [deploy-training-openemr-setup.sh](#deploy-training-openemr-setupsh)
+  - [quick-deploy.sh](#quick-deploysh)
   - [test-config.yaml](#test-configyaml)
 
 ### **🔧 Maintenance & Operations**
@@ -82,6 +85,10 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 #### 🧪 **Testing**
 1. `run-test-suite.sh` (comprehensive tests)
 2. `test-end-to-end-backup-restore.sh` (backup/restore validation)
+3. `test-warp-end-to-end.sh` (Warp deployment and data import validation)
+
+#### 🚀 **Quick Deployment**
+1. `quick-deploy.sh` (one-command deployment with monitoring)
 
 ### Core Deployment Scripts
 
@@ -116,6 +123,9 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **`run-test-suite.sh`** - Comprehensive test suite runner
 - **`test-end-to-end-backup-restore.sh`** - End-to-end backup/restore testing (this script MUST run successfully to test new additions)
 - **`test-warp-pinned-versions.sh`** - Tests that Warp Python package dependencies match versions.yaml (automatically runs in CI/CD)
+- **`test-warp-end-to-end.sh`** - Comprehensive end-to-end test for Warp that deploys infrastructure, OpenEMR, and imports test data and then waits a default of 5 minutes for the user to verify that the import was successful before deleting all the infrastructure.
+- **`quick-deploy.sh`** - Quick deployment script that deploys infrastructure, OpenEMR, and monitoring stack in one command
+- **`deploy-training-openemr-setup.sh`** - Training setup deployment script with synthetic patient data from S3
 - **`test-config.yaml`** - Test configuration for CI/CD pipeline
 
 ## Script Categories
@@ -412,6 +422,137 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Script validates that versions.yaml and actual installed packages match
   - If Python 3.14 is not available locally, script will use available Python version with warning
 
+#### `test-warp-end-to-end.sh`
+
+- **Purpose**: Comprehensive end-to-end test for Warp that validates the complete deployment and data import workflow, then automatically cleans up
+- **Dependencies**: terraform, kubectl, aws, jq, tar
+- **Key Features**:
+  - Deploys complete Terraform infrastructure (EKS, RDS, Redis, EFS, etc.)
+  - Deploys OpenEMR on EKS using the standard deployment script
+  - Installs Warp by packaging code and creating Kubernetes ConfigMap
+  - Imports test data using Warp (configurable record count, default: 1000)
+  - Extracts and displays OpenEMR login credentials and URL
+  - Waits 5 minutes for user verification after displaying credentials
+  - Automatically runs destroy.sh to clean up all infrastructure
+  - Prints comprehensive test statistics and pass/fail status
+  - Supports skipping infrastructure or application deployment for faster iteration
+  - Comprehensive error handling and progress tracking
+- **Usage**:
+  ```bash
+  # Full end-to-end test (default: imports 1000 records)
+  ./scripts/test-warp-end-to-end.sh
+
+  # Import 500 records instead
+  ./scripts/test-warp-end-to-end.sh --max-records 500
+
+  # Use existing infrastructure
+  ./scripts/test-warp-end-to-end.sh --skip-terraform --skip-openemr
+
+  # Custom data source
+  ./scripts/test-warp-end-to-end.sh --data-source s3://my-bucket/my-data/
+  ```
+- **Options**:
+  - `--cluster-name NAME` - EKS cluster name (default: auto-detect from Terraform)
+  - `--aws-region REGION` - AWS region (default: us-west-2)
+  - `--data-source SOURCE` - S3 path to OMOP data (default: s3://synpuf-omop/cmsdesynpuf1k/)
+  - `--max-records COUNT` - Number of records to import (default: 1000)
+  - `--skip-terraform` - Skip Terraform deployment (use existing infrastructure)
+  - `--skip-openemr` - Skip OpenEMR deployment (use existing deployment)
+- **Output**: 
+  - Prints OpenEMR login URL and admin credentials
+  - Waits 5 minutes for verification
+  - Automatically cleans up infrastructure
+  - Prints test statistics with pass/fail status
+- **Maintenance Notes**:
+  - Script follows the same patterns as other end-to-end test scripts
+  - Uses ConfigMap-based Warp deployment (no Docker image required)
+  - Automatically configures kubectl and retrieves cluster information from Terraform
+  - Validates prerequisites before starting deployment
+  - Automatically cleans up all resources after test completion
+
+#### `deploy-training-openemr-setup.sh`
+
+- **Purpose**: Deploys OpenEMR on EKS with Warp for training purposes with synthetic patient data
+- **Dependencies**: terraform, kubectl, aws, jq, tar
+- **Key Features**:
+  - Deploys complete Terraform infrastructure (EKS, RDS, Redis, EFS, etc.)
+  - Deploys OpenEMR on EKS using the standard deployment script
+  - Installs Warp by packaging code and creating Kubernetes ConfigMap
+  - Imports synthetic patient data from a user-specified S3 bucket
+  - Configurable number of records to import
+  - Validates S3 bucket access before deployment
+  - Extracts and displays OpenEMR login credentials and URL
+  - Supports skipping infrastructure or application deployment for faster iteration
+  - Comprehensive error handling and progress tracking
+- **Usage**:
+  ```bash
+  # Deploy with 1000 records from S3 bucket
+  ./scripts/deploy-training-openemr-setup.sh --s3-bucket my-training-data-bucket
+
+  # Deploy with 500 records from a specific S3 prefix
+  ./scripts/deploy-training-openemr-setup.sh --s3-bucket my-training-data-bucket --s3-prefix omop-data/ --max-records 500
+
+  # Use existing infrastructure
+  ./scripts/deploy-training-openemr-setup.sh --s3-bucket my-training-data-bucket --skip-terraform --skip-openemr
+  ```
+- **Options**:
+  - `--cluster-name NAME` - EKS cluster name (default: auto-detect from Terraform)
+  - `--aws-region REGION` - AWS region (default: us-west-2)
+  - `--s3-bucket BUCKET` - S3 bucket containing OMOP data (REQUIRED)
+  - `--s3-prefix PREFIX` - S3 prefix/path within bucket (default: empty)
+  - `--max-records COUNT` - Number of records to import (default: 1000)
+  - `--skip-terraform` - Skip Terraform deployment (use existing infrastructure)
+  - `--skip-openemr` - Skip OpenEMR deployment (use existing deployment)
+- **Output**: Prints OpenEMR login URL and admin credentials at completion
+- **Maintenance Notes**:
+  - Script follows the same patterns as other deployment scripts
+  - Uses ConfigMap-based Warp deployment (no Docker image required)
+  - Automatically configures kubectl and retrieves cluster information from Terraform
+  - Validates prerequisites and S3 bucket access before starting deployment
+  - Designed specifically for training setups with synthetic patient data
+
+#### `quick-deploy.sh`
+
+- **Purpose**: Quick deployment script that deploys infrastructure, OpenEMR, and monitoring stack in a single command
+- **Dependencies**: terraform, kubectl, aws, jq, helm
+- **Key Features**:
+  - Deploys complete Terraform infrastructure (EKS, RDS, Redis, EFS, etc.)
+  - Deploys OpenEMR on EKS using the standard deployment script
+  - Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Jaeger)
+  - Extracts and displays OpenEMR and Grafana login credentials and URLs
+  - Supports skipping any deployment step for faster iteration
+  - Optional ingress configuration for Grafana
+  - Comprehensive error handling and progress tracking
+- **Usage**:
+  ```bash
+  # Full deployment with monitoring
+  ./scripts/quick-deploy.sh
+
+  # Use existing infrastructure
+  ./scripts/quick-deploy.sh --skip-terraform --skip-openemr
+
+  # Enable Grafana ingress
+  ./scripts/quick-deploy.sh --enable-ingress --grafana-hostname grafana.example.com
+
+  # Custom cluster name or region
+  ./scripts/quick-deploy.sh --cluster-name my-cluster --aws-region us-east-1
+  ```
+- **Options**:
+  - `--cluster-name NAME` - EKS cluster name (default: auto-detect from Terraform)
+  - `--aws-region REGION` - AWS region (default: us-west-2)
+  - `--skip-terraform` - Skip Terraform deployment (use existing infrastructure)
+  - `--skip-openemr` - Skip OpenEMR deployment (use existing deployment)
+  - `--skip-monitoring` - Skip monitoring installation (use existing monitoring)
+  - `--enable-ingress` - Enable ingress for Grafana (disabled by default)
+  - `--grafana-hostname HOSTNAME` - Hostname for Grafana ingress (e.g., grafana.example.com)
+- **Output**: Prints OpenEMR and Grafana login URLs and credentials at completion
+- **Maintenance Notes**:
+  - Script follows the same patterns as other deployment scripts
+  - Uses the existing monitoring installation script (`monitoring/install-monitoring.sh`)
+  - Automatically configures kubectl and retrieves cluster information from Terraform
+  - Validates prerequisites before starting deployment
+  - Provides port-forward instructions if ingress is not enabled
+
 #### `test-config.yaml`
 
 - **Purpose**: Test configuration for CI/CD pipeline
@@ -584,10 +725,12 @@ Some scripts are designed to call other scripts as part of their operations. Bel
 
 | Script       | Used By                                                                 |
 |--------------|-------------------------------------------------------------------------|
-| `deploy.sh`  | `restore.sh`, `test-end-to-end-backup-restore.sh`                       |
+| `deploy.sh`  | `restore.sh`, `test-end-to-end-backup-restore.sh`, `test-warp-end-to-end.sh`, `quick-deploy.sh`, `deploy-training-openemr-setup.sh` |
+| `quick-deploy.sh` | (standalone - calls deploy.sh and monitoring/install-monitoring.sh internally) |
+| `deploy-training-openemr-setup.sh` | (standalone - calls deploy.sh internally) |
+| `destroy.sh` | `test-end-to-end-backup-restore.sh`, `test-warp-end-to-end.sh` |
 | `restore-defaults.sh` | `restore.sh`, `test-end-to-end-backup-restore.sh`, `clean-deployment.sh` |
 | `backup.sh` | `test-end-to-end-backup-restore.sh`                                     |
-| `destroy.sh` | `test-end-to-end-backup-restore.sh`                                     |
 | `restore.sh` | `test-end-to-end-backup-restore.sh`                                     |
 | `clean-deployment.sh` | `restore.sh`, `destroy.sh`                                              |
 

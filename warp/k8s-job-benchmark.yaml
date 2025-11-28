@@ -111,7 +111,7 @@ spec:
           echo "=========================================="
           echo "Benchmark Complete"
           echo "End time: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
-          echo "Total duration: ${DURATION} seconds ($(echo "scale=2; $DURATION / 60" | bc) minutes)"
+          echo "Total duration: ${DURATION} seconds ($(awk "BEGIN {printf \"%.2f\", $DURATION / 60}") minutes)"
           echo "=========================================="
         
         # Resources - Increased for benchmark performance

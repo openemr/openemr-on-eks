@@ -858,30 +858,111 @@ cleanup_aws_backup_resources() {
     done
     
     # Delete recovery points in the vault (if any exist)
+    # Must handle composite recovery points specially - they need to be disassociated first
     log_info "Deleting recovery points in vault: $backup_vault_name"
     
-    # List all recovery points in the vault
-    local recovery_point_arns
-    recovery_point_arns=$(aws backup list-recovery-points-by-backup-vault \
+    # List all recovery points in the vault with full details (need to check for composite/parent status)
+    local recovery_points_json
+    recovery_points_json=$(aws backup list-recovery-points-by-backup-vault \
         --backup-vault-name "$backup_vault_name" \
         --region "$AWS_REGION" \
-        --query "RecoveryPoints[].RecoveryPointArn" \
-        --output text 2>/dev/null || echo "")
+        --output json 2>/dev/null || echo '{"RecoveryPoints":[]}')
     
-    if [ -n "$recovery_point_arns" ]; then
-        local count
-        count=$(echo "$recovery_point_arns" | wc -w)
-        log_info "Found $count recovery point(s) to delete"
+    local recovery_point_count
+    recovery_point_count=$(echo "$recovery_points_json" | jq '.RecoveryPoints | length')
+    
+    if [ "$recovery_point_count" -gt 0 ]; then
+        log_info "Found $recovery_point_count recovery point(s) to delete"
         
-        for recovery_point_arn in $recovery_point_arns; do
-            log_info "Deleting recovery point: $recovery_point_arn"
-            safe_aws "delete recovery point: $recovery_point_arn" \
+        # First pass: Identify and disassociate composite (parent) recovery points
+        log_info "Checking for composite recovery points that need disassociation..."
+        local composite_arns
+        composite_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.IsParent == true or .CompositeMemberIdentifier != null) | .RecoveryPointArn' 2>/dev/null || echo "")
+        
+        if [ -n "$composite_arns" ]; then
+            log_info "Found composite recovery points - disassociating first..."
+            for recovery_point_arn in $composite_arns; do
+                if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
+                    log_info "Disassociating composite recovery point: $recovery_point_arn"
+                    aws backup disassociate-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>/dev/null || log_warning "Could not disassociate $recovery_point_arn (may not be composite)"
+                fi
+            done
+            # Wait for disassociation to propagate
+            log_info "Waiting 10 seconds for disassociation to propagate..."
+            sleep 10
+        fi
+        
+        # Second pass: Delete all recovery points (children first, then parents)
+        # Get child recovery points first (those with ParentRecoveryPointArn)
+        local child_arns
+        child_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.ParentRecoveryPointArn != null) | .RecoveryPointArn' 2>/dev/null || echo "")
+        
+        if [ -n "$child_arns" ]; then
+            log_info "Deleting child recovery points first..."
+            for recovery_point_arn in $child_arns; do
+                if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
+                    log_info "Deleting child recovery point: $recovery_point_arn"
+                    aws backup delete-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>/dev/null || log_warning "Could not delete child $recovery_point_arn"
+                fi
+            done
+        fi
+        
+        # Third pass: Delete parent/standalone recovery points
+        local all_arns
+        all_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[].RecoveryPointArn' 2>/dev/null || echo "")
+        
+        for recovery_point_arn in $all_arns; do
+            if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
+                log_info "Deleting recovery point: $recovery_point_arn"
                 aws backup delete-recovery-point \
                     --backup-vault-name "$backup_vault_name" \
                     --recovery-point-arn "$recovery_point_arn" \
                     --region "$AWS_REGION" \
-                    --no-cli-pager
+                    --no-cli-pager 2>/dev/null || log_warning "Could not delete $recovery_point_arn (may already be deleted)"
+            fi
         done
+        
+        # Wait for deletions to complete
+        log_info "Waiting 15 seconds for recovery point deletions to complete..."
+        sleep 15
+        
+        # Verify all recovery points are deleted
+        local remaining
+        remaining=$(aws backup list-recovery-points-by-backup-vault \
+            --backup-vault-name "$backup_vault_name" \
+            --region "$AWS_REGION" \
+            --query "RecoveryPoints[].RecoveryPointArn" \
+            --output text 2>/dev/null || echo "")
+        
+        if [ -n "$remaining" ]; then
+            log_warning "Some recovery points may still exist. Attempting force delete..."
+            for recovery_point_arn in $remaining; do
+                if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
+                    # Try disassociate again in case it's a composite
+                    aws backup disassociate-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>/dev/null || true
+                    sleep 2
+                    aws backup delete-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>/dev/null || log_warning "Still could not delete $recovery_point_arn"
+                fi
+            done
+        fi
+        
+        log_success "Recovery points cleanup completed"
     else
         log_info "No recovery points found in vault"
     fi

@@ -12,6 +12,9 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - [File Descriptions](#file-descriptions)
   - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
   - [GitHub Banner (`openemr_on_eks_github_banner.png`)](#github-banner-openemr_on_eks_github_bannerpng)
+  - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
+  - [Deploy Training Setup Screenshot (`deploy-training-setup.png`)](#deploy-training-setup-screenshot-deploy-training-setuppng)
+  - [Destroy Screenshot (`destroy.png`)](#destroy-screenshot-destroypng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -60,6 +63,9 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 - **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
 - **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
+- **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
+- **`deploy-training-setup.png`** - Screenshot showing the training environment setup process
+- **`destroy.png`** - Screenshot showing successful infrastructure destruction
 
 ## File Descriptions
 
@@ -76,6 +82,27 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: PNG image with transparency support
 - **Usage**: Repository banner, social media sharing, and promotional materials
 - **Dimensions**: Optimized for GitHub's banner display requirements
+
+### **Quick Deploy Screenshot (`quick-deploy.png`)**
+
+- **Purpose**: Visual demonstration of the quick deployment script (`scripts/quick-deploy.sh`) in action
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the quick deployment workflow
+- **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
+
+### **Deploy Training Setup Screenshot (`deploy-training-setup.png`)**
+
+- **Purpose**: Visual demonstration of the training environment setup script (`scripts/deploy-training-openemr-setup.sh`)
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the training setup workflow
+- **Context**: Illustrates the process for deploying OpenEMR training environments with pre-configured settings
+
+### **Destroy Screenshot (`destroy.png`)**
+
+- **Purpose**: Visual demonstration of successful infrastructure destruction using the destroy script (`scripts/destroy.sh`)
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the cleanup workflow
+- **Context**: Illustrates the complete infrastructure destruction process with the "DESTRUCTION COMPLETE!" success message
 
 ## Setting GitHub Social Banner
 

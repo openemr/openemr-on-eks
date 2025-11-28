@@ -258,6 +258,33 @@ resources:
 - **Performance**: ~7.5 patients imported per second
 - **Tested**: Successfully imported 1,000 patients in 2.22 minutes
 
+## End-to-End Testing
+
+For comprehensive testing of the complete Warp deployment and data import workflow, use the automated end-to-end test script:
+
+```bash
+# Full end-to-end test (deploys infrastructure, OpenEMR, and imports 1000 records)
+cd ../scripts
+./test-warp-end-to-end.sh
+
+# Import 500 records instead
+./test-warp-end-to-end.sh --max-records 500
+
+# Use existing infrastructure
+./test-warp-end-to-end.sh --skip-terraform --skip-openemr
+```
+
+**What the End-to-End Test Does:**
+1. Deploys Terraform infrastructure (EKS, RDS, Redis, EFS, etc.)
+2. Deploys OpenEMR on EKS
+3. Installs Warp via ConfigMap
+4. Imports test data using Warp
+5. Prints OpenEMR login URL and credentials
+6. Waits a default of 5 minutes while the user verifies successful data import
+7. Deletes all infrastructure with `destroy.sh`
+
+See `scripts/README.md` for complete documentation of the end-to-end test script.
+
 ## Kubernetes Deployment
 
 Warp is designed to run as a Kubernetes Job with generous resources. There are two deployment approaches:
