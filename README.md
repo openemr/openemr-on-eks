@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="400">
+<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="500">
 
 <!-- Status Badges -->
 [![CI/CD Tests](../../actions/workflows/ci-cd-tests.yml/badge.svg)](../../actions/workflows/ci-cd-tests.yml)
@@ -18,6 +18,7 @@
 > - Staff training and access controls
 > - Regular security audits and risk assessments
 
+> **⚠️ End-to-End Test Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete AWS resources (including backup buckets and RDS snapshots) and automatically reset Kubernetes manifests to their default state. **Only run in development AWS accounts** and commit/stash any uncommitted changes to `k8s/` manifests before testing.
 ---
 
 <div align="center">
