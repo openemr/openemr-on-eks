@@ -209,7 +209,7 @@ terraform --version  # Should show v1.13.4
 
 ```bash
 # Install via Homebrew (macOS/Linux)
-brew install kubectl helm awscli jq
+brew install awscli helm jq kubectl
 
 # Verify installations
 kubectl version --client
@@ -225,9 +225,9 @@ jq --version
 aws --version  # Must be 2.15.0 or higher
 
 # Required IAM permissions
+- ec2:CreateVpc (with required CIDR blocks)
 - eks:CreateCluster (with Kubernetes 1.29+)
 - iam:CreateRole (with specific Auto Mode trust policies)
-- ec2:CreateVpc (with required CIDR blocks)
 - kms:CreateKey (for encryption requirements)
 
 # EKS Auto Mode specific requirements
@@ -293,7 +293,7 @@ cd openemr-on-eks
 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
 # Install required tools on macOS
-brew install terraform kubectl helm awscli jq
+brew install awscli helm jq kubectl terraform
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
@@ -954,23 +954,23 @@ The real return on investment often comes from time gains and the reliability of
 
 ### Pricing Documentation
 
+- Backup & Recovery Pricing
+  - [AWS Backup Pricing](https://aws.amazon.com/backup/pricing/)
+- Compute Orchestration Pricing
+  - [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/)
 - Compute Pricing
   - [Amazon EC2 On-Demand Pricing](https://aws.amazon.com/ec2/pricing/on-demand/)
   - [Amazon EC2 Spot Pricing](https://aws.amazon.com/ec2/spot/pricing/)
-- Compute Orchestration Pricing
-  - [Amazon EKS Pricing](https://aws.amazon.com/eks/pricing/)
-- Database Pricing
-  - [Amazon Aurora Pricing (see section on Aurora Serverless v2 MySQL compatible pricing specifically)](https://aws.amazon.com/rds/aurora/pricing/)
-- Web-Caching Pricing
-  - [Amazon Elasticache Pricing (see section on Valkey Serverless pricing specifically)](https://aws.amazon.com/elasticache/pricing/)
 - Data Storage Pricing
   - [Amazon EFS Pricing](https://aws.amazon.com/efs/pricing/)
+- Database Pricing
+  - [Amazon Aurora Pricing (see section on Aurora Serverless v2 MySQL compatible pricing specifically)](https://aws.amazon.com/rds/aurora/pricing/)
 - Network Infrastructure Pricing
   - [Amazon VPC/NAT Gateway Pricing](https://aws.amazon.com/vpc/pricing/)
 - Web Application Security Pricing
   - [AWS WAF Pricing](https://aws.amazon.com/waf/pricing/)
-- Backup & Recovery Pricing
-  - [AWS Backup Pricing](https://aws.amazon.com/backup/pricing/)
+- Web-Caching Pricing
+  - [Amazon Elasticache Pricing (see section on Valkey Serverless pricing specifically)](https://aws.amazon.com/elasticache/pricing/)
 
 ### **🔒 WAFv2 Pricing Breakdown**
 
@@ -1436,25 +1436,18 @@ export POLLING_INTERVAL=30                 # 30 sec default
 
 The infrastructure is organized into **modular Terraform files** for better maintainability:
 
+### **Compute & Storage**
+
+- **`efs.tf`** - EFS file system with elastic performance mode
+- **`eks.tf`** - EKS cluster with Auto Mode configuration
+- **`s3.tf`** - S3 buckets for ALB logs with lifecycle policies
+
 ### **Core Configuration**
 
 - **`backup.tf`** - AWS Backup configuration for S3 buckets, EKS, RDS and EFS
 - **`main.tf`** - Terraform providers, required versions, and data sources
 - **`outputs.tf`** - Resource outputs for integration with Kubernetes
 - **`variables.tf`** - All input variables with descriptions and defaults
-
-### **Networking & Security**
-
-- **`iam.tf`** - Service account roles with Auto Mode trust policies
-- **`kms.tf`** - 6 dedicated KMS keys for granular encryption
-- **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
-- **`waf.tf`** - Configures WAFv2 for our ingress to our application
-
-### **Compute & Storage**
-
-- **`efs.tf`** - EFS file system with elastic performance mode
-- **`eks.tf`** - EKS cluster with Auto Mode configuration
-- **`s3.tf`** - S3 buckets for ALB logs with lifecycle policies
 
 ### **Database and Caching Services**
 
@@ -1466,6 +1459,13 @@ The infrastructure is organized into **modular Terraform files** for better main
 - **`cloudtrail.tf`** - CloudTrail logging with encrypted S3 storage
 - **`cloudwatch.tf`** - Log groups with retention settings
 
+### **Networking & Security**
+
+- **`iam.tf`** - Service account roles with Auto Mode trust policies
+- **`kms.tf`** - 6 dedicated KMS keys for granular encryption
+- **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
+- **`waf.tf`** - Configures WAFv2 for our ingress to our application
+
 ## ⚙️ Kubernetes Manifests Organization
 
 The Kubernetes manifests are organized for clear separation of concerns:
@@ -1473,28 +1473,27 @@ The Kubernetes manifests are organized for clear separation of concerns:
 ### **Application Deployment**
 
 - **`deployment.yaml`** - OpenEMR application with Auto Mode optimization (version: `${OPENEMR_VERSION}`)
-- **`service.yaml`** - Defines OpenEMR service and the load balancer configuration (including optional AWS Certificate Manager and AWS WAF v2 integrations)
 - **`secrets.yaml`** - Database credentials and Redis authentication
+- **`service.yaml`** - Defines OpenEMR service and the load balancer configuration (including optional AWS Certificate Manager and AWS WAF v2 integrations)
 
 > **📝 Version Management**: OpenEMR version is always specified as `${OPENEMR_VERSION}` in manifests and substituted during deployment from Terraform configuration.
 
-### **Storage & Persistence**
+### **Observability & Operations**
 
-- **`storage.yaml`** - EFS storage classes and PVCs
-- **`namespace.yaml`** - Namespace with Pod Security Standards
+- **`hpa.yaml`** - Horizontal Pod Autoscaler configuration
+- **`logging.yaml`** - Fluent Bit sidecar configuration for log collection
+- **`ssl-renewal.yaml`** - Automated SSL certificate renewal
 
 ### **Security & Access Control**
 
-- **`security.yaml`** - RBAC, service accounts, Pod Disruption Budget
 - **`ingress.yaml`** - Ingress controller configuration
 - **`network-policies.yaml`** - Networking policies for our deployment
+- **`security.yaml`** - RBAC, service accounts, Pod Disruption Budget
 
+### **Storage & Persistence**
 
-### **Observability & Operations**
-
-- **`logging.yaml`** - Fluent Bit sidecar configuration for log collection
-- **`hpa.yaml`** - Horizontal Pod Autoscaler configuration
-- **`ssl-renewal.yaml`** - Automated SSL certificate renewal
+- **`namespace.yaml`** - Namespace with Pod Security Standards
+- **`storage.yaml`** - EFS storage classes and PVCs
 
 ### **🔧 Working with Kubernetes Manifests**
 
@@ -2203,22 +2202,22 @@ The project features a comprehensive version check system that supports both aut
 The system tracks versions for:
 
 - **Applications**: OpenEMR, Fluent Bit
-- **Infrastructure**: Kubernetes, Terraform, AWS Provider
-- **Terraform Modules**: EKS ([terraform-aws-modules/eks/aws](https://github.com/terraform-aws-modules/terraform-aws-eks)), EKS Pod Identity ([terraform-aws-modules/eks-pod-identity/aws](https://github.com/terraform-aws-modules/terraform-aws-eks-pod-identity)), VPC ([terraform-aws-modules/vpc/aws](https://github.com/terraform-aws-modules/terraform-aws-vpc)), AWS ([hashicorp/aws](https://github.com/hashicorp/terraform-provider-aws)), Kubernetes ([hashicorp/kubernetes](https://github.com/hashicorp/terraform-provider-kubernetes))
-- **GitHub Workflows**: GitHub Actions dependencies and versions
-- **Pre-commit Hooks**: Code quality tools and versions
-- **Semver Packages**: The Python package called ["Semver"](https://pypi.org/project/semver/), Python, Terraform CLI, kubectl
-- **Monitoring**: Prometheus, Loki, Jaeger
-- **Security**: Cert Manager
 - **EKS Add-ons**: EFS CSI Driver, Metrics Server
+- **GitHub Workflows**: GitHub Actions dependencies and versions
+- **Infrastructure**: Kubernetes, Terraform, AWS Provider
+- **Monitoring**: Prometheus, Loki, Jaeger
+- **Pre-commit Hooks**: Code quality tools and versions
+- **Security**: Cert Manager
+- **Semver Packages**: The Python package called ["Semver"](https://pypi.org/project/semver/), Python, Terraform CLI, kubectl
+- **Terraform Modules**: EKS ([terraform-aws-modules/eks/aws](https://github.com/terraform-aws-modules/terraform-aws-eks)), EKS Pod Identity ([terraform-aws-modules/eks-pod-identity/aws](https://github.com/terraform-aws-modules/terraform-aws-eks-pod-identity)), VPC ([terraform-aws-modules/vpc/aws](https://github.com/terraform-aws-modules/terraform-aws-vpc)), AWS ([hashicorp/aws](https://github.com/hashicorp/terraform-provider-aws)), Kubernetes ([hashicorp/kubernetes](https://github.com/hashicorp/terraform-provider-kubernetes))
 
 ### **AWS Dependencies**
 
 Some version checks require AWS CLI credentials to be configured:
 
-- **EKS Add-ons**: EFS CSI Driver and Metrics Server versions require AWS CLI to query EKS add-on versions
 - **Aurora MySQL**: (optional) Can use AWS credentials as a redundant source for version lookups
-- **Infrastructure**: EKS versions require AWS access for accurate version checking via AWS CLI
+- **EKS Add-ons**: EFS CSI Driver and Metrics Server versions require AWS CLI to query EKS add-on versions
+- **EKS Versions**: EKS versions require AWS access for accurate version checking via AWS CLI
 
 **Authentication Method:**
 
