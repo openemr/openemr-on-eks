@@ -40,20 +40,36 @@
 - 📊 Grafana URL and admin credentials  
 - 📈 Full observability stack ready to use
 
-**Deployment Output:**
-<img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="700">
+**Terminal Output:**
+<img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
 
-**Access OpenEMR:**
-<img src="./images/quick-deploy-openemr-login.png" alt="OpenEMR login page" width="700">
+<details>
+<summary><strong>Access OpenEMR</strong></summary>
 
-**OpenEMR Admin Dashboard:**
-<img src="./images/quick-deploy-openemr-admin-landing-page.png" alt="OpenEMR admin landing page" width="700">
+<img src="./images/quick-deploy-openemr-login.png" alt="OpenEMR login page" width="500">
 
-**Access Grafana:**
-<img src="./images/quick-deploy-grafana-login.png" alt="Grafana login page" width="700">
+</details>
 
-**Monitor OpenEMR in Grafana:**
-<img src="./images/quick-deploy-openemr-grafana.png" alt="OpenEMR monitoring dashboard in Grafana" width="700">
+<details>
+<summary><strong>OpenEMR Admin Dashboard</strong></summary>
+
+<img src="./images/quick-deploy-openemr-admin-landing-page.png" alt="OpenEMR admin landing page" width="500">
+
+</details>
+
+<details>
+<summary><strong>Access Grafana</strong></summary>
+
+<img src="./images/quick-deploy-grafana-login.png" alt="Grafana login page" width="500">
+
+</details>
+
+<details>
+<summary><strong>Monitor OpenEMR in Grafana</strong></summary>
+
+<img src="./images/quick-deploy-openemr-grafana.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
+
+</details>
 
 **Deploy a training OpenEMR setup with 100 synthetic patients:**
 
@@ -71,7 +87,7 @@
 - 👥 Number of synthetic patients equal to the argument to "--max-records" (example above would upload 100 synthetic patients)
 - 🛜 Setup populated by synthetic patient data stored in an S3 bucket in OMOP format (default is https://registry.opendata.aws/cmsdesynpuf-omop/)
 
-<img src="./images/deploy-training-setup.png" alt="Terminal output after running deploy-training-openemr-setup.sh" width="700">
+<img src="./images/deploy-training-setup.png" alt="Terminal output after running deploy-training-openemr-setup.sh" width="500">
 
 **Clean up the deployment with a single command:**
 
@@ -84,7 +100,7 @@
 ./scripts/destroy.sh
 ```
 
-<img src="./images/destroy.png" alt="Terminal output after running destroy.sh" width="700">
+<img src="./images/destroy.png" alt="Terminal output after running destroy.sh" width="500">
 
 ---
 
