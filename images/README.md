@@ -13,6 +13,10 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
   - [GitHub Banner (`openemr_on_eks_github_banner.png`)](#github-banner-openemr_on_eks_github_bannerpng)
   - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
+  - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
+  - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
+  - [Grafana Login Screenshot (`quick-deploy-grafana-login.png`)](#grafana-login-screenshot-quick-deploy-grafana-loginpng)
+  - [OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)](#openemr-grafana-dashboard-screenshot-quick-deploy-openemr-grafanapng)
   - [Deploy Training Setup Screenshot (`deploy-training-setup.png`)](#deploy-training-setup-screenshot-deploy-training-setuppng)
   - [Destroy Screenshot (`destroy.png`)](#destroy-screenshot-destroypng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
@@ -64,6 +68,10 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
 - **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
 - **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
+- **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
+- **`quick-deploy-openemr-admin-landing-page.png`** - Screenshot showing the OpenEMR admin dashboard landing page
+- **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
+- **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
 - **`deploy-training-setup.png`** - Screenshot showing the training environment setup process
 - **`destroy.png`** - Screenshot showing successful infrastructure destruction
 
@@ -89,6 +97,34 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show the quick deployment workflow
 - **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
+
+### **OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)**
+
+- **Purpose**: Visual demonstration of accessing the OpenEMR application after successful deployment
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the OpenEMR login interface
+- **Context**: Shows users what to expect when accessing OpenEMR for the first time after deployment
+
+### **OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)**
+
+- **Purpose**: Visual demonstration of the OpenEMR admin dashboard landing page
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the admin interface after login
+- **Context**: Illustrates the admin dashboard that users will see after logging into OpenEMR
+
+### **Grafana Login Screenshot (`quick-deploy-grafana-login.png`)**
+
+- **Purpose**: Visual demonstration of accessing the Grafana monitoring interface after deployment
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the Grafana login page
+- **Context**: Shows users how to access the monitoring stack that comes with the quick deployment
+
+### **OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)**
+
+- **Purpose**: Visual demonstration of monitoring OpenEMR in the Grafana dashboard
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the monitoring capabilities
+- **Context**: Illustrates the pre-configured Grafana dashboard that monitors OpenEMR deployment metrics and health
 
 ### **Deploy Training Setup Screenshot (`deploy-training-setup.png`)**
 
