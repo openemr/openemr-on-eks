@@ -150,7 +150,7 @@
 
 - [Architecture Overview](#architecture-overview)
 - [Prerequisites](#prerequisites)
-- [Quick Start (Manual Deployment)](#-quick-start-1)
+- [Quick Start (Manual Deployment)](#-quick-start)
 - [Directory Structure](#directory-structure)
 
 ### **💰 Cost Analysis**
