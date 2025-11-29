@@ -18,8 +18,6 @@
 > - Staff training and access controls
 > - Regular security audits and risk assessments
 
-> **⚠️ End-to-End Test Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete AWS resources (including backup buckets and RDS snapshots) and automatically reset Kubernetes manifests to their default state. **Only run in development AWS accounts** and commit/stash any uncommitted changes to `k8s/` manifests before testing.
-
 ---
 
 <div align="center">
@@ -30,7 +28,7 @@
 
 </div> 
 
-## **Deploy OpenEMR with monitoring (~45-60 min.)**
+## 📊 Deploy OpenEMR with monitoring (~45-60 min.)
 
 ```bash
 ./scripts/quick-deploy.sh
@@ -87,7 +85,7 @@
 
 </details>
 
-## **Deploy OpenEMR with 100 synthetic patients (~35-50 min.)**
+## 👥 Deploy OpenEMR with 100 synthetic patients (~35-50 min.)
 
 ```bash
 ./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100
@@ -130,7 +128,7 @@
 
 </details>
 
-## **Cleanup all deployed resources (~15-20 min.)**
+## 🧹 Cleanup all deployed resources (~15-20 min.)
 
 ```bash
 ./scripts/destroy.sh

@@ -10,15 +10,19 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 ### **📄 File Documentation**
 - [File Descriptions](#file-descriptions)
-  - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
-  - [GitHub Banner (`openemr_on_eks_github_banner.png`)](#github-banner-openemr_on_eks_github_bannerpng)
-  - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
-  - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
-  - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
-  - [Grafana Login Screenshot (`quick-deploy-grafana-login.png`)](#grafana-login-screenshot-quick-deploy-grafana-loginpng)
-  - [OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)](#openemr-grafana-dashboard-screenshot-quick-deploy-openemr-grafanapng)
   - [Deploy Training Setup Screenshot (`deploy-training-setup.png`)](#deploy-training-setup-screenshot-deploy-training-setuppng)
+  - [Deploy Training Setup OpenEMR Login (`deploy-training-setup-openemr-login.png`)](#deploy-training-setup-openemr-login-deploy-training-setup-openemr-loginpng)
+  - [Deploy Training Setup Patient Finder (`deploy-training-setup-patient-finder.png`)](#deploy-training-setup-patient-finder-deploy-training-setup-patient-finderpng)
+  - [Deploy Training Setup Warp Data Upload (`deploy-training-setup-warp-data-upload.png`)](#deploy-training-setup-warp-data-upload-deploy-training-setup-warp-data-uploadpng)
   - [Destroy Screenshot (`destroy.png`)](#destroy-screenshot-destroypng)
+  - [GitHub Banner (`openemr_on_eks_github_banner.png`)](#github-banner-openemr_on_eks_github_bannerpng)
+  - [Grafana Login Screenshot (`quick-deploy-grafana-login.png`)](#grafana-login-screenshot-quick-deploy-grafana-loginpng)
+  - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
+  - [OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)](#openemr-grafana-dashboard-screenshot-quick-deploy-openemr-grafanapng)
+  - [OpenEMR Grafana Datasources (`quick-deploy-openemer-grafana-datasources.png`)](#openemr-grafana-datasources-quick-deploy-openemer-grafana-datasourcespng)
+  - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
+  - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
+  - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -65,66 +69,21 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 ### **Visual Assets**
 
-- **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
-- **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
-- **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
-- **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
-- **`quick-deploy-openemr-admin-landing-page.png`** - Screenshot showing the OpenEMR admin dashboard landing page
-- **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
-- **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
 - **`deploy-training-setup.png`** - Screenshot showing the training environment setup process
+- **`deploy-training-setup-openemr-login.png`** - Screenshot showing the OpenEMR login page with newly generated admin credentials
+- **`deploy-training-setup-patient-finder.png`** - Screenshot showing synthetic patients in OpenEMR's Patient Finder
+- **`deploy-training-setup-warp-data-upload.png`** - Screenshot showing Warp uploading 100 synthetic patients in less than 1 minute
 - **`destroy.png`** - Screenshot showing successful infrastructure destruction
+- **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
+- **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
+- **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
+- **`quick-deploy-openemer-grafana-datasources.png`** - Screenshot showing 5 integrated datasources for dashboarding and alerting
+- **`quick-deploy-openemr-admin-landing-page.png`** - Screenshot showing the OpenEMR admin dashboard landing page
+- **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
+- **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
+- **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
 
 ## File Descriptions
-
-### **Project Logo (`openemr_on_eks_logo.png`)**
-
-- **Purpose**: Primary project logo used in documentation, README files, and branding materials
-- **Format**: PNG image optimized for web display with transparency support
-- **Usage**: Embedded in main README below the project title
-- **Dimensions**: Optimized for various display sizes and contexts (<500KB file size for fast loading)
-
-### **GitHub Banner (`openemr_on_eks_github_banner.png`)**
-
-- **Purpose**: Social media banner for GitHub repository display
-- **Format**: PNG image with transparency support
-- **Usage**: Repository banner, social media sharing, and promotional materials
-- **Dimensions**: Optimized for GitHub's banner display requirements
-
-### **Quick Deploy Screenshot (`quick-deploy.png`)**
-
-- **Purpose**: Visual demonstration of the quick deployment script (`scripts/quick-deploy.sh`) in action
-- **Format**: PNG screenshot
-- **Usage**: Documentation and README files to show the quick deployment workflow
-- **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
-
-### **OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)**
-
-- **Purpose**: Visual demonstration of accessing the OpenEMR application after successful deployment
-- **Format**: PNG screenshot
-- **Usage**: Documentation and README files to show the OpenEMR login interface
-- **Context**: Shows users what to expect when accessing OpenEMR for the first time after deployment
-
-### **OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)**
-
-- **Purpose**: Visual demonstration of the OpenEMR admin dashboard landing page
-- **Format**: PNG screenshot
-- **Usage**: Documentation and README files to show the admin interface after login
-- **Context**: Illustrates the admin dashboard that users will see after logging into OpenEMR
-
-### **Grafana Login Screenshot (`quick-deploy-grafana-login.png`)**
-
-- **Purpose**: Visual demonstration of accessing the Grafana monitoring interface after deployment
-- **Format**: PNG screenshot
-- **Usage**: Documentation and README files to show the Grafana login page
-- **Context**: Shows users how to access the monitoring stack that comes with the quick deployment
-
-### **OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)**
-
-- **Purpose**: Visual demonstration of monitoring OpenEMR in the Grafana dashboard
-- **Format**: PNG screenshot
-- **Usage**: Documentation and README files to show the monitoring capabilities
-- **Context**: Illustrates the pre-configured Grafana dashboard that monitors OpenEMR deployment metrics and health
 
 ### **Deploy Training Setup Screenshot (`deploy-training-setup.png`)**
 
@@ -133,12 +92,89 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Documentation and README files to show the training setup workflow
 - **Context**: Illustrates the process for deploying OpenEMR training environments with pre-configured settings
 
+### **Deploy Training Setup OpenEMR Login (`deploy-training-setup-openemr-login.png`)**
+
+- **Purpose**: Visual demonstration of accessing the OpenEMR application after training setup deployment
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the OpenEMR login interface with newly generated admin credentials
+- **Context**: Shows users what to expect when accessing OpenEMR after the training setup deployment
+
+### **Deploy Training Setup Patient Finder (`deploy-training-setup-patient-finder.png`)**
+
+- **Purpose**: Visual demonstration of verifying synthetic patient uploads in OpenEMR's Patient Finder
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show how to verify uploaded synthetic patients
+- **Context**: Illustrates navigating to "Finder" → "Patient Finder" to see uploaded synthetic patients
+
+### **Deploy Training Setup Warp Data Upload (`deploy-training-setup-warp-data-upload.png`)**
+
+- **Purpose**: Visual demonstration of Warp uploading synthetic patient data
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the speed of Warp data uploads
+- **Context**: Shows Warp uploading 100 synthetic patients in less than 1 minute
+
 ### **Destroy Screenshot (`destroy.png`)**
 
 - **Purpose**: Visual demonstration of successful infrastructure destruction using the destroy script (`scripts/destroy.sh`)
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show the cleanup workflow
 - **Context**: Illustrates the complete infrastructure destruction process with the "DESTRUCTION COMPLETE!" success message
+
+### **GitHub Banner (`openemr_on_eks_github_banner.png`)**
+
+- **Purpose**: Social media banner for GitHub repository display
+- **Format**: PNG image with transparency support
+- **Usage**: Repository banner, social media sharing, and promotional materials
+- **Dimensions**: Optimized for GitHub's banner display requirements
+
+### **Grafana Login Screenshot (`quick-deploy-grafana-login.png`)**
+
+- **Purpose**: Visual demonstration of accessing the Grafana monitoring interface after deployment
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the Grafana login page
+- **Context**: Shows users how to access the monitoring stack that comes with the quick deployment
+
+### **OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)**
+
+- **Purpose**: Visual demonstration of the OpenEMR admin dashboard landing page
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the admin interface after login
+- **Context**: Illustrates the admin dashboard that users will see after logging into OpenEMR
+
+### **OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)**
+
+- **Purpose**: Visual demonstration of monitoring OpenEMR in the Grafana dashboard
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the monitoring capabilities
+- **Context**: Illustrates the pre-configured Grafana dashboard that monitors OpenEMR deployment metrics and health
+
+### **OpenEMR Grafana Datasources (`quick-deploy-openemer-grafana-datasources.png`)**
+
+- **Purpose**: Visual demonstration of the 5 integrated datasources available in the monitoring stack
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show datasource configuration
+- **Context**: Illustrates the comprehensive datasources available for dashboarding and alerting
+
+### **OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)**
+
+- **Purpose**: Visual demonstration of accessing the OpenEMR application after successful deployment
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the OpenEMR login interface
+- **Context**: Shows users what to expect when accessing OpenEMR for the first time after deployment
+
+### **Project Logo (`openemr_on_eks_logo.png`)**
+
+- **Purpose**: Primary project logo used in documentation, README files, and branding materials
+- **Format**: PNG image optimized for web display with transparency support
+- **Usage**: Embedded in main README below the project title
+- **Dimensions**: Optimized for various display sizes and contexts (<500KB file size for fast loading)
+
+### **Quick Deploy Screenshot (`quick-deploy.png`)**
+
+- **Purpose**: Visual demonstration of the quick deployment script (`scripts/quick-deploy.sh`) in action
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the quick deployment workflow
+- **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
 
 ## Setting GitHub Social Banner
 
