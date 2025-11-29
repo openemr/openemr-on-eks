@@ -35,14 +35,21 @@
 ./scripts/quick-deploy.sh
 ```
 
-**What you get:**
+<details>
+<summary><strong>What you get</strong></summary>
+
 - 🌐 OpenEMR URL and admin credentials
 - 📊 Grafana URL and admin credentials  
 - 📈 Full observability stack ready to use
 
-**Terminal Output:**
+</details>
+
+<details>
+<summary><strong>Terminal Output</strong></summary>
 
 <img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
+
+</details>
 
 <details>
 <summary><strong>Access OpenEMR</strong></summary>
@@ -83,12 +90,21 @@
 ./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100
 ```
 
-**What you get:**
+<details>
+<summary><strong>What you get</strong></summary>
+
 - 🌐 OpenEMR URL and admin credentials
 - 👥 Number of synthetic patients equal to the argument to "--max-records" (example above would upload 100 synthetic patients)
 - 🛜 Setup populated by synthetic patient data stored in an S3 bucket in OMOP format (default is https://registry.opendata.aws/cmsdesynpuf-omop/)
 
+</details>
+
+<details>
+<summary><strong>Terminal Output</strong></summary>
+
 <img src="./images/deploy-training-setup.png" alt="Terminal output after running deploy-training-openemr-setup.sh" width="500">
+
+</details>
 
 ### **Clean up all deployed resources with a single command**
 
@@ -101,7 +117,12 @@
 ./scripts/destroy.sh
 ```
 
+<details>
+<summary><strong>Terminal Output</strong></summary>
+
 <img src="./images/destroy.png" alt="Terminal output after running destroy.sh" width="500">
+
+</details>
 
 ---
 
