@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="600">
+<img src="images/openemr_on_eks_logo.png" alt="OpenEMR on EKS Logo" width="400">
 
 <!-- Status Badges -->
 [![CI/CD Tests](../../actions/workflows/ci-cd-tests.yml/badge.svg)](../../actions/workflows/ci-cd-tests.yml)
