@@ -22,7 +22,13 @@
 
 ---
 
-## ⚡ Quick Start 
+<div align="center">
+
+# 🚀 ⚡ Quick Start ⚡ 🚀
+
+*Deploy OpenEMR on EKS in minutes*
+
+</div> 
 
 ## **Deploy OpenEMR with monitoring (~45-60 min.)**
 
