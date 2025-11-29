@@ -1438,32 +1438,33 @@ The infrastructure is organized into **modular Terraform files** for better main
 
 ### **Core Configuration**
 
+- **`backup.tf`** - AWS Backup configuration for S3 buckets, EKS, RDS and EFS
 - **`main.tf`** - Terraform providers, required versions, and data sources
-- **`variables.tf`** - All input variables with descriptions and defaults
 - **`outputs.tf`** - Resource outputs for integration with Kubernetes
+- **`variables.tf`** - All input variables with descriptions and defaults
 
 ### **Networking & Security**
 
-- **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
-- **`kms.tf`** - 6 dedicated KMS keys for granular encryption
 - **`iam.tf`** - Service account roles with Auto Mode trust policies
+- **`kms.tf`** - 6 dedicated KMS keys for granular encryption
+- **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
 - **`waf.tf`** - Configures WAFv2 for our ingress to our application
 
 ### **Compute & Storage**
 
-- **`eks.tf`** - EKS cluster with Auto Mode configuration
 - **`efs.tf`** - EFS file system with elastic performance mode
+- **`eks.tf`** - EKS cluster with Auto Mode configuration
 - **`s3.tf`** - S3 buckets for ALB logs with lifecycle policies
 
-### **Data Services**
+### **Database and Caching Services**
 
-- **`rds.tf`** - Aurora Serverless V2 MySQL with encryption
 - **`elasticache.tf`** - Valkey Serverless cache
+- **`rds.tf`** - Aurora Serverless V2 MySQL with encryption
 
 ### **Observability & Compliance**
 
-- **`cloudwatch.tf`** - Log groups with retention settings
 - **`cloudtrail.tf`** - CloudTrail logging with encrypted S3 storage
+- **`cloudwatch.tf`** - Log groups with retention settings
 
 ## ⚙️ Kubernetes Manifests Organization
 
