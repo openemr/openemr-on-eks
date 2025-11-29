@@ -43,40 +43,30 @@
 - 📊 Grafana URL and admin credentials  
 - 📈 Full observability stack ready to use
 
-</details>
-
-<details>
 <summary><strong>Terminal Output</strong></summary>
 
 <img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
 
-</details>
-
-<details>
 <summary><strong>Access OpenEMR</strong></summary>
 
 <img src="./images/quick-deploy-openemr-login.png" alt="OpenEMR login page" width="500">
 
-</details>
-
-<details>
 <summary><strong>OpenEMR Admin Dashboard</strong></summary>
 
 <img src="./images/quick-deploy-openemr-admin-landing-page.png" alt="OpenEMR admin landing page" width="500">
 
-</details>
-
-<details>
 <summary><strong>Access Grafana</strong></summary>
 
 <img src="./images/quick-deploy-grafana-login.png" alt="Grafana login page" width="500">
 
-</details>
-
-<details>
 <summary><strong>Monitor OpenEMR in Grafana</strong></summary>
 
 <img src="./images/quick-deploy-openemr-grafana.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
+
+<summary><strong>Monitoring Stack Comes With 5 Integrated Datasources for Comprehensive Dashboards and Alerting</strong></summary>
+
+<img src="./images/quick-deploy-openemer-grafana-datasources.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
+
 
 </details>
 
@@ -96,10 +86,21 @@
 </details>
 
 <details>
+<summary><strong>Warp Uploads 100 Synthetic Patients in <1 minute</strong></summary>
+
+<img src="./images/deploy-training-setup-warp-data-upload.png" alt="Warp uploading 100 patients in <1 min." width="500">
+
 <summary><strong>Terminal Output</strong></summary>
 
 <img src="./images/deploy-training-setup.png" alt="Terminal output after running deploy-training-openemr-setup.sh" width="500">
 
+<summary><strong>Access OpenEMR</strong></summary>
+
+<img src="./images/deploy-training-setup-openemr-login.png" alt="OpenEMR login page with newly generated admin credentials" width="500">
+
+<summary><strong>Navigate to "Finder" → "Patient Finder" to verify synthetic patient upload</strong></summary>
+
+<img src="./images/deploy-training-setup-patient-finder.png" alt="Screenshot showing synthetic patients in OpenEMR's Patient Finder" width="500">
 </details>
 
 ## **Cleanup all deployed resources (~15-20 min.)**
