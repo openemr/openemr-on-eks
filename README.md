@@ -24,7 +24,7 @@
 
 ## ⚡ Quick Start 
 
-**Deploy OpenEMR with a full monitoring stack on EKS in a single command:**
+### **Deploy OpenEMR with a full monitoring stack on EKS in a single command**
 
 ```bash
 # Requires: aws, helm, jq, kubectl, terraform
@@ -41,6 +41,7 @@
 - 📈 Full observability stack ready to use
 
 **Terminal Output:**
+
 <img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
 
 <details>
@@ -71,7 +72,7 @@
 
 </details>
 
-**Deploy a training OpenEMR setup with 100 synthetic patients:**
+### **Deploy a training OpenEMR setup with 100 synthetic patients**
 
 ```bash
 # Requires: aws, jq, kubectl, terraform
@@ -89,7 +90,7 @@
 
 <img src="./images/deploy-training-setup.png" alt="Terminal output after running deploy-training-openemr-setup.sh" width="500">
 
-**Clean up the deployment with a single command:**
+### **Clean up all deployed resources with a single command**
 
 ```bash
 # Requires: aws, kubectl, terraform
