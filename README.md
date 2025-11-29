@@ -24,10 +24,10 @@
 
 ## ⚡ Quick Start 
 
-## **Deploy OpenEMR with monitoring**
+## **Deploy OpenEMR with monitoring (~45-60 min.)**
 
 ```bash
-./scripts/quick-deploy.sh # ~45-60 minutes
+./scripts/quick-deploy.sh
 ```
 
 <details>
@@ -74,10 +74,10 @@
 
 </details>
 
-## **Deploy OpenEMR with 100 synthetic patients**
+## **Deploy OpenEMR with 100 synthetic patients (~35-50 min.)**
 
 ```bash
-./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100 # ~35-50 minutes
+./scripts/deploy-training-openemr-setup.sh --use-default-dataset --max-records 100
 ```
 
 <details>
@@ -96,10 +96,10 @@
 
 </details>
 
-## **Cleanup all deployed resources**
+## **Cleanup all deployed resources (~15-20 min.)**
 
 ```bash
-./scripts/destroy.sh # ~15-20 minutes
+./scripts/destroy.sh
 ```
 
 <details>
