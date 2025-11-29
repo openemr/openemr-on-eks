@@ -81,7 +81,7 @@
 </details>
 
 <details>
-<summary><strong>Monitoring Stack Comes With 5 Integrated Datasources for Comprehensive Dashboards and Alerting</strong></summary>
+<summary><strong>5 Integrated Datasources for Dashboarding/Alerting</strong></summary>
 
 <img src="./images/quick-deploy-openemer-grafana-datasources.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
 
@@ -124,7 +124,7 @@
 </details>
 
 <details>
-<summary><strong>Navigate to "Finder" → "Patient Finder" to verify synthetic patient upload</strong></summary>
+<summary><strong>Navigate to "Finder" → "Patient Finder" to see uploaded synthetic patients</strong></summary>
 
 <img src="./images/deploy-training-setup-patient-finder.png" alt="Screenshot showing synthetic patients in OpenEMR's Patient Finder" width="500">
 
