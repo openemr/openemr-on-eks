@@ -42,21 +42,10 @@ BASE_DELAY="30"                 # Base delay between retries (seconds)
 MAX_DELAY="300"                 # Maximum delay between retries (seconds)
 
 # =============================================================================
-# INGRESS CONFIGURATION (optional)
+# ACCESS CONFIGURATION
 # =============================================================================
-# Enable NGINX ingress for external access to Grafana
-ENABLE_INGRESS="0"              # Set to "1" to enable
-
-# Required if ENABLE_INGRESS="1"
-GRAFANA_HOSTNAME=""             # e.g., "grafana.example.com"
-
-# TLS configuration
-TLS_SECRET_NAME=""              # Leave empty for auto-generated self-signed cert
-
-# Basic authentication (only works with NGINX ingress)
-ENABLE_BASIC_AUTH="0"           # Set to "1" to enable
-BASIC_AUTH_USER="admin"         # Basic auth username
-BASIC_AUTH_PASSWORD=""          # Leave empty for auto-generated password
+# Monitoring stack is accessed via port-forwarding (no ingress required)
+# Example: kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
 
 # =============================================================================
 # ALERTMANAGER SLACK INTEGRATION (optional)
@@ -95,20 +84,15 @@ VALUES_FILE="./prometheus-values.yaml"  # Generated values file
 
 # Development Environment:
 # MONITORING_NAMESPACE="monitoring-dev"
-# ENABLE_INGRESS="0"
 # DEBUG="1"
 
 # Production Environment with Slack:
-# ENABLE_INGRESS="1"
-# GRAFANA_HOSTNAME="grafana.yourdomain.com"
-# ENABLE_BASIC_AUTH="1"
 # SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 # SLACK_CHANNEL="#production-alerts"
 
 # Multi-Tenant Environment:
 # MONITORING_NAMESPACE="monitoring-tenant1"
 # OPENEMR_NAMESPACE="openemr-tenant1"
-# GRAFANA_HOSTNAME="grafana-tenant1.example.com"
 
 # =============================================================================
 # SECURITY NOTES

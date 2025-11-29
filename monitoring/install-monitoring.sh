@@ -8,7 +8,7 @@
 #   Installs and configures a comprehensive monitoring stack for OpenEMR on
 #   Amazon EKS, including Prometheus, Grafana, Loki, and Jaeger. Provides
 #   observability, metrics, logging, and distributed tracing capabilities
-#   with optional ingress and authentication configuration.
+#   with port-forwarding access for monitoring tools.
 #
 # Key Features:
 #   - Prometheus Operator deployment with kube-prometheus-stack
@@ -16,7 +16,6 @@
 #   - Loki for centralized log aggregation
 #   - Jaeger for distributed tracing
 #   - cert-manager for TLS certificate management
-#   - Ingress configuration with optional authentication
 #   - Storage provisioning with encryption support
 #   - Integration with OpenEMR Fluent Bit sidecars
 #   - CloudWatch metrics integration via Grafana
@@ -35,9 +34,6 @@
 #   install                 Install monitoring stack (default operation)
 #   uninstall               Remove monitoring stack and clean up resources
 #   verify                  Verify monitoring stack installation and health
-#   --enable-ingress        Enable ingress with optional authentication (disabled by default)
-#   --grafana-hostname      Hostname for Grafana ingress (e.g., grafana.example.com)
-#   --tls-secret-name       TLS secret name for ingress (optional)
 #   --help                  Show this help message
 #
 # Environment Variables (Grouped by Category):
@@ -84,21 +80,6 @@
 #   MAX_DELAY                  Maximum delay in seconds for retries (default: 300)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │ Ingress Configuration                                                   │
-# └─────────────────────────────────────────────────────────────────────────┘
-#   ENABLE_INGRESS             Enable ingress (0 or 1, default: 0)
-#   INGRESS_TYPE               Ingress controller type (default: nginx, only nginx supported)
-#   GRAFANA_HOSTNAME           Grafana hostname for ingress (e.g., grafana.example.com)
-#   TLS_SECRET_NAME            TLS secret name for ingress (optional, auto-generated if empty)
-#
-# ┌─────────────────────────────────────────────────────────────────────────┐
-# │ Authentication Configuration                                            │
-# └─────────────────────────────────────────────────────────────────────────┘
-#   ENABLE_BASIC_AUTH          Enable basic authentication (0 or 1, default: 0, nginx only)
-#   BASIC_AUTH_USER            Basic auth username (default: admin)
-#   BASIC_AUTH_PASSWORD        Basic auth password (optional, auto-generated if empty)
-#
-# ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Alerting Configuration (Optional)                                       │
 # └─────────────────────────────────────────────────────────────────────────┘
 #   SLACK_WEBHOOK_URL          Slack webhook URL for Alertmanager (optional)
@@ -128,20 +109,12 @@
 #   HPA_CPU_TARGET             HPA CPU utilization target percentage (default: 70)
 #   HPA_MEMORY_TARGET          HPA memory utilization target percentage (default: 80)
 #
-# ┌─────────────────────────────────────────────────────────────────────────┐
-# │ TLS/cert-manager Configuration                                          │
-# └─────────────────────────────────────────────────────────────────────────┘
-#   USE_CERT_MANAGER_TLS       Use cert-manager for Grafana TLS (0 or 1, default: 0)
-#   CERT_MANAGER_ISSUER_NAME   cert-manager Issuer name (required if USE_CERT_MANAGER_TLS=1)
-#   CERT_MANAGER_ISSUER_KIND   cert-manager Issuer kind (default: ClusterIssuer)
-#   CERT_MANAGER_ISSUER_GROUP  cert-manager Issuer group (default: cert-manager.io)
-#
 # Examples:
 #   # Basic installation with Jaeger, Cert-manager, Alertmanager, Prometheus, Jaeger and Grafana
 #   ./install-monitoring.sh
 #
-#   # With ingress and TLS
-#   ./install-monitoring.sh --enable-ingress --grafana-hostname grafana.example.com
+#   # Access via port-forwarding (default)
+#   kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
 #
 # Notes:
 #   - Installation takes approximately 10 minutes
@@ -193,16 +166,6 @@ readonly MAX_RETRIES="${MAX_RETRIES:-3}"
 readonly BASE_DELAY="${BASE_DELAY:-30}"
 readonly MAX_DELAY="${MAX_DELAY:-300}"
 
-# Ingress / Auth toggles (only nginx supported)
-readonly ENABLE_INGRESS="${ENABLE_INGRESS:-0}"
-readonly INGRESS_TYPE="${INGRESS_TYPE:-nginx}"     # must be 'nginx'
-readonly GRAFANA_HOSTNAME="${GRAFANA_HOSTNAME:-}"  # e.g. grafana.example.com
-TLS_SECRET_NAME="${TLS_SECRET_NAME:-}"             # may be set later if self-signed
-
-# Basic auth (nginx only)
-readonly ENABLE_BASIC_AUTH="${ENABLE_BASIC_AUTH:-0}"
-readonly BASIC_AUTH_USER="${BASIC_AUTH_USER:-admin}"
-readonly BASIC_AUTH_PASSWORD="${BASIC_AUTH_PASSWORD:-}"
 
 # Alertmanager Slack (optional)
 readonly SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"
@@ -279,12 +242,8 @@ readonly JAEGER_MAX_REPLICAS="${JAEGER_MAX_REPLICAS:-3}"
 readonly HPA_CPU_TARGET="${HPA_CPU_TARGET:-70}"
 readonly HPA_MEMORY_TARGET="${HPA_MEMORY_TARGET:-80}"
 
-# ---- cert-manager (pinned) & optional Grafana TLS via cert-manager
+# ---- cert-manager (pinned, used by Jaeger)
 readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.19.1}"
-readonly USE_CERT_MANAGER_TLS="${USE_CERT_MANAGER_TLS:-0}"
-readonly CERT_MANAGER_ISSUER_NAME="${CERT_MANAGER_ISSUER_NAME:-}"
-readonly CERT_MANAGER_ISSUER_KIND="${CERT_MANAGER_ISSUER_KIND:-ClusterIssuer}"   # or Issuer
-readonly CERT_MANAGER_ISSUER_GROUP="${CERT_MANAGER_ISSUER_GROUP:-cert-manager.io}"
 
 # Colors
 readonly RED='\033[0;31m'; readonly GREEN='\033[0;32m'
@@ -348,14 +307,7 @@ validate_inputs(){
   [[ "$STORAGE_CLASS_RWO" =~ ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$ ]] || { log_error "Invalid storage class: $STORAGE_CLASS_RWO"; return 1; }
   [[ "$BASE_DELAY" =~ ^[0-9]+$ && "$MAX_DELAY" =~ ^[0-9]+$ ]] || { log_error "Invalid delay values: BASE_DELAY=$BASE_DELAY, MAX_DELAY=$MAX_DELAY"; return 1; }
 
-  if [[ "$ENABLE_INGRESS" == "1" ]]; then
-    [[ -n "$GRAFANA_HOSTNAME" ]] || { log_error "ENABLE_INGRESS=1 requires GRAFANA_HOSTNAME"; return 1; }
-    [[ "$INGRESS_TYPE" == "nginx" ]] || { log_error "Only NGINX ingress is supported (ALB removed). Set INGRESS_TYPE=nginx."; return 1; }
-  fi
 
-  if [[ "$USE_CERT_MANAGER_TLS" == "1" && -z "$CERT_MANAGER_ISSUER_NAME" ]]; then
-    log_error "USE_CERT_MANAGER_TLS=1 requires CERT_MANAGER_ISSUER_NAME (and optionally CERT_MANAGER_ISSUER_KIND/GROUP)."; return 1
-  fi
 
   # Validate autoscaling configuration
   if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
@@ -1737,128 +1689,6 @@ EOF
   log_success "NetworkPolicies applied"
 }
 
-# ------------------------------
-# Ingress & Basic Auth (Grafana) + TLS (cert-manager or self-signed)
-# ------------------------------
-maybe_create_basic_auth_secret(){
-  [[ "$ENABLE_BASIC_AUTH" == "1" && "$INGRESS_TYPE" == "nginx" ]] || return 0
-  if ! command -v htpasswd >/dev/null 2>&1; then log_warn "htpasswd not installed; cannot create basic-auth secret. Skipping basic auth."; return 0; fi
-  local user="$BASIC_AUTH_USER" pass="$BASIC_AUTH_PASSWORD"
-  if [[ -z "$pass" ]]; then pass="$(generate_secure_password)"; log_info "Generated BASIC_AUTH_PASSWORD for user '$user'"; fi
-  local tmp; tmp="$(mktemp)"; htpasswd -nbBC 10 "$user" "$pass" > "$tmp"
-  kubectl create secret generic grafana-basic-auth --from-file=auth="$tmp" -n "$MONITORING_NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
-  rm -f "$tmp"; log_success "grafana-basic-auth secret created (user: $user)"; log_info "Store basic auth password securely; it will not be shown again."
-}
-
-ensure_self_signed_tls_secret(){
-  [[ "$ENABLE_INGRESS" == "1" ]] || return 0
-  if [[ -z "$TLS_SECRET_NAME" ]]; then
-    [[ -n "$GRAFANA_HOSTNAME" ]] || { log_error "GRAFANA_HOSTNAME required for self-signed TLS"; return 1; }
-    TLS_SECRET_NAME="grafana-tls-selfsigned"
-    log_step "Creating self-signed TLS secret '$TLS_SECRET_NAME' for host $GRAFANA_HOSTNAME ..."
-    local td; td="$(mktemp -d)"
-    openssl req -x509 -nodes -newkey rsa:2048 -days 825 \
-      -keyout "${td}/tls.key" -out "${td}/tls.crt" \
-      -subj "/CN=${GRAFANA_HOSTNAME}" -addext "subjectAltName=DNS:${GRAFANA_HOSTNAME}" >/dev/null 2>&1
-    kubectl create secret tls "$TLS_SECRET_NAME" --namespace "$MONITORING_NAMESPACE" --key "${td}/tls.key" --cert "${td}/tls.crt" --dry-run=client -o yaml | kubectl apply -f -
-    rm -rf "$td"; log_success "Self-signed TLS secret created: $TLS_SECRET_NAME"
-  fi
-}
-
-create_grafana_ingress(){
-  [[ "$ENABLE_INGRESS" == "1" ]] || { log_info "Ingress disabled (ENABLE_INGRESS=0)"; return 0; }
-  ensure_namespace "$MONITORING_NAMESPACE"
-  maybe_create_basic_auth_secret
-
-  # If using cert-manager for TLS, annotate and let it create the secret
-  if [[ "$USE_CERT_MANAGER_TLS" == "1" ]]; then
-    install_cert_manager
-    [[ -n "$TLS_SECRET_NAME" ]] || TLS_SECRET_NAME="grafana-tls"
-    log_step "Creating NGINX Ingress for Grafana (cert-manager TLS) at host: $GRAFANA_HOSTNAME"
-    local issuer_annotations=""
-    if [[ "$CERT_MANAGER_ISSUER_KIND" == "ClusterIssuer" ]]; then
-      issuer_annotations="cert-manager.io/cluster-issuer: ${CERT_MANAGER_ISSUER_NAME}"
-    else
-      issuer_annotations="cert-manager.io/issuer: ${CERT_MANAGER_ISSUER_NAME}
-    cert-manager.io/issuer-kind: ${CERT_MANAGER_ISSUER_KIND}
-    cert-manager.io/issuer-group: ${CERT_MANAGER_ISSUER_GROUP}"
-    fi
-    # Build annotations dynamically
-    local basic_auth_annotations=""
-    if [[ "$ENABLE_BASIC_AUTH" == "1" ]] && [[ -n "$(kubectl get secret grafana-basic-auth -n "$MONITORING_NAMESPACE" --ignore-not-found)" ]]; then
-      basic_auth_annotations="    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
-    nginx.ingress.kubernetes.io/auth-realm: \"Authentication Required\""
-    fi
-
-    kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana
-  namespace: ${MONITORING_NAMESPACE}
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    ${issuer_annotations}
-${basic_auth_annotations}
-spec:
-  tls:
-  - hosts:
-    - ${GRAFANA_HOSTNAME}
-    secretName: ${TLS_SECRET_NAME}
-  rules:
-  - host: ${GRAFANA_HOSTNAME}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: prometheus-stack-grafana
-            port:
-              number: 80
-EOF
-    log_success "NGINX Ingress created (cert-manager will provision TLS)"
-  else
-    ensure_self_signed_tls_secret
-    log_step "Creating NGINX Ingress for Grafana (self-signed TLS) at host: $GRAFANA_HOSTNAME"
-    # Build annotations dynamically
-    local basic_auth_annotations=""
-    if [[ "$ENABLE_BASIC_AUTH" == "1" ]] && [[ -n "$(kubectl get secret grafana-basic-auth -n "$MONITORING_NAMESPACE" --ignore-not-found)" ]]; then
-      basic_auth_annotations="    nginx.ingress.kubernetes.io/auth-type: basic
-    nginx.ingress.kubernetes.io/auth-secret: grafana-basic-auth
-    nginx.ingress.kubernetes.io/auth-realm: \"Authentication Required\""
-    fi
-
-    kubectl apply -f - <<EOF
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: grafana
-  namespace: ${MONITORING_NAMESPACE}
-  annotations:
-    kubernetes.io/ingress.class: nginx
-${basic_auth_annotations}
-spec:
-  tls:
-  - hosts:
-    - ${GRAFANA_HOSTNAME}
-    secretName: ${TLS_SECRET_NAME}
-  rules:
-  - host: ${GRAFANA_HOSTNAME}
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: prometheus-stack-grafana
-            port:
-              number: 80
-EOF
-    log_success "NGINX Ingress created (self-signed TLS)"
-  fi
-}
 
 # ------------------------------
 # Utilities
@@ -1866,9 +1696,8 @@ EOF
 uninstall_all(){
   log_step "Uninstalling monitoring stack..."
   set +e
-  kubectl delete ingress grafana -n "$MONITORING_NAMESPACE" --ignore-not-found
-  helm uninstall prometheus-stack -n "$MONITORING_NAMESPACE"
-  helm uninstall loki -n "$MONITORING_NAMESPACE"
+  helm uninstall prometheus-stack -n "$MONITORING_NAMESPACE" --ignore-not-found
+  helm uninstall loki -n "$MONITORING_NAMESPACE" --ignore-not-found
   helm uninstall jaeger -n "$MONITORING_NAMESPACE" --ignore-not-found
   kubectl delete -n "$MONITORING_NAMESPACE" secret grafana-admin-secret grafana-basic-auth --ignore-not-found
   kubectl delete cm grafana-datasources grafana-dashboard-openemr -n "$MONITORING_NAMESPACE" --ignore-not-found
@@ -1930,7 +1759,6 @@ main(){
       create_alertmanager_config
       create_openemr_monitoring
       apply_network_policies || log_warn "NetworkPolicies failed (continuing)"
-      create_grafana_ingress
       verify_installation
       verify_openemr_monitoring
       ;;
@@ -1939,7 +1767,7 @@ main(){
       verify_openemr_monitoring
       ;;
     status)
-      kubectl get pods,svc,ingress -n "$MONITORING_NAMESPACE" || true
+      kubectl get pods,svc -n "$MONITORING_NAMESPACE" || true
       ;;
     uninstall|destroy|delete)
       uninstall_all

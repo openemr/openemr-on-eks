@@ -45,7 +45,6 @@ graph TB
     end
 
     subgraph "External Access"
-        ING[NGINX Ingress]
         PF[Port Forward]
     end
 
@@ -56,7 +55,6 @@ graph TB
     LOKI --> GRAF
     JAEG --> GRAF
     PROM --> ALERT
-    ING --> GRAF
     PF --> GRAF
 ```
 
@@ -199,24 +197,6 @@ cd monitoring
 ./install-monitoring.sh
 ```
 
-### Production Installation with Ingress
-
-```bash
-# Configure for production access
-export ENABLE_INGRESS="1"
-export GRAFANA_HOSTNAME="grafana.yourhospital.org"
-export ENABLE_BASIC_AUTH="1"
-
-# Optional: Slack alerting
-export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
-export SLACK_CHANNEL="#openemr-alerts"
-
-# Install (total install time ~8-10 minutes with S3 storage)
-./install-monitoring.sh
-
-# Verify installation
-./install-monitoring.sh verify
-```
 
 ### Access Credentials
 
@@ -379,7 +359,7 @@ export ENABLE_AUTOSCALING="0"     # All components run with minimum replicas
 
 ## 🌐 Access Methods
 
-### Method 1: Port-Forward (Development)
+### Port-Forwarding (Recommended)
 
 ```bash
 # Grafana (primary interface)
@@ -400,21 +380,6 @@ kubectl port-forward -n monitoring svc/loki 3100:3100
 # Access: http://localhost:3100
 ```
 
-### Method 2: NGINX Ingress (Production)
-
-```bash
-# Prerequisites
-# 1. Install NGINX Ingress Controller
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.13.1/deploy/static/provider/aws/deploy.yaml
-
-# 2. Configure DNS
-# Point grafana.yourhospital.org to ingress LoadBalancer
-
-# 3. Access
-# URL: https://grafana.yourhospital.org
-# Basic Auth: As configured
-# Grafana Login: admin / <password>
-```
 
 ## 📊 Dashboards
 
@@ -457,14 +422,14 @@ Your Grafana has these data sources pre-configured:
 | Requirement | Implementation | Verification                                                                                                 |
 |-------------|---------------|--------------------------------------------------------------------------------------------------------------|
 | **Encryption at Rest** | GP3 encrypted storage | `kubectl get sc gp3-monitoring-encrypted -o yaml`                                                            |
-| **Encryption in Transit** | TLS 1.2+ for all traffic | Check ingress TLS configuration                                                                              |
+| **Encryption in Transit** | TLS 1.2+ for all traffic | All traffic uses port-forwarding (local access only)                                                                              |
 | **Access Control** | RBAC + Basic Auth + TLS | Review service accounts and secrets                                                                          |
 | **Data Retention** | Configurable retention | Review and confirm configuration allows for necessary retention of data in compliance with relevant policies |
 | **Network Isolation** | NetworkPolicies | `kubectl get networkpolicy -n monitoring`                                                                    |
 
 ### Security Hardening Checklist
 
-- [ ] Enable ingress with TLS only
+- [ ] Use port-forwarding or another secure method for local access
 - [ ] Configure cert-manager for automatic certificate renewal
 - [ ] Set up authentication
 - [ ] Apply NetworkPolicies

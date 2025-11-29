@@ -20,8 +20,6 @@
 #   --skip-terraform        Skip Terraform deployment (use existing infrastructure)
 #   --skip-openemr          Skip OpenEMR deployment (use existing deployment)
 #   --skip-monitoring       Skip monitoring installation (use existing monitoring)
-#   --enable-ingress        Enable ingress for Grafana (disabled by default)
-#   --grafana-hostname      Hostname for Grafana ingress (e.g., grafana.example.com)
 #   --help                  Show this help message
 #
 # Prerequisites:
@@ -55,8 +53,6 @@ CLUSTER_NAME=""
 SKIP_TERRAFORM=false
 SKIP_OPENEMR=false
 SKIP_MONITORING=false
-ENABLE_INGRESS=false
-GRAFANA_HOSTNAME=""
 NAMESPACE="openemr"
 MONITORING_NAMESPACE="monitoring"
 
@@ -202,12 +198,6 @@ install_monitoring() {
     # Build monitoring install command
     MONITORING_CMD="./install-monitoring.sh install"
     
-    if [ "$ENABLE_INGRESS" = true ]; then
-        MONITORING_CMD="$MONITORING_CMD --enable-ingress"
-        if [ -n "$GRAFANA_HOSTNAME" ]; then
-            MONITORING_CMD="$MONITORING_CMD --grafana-hostname $GRAFANA_HOSTNAME"
-        fi
-    fi
     
     $MONITORING_CMD
     
@@ -282,16 +272,12 @@ print_credentials() {
     echo -e "${CYAN}Monitoring Stack Access Information:${NC}"
     echo ""
     
-    if [ "$ENABLE_INGRESS" = true ] && [ -n "$GRAFANA_HOSTNAME" ]; then
-        echo -e "  ${BLUE}Grafana URL:${NC}    https://$GRAFANA_HOSTNAME"
+    echo -e "  ${BLUE}Grafana Access:${NC} Use port-forward:"
+    if [ -n "$GRAFANA_PORT_FORWARD" ]; then
+        echo -e "  ${BLUE}              ${NC} $GRAFANA_PORT_FORWARD"
+        echo -e "  ${BLUE}              ${NC} Then visit: http://localhost:3000"
     else
-        echo -e "  ${BLUE}Grafana Access:${NC} Use port-forward:"
-        if [ -n "$GRAFANA_PORT_FORWARD" ]; then
-            echo -e "  ${BLUE}              ${NC} $GRAFANA_PORT_FORWARD"
-            echo -e "  ${BLUE}              ${NC} Then visit: http://localhost:3000"
-        else
-            echo -e "  ${YELLOW}              ${NC} kubectl get svc -n $MONITORING_NAMESPACE -l app.kubernetes.io/name=grafana"
-        fi
+        echo -e "  ${YELLOW}              ${NC} kubectl port-forward -n $MONITORING_NAMESPACE svc/prometheus-stack-grafana 3000:80"
     fi
     
     echo ""
@@ -352,8 +338,6 @@ OPTIONS:
     --skip-terraform        Skip Terraform deployment (use existing infrastructure)
     --skip-openemr          Skip OpenEMR deployment (use existing deployment)
     --skip-monitoring       Skip monitoring installation (use existing monitoring)
-    --enable-ingress        Enable ingress for Grafana (disabled by default)
-    --grafana-hostname      Hostname for Grafana ingress (e.g., grafana.example.com)
     --help                  Show this help message
 
 ENVIRONMENT VARIABLES:
@@ -367,8 +351,8 @@ EXAMPLES:
     # Use existing infrastructure
     $0 --skip-terraform --skip-openemr
 
-    # Enable Grafana ingress
-    $0 --enable-ingress --grafana-hostname grafana.example.com
+    # Access Grafana via port-forwarding
+    kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
 
 PREREQUISITES:
     - AWS CLI configured with appropriate permissions
@@ -408,14 +392,6 @@ main() {
                 SKIP_MONITORING=true
                 shift
                 ;;
-            --enable-ingress)
-                ENABLE_INGRESS=true
-                shift
-                ;;
-            --grafana-hostname)
-                GRAFANA_HOSTNAME="$2"
-                shift 2
-                ;;
             --help)
                 show_help
                 exit 0
@@ -436,10 +412,6 @@ main() {
     log_info "  Skip Terraform: $SKIP_TERRAFORM"
     log_info "  Skip OpenEMR: $SKIP_OPENEMR"
     log_info "  Skip Monitoring: $SKIP_MONITORING"
-    log_info "  Enable Ingress: $ENABLE_INGRESS"
-    if [ -n "$GRAFANA_HOSTNAME" ]; then
-        log_info "  Grafana Hostname: $GRAFANA_HOSTNAME"
-    fi
     
     # Check prerequisites
     check_prerequisites

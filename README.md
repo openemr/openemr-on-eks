@@ -657,11 +657,8 @@ export SLACK_WEBHOOK_URL="https://hooks.slack.com/services/..."
 export SLACK_CHANNEL="#openemr-alerts"
 ./install-monitoring.sh
 
-# Optional: Install with ingress and basic auth
-export ENABLE_INGRESS="1"
-export GRAFANA_HOSTNAME="grafana.yourdomain.com"
-export ENABLE_BASIC_AUTH="1"
-./install-monitoring.sh
+# Access monitoring stack via port-forwarding:
+# kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
 
 # If not using jumpbox, disable access again after monitoring installation
 cd ../scripts
@@ -687,7 +684,7 @@ cd ../scripts
 - 💾 **Optimized Storage**: GP3 with 3000 IOPS for time-series data performance
 - 🔒 **Enhanced Security**: RBAC, network policies, security contexts, encrypted storage, WAFv2 protection
 - 🚀 **Parallel Installation**: Components install simultaneously for faster deployment
-- 🌐 **Optional Ingress**: NGINX ingress with TLS and basic authentication support
+- 🌐 **Port-Forwarding Access**: Secure local access via kubectl port-forward
 - 📋 **Audit Logging**: Audit trails for all monitoring operations
 - ⚙️ **Intelligent Autoscaling**: HPA for all components integrated with EKS Auto Mode
 

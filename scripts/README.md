@@ -521,7 +521,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Jaeger)
   - Extracts and displays OpenEMR and Grafana login credentials and URLs
   - Supports skipping any deployment step for faster iteration
-  - Optional ingress configuration for Grafana
+  - Port-forwarding access for monitoring stack
   - Comprehensive error handling and progress tracking
 - **Usage**:
   ```bash
@@ -531,8 +531,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   # Use existing infrastructure
   ./scripts/quick-deploy.sh --skip-terraform --skip-openemr
 
-  # Enable Grafana ingress
-  ./scripts/quick-deploy.sh --enable-ingress --grafana-hostname grafana.example.com
+  # Access Grafana via port-forwarding
+  kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
 
   # Custom cluster name or region
   ./scripts/quick-deploy.sh --cluster-name my-cluster --aws-region us-east-1
@@ -543,15 +543,13 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - `--skip-terraform` - Skip Terraform deployment (use existing infrastructure)
   - `--skip-openemr` - Skip OpenEMR deployment (use existing deployment)
   - `--skip-monitoring` - Skip monitoring installation (use existing monitoring)
-  - `--enable-ingress` - Enable ingress for Grafana (disabled by default)
-  - `--grafana-hostname HOSTNAME` - Hostname for Grafana ingress (e.g., grafana.example.com)
 - **Output**: Prints OpenEMR and Grafana login URLs and credentials at completion
 - **Maintenance Notes**:
   - Script follows the same patterns as other deployment scripts
   - Uses the existing monitoring installation script (`monitoring/install-monitoring.sh`)
   - Automatically configures kubectl and retrieves cluster information from Terraform
   - Validates prerequisites before starting deployment
-  - Provides port-forward instructions if ingress is not enabled
+  - Provides port-forward instructions for accessing monitoring stack
 
 #### `test-config.yaml`
 
