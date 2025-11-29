@@ -19,7 +19,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Grafana Login Screenshot (`quick-deploy-grafana-login.png`)](#grafana-login-screenshot-quick-deploy-grafana-loginpng)
   - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
   - [OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)](#openemr-grafana-dashboard-screenshot-quick-deploy-openemr-grafanapng)
-  - [OpenEMR Grafana Datasources (`quick-deploy-openemer-grafana-datasources.png`)](#openemr-grafana-datasources-quick-deploy-openemer-grafana-datasourcespng)
+  - [OpenEMR Grafana Datasources (`quick-deploy-openemr-grafana-datasources.png`)](#openemr-grafana-datasources-quick-deploy-openemr-grafana-datasourcespng)
   - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
   - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
   - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
@@ -77,7 +77,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
 - **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
 - **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
-- **`quick-deploy-openemer-grafana-datasources.png`** - Screenshot showing 5 integrated datasources for dashboarding and alerting
+- **`quick-deploy-openemr-grafana-datasources.png`** - Screenshot showing 5 integrated datasources for dashboarding and alerting
 - **`quick-deploy-openemr-admin-landing-page.png`** - Screenshot showing the OpenEMR admin dashboard landing page
 - **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
 - **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
@@ -148,7 +148,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Documentation and README files to show the monitoring capabilities
 - **Context**: Illustrates the pre-configured Grafana dashboard that monitors OpenEMR deployment metrics and health
 
-### **OpenEMR Grafana Datasources (`quick-deploy-openemer-grafana-datasources.png`)**
+### **OpenEMR Grafana Datasources (`quick-deploy-openemr-grafana-datasources.png`)**
 
 - **Purpose**: Visual demonstration of the 5 integrated datasources available in the monitoring stack
 - **Format**: PNG screenshot

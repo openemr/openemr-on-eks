@@ -82,7 +82,7 @@
 <details>
 <summary><strong>5 Integrated Datasources for Dashboarding/Alerting</strong></summary>
 
-<img src="./images/quick-deploy-openemer-grafana-datasources.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
+<img src="./images/quick-deploy-openemr-grafana-datasources.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
 
 </details>
 
