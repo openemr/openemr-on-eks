@@ -452,7 +452,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
           # Install test dependencies (versions pinned to match versions.yaml)
-          pip install pytest==8.3.4 pytest-cov==6.0.0 flake8==7.3.0 black==25.11.0 mypy==1.13.0
+          pip install pytest==9.0.1 pytest-cov==7.0.0 flake8==7.3.0 black==25.11.0 mypy==1.19.0
 
       # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
