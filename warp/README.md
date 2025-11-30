@@ -17,9 +17,13 @@
 
 <div align="center">
 
-<img src="images/warp-imports-in-openemr.png" alt="Warp imports displayed in OpenEMR" width="600">
+<img src="../images/deploy-training-setup-warp-data-upload.png" alt="Warp uploading 100 patients in under 100 minutes" width="600">
 
-*Warp imports successfully displayed in OpenEMR patient list*
+*Warp importing 100 patients to OpenEMR in <1 min.*
+
+<img src="../images/deploy-training-setup-patient-finder.png" alt="Warp uploading 100 patients in under 100 minutes" width="600">
+
+*Patients uploaded by Warp displayed in OpenEMR's Patient Finder*
 
 </div>
 
