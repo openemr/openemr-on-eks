@@ -2,9 +2,11 @@
 
 <img src="logo/warp_logo.png" alt="Warp Logo" width="300">
 
-# Warp - OpenEMR Data Upload Accelerator
+# 🌀 ⚡ Warp ⚡ 🌀
 
-**High-performance direct database import for OpenEMR on EKS - Database access required**
+## OpenEMR Data Upload Accelerator
+
+**High-performance direct database and file system import for OpenEMR on EKS**
 
 [![CI/CD Tests](https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
 [![Version](https://img.shields.io/badge/version-0.1.2-blue)](../warp/setup.py#L12)
