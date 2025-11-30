@@ -876,8 +876,6 @@ openemr-on-eks/
 │   ├── k8s-job-benchmark.yaml             # Kubernetes job manifest for performance benchmarking
 │   ├── logo/                              # Warp project logo and branding
 │   │   └── warp_logo.png                  # Warp project logo
-│   ├── images/                            # Warp visual assets
-│   │   └── warp-imports-in-openemr.png    # Screenshot showing Warp imports in OpenEMR
 │   ├── benchmark-data/                    # Benchmark dataset verification tools
 │   │   ├── README.md                      # Documentation for downloading and verifying dataset counts
 │   │   └── verify-counts.sh               # Script to verify OMOP dataset record counts
