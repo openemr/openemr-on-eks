@@ -65,8 +65,8 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 79.1.0)
-#   CHART_LOKI_VERSION         Loki chart version (default: 6.45.2)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 79.9.0)
+#   CHART_LOKI_VERSION         Loki chart version (default: 6.46.0)
 #   CHART_JAEGER_VERSION       Jaeger chart version (default: 3.4.1)
 #   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
 #
@@ -155,8 +155,8 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-79.1.0}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.45.2}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-79.9.0}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.46.0}"
 readonly CHART_JAEGER_VERSION="${CHART_JAEGER_VERSION:-3.4.1}"
 
 # Timeouts / retries

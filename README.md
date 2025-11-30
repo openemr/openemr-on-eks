@@ -253,7 +253,7 @@ graph TB
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.13.4)**
+#### **Terraform Installation (Required: v1.14.0)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -261,17 +261,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.13.4/
+# Visit: https://releases.hashicorp.com/terraform/1.14.0/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.13.4
-tfenv use 1.13.4
+tfenv install 1.14.0
+tfenv use 1.14.0
 
 # Verify installation
-terraform --version  # Should show v1.13.4
+terraform --version  # Should show v1.14.0
 ```
 
 #### **Other Required Tools**
@@ -366,11 +366,11 @@ brew install awscli helm jq kubectl terraform
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.13.4/
+# Download from: https://releases.hashicorp.com/terraform/1.14.0/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.13.4
-# tfenv use 1.13.4
+# tfenv install 1.14.0
+# tfenv use 1.14.0
 
 # Configure AWS credentials
 aws configure
@@ -491,9 +491,9 @@ Next steps for first-time deployment:
 • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v79.1.0 (metrics & alerting)
+     - Prometheus v79.9.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.45.2 (log aggregation with S3 storage)
+     - Loki v6.46.0 (log aggregation with S3 storage)
      - Jaeger v3.4.1 (distributed tracing)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
@@ -741,9 +741,9 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v79.1.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v79.9.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
-- 📝 **Loki**: v6.45.2 single-binary (log aggregation with S3 storage and 720h retention)
+- 📝 **Loki**: v6.46.0 single-binary (log aggregation with S3 storage and 720h retention)
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access

@@ -266,7 +266,7 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 
 - **Python**: 3.14.0
 - **Terraform**: 1.13.3
-- **Kubectl**: v1.34.1
+- **Kubectl**: v1.34.2
 - **Operating System**: Ubuntu 24.04
 
 #### **Permissions**

@@ -27,8 +27,8 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="79.1.0"      # kube-prometheus-stack
-CHART_LOKI_VERSION="6.45.2"     # Loki stack
+CHART_KPS_VERSION="79.9.0"      # kube-prometheus-stack
+CHART_LOKI_VERSION="6.46.0"     # Loki stack
 CHART_JAEGER_VERSION="3.4.1"    # Jaeger
 
 # =============================================================================

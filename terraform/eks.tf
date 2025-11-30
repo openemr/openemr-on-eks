@@ -9,7 +9,7 @@
 module "eks" {
   # Source module for EKS cluster creation with Auto Mode support
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.8.0" # Latest stable version with Auto Mode support
+  version = "21.10.1" # Latest stable version with Auto Mode support
 
   # Cluster identification and version configuration
   name               = var.cluster_name       # EKS cluster name
@@ -123,7 +123,7 @@ resource "time_sleep" "wait_for_compute" {
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "metrics-server"    # Essential for autoscaling
-  addon_version               = "v0.8.0-eksbuild.3" # Latest stable version for Kubernetes 1.34
+  addon_version               = "v0.8.0-eksbuild.5" # Latest stable version for Kubernetes 1.34
   resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
 
@@ -147,7 +147,7 @@ resource "aws_eks_addon" "metrics_server" {
 resource "aws_eks_addon" "efs_csi_driver" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "aws-efs-csi-driver" # CSI driver for EFS integration
-  addon_version               = "v2.1.13-eksbuild.1" # Latest stable version for Kubernetes 1.34
+  addon_version               = "v2.1.15-eksbuild.1" # Latest stable version for Kubernetes 1.34
   resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
 
@@ -184,7 +184,7 @@ resource "aws_eks_addon" "efs_csi_driver" {
 module "aws_efs_csi_pod_identity" {
   # Source module for Pod Identity configuration
   source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "2.2.1"
+  version = "2.5.0"
 
   name = "aws-efs-csi" # Name for the Pod Identity configuration
 

@@ -57,11 +57,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
 
       # Step 2: Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v6.0.0
+        uses: actions/setup-python@v6.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -98,11 +98,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
 
       # Step 2: Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v6.0.0
+        uses: actions/setup-python@v6.1.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -138,7 +138,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
 
       # Step 2: Run Trivy vulnerability scanner (Table format)
       - name: Run Trivy vulnerability scanner (Table format)
@@ -201,7 +201,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6.0.0
 
       # Step 2: Download test artifacts
       - name: Download test artifacts

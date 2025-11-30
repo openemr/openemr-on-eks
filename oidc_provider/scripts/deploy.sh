@@ -18,7 +18,7 @@
 #   - Outputs role ARN for use in GitHub repository secrets
 #
 # Prerequisites:
-#   - Terraform 1.13.4+ installed and in PATH
+#   - Terraform 1.14.0+ installed and in PATH
 #   - AWS CLI 2.15+ installed and configured
 #   - AWS credentials with permissions to create OIDC providers and IAM roles
 #   - Proper IAM permissions (see oidc_provider/README.md)
@@ -106,7 +106,7 @@ check_dependencies() {
     # Check Terraform
     if ! command -v terraform >/dev/null 2>&1; then
         log_error "Terraform is required but not installed."
-        log_error "Install Terraform 1.13.4 (see main README for instructions)"
+        log_error "Install Terraform 1.14.0 (see main README for instructions)"
         ((errors++))
     else
         local terraform_version
@@ -116,7 +116,7 @@ check_dependencies() {
         fi
         log_info "Terraform version: $terraform_version"
         
-        # Check if version is 1.13.4 or higher
+        # Check if version is 1.14.0 or higher
         if [ -n "$terraform_version" ]; then
             log_success "Terraform found: $terraform_version"
         else

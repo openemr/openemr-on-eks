@@ -932,9 +932,9 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v79.1.0 (metrics & alerting)
+     - Prometheus v79.9.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.45.2 (log aggregation with S3 storage)
+     - Loki v6.46.0 (log aggregation with S3 storage)
      - Jaeger v3.4.1 (distributed tracing)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
