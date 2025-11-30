@@ -298,7 +298,7 @@ python_packages:
     min_version: "25.0.0"
 
   mypy:
-    current: "1.13.0"
+    current: "1.19.0"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
