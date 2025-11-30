@@ -1477,7 +1477,7 @@ restore_rds_cluster_from_snapshot() {
     # Get configuration from Terraform
     local db_subnet_group_name vpc_security_group_ids engine_version
     db_subnet_group_name=$(terraform_with_retry output -raw aurora_db_subnet_group_name 2>/dev/null || echo "")
-    engine_version=$(terraform_with_retry output -raw aurora_engine_version 2>/dev/null || echo "8.0.mysql_aurora.3.10.1")
+    engine_version=$(terraform_with_retry output -raw aurora_engine_version 2>/dev/null || echo "8.0.mysql_aurora.3.11.0")
     
     # Log the engine version being used
     echo -e "${BLUE}   Using engine version: $engine_version${NC}"
