@@ -7,11 +7,11 @@
 **High-performance direct database import for OpenEMR on EKS - Database access required**
 
 [![CI/CD Tests](https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
-[![Version](https://img.shields.io/badge/version-0.1.1-blue)](../warp/setup.py#L12)
+[![Version](https://img.shields.io/badge/version-0.1.2-blue)](../warp/setup.py#L12)
 
 </div>
 
-> **⚠️ Beta Status**: Warp is currently in **beta** (version 0.1.1) and should **not be considered production-ready**. While we welcome development contributions and feedback, please use this tool with caution in non-production environments. The project is actively being developed and may undergo significant changes. **Warp will be considered production-ready upon the release of version 1.0.0.**
+> **⚠️ Beta Status**: Warp is currently in **beta** (version 0.1.2) and should **not be considered production-ready**. While we welcome development contributions and feedback, please use this tool with caution in non-production environments. The project is actively being developed and may undergo significant changes. **Warp will be considered production-ready upon the release of version 1.0.0.**
 
 <div align="center">
 

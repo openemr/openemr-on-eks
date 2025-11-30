@@ -250,36 +250,36 @@ semver_packages:
 # Python Package Dependencies (Warp Project)
 python_packages:
   pymysql:
-    current: "1.1.0"
+    current: "1.1.2"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "Direct database access library for Warp - ONLY METHOD for uploading data (maximum speed and reliability)"
-    min_version: "1.1.0"
+    min_version: "1.1.2"
 
   boto3:
-    current: "1.28.0"
+    current: "1.41.5"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS SDK for Python - for S3 data access in Warp (already used in project)"
-    min_version: "1.28.0"
+    min_version: "1.41.5"
 
   pytest:
-    current: "8.3.4"
+    current: "9.0.1"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "Testing framework for Warp project"
-    min_version: "8.0.0"
+    min_version: "9.0.1"
 
   pytest_cov:
-    current: "6.0.0"
+    current: "7.0.0"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "Pytest coverage plugin for Warp test suite"
-    min_version: "6.0.0"
+    min_version: "7.0.0"
 
   flake8:
     current: "7.3.0"
