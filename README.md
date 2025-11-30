@@ -102,7 +102,7 @@
 </details>
 
 <details>
-<summary><strong>Warp Uploads 100 Synthetic Patients in <1 minute</strong></summary>
+<summary><strong>Warp Uploading 100 Synthetic Patients in <1 minute</strong></summary>
 
 <img src="./images/deploy-training-setup-warp-data-upload.png" alt="Warp uploading 100 patients in <1 min." width="500">
 
