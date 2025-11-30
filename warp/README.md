@@ -2,7 +2,7 @@
 
 <img src="logo/warp_logo.png" alt="Warp Logo" width="300">
 
-# 🌀 ⚡ Warp ⚡ 🌀
+# ⚡ Warp ⚡
 
 ## OpenEMR Data Upload Accelerator
 
