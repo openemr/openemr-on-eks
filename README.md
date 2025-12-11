@@ -585,8 +585,7 @@ Next steps for first-time deployment:
 
 📊 Monitoring Setup:
    • CloudWatch logging with Fluent Bit sidecar (included in OpenEMR deployment)
-• Basic deployment: CloudWatch logs only
-• **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
+   • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
      - Prometheus v79.11.0 (metrics & alerting)
@@ -843,6 +842,8 @@ cd ../scripts
 
 - 📊 **Prometheus**: kube-prometheus-stack v79.11.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
+  - **AlertManager Integration**: Automatically receives alerts from AlertManager
+  - **On-Call Management**: Manages on-call schedules, escalations, and incident response
 - 📝 **Loki**: v6.46.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
   - **Distributed Architecture**: Uses SimpleScalable deployment mode with separate read, write, and backend components for better scalability and high availability
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
@@ -859,13 +860,11 @@ cd ../scripts
   - **Zero-Code Instrumentation**: Automatically instruments OpenEMR pods without code changes
   - **Traces**: Exports traces to Tempo for distributed tracing
   - **Integration**: Exposes metrics in Prometheus format (scraped by Prometheus)
-  - **AlertManager Integration**: Automatically receives alerts from AlertManager
-  - **On-Call Management**: Manages on-call schedules, escalations, and incident response
-  - **Unified Alerting**: Integrates with Grafana unified alerting for comprehensive incident management
 - 🚨 **AlertManager**: Slack integration support with customizable notifications and S3 state storage
+  - **Unified Alerting**: Integrates with Grafana unified alerting for comprehensive incident management
 - 📊 **Grafana Datasources**: **7 pre-configured datasources** - Prometheus, Mimir, Loki, Tempo, CloudWatch, X-Ray, and AlertManager integration
 - 🎯 **OpenEMR Integration**: Automatically and continually collects a broad set of metrics from the OpenEMR namespace where your application is running so you can precisely monitor the health and performance of your OpenEMR deployment in real-time. (see [monitoring documentation](./monitoring/README.md) guidance for creating custom dashboards)
-- 💾 **Optimized Storage**: GP3 with 3000 IOPS for time-series data performance
+- 💾 **Optimized Storage**: GP3 with 3000 IOPS for time-series data performance and in-region S3 access
 - 🔒 **Enhanced Security**: RBAC, network policies, security contexts, encrypted storage, WAFv2 protection
 - 🚀 **Parallel Installation**: Components install simultaneously for faster deployment
 - 🌐 **Port-Forwarding Access**: Secure local access via kubectl port-forward
