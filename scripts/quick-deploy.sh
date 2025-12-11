@@ -8,7 +8,7 @@
 #   Quick deployment script that:
 #   1. Stands up OpenEMR on EKS terraform infrastructure
 #   2. Deploys OpenEMR on EKS
-#   3. Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Jaeger)
+#   3. Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Tempo, Mimir, OTeBPF, AlertManager)
 #   4. Prints out login addresses and credentials
 #
 # Usage:
@@ -32,6 +32,10 @@
 # =============================================================================
 
 set -euo pipefail
+
+# Disable AWS CLI pager to prevent interactive editors from opening
+export AWS_PAGER=""
+export AWS_CLI_AUTO_PROMPT=off
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -192,7 +196,14 @@ install_monitoring() {
     cd "$PROJECT_ROOT/monitoring" || exit 1
     
     log_step "Installing monitoring stack..."
-    log_info "This includes Prometheus, Grafana, Loki, and Jaeger..."
+    log_info "This includes:"
+    log_info "  - Prometheus (metrics collection and alerting)"
+    log_info "  - Grafana (dashboards and visualization)"
+    log_info "  - Loki (log aggregation, S3-backed)"
+    log_info "  - Tempo (distributed tracing, S3-backed, distributed mode)"
+    log_info "  - Mimir (long-term metrics storage, S3-backed)"
+    log_info "  - OTeBPF (eBPF auto-instrumentation for traces)"
+    log_info "  - AlertManager (alert routing and notifications)"
     log_info "This may take 5-10 minutes..."
     
     # Build monitoring install command
@@ -296,7 +307,9 @@ print_credentials() {
     echo -e "  ${BLUE}Prometheus:${NC}      Metrics collection and alerting"
     echo -e "  ${BLUE}Grafana:${NC}         Dashboards and visualization"
     echo -e "  ${BLUE}Loki:${NC}            Log aggregation (S3-backed)"
-    echo -e "  ${BLUE}Jaeger:${NC}          Distributed tracing"
+    echo -e "  ${BLUE}Tempo:${NC}           Distributed tracing (S3-backed, distributed mode)"
+    echo -e "  ${BLUE}Mimir:${NC}           Long-term metrics storage (S3-backed)"
+    echo -e "  ${BLUE}OTeBPF:${NC}          eBPF auto-instrumentation for traces"
     echo -e "  ${BLUE}AlertManager:${NC}    Alert routing and notifications"
     echo ""
     echo -e "${CYAN}Deployment Summary:${NC}"
@@ -311,8 +324,10 @@ print_credentials() {
     echo "  1. Access OpenEMR at the URL above"
     echo "  2. Access Grafana using the method above"
     echo "  3. Explore pre-configured dashboards in Grafana"
-    echo "  4. Check Prometheus targets and metrics"
-    echo "  5. Review logs in Loki"
+    echo "  4. Check Prometheus targets and metrics in Grafana"
+    echo "  5. Review logs in Loki (datasource configured in Grafana)"
+    echo "  6. View traces in Tempo (datasource configured in Grafana)"
+    echo "  7. Explore auto-instrumented traces from OTeBPF (filter by service: openemr)"
     echo ""
     echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
@@ -329,7 +344,7 @@ DESCRIPTION:
     Quick deployment script that:
     1. Stands up OpenEMR on EKS terraform infrastructure
     2. Deploys OpenEMR on EKS
-    3. Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Jaeger)
+    3. Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Tempo, Mimir, OTeBPF, AlertManager)
     4. Prints out login addresses and credentials
 
 OPTIONS:

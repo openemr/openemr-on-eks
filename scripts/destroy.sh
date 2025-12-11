@@ -75,6 +75,10 @@
 
 set -euo pipefail
 
+# Disable AWS CLI pager to prevent interactive editors from opening
+export AWS_PAGER=""
+export AWS_CLI_AUTO_PROMPT=off
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================
@@ -592,6 +596,43 @@ empty_s3_bucket() {
     rm -f "$temp_file"
 }
 
+cleanup_cloudtrail() {
+    log_step "Cleaning up CloudTrail (required before S3 bucket deletion)..."
+    
+    # CloudTrail must be deleted before its S3 bucket can be deleted
+    # CloudTrail buckets cannot be deleted while CloudTrail is still logging to them
+    
+    local cloudtrail_name="${CLUSTER_NAME}-cloudtrail"
+    
+    # Check if CloudTrail exists
+    if aws cloudtrail get-trail --name "$cloudtrail_name" --region "$AWS_REGION" --no-cli-pager >/dev/null 2>&1; then
+        log_info "Found CloudTrail: $cloudtrail_name"
+        
+        # Stop logging first (required before deletion)
+        log_info "Stopping CloudTrail logging..."
+        safe_aws "stop CloudTrail logging: $cloudtrail_name" \
+            aws cloudtrail stop-logging \
+                --name "$cloudtrail_name" \
+                --region "$AWS_REGION" \
+                --no-cli-pager
+        
+        # Wait a moment for the stop operation to propagate
+        sleep 5
+        
+        # Delete the CloudTrail
+        log_info "Deleting CloudTrail: $cloudtrail_name"
+        safe_aws "delete CloudTrail: $cloudtrail_name" \
+            aws cloudtrail delete-trail \
+                --name "$cloudtrail_name" \
+                --region "$AWS_REGION" \
+                --no-cli-pager
+        
+        log_success "CloudTrail deleted successfully"
+    else
+        log_info "No CloudTrail found with name: $cloudtrail_name"
+    fi
+}
+
 cleanup_s3_buckets() {
     log_step "Cleaning up Terraform-managed S3 buckets..."
     
@@ -663,6 +704,53 @@ cleanup_s3_buckets() {
             terraform_buckets+=("$loki_bucket")
             log_info "Found Loki storage bucket from Terraform output: $loki_bucket"
         fi
+        
+        # Get Tempo storage bucket
+        local tempo_bucket
+        tempo_bucket=$(terraform output -raw tempo_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$tempo_bucket" ] && [ "$tempo_bucket" != "null" ] && [ "$tempo_bucket" != "" ]; then
+            terraform_buckets+=("$tempo_bucket")
+            log_info "Found Tempo storage bucket from Terraform output: $tempo_bucket"
+        fi
+        
+        # Get Mimir blocks storage bucket
+        local mimir_blocks_bucket
+        mimir_blocks_bucket=$(terraform output -raw mimir_blocks_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || \
+            terraform output -raw mimir_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$mimir_blocks_bucket" ] && [ "$mimir_blocks_bucket" != "null" ] && [ "$mimir_blocks_bucket" != "" ]; then
+            terraform_buckets+=("$mimir_blocks_bucket")
+            log_info "Found Mimir blocks storage bucket from Terraform output: $mimir_blocks_bucket"
+        fi
+        
+        # Get Mimir ruler storage bucket
+        local mimir_ruler_bucket
+        mimir_ruler_bucket=$(terraform output -raw mimir_ruler_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$mimir_ruler_bucket" ] && [ "$mimir_ruler_bucket" != "null" ] && [ "$mimir_ruler_bucket" != "" ]; then
+            terraform_buckets+=("$mimir_ruler_bucket")
+            log_info "Found Mimir ruler storage bucket from Terraform output: $mimir_ruler_bucket"
+        fi
+        
+        # Get AlertManager storage bucket
+        local alertmanager_bucket
+        alertmanager_bucket=$(terraform output -raw alertmanager_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$alertmanager_bucket" ] && [ "$alertmanager_bucket" != "null" ] && [ "$alertmanager_bucket" != "" ]; then
+            terraform_buckets+=("$alertmanager_bucket")
+            log_info "Found AlertManager storage bucket from Terraform output: $alertmanager_bucket"
+        fi
+        
+        # Get CloudTrail logs bucket
+        local cloudtrail_bucket
+        cloudtrail_bucket=$(terraform output -raw cloudtrail_s3_bucket_name 2>/dev/null | \
+            grep -v "Warning:" | grep -v "No outputs found" | grep -v "^╷" | grep -v "^│" | grep -v "^╵" | xargs || echo "")
+        if [ -n "$cloudtrail_bucket" ] && [ "$cloudtrail_bucket" != "null" ] && [ "$cloudtrail_bucket" != "" ]; then
+            terraform_buckets+=("$cloudtrail_bucket")
+            log_info "Found CloudTrail logs bucket from Terraform output: $cloudtrail_bucket"
+        fi
     fi
     
     cd - >/dev/null
@@ -700,7 +788,7 @@ cleanup_s3_buckets() {
         done
         
         log_success "Terraform-managed S3 buckets cleaned up (backup buckets preserved)"
-        log_info "Cleaned buckets include: ALB logs, WAF logs, and Loki storage buckets"
+        log_info "Cleaned buckets include: ALB logs, WAF logs, Loki, Tempo, Mimir (blocks and ruler), and AlertManager storage buckets"
     else
         log_info "No Terraform-managed S3 buckets found in Terraform outputs"
         log_info "This is expected if Terraform has not been applied yet or state is unavailable"
@@ -943,58 +1031,257 @@ cleanup_aws_backup_resources() {
         log_info "Found $recovery_point_count recovery point(s) to delete"
         
         # First pass: Identify and disassociate composite (parent) recovery points
+        # Note: Some composite recovery points (like EKS) may not support disassociation
+        # or may need to be deleted directly. We'll try disassociation but continue if it fails.
         log_info "Checking for composite recovery points that need disassociation..."
         local composite_arns
         composite_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.IsParent == true or .CompositeMemberIdentifier != null) | .RecoveryPointArn' 2>/dev/null || echo "")
         
         if [ -n "$composite_arns" ]; then
-            log_info "Found composite recovery points - disassociating first..."
+            log_info "Found composite recovery points - attempting disassociation..."
             for recovery_point_arn in $composite_arns; do
                 if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
-                    log_info "Disassociating composite recovery point: $recovery_point_arn"
-                    aws backup disassociate-recovery-point \
-                        --backup-vault-name "$backup_vault_name" \
-                        --recovery-point-arn "$recovery_point_arn" \
-                        --region "$AWS_REGION" \
-                        --no-cli-pager 2>/dev/null || log_warning "Could not disassociate $recovery_point_arn (may not be composite)"
+                    # Get resource type to determine if disassociation is supported
+                    local resource_type
+                    resource_type=$(echo "$recovery_points_json" | jq -r ".RecoveryPoints[] | select(.RecoveryPointArn == \"$recovery_point_arn\") | .ResourceType" 2>/dev/null || echo "")
+                    
+                    log_info "Attempting to disassociate composite recovery point: $recovery_point_arn (ResourceType: $resource_type)"
+                    
+                    # Try disassociation, but don't fail if it doesn't work
+                    # Some resource types (like EKS composite) may not support disassociation
+                    # For EBS snapshots, disassociation often hangs - skip it and delete directly
+                    if echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                        log_info "EBS snapshot detected - skipping disassociation (often hangs), will delete directly: $recovery_point_arn"
+                        local disassociate_output="Skipped disassociation for EBS snapshot (will delete directly)"
+                        local disassociate_exit_code=1
+                    else
+                        # Add timeout to prevent hanging (30 seconds should be enough)
+                        local disassociate_output
+                        local disassociate_exit_code=0
+                        if command -v timeout >/dev/null 2>&1; then
+                            disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \
+                                --backup-vault-name "$backup_vault_name" \
+                                --recovery-point-arn "$recovery_point_arn" \
+                                --region "$AWS_REGION" \
+                                --no-cli-pager 2>&1)
+                            disassociate_exit_code=$?
+                            # Timeout returns 124 on timeout
+                            if [ $disassociate_exit_code -eq 124 ]; then
+                                disassociate_output="Command timed out after 30 seconds"
+                            fi
+                        else
+                            # Fallback if timeout command is not available - use background process with kill
+                            local pid_file="/tmp/disassociate_$$.pid"
+                            (aws backup disassociate-recovery-point \
+                                --backup-vault-name "$backup_vault_name" \
+                                --recovery-point-arn "$recovery_point_arn" \
+                                --region "$AWS_REGION" \
+                                --no-cli-pager > "$pid_file.out" 2>&1) &
+                            local bg_pid=$!
+                            echo $bg_pid > "$pid_file"
+                            
+                            # Wait up to 30 seconds
+                            local waited=0
+                            while [ $waited -lt 30 ]; do
+                                if ! kill -0 $bg_pid 2>/dev/null; then
+                                    # Process finished
+                                    break
+                                fi
+                                sleep 1
+                                waited=$((waited + 1))
+                            done
+                            
+                            if kill -0 $bg_pid 2>/dev/null; then
+                                # Still running, kill it
+                                kill $bg_pid 2>/dev/null
+                                disassociate_output="Command timed out after 30 seconds"
+                                disassociate_exit_code=124
+                            else
+                                # Process finished, get output
+                                disassociate_output=$(cat "$pid_file.out" 2>/dev/null || echo "")
+                                # Temporarily disable set -e to capture exit code without script exiting
+                                set +e
+                                wait $bg_pid
+                                disassociate_exit_code=$?
+                                set -e
+                            fi
+                            rm -f "$pid_file" "$pid_file.out" 2>/dev/null
+                        fi
+                    fi
+                    
+                    if [ $disassociate_exit_code -eq 0 ]; then
+                        log_success "Successfully disassociated composite recovery point: $recovery_point_arn"
+                    else
+                        # Check if error is about invalid parameter (some composites don't support disassociation)
+                        if echo "$disassociate_output" | grep -q "InvalidParameterValueException\|InvalidParameterException"; then
+                            log_info "Disassociation not supported for this recovery point type - will attempt direct deletion: $recovery_point_arn"
+                        else
+                            log_warning "Could not disassociate $recovery_point_arn: $disassociate_output"
+                            log_info "Will attempt direct deletion instead"
+                        fi
+                    fi
                 fi
             done
-            # Wait for disassociation to propagate
+            # Wait for disassociation to propagate (if any succeeded)
             log_info "Waiting 10 seconds for disassociation to propagate..."
             sleep 10
         fi
         
-        # Second pass: Delete all recovery points (children first, then parents)
-        # Get child recovery points first (those with ParentRecoveryPointArn)
-        local child_arns
-        child_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.ParentRecoveryPointArn != null) | .RecoveryPointArn' 2>/dev/null || echo "")
+        # Second pass: Delete all NON-COMPOSITE recovery points first
+        # For composite recovery points, we must delete all nested/non-composite recovery points
+        # before we can delete the composite parent
+        log_info "Deleting non-composite recovery points first (required before deleting composite parent)..."
         
-        if [ -n "$child_arns" ]; then
-            log_info "Deleting child recovery points first..."
-            for recovery_point_arn in $child_arns; do
+        # Get all recovery points that are NOT composite parents
+        local non_composite_arns
+        non_composite_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.IsParent != true) | .RecoveryPointArn' 2>/dev/null || echo "")
+        
+        if [ -n "$non_composite_arns" ]; then
+            local failed_deletions=()
+            for recovery_point_arn in $non_composite_arns; do
                 if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
-                    log_info "Deleting child recovery point: $recovery_point_arn"
-                    aws backup delete-recovery-point \
+                    log_info "Deleting non-composite recovery point: $recovery_point_arn"
+                    
+                    # Check if this is an EBS snapshot (needs special handling)
+                    if echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                        local snapshot_id
+                        snapshot_id=$(echo "$recovery_point_arn" | sed 's/.*snapshot\/\(snap-[^ ]*\).*/\1/')
+                        log_info "Detected EBS snapshot: $snapshot_id"
+                    fi
+                    
+                    local delete_output
+                    if delete_output=$(aws backup delete-recovery-point \
                         --backup-vault-name "$backup_vault_name" \
                         --recovery-point-arn "$recovery_point_arn" \
                         --region "$AWS_REGION" \
-                        --no-cli-pager 2>/dev/null || log_warning "Could not delete child $recovery_point_arn"
+                        --no-cli-pager 2>&1); then
+                        log_success "Successfully deleted: $recovery_point_arn"
+                        # Small delay between successful deletions
+                        sleep 2
+                    else
+                        # Check if error is about composite dependency
+                        if echo "$delete_output" | grep -q "cannot be deleted until all other nested recovery points"; then
+                            log_warning "Recovery point is nested under composite - will retry after other nested points: $recovery_point_arn"
+                            failed_deletions+=("$recovery_point_arn")
+                        elif echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                            # For EBS snapshots, try deleting via EC2 API as fallback
+                            local snapshot_id
+                            snapshot_id=$(echo "$recovery_point_arn" | sed 's/.*snapshot\/\(snap-[^ ]*\).*/\1/')
+                            log_info "Backup API deletion failed, trying EC2 API for snapshot: $snapshot_id"
+                            if aws ec2 delete-snapshot --snapshot-id "$snapshot_id" --region "$AWS_REGION" 2>/dev/null; then
+                                log_success "Deleted EBS snapshot via EC2 API: $snapshot_id"
+                            else
+                                log_warning "Could not delete EBS snapshot: $delete_output"
+                                failed_deletions+=("$recovery_point_arn")
+                            fi
+                        else
+                            log_warning "Could not delete $recovery_point_arn: $delete_output"
+                            failed_deletions+=("$recovery_point_arn")
+                        fi
+                    fi
                 fi
             done
+            
+            # Retry failed deletions (they might have been waiting for other nested points)
+            if [ ${#failed_deletions[@]} -gt 0 ]; then
+                log_info "Retrying ${#failed_deletions[@]} failed deletion(s)..."
+                sleep 5
+                for recovery_point_arn in "${failed_deletions[@]}"; do
+                    log_info "Retrying deletion: $recovery_point_arn"
+                    if aws backup delete-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>/dev/null; then
+                        log_success "Successfully deleted on retry: $recovery_point_arn"
+                    else
+                        log_warning "Still could not delete: $recovery_point_arn"
+                    fi
+                    sleep 2
+                done
+            fi
+            
+            # Wait for deletions to propagate
+            log_info "Waiting 15 seconds for non-composite recovery point deletions to propagate..."
+            sleep 15
         fi
         
-        # Third pass: Delete parent/standalone recovery points
-        local all_arns
-        all_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[].RecoveryPointArn' 2>/dev/null || echo "")
+        # Third pass: Delete composite parent recovery points (must be last)
+        log_info "Deleting composite parent recovery points (after all nested points are deleted)..."
+        local composite_parent_arns
+        composite_parent_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.IsParent == true) | .RecoveryPointArn' 2>/dev/null || echo "")
         
-        for recovery_point_arn in $all_arns; do
+        if [ -n "$composite_parent_arns" ]; then
+            for recovery_point_arn in $composite_parent_arns; do
+                if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
+                    log_info "Deleting composite parent recovery point: $recovery_point_arn"
+                    local delete_output
+                    if delete_output=$(aws backup delete-recovery-point \
+                        --backup-vault-name "$backup_vault_name" \
+                        --recovery-point-arn "$recovery_point_arn" \
+                        --region "$AWS_REGION" \
+                        --no-cli-pager 2>&1); then
+                        log_success "Successfully deleted composite parent: $recovery_point_arn"
+                    else
+                        log_warning "Could not delete composite parent $recovery_point_arn: $delete_output"
+                        log_warning "This may indicate that nested recovery points still exist"
+                    fi
+                    # Delay between composite deletions
+                    sleep 3
+                fi
+            done
+            
+            # Wait for composite deletion to propagate
+            log_info "Waiting 15 seconds for composite parent deletions to propagate..."
+            sleep 15
+        fi
+        
+        # Fourth pass: Delete any remaining standalone recovery points (fallback)
+        local parent_and_standalone_arns
+        parent_and_standalone_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[] | select(.ParentRecoveryPointArn == null and .IsParent != true) | .RecoveryPointArn' 2>/dev/null || echo "")
+        
+        if [ -z "$parent_and_standalone_arns" ]; then
+            # Fallback: if jq filter didn't work, get all ARNs
+            parent_and_standalone_arns=$(echo "$recovery_points_json" | jq -r '.RecoveryPoints[].RecoveryPointArn' 2>/dev/null || echo "")
+        fi
+        
+        for recovery_point_arn in $parent_and_standalone_arns; do
             if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
                 log_info "Deleting recovery point: $recovery_point_arn"
-                aws backup delete-recovery-point \
+                
+                # Check if this is an EBS snapshot (needs special handling)
+                if echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                    local snapshot_id
+                    snapshot_id=$(echo "$recovery_point_arn" | sed 's/.*snapshot\/\(snap-[^ ]*\).*/\1/')
+                    log_info "Detected EBS snapshot - attempting deletion via Backup API first: $snapshot_id"
+                fi
+                
+                local delete_output
+                if delete_output=$(aws backup delete-recovery-point \
                     --backup-vault-name "$backup_vault_name" \
                     --recovery-point-arn "$recovery_point_arn" \
                     --region "$AWS_REGION" \
-                    --no-cli-pager 2>/dev/null || log_warning "Could not delete $recovery_point_arn (may already be deleted)"
+                    --no-cli-pager 2>&1); then
+                    log_success "Successfully deleted recovery point: $recovery_point_arn"
+                else
+                    # Check if it's a "resource in use" error that might resolve with time
+                    if echo "$delete_output" | grep -q "ResourceInUseException\|InvalidStateException"; then
+                        log_warning "Recovery point $recovery_point_arn is in use - will retry later: $delete_output"
+                    elif echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                        # For EBS snapshots, try deleting via EC2 API as fallback
+                        local snapshot_id
+                        snapshot_id=$(echo "$recovery_point_arn" | sed 's/.*snapshot\/\(snap-[^ ]*\).*/\1/')
+                        log_info "Backup API deletion failed, trying EC2 API for snapshot: $snapshot_id"
+                        local ec2_delete_output
+                        if ec2_delete_output=$(aws ec2 delete-snapshot --snapshot-id "$snapshot_id" --region "$AWS_REGION" 2>&1); then
+                            log_success "Deleted EBS snapshot via EC2 API: $snapshot_id"
+                        else
+                            log_warning "Could not delete EBS snapshot via EC2 API: $ec2_delete_output"
+                        fi
+                    else
+                        log_warning "Could not delete $recovery_point_arn: $delete_output"
+                    fi
+                fi
             fi
         done
         
@@ -1002,37 +1289,123 @@ cleanup_aws_backup_resources() {
         log_info "Waiting 15 seconds for recovery point deletions to complete..."
         sleep 15
         
-        # Verify all recovery points are deleted
+        # Verify all recovery points are deleted with retry logic
+        # Use more aggressive retry with longer waits for AWS API propagation
+        local max_retries=5
+        local retry_count=0
         local remaining
+        
+        while [ $retry_count -lt $max_retries ]; do
+            # Get fresh list of remaining recovery points
+            remaining=$(aws backup list-recovery-points-by-backup-vault \
+                --backup-vault-name "$backup_vault_name" \
+                --region "$AWS_REGION" \
+                --query "RecoveryPoints[].RecoveryPointArn" \
+                --output text 2>/dev/null || echo "")
+            
+            # Check if empty or just whitespace/None
+            remaining=$(echo "$remaining" | xargs)
+            
+            if [ -z "$remaining" ] || [ "$remaining" = "None" ] || [ "$remaining" = "" ]; then
+                log_success "All recovery points have been deleted"
+                break
+            fi
+            
+            retry_count=$((retry_count + 1))
+            log_info "Found $(echo "$remaining" | wc -w | xargs) recovery point(s) still remaining (check $retry_count/$max_retries)"
+            
+            if [ $retry_count -lt $max_retries ]; then
+                log_warning "Some recovery points still exist. Retrying deletion..."
+                
+                # Try deleting remaining recovery points again with detailed error handling
+                for recovery_point_arn in $remaining; do
+                    if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ] && [ "$recovery_point_arn" != "None" ]; then
+                        log_info "Retrying deletion of recovery point: $recovery_point_arn"
+                        
+                        local delete_error
+                        if delete_error=$(aws backup delete-recovery-point \
+                            --backup-vault-name "$backup_vault_name" \
+                            --recovery-point-arn "$recovery_point_arn" \
+                            --region "$AWS_REGION" \
+                            --no-cli-pager 2>&1); then
+                            log_success "Successfully deleted: $recovery_point_arn"
+                        else
+                            log_warning "Delete attempt failed for $recovery_point_arn: $delete_error"
+                            
+                            # For EBS snapshots, they might need to be deleted via EC2 API
+                            if echo "$recovery_point_arn" | grep -q "snapshot/snap-"; then
+                                local snapshot_id
+                                snapshot_id=$(echo "$recovery_point_arn" | sed 's/.*snapshot\/\(snap-[^ ]*\).*/\1/')
+                                log_info "Attempting to delete EBS snapshot directly: $snapshot_id"
+                                if aws ec2 delete-snapshot --snapshot-id "$snapshot_id" --region "$AWS_REGION" 2>/dev/null; then
+                                    log_success "Deleted EBS snapshot: $snapshot_id"
+                                else
+                                    log_warning "Could not delete EBS snapshot: $snapshot_id"
+                                fi
+                            fi
+                        fi
+                    fi
+                done
+                
+                # Longer wait for AWS API propagation (recovery point deletions can take time)
+                local wait_time=$((20 + retry_count * 10))
+                log_info "Waiting ${wait_time} seconds for deletions to propagate..."
+                sleep "$wait_time"
+            else
+                log_error "Some recovery points could not be deleted after $max_retries attempts"
+                log_error "Remaining recovery points: $remaining"
+                log_error "Vault deletion will fail - recovery points must be deleted first"
+                return 1
+            fi
+        done
+        
+        # Final verification before proceeding
         remaining=$(aws backup list-recovery-points-by-backup-vault \
             --backup-vault-name "$backup_vault_name" \
             --region "$AWS_REGION" \
             --query "RecoveryPoints[].RecoveryPointArn" \
             --output text 2>/dev/null || echo "")
+        remaining=$(echo "$remaining" | xargs)
         
-        if [ -n "$remaining" ]; then
-            log_warning "Some recovery points may still exist. Attempting force delete..."
-            for recovery_point_arn in $remaining; do
-                if [ -n "$recovery_point_arn" ] && [ "$recovery_point_arn" != "null" ]; then
-                    # Try disassociate again in case it's a composite
-                    aws backup disassociate-recovery-point \
-                        --backup-vault-name "$backup_vault_name" \
-                        --recovery-point-arn "$recovery_point_arn" \
-                        --region "$AWS_REGION" \
-                        --no-cli-pager 2>/dev/null || true
-                    sleep 2
-                    aws backup delete-recovery-point \
-                        --backup-vault-name "$backup_vault_name" \
-                        --recovery-point-arn "$recovery_point_arn" \
-                        --region "$AWS_REGION" \
-                        --no-cli-pager 2>/dev/null || log_warning "Still could not delete $recovery_point_arn"
-                fi
-            done
+        if [ -n "$remaining" ] && [ "$remaining" != "None" ] && [ "$remaining" != "" ]; then
+            log_error "Recovery points still exist after all retry attempts: $remaining"
+            log_error "Cannot delete backup vault while recovery points exist"
+            return 1
+        fi
+        
+        # Final check - if recovery points still exist, we cannot delete the vault
+        local final_check
+        final_check=$(aws backup list-recovery-points-by-backup-vault \
+            --backup-vault-name "$backup_vault_name" \
+            --region "$AWS_REGION" \
+            --query "RecoveryPoints[].RecoveryPointArn" \
+            --output text 2>/dev/null || echo "")
+        final_check=$(echo "$final_check" | xargs)
+        
+        if [ -n "$final_check" ] && [ "$final_check" != "None" ] && [ "$final_check" != "" ]; then
+            log_error "Recovery points still exist - cannot delete vault"
+            log_error "Remaining: $final_check"
+            return 1
         fi
         
         log_success "Recovery points cleanup completed"
     else
         log_info "No recovery points found in vault"
+    fi
+    
+    # Final verification before deleting vault
+    log_info "Verifying vault is empty before deletion..."
+    local vault_check
+    vault_check=$(aws backup list-recovery-points-by-backup-vault \
+        --backup-vault-name "$backup_vault_name" \
+        --region "$AWS_REGION" \
+        --query "RecoveryPoints[].RecoveryPointArn" \
+        --output text 2>/dev/null || echo "")
+    vault_check=$(echo "$vault_check" | xargs)
+    
+    if [ -n "$vault_check" ] && [ "$vault_check" != "None" ] && [ "$vault_check" != "" ]; then
+        log_error "Cannot delete backup vault - recovery points still exist: $vault_check"
+        return 1
     fi
     
     # Delete backup vault
@@ -1383,6 +1756,9 @@ main() {
         
         log_success "Verification succeeded after additional wait"
     fi
+    
+    # Clean up CloudTrail first (must be deleted before its S3 bucket)
+    cleanup_cloudtrail
     
     cleanup_s3_buckets
     cleanup_cloudwatch_logs

@@ -40,6 +40,10 @@
 
 set -euo pipefail
 
+# Disable AWS CLI pager to prevent interactive editors from opening
+export AWS_PAGER=""
+export AWS_CLI_AUTO_PROMPT=off
+
 # =============================================================================
 # CONFIGURATION
 # =============================================================================

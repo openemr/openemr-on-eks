@@ -1,0 +1,72 @@
+#!/bin/bash
+
+# =============================================================================
+# OpenEMR on EKS Console Launcher
+# =============================================================================
+#
+# Purpose:
+#   Launches the OpenEMR on EKS TUI console application
+#
+# Usage:
+#   /start_console
+#
+# =============================================================================
+
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CONSOLE_DIR="$SCRIPT_DIR/console"
+
+# Check if console directory exists
+if [ ! -d "$CONSOLE_DIR" ]; then
+    echo "Error: Console directory not found at $CONSOLE_DIR"
+    exit 1
+fi
+
+# Check if Go is installed
+if ! command -v go >/dev/null 2>&1; then
+    echo "Error: Go is not installed. Please install Go to use the console."
+    echo "Visit: https://golang.org/dl/"
+    exit 1
+fi
+
+# Check Go version (requires 1.25 or later)
+GO_VERSION=$(go version | awk '{print $3}' | sed 's/go//')
+REQUIRED_VERSION="1.25"
+if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$GO_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
+    echo "Error: Go version $GO_VERSION is installed, but version $REQUIRED_VERSION or later is required."
+    echo "Please upgrade Go: https://golang.org/dl/"
+    exit 1
+fi
+
+# Change to console directory
+cd "$CONSOLE_DIR" || exit 1
+
+# Check if go.mod exists, if not initialize
+if [ ! -f "go.mod" ]; then
+    echo "Initializing Go module..."
+    go mod init github.com/openemr/openemr-on-eks/console 2>/dev/null || true
+fi
+
+# Download dependencies
+echo "Downloading dependencies..."
+go mod download 2>/dev/null || true
+go mod tidy 2>/dev/null || true
+
+# Get the project root directory (parent of console directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+
+# Build the console
+echo "Building console..."
+if go build -ldflags "-X main.embeddedProjectRoot=$PROJECT_ROOT" -o openemr-eks-console main.go; then
+    # Run the console
+    ./openemr-eks-console
+else
+    echo ""
+    echo "Error: Failed to build console application"
+    echo "Please check the error messages above and ensure:"
+    echo "  - Go 1.25 or later is installed"
+    echo "  - All dependencies are available"
+    echo "  - The code compiles without errors"
+    exit 1
+fi

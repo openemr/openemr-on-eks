@@ -27,9 +27,12 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="79.9.0"      # kube-prometheus-stack
-CHART_LOKI_VERSION="6.46.0"     # Loki stack
-CHART_JAEGER_VERSION="3.4.1"    # Jaeger
+CHART_KPS_VERSION="79.11.0"      # kube-prometheus-stack
+CHART_LOKI_VERSION="6.46.0"      # Grafana Loki stack
+CHART_TEMPO_VERSION="1.57.0"     # Grafana Tempo Distributed (distributed tracing in microservice mode)
+CHART_MIMIR_VERSION="6.0.5"      # Grafana Mimir (long-term metrics storage)
+OTEBPF_VERSION="v0.3.0"          # OTeBPF (eBPF auto-instrumentation) - Docker Hub: otel/ebpf-instrument
+CERT_MANAGER_VERSION="v1.19.1"   # cert-manager (TLS certificate management)
 
 # =============================================================================
 # TIMEOUTS AND RETRIES
@@ -40,6 +43,26 @@ TIMEOUT_KUBECTL="600s"          # kubectl wait timeout
 MAX_RETRIES="3"                 # Maximum retry attempts
 BASE_DELAY="30"                 # Base delay between retries (seconds)
 MAX_DELAY="300"                 # Maximum delay between retries (seconds)
+
+# Component-specific retry and delay configuration
+HELM_INSTALL_RETRY_DELAY="30"                # Delay between Helm install retries (seconds)
+PATCH_RETRY_DELAY="5"                        # Delay between patch operation retries (seconds)
+PVC_WAIT_DELAY="5"                           # Delay after PVC creation before checking (seconds)
+QUERY_FRONTEND_READINESS_INITIAL_DELAY="10"  # Initial delay for query-frontend readiness probe (seconds)
+
+# kubectl wait timeouts (can be shorter than TIMEOUT_KUBECTL for specific operations)
+KUBECTL_WAIT_TIMEOUT_SHORT="180s"   # Short timeout for quick operations (e.g., Grafana restart)
+KUBECTL_WAIT_TIMEOUT_MEDIUM="300s"  # Medium timeout for standard operations
+KUBECTL_WAIT_TIMEOUT_LONG="600s"    # Long timeout for slow operations (e.g., Mimir initialization)
+
+# AlertManager cluster configuration
+ALERTMANAGER_PEER_TIMEOUT="15s"         # Peer timeout for AlertManager cluster
+ALERTMANAGER_GOSSIP_INTERVAL="200ms"    # Gossip interval for AlertManager cluster
+ALERTMANAGER_PUSH_PULL_INTERVAL="60s"   # Push-pull interval for AlertManager cluster
+ALERTMANAGER_REPEAT_INTERVAL="24h"      # Repeat interval for AlertManager alerts
+
+# Loki index configuration
+LOKI_INDEX_PERIOD="24h"         # Period for Loki index rotation
 
 # =============================================================================
 # ACCESS CONFIGURATION
@@ -76,7 +99,197 @@ DEBUG="0"                       # Set to "1" for verbose debug output
 # Customize storage directories
 CREDENTIALS_DIR="./credentials"         # Secure credential storage
 BACKUP_DIR="./backups"                  # Configuration backups
-VALUES_FILE="./prometheus-values.yaml"  # Generated values file
+VALUES_FILE="./prometheus-values.yaml"  # Generated Prometheus values file
+TEMPO_VALUES_FILE="./tempo-values.yaml" # Generated Tempo values file (reference)
+
+# =============================================================================
+# AUTOSCALING CONFIGURATION
+# =============================================================================
+# Enable/disable autoscaling for monitoring components
+ENABLE_AUTOSCALING="1"                  # Set to "0" to disable autoscaling
+
+# Component-specific replica limits
+GRAFANA_MIN_REPLICAS="1"                # Minimum Grafana replicas
+GRAFANA_MAX_REPLICAS="3"                # Maximum Grafana replicas
+PROMETHEUS_MIN_REPLICAS="1"             # Minimum Prometheus replicas
+PROMETHEUS_MAX_REPLICAS="3"             # Maximum Prometheus replicas
+LOKI_MIN_REPLICAS="2"                   # Minimum Loki replicas (SimpleScalable mode requires at least 2)
+LOKI_MAX_REPLICAS="3"                   # Maximum Loki replicas
+TEMPO_MIN_REPLICAS="1"                  # Minimum Tempo replicas
+TEMPO_MAX_REPLICAS="3"                  # Maximum Tempo replicas
+MIMIR_MIN_REPLICAS="1"                  # Minimum Mimir replicas
+MIMIR_MAX_REPLICAS="3"                  # Maximum Mimir replicas
+ALERTMANAGER_MIN_REPLICAS="1"           # Minimum AlertManager replicas
+ALERTMANAGER_MAX_REPLICAS="3"           # Maximum AlertManager replicas
+
+# Autoscaling targets
+HPA_CPU_TARGET="70"                     # CPU usage percentage target
+HPA_MEMORY_TARGET="80"                  # Memory usage percentage target
+
+# Component enable/disable flags
+OTEBPF_ENABLED="1"                     # Enable OTeBPF (eBPF auto-instrumentation)
+# Uses Docker Hub image: otel/ebpf-instrument (https://hub.docker.com/r/otel/ebpf-instrument)
+
+# =============================================================================
+# PORT CONFIGURATION
+# =============================================================================
+# Service ports for port-forwarding and internal communication
+TEMPO_HTTP_PORT="3200"                  # Tempo HTTP API port
+TEMPO_OTLP_GRPC_PORT="4317"             # Tempo OTLP gRPC receiver port
+TEMPO_OTLP_HTTP_PORT="4318"             # Tempo OTLP HTTP receiver port
+TEMPO_QUERY_FRONTEND_GRPC_PORT="9095"   # Tempo query frontend gRPC port
+GRAFANA_PORT="3000"                     # Grafana web UI port (for port-forwarding)
+PROMETHEUS_PORT="9090"                  # Prometheus web UI port (for port-forwarding)
+ALERTMANAGER_PORT="9093"                # AlertManager web UI port (for port-forwarding)
+LOKI_PORT="3100"                        # Loki web UI port (for port-forwarding)
+MIMIR_PORT="8080"                       # Mimir gateway port (for port-forwarding)
+
+# =============================================================================
+# TEMPO CONFIGURATION
+# =============================================================================
+TEMPO_MAX_BLOCK_DURATION="5m"           # Maximum duration before flushing a block
+TEMPO_TRACE_IDLE_PERIOD="10s"           # Time to wait before considering a trace complete
+TEMPO_BLOCK_RETENTION="1h"              # How long to retain blocks before compaction
+TEMPO_COMPACTED_BLOCK_RETENTION="10m"   # How long to retain compacted blocks
+TEMPO_QUERY_DEFAULT_RESULT_LIMIT="20"   # Default number of results to return per query
+TEMPO_QUERY_MAX_RESULT_LIMIT="0"        # Maximum number of results (0 = unlimited)
+TEMPO_SPAN_START_TIME_SHIFT="1h"        # Time shift for trace-to-log correlation (start)
+TEMPO_SPAN_END_TIME_SHIFT="-1h"         # Time shift for trace-to-log correlation (end)
+
+# =============================================================================
+# RESOURCE REQUESTS AND LIMITS
+# =============================================================================
+# CPU values in millicores (e.g., "100m" = 0.1 CPU, "500m" = 0.5 CPU)
+# Memory values in Mi/Gi (e.g., "256Mi" = 256 MiB, "1Gi" = 1 GiB)
+
+# Tempo Resources
+TEMPO_DISTRIBUTOR_CPU_REQUEST="100m"
+TEMPO_DISTRIBUTOR_CPU_LIMIT="500m"
+TEMPO_DISTRIBUTOR_MEMORY_REQUEST="256Mi"
+TEMPO_DISTRIBUTOR_MEMORY_LIMIT="512Mi"
+
+TEMPO_INGESTER_CPU_REQUEST="200m"
+TEMPO_INGESTER_CPU_LIMIT="1000m"
+TEMPO_INGESTER_MEMORY_REQUEST="512Mi"
+TEMPO_INGESTER_MEMORY_LIMIT="1Gi"
+TEMPO_INGESTER_STORAGE_SIZE="10Gi"
+
+TEMPO_QUERIER_CPU_REQUEST="100m"
+TEMPO_QUERIER_CPU_LIMIT="500m"
+TEMPO_QUERIER_MEMORY_REQUEST="256Mi"
+TEMPO_QUERIER_MEMORY_LIMIT="1Gi"
+
+TEMPO_QUERY_FRONTEND_CPU_REQUEST="100m"
+TEMPO_QUERY_FRONTEND_CPU_LIMIT="500m"
+TEMPO_QUERY_FRONTEND_MEMORY_REQUEST="256Mi"
+TEMPO_QUERY_FRONTEND_MEMORY_LIMIT="1Gi"
+
+TEMPO_COMPACTOR_CPU_REQUEST="100m"
+TEMPO_COMPACTOR_CPU_LIMIT="500m"
+TEMPO_COMPACTOR_MEMORY_REQUEST="256Mi"
+TEMPO_COMPACTOR_MEMORY_LIMIT="512Mi"
+
+TEMPO_GATEWAY_CPU_REQUEST="100m"
+TEMPO_GATEWAY_CPU_LIMIT="200m"
+TEMPO_GATEWAY_MEMORY_REQUEST="128Mi"
+TEMPO_GATEWAY_MEMORY_LIMIT="256Mi"
+
+TEMPO_METRICS_GENERATOR_CPU_REQUEST="100m"
+TEMPO_METRICS_GENERATOR_CPU_LIMIT="500m"
+TEMPO_METRICS_GENERATOR_MEMORY_REQUEST="256Mi"
+TEMPO_METRICS_GENERATOR_MEMORY_LIMIT="1Gi"
+
+# Prometheus Resources
+PROMETHEUS_CPU_REQUEST="500m"
+PROMETHEUS_CPU_LIMIT="2000m"
+PROMETHEUS_MEMORY_REQUEST="2Gi"
+PROMETHEUS_MEMORY_LIMIT="4Gi"
+PROMETHEUS_STORAGE_SIZE="100Gi"
+PROMETHEUS_RETENTION="30d"              # How long to retain metrics locally
+PROMETHEUS_RETENTION_SIZE="90GB"        # Maximum size of local storage
+
+# Grafana Resources
+GRAFANA_CPU_REQUEST="100m"
+GRAFANA_CPU_LIMIT="500m"
+GRAFANA_MEMORY_REQUEST="256Mi"
+GRAFANA_MEMORY_LIMIT="512Mi"
+GRAFANA_STORAGE_SIZE="20Gi"
+
+# AlertManager Resources
+ALERTMANAGER_CPU_REQUEST="100m"
+ALERTMANAGER_CPU_LIMIT="500m"
+ALERTMANAGER_MEMORY_REQUEST="256Mi"
+ALERTMANAGER_MEMORY_LIMIT="512Mi"
+ALERTMANAGER_STORAGE_SIZE="1Gi"
+ALERTMANAGER_GROUP_WAIT="10s"           # Time to wait before sending first notification
+ALERTMANAGER_GROUP_INTERVAL="10s"       # Time to wait before sending batch of notifications
+
+# Loki Resources
+LOKI_CPU_REQUEST="200m"
+LOKI_CPU_LIMIT="1000m"
+LOKI_MEMORY_REQUEST="512Mi"
+LOKI_MEMORY_LIMIT="1Gi"
+LOKI_STORAGE_SIZE="10Gi"
+LOKI_RETENTION_PERIOD="720h"            # How long to retain logs (30 days)
+
+# Mimir Resources
+MIMIR_CPU_REQUEST="500m"
+MIMIR_CPU_LIMIT="2000m"
+MIMIR_MEMORY_REQUEST="2Gi"
+MIMIR_MEMORY_LIMIT="4Gi"
+
+MIMIR_GATEWAY_CPU_REQUEST="100m"
+MIMIR_GATEWAY_CPU_LIMIT="500m"
+MIMIR_GATEWAY_MEMORY_REQUEST="128Mi"
+MIMIR_GATEWAY_MEMORY_LIMIT="256Mi"
+
+
+# OTeBPF Resources
+OTEBPF_CPU_REQUEST="50m"
+OTEBPF_CPU_LIMIT="500m"
+OTEBPF_MEMORY_REQUEST="256Mi"
+OTEBPF_MEMORY_LIMIT="512Mi"
+
+# =============================================================================
+# SECURITY CONTEXT
+# =============================================================================
+RUN_AS_USER="1000"                      # User ID for running containers (Prometheus, AlertManager, etc.)
+RUN_AS_GROUP="3000"                     # Group ID for running containers (Prometheus, AlertManager, etc.)
+FS_GROUP="2000"                         # Filesystem group ID (Prometheus, AlertManager, etc.)
+
+# Grafana Security Context (Grafana-specific user/group IDs)
+GRAFANA_RUN_AS_USER="472"               # Grafana user ID (Grafana-specific, default: 472)
+GRAFANA_RUN_AS_GROUP="472"              # Grafana group ID (Grafana-specific, default: 472)
+GRAFANA_FS_GROUP="472"                  # Grafana filesystem group ID (Grafana-specific, default: 472)
+
+# =============================================================================
+# PROMETHEUS SCRAPING CONFIGURATION
+# =============================================================================
+PROMETHEUS_SCRAPE_INTERVAL="30s"        # How often to scrape metrics
+PROMETHEUS_EVALUATION_INTERVAL="30s"    # How often to evaluate alert rules
+PROMETHEUS_SCRAPE_TIMEOUT="10s"         # Timeout for scraping metrics
+
+# =============================================================================
+# ALERT THRESHOLDS
+# =============================================================================
+ALERT_CPU_THRESHOLD="0.8"               # CPU usage threshold (0.8 = 80%)
+ALERT_MEMORY_THRESHOLD="0.9"            # Memory usage threshold (0.9 = 90%)
+ALERT_ERROR_RATE_THRESHOLD="0.05"       # Error rate threshold (0.05 = 5%)
+ALERT_LATENCY_THRESHOLD_SECONDS="2"     # P95 latency threshold in seconds
+ALERT_EVALUATION_INTERVAL="30s"         # How often to evaluate alerts
+ALERT_FOR_DURATION="5m"                 # How long condition must persist before alerting
+
+# =============================================================================
+# COMPONENT READINESS CHECK CONFIGURATION
+# =============================================================================
+TEMPO_READINESS_MAX_RETRIES="60"        # Maximum number of retry attempts for Tempo readiness check
+TEMPO_READINESS_SLEEP_INTERVAL="5"      # Sleep interval in seconds between readiness checks
+TEMPO_READINESS_MIN_RUNNING_PODS="1"    # Minimum number of running pods required for Tempo to be considered ready
+
+
+OTEBPF_READINESS_MAX_RETRIES="30"       # Maximum number of retry attempts for OTeBPF readiness check
+OTEBPF_READINESS_SLEEP_INTERVAL="2"     # Sleep interval in seconds between readiness checks
+OTEBPF_READINESS_MIN_RUNNING_PODS="1"   # Minimum number of running pods required for OTeBPF (DaemonSet - pending pods are normal when nodes don't exist yet in EKS Auto Mode)
 
 # =============================================================================
 # EXAMPLE CONFIGURATIONS

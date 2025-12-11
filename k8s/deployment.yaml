@@ -47,8 +47,8 @@ spec:
         # Prometheus scraping configuration for metrics collection
         prometheus.io/scrape: "true"                   # Enable metrics scraping by Prometheus
         prometheus.io/port: "9090"                     # Metrics endpoint port (if available)
-        # Jaeger distributed tracing configuration
-        sidecar.jaegertracing.io/inject: "true"        # Enable automatic Jaeger sidecar injection for distributed tracing
+        # Distributed tracing: OTeBPF auto-instruments pods with label app=openemr
+        # Traces are automatically sent to Tempo via eBPF-based instrumentation
     spec:
       serviceAccountName: openemr-sa                   # Service account for AWS IAM role binding (IRSA)
       restartPolicy: Always                            # Always restart failed containers

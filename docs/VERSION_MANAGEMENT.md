@@ -195,9 +195,11 @@ chmod +x scripts/version-manager.sh
 ### Monitoring Stack
 
 **Components:**
-- Prometheus Operator (Helm chart)
-- Loki (Helm chart)
-- Jaeger (Helm chart)
+- Prometheus Operator (Helm chart: kube-prometheus-stack)
+- Loki (Helm chart: loki, repository: grafana)
+- Tempo (Helm chart: tempo, repository: grafana, replaces Jaeger)
+- Mimir (Helm chart: mimir-distributed, repository: grafana)
+- OTeBPF (DaemonSet deployment, not a Helm chart)
 
 **Files Updated:**
 - `monitoring/prometheus-values.yaml`
@@ -501,7 +503,7 @@ Manual runs support targeted component checking:
 - `infrastructure` - Kubernetes, Terraform, AWS Provider
 - `terraform_modules` - EKS, VPC, RDS modules
 - `github_workflows` - GitHub Actions dependencies
-- `monitoring` - Prometheus, Loki, Jaeger
+- `monitoring` - Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - `eks_addons` - EFS CSI Driver, Metrics Server
 
 #### **Use Cases**

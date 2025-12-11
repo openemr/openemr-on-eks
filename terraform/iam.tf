@@ -228,6 +228,23 @@ resource "aws_iam_policy" "grafana_cloudwatch" {
           "tag:GetResources" # Get resources by tags for filtering
         ]
         Resource = "*" # Tag API doesn't support resource-level permissions
+      },
+      {
+        # X-Ray permissions for trace linking from CloudWatch logs
+        Effect = "Allow"
+        Action = [
+          "xray:BatchGetTraces",                 # Get trace details by trace IDs
+          "xray:GetTraceSummaries",              # Get trace summaries for queries
+          "xray:GetTraceGraph",                  # Get trace graph visualization
+          "xray:GetServiceGraph",                # Get service graph
+          "xray:GetTimeSeriesServiceStatistics", # Get time series statistics
+          "xray:GetInsightSummaries",            # Get insight summaries
+          "xray:GetInsight",                     # Get insight details
+          "xray:GetInsightEvents",               # Get insight events
+          "xray:GetSamplingRules",               # Get sampling rules
+          "xray:GetSamplingTargets"              # Get sampling targets
+        ]
+        Resource = "*" # X-Ray doesn't support resource-level permissions for certain actions
       }
     ]
   })
@@ -335,4 +352,269 @@ resource "aws_iam_policy" "loki_s3" {
 resource "aws_iam_role_policy_attachment" "loki_s3" {
   role       = aws_iam_role.loki_s3.name
   policy_arn = aws_iam_policy.loki_s3.arn
+}
+
+# =============================================================================
+# IAM ROLE AND POLICY FOR TEMPO S3 STORAGE
+# =============================================================================
+# This configuration creates an IAM role and policy for Tempo to access S3 storage
+# for distributed tracing and long-term trace retention.
+
+# IAM Role for Tempo - Service account role for S3 storage access
+resource "aws_iam_role" "tempo_s3" {
+  name        = "${var.cluster_name}-tempo-s3-role"
+  description = "IAM role for Tempo to access S3 storage for distributed tracing"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}"
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:monitoring:tempo"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.cluster_name}-tempo-s3-role"
+    Component   = "monitoring"
+    Description = "Tempo S3 storage access"
+  }
+}
+
+# IAM Policy for Tempo S3 access
+resource "aws_iam_policy" "tempo_s3" {
+  name        = "${var.cluster_name}-tempo-s3-policy"
+  description = "Policy for Tempo to access S3 storage bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning"
+        ]
+        Resource = aws_s3_bucket.tempo_storage.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObjectVersion",
+          "s3:RestoreObject"
+        ]
+        Resource = "${aws_s3_bucket.tempo_storage.arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.s3.arn
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "${var.cluster_name}-tempo-s3-policy"
+    Component = "monitoring"
+  }
+}
+
+# Attach the S3 policy to the Tempo IAM role
+resource "aws_iam_role_policy_attachment" "tempo_s3" {
+  role       = aws_iam_role.tempo_s3.name
+  policy_arn = aws_iam_policy.tempo_s3.arn
+}
+
+# =============================================================================
+# IAM ROLE AND POLICY FOR MIMIR S3 STORAGE
+# =============================================================================
+# This configuration creates an IAM role and policy for Mimir to access S3 storage
+# for metrics storage and long-term retention.
+
+# IAM Role for Mimir - Service account role for S3 storage access
+resource "aws_iam_role" "mimir_s3" {
+  name        = "${var.cluster_name}-mimir-s3-role"
+  description = "IAM role for Mimir to access S3 storage for metrics storage"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}"
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:monitoring:mimir"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.cluster_name}-mimir-s3-role"
+    Component   = "monitoring"
+    Description = "Mimir S3 storage access"
+  }
+}
+
+# IAM Policy for Mimir S3 access
+resource "aws_iam_policy" "mimir_s3" {
+  name        = "${var.cluster_name}-mimir-s3-policy"
+  description = "Policy for Mimir to access S3 storage buckets (blocks, ruler, and alertmanager)"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning"
+        ]
+        Resource = [
+          aws_s3_bucket.mimir_blocks_storage.arn,
+          aws_s3_bucket.mimir_ruler_storage.arn,
+          aws_s3_bucket.alertmanager_storage.arn
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObjectVersion",
+          "s3:RestoreObject"
+        ]
+        Resource = [
+          "${aws_s3_bucket.mimir_blocks_storage.arn}/*",
+          "${aws_s3_bucket.mimir_ruler_storage.arn}/*",
+          "${aws_s3_bucket.alertmanager_storage.arn}/*"
+        ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.s3.arn
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "${var.cluster_name}-mimir-s3-policy"
+    Component = "monitoring"
+  }
+}
+
+# Attach the S3 policy to the Mimir IAM role
+resource "aws_iam_role_policy_attachment" "mimir_s3" {
+  role       = aws_iam_role.mimir_s3.name
+  policy_arn = aws_iam_policy.mimir_s3.arn
+}
+
+# =============================================================================
+# IAM ROLE AND POLICY FOR ALERTMANAGER S3 STORAGE
+# =============================================================================
+# This configuration creates an IAM role and policy for AlertManager to access S3 storage
+# for cluster state storage in high-availability deployments.
+
+# IAM Role for AlertManager - Service account role for S3 storage access
+resource "aws_iam_role" "alertmanager_s3" {
+  name        = "${var.cluster_name}-alertmanager-s3-role"
+  description = "IAM role for AlertManager to access S3 storage for cluster state"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}"
+        }
+        Action = "sts:AssumeRoleWithWebIdentity"
+        Condition = {
+          StringEquals = {
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:monitoring:alertmanager-prometheus-stack-kube-prom-alertmanager"
+            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = {
+    Name        = "${var.cluster_name}-alertmanager-s3-role"
+    Component   = "monitoring"
+    Description = "AlertManager S3 storage access"
+  }
+}
+
+# IAM Policy for AlertManager S3 access
+resource "aws_iam_policy" "alertmanager_s3" {
+  name        = "${var.cluster_name}-alertmanager-s3-policy"
+  description = "Policy for AlertManager to access S3 storage bucket"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListBucket",
+          "s3:GetBucketLocation",
+          "s3:GetBucketVersioning"
+        ]
+        Resource = aws_s3_bucket.alertmanager_storage.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:GetObjectVersion"
+        ]
+        Resource = "${aws_s3_bucket.alertmanager_storage.arn}/*"
+      }
+    ]
+  })
+
+  tags = {
+    Name      = "${var.cluster_name}-alertmanager-s3-policy"
+    Component = "monitoring"
+  }
+}
+
+# Attach the S3 policy to the AlertManager IAM role
+resource "aws_iam_role_policy_attachment" "alertmanager_s3" {
+  role       = aws_iam_role.alertmanager_s3.name
+  policy_arn = aws_iam_policy.alertmanager_s3.arn
 }

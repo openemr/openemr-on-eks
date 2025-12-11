@@ -33,11 +33,13 @@ data:
 
     # Test log input to verify functionality
     # Generates test logs to verify Fluent Bit is working correctly
+    # Rate: 1 per 10 minutes (sufficient for health monitoring, minimal storage impact)
+    # With 30-day retention: ~0.62 MB max per pod (~1.86 MB for 3 pods)
     [INPUT]
         Name             dummy
         Tag              test.logs
         Dummy            {"message": "Fluent Bit sidecar is working!", "timestamp": "2025-08-26", "level": "INFO"}
-        Rate             1
+        Rate             0.00167
 
     # Collect Apache access logs
     # Monitors HTTP access logs for web traffic analysis

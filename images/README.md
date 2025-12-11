@@ -20,9 +20,18 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
   - [OpenEMR Grafana Dashboard Screenshot (`quick-deploy-openemr-grafana.png`)](#openemr-grafana-dashboard-screenshot-quick-deploy-openemr-grafanapng)
   - [OpenEMR Grafana Datasources (`quick-deploy-openemr-grafana-datasources.png`)](#openemr-grafana-datasources-quick-deploy-openemr-grafana-datasourcespng)
+  - [16 Built-in Grafana Dashboards (`16_built_in_grafana_dashboards.png`)](#16-built-in-grafana-dashboards-16_built_in_grafana_dashboardspng)
+  - [1531 Built-in Prometheus Metrics (`1531_built_in_prometheus_metrics.png`)](#1531-built-in-prometheus-metrics-1531_built_in_prometheus_metricspng)
+  - [218 Built-in Alerting Rules (`218_built_in_alerting_rules.png`)](#218-built-in-alerting-rules-218_built_in_alerting_rulespng)
+  - [Auto-Instrumented Traces (`auto_instrumented_traces.png`)](#auto-instrumented-traces-auto_instrumented_tracespng)
+  - [Automate Your On-Call Escalations (`automate_your_on_call_escalations.png`)](#automate-your-on-call-escalations-automate_your_on_call_escalationspng)
   - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
   - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
   - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
+  - [Quick Start Section Picture (`quickstart_section_picture.png`)](#quick-start-section-picture-quickstart_section_picturepng)
+  - [Table of Contents Section Picture (`table_of_contents_section_picture.png`)](#table-of-contents-section-picture-table_of_contents_section_picturepng)
+  - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
+  - [Console Title Image (`console-title-image.png`)](#console-title-image-console-title-imagepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -77,11 +86,20 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
 - **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
 - **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
-- **`quick-deploy-openemr-grafana-datasources.png`** - Screenshot showing 5 integrated datasources for dashboarding and alerting
+- **`quick-deploy-openemr-grafana-datasources.png`** - Screenshot showing 7 integrated datasources for dashboarding and alerting
+- **`16_built_in_grafana_dashboards.png`** - Screenshot showing the 16 built-in Grafana dashboards available in the monitoring stack
+- **`1531_built_in_prometheus_metrics.png`** - Screenshot showing the 1531 built-in Prometheus metrics collected from the cluster
+- **`218_built_in_alerting_rules.png`** - Screenshot showing the 218 built-in alerting rules configured for comprehensive monitoring
+- **`auto_instrumented_traces.png`** - Screenshot showing auto-instrumented distributed traces from OTeBPF in Grafana Tempo
+- **`automate_your_on_call_escalations.png`** - Screenshot showing automated on-call escalation configuration in AlertManager
 - **`quick-deploy-openemr-admin-landing-page.png`** - Screenshot showing the OpenEMR admin dashboard landing page
 - **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
 - **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
 - **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
+- **`quickstart_section_picture.png`** - Project mascot giving a thumbs up while dressed like an astronaut, used at the beginning of the Quick Start section
+- **`table_of_contents_section_picture.png`** - Project mascot dressed like an astronaut reading a book, used in the table of contents section
+- **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
+- **`console-title-image.png`** - Project mascot image used as a title image for the console documentation
 
 ## File Descriptions
 
@@ -150,10 +168,45 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 ### **OpenEMR Grafana Datasources (`quick-deploy-openemr-grafana-datasources.png`)**
 
-- **Purpose**: Visual demonstration of the 5 integrated datasources available in the monitoring stack
+- **Purpose**: Visual demonstration of the 7 integrated datasources available in the monitoring stack
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show datasource configuration
 - **Context**: Illustrates the comprehensive datasources available for dashboarding and alerting
+
+### **16 Built-in Grafana Dashboards (`16_built_in_grafana_dashboards.png`)**
+
+- **Purpose**: Visual demonstration of the 16 pre-configured Grafana dashboards available in the monitoring stack
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the extensive dashboard collection
+- **Context**: Shows users the comprehensive set of Kubernetes and system monitoring dashboards that are automatically available after deployment
+
+### **1531 Built-in Prometheus Metrics (`1531_built_in_prometheus_metrics.png`)**
+
+- **Purpose**: Visual demonstration of the extensive Prometheus metrics collection (1531 metrics)
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the depth of metrics collection
+- **Context**: Illustrates the comprehensive metrics available for monitoring cluster, pod, and application health
+
+### **218 Built-in Alerting Rules (`218_built_in_alerting_rules.png`)**
+
+- **Purpose**: Visual demonstration of the 218 pre-configured alerting rules in Prometheus
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the comprehensive alerting coverage
+- **Context**: Shows users the extensive alerting rules that automatically monitor various aspects of the cluster and applications
+
+### **Auto-Instrumented Traces (`auto_instrumented_traces.png`)**
+
+- **Purpose**: Visual demonstration of auto-instrumented distributed traces from OTeBPF displayed in Grafana Tempo
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show zero-code instrumentation capabilities
+- **Context**: Illustrates how OTeBPF automatically instruments OpenEMR pods and generates traces visible in Grafana without requiring code changes
+
+### **Automate Your On-Call Escalations (`automate_your_on_call_escalations.png`)**
+
+- **Purpose**: Visual demonstration of AlertManager's on-call escalation configuration
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show alerting and notification automation features
+- **Context**: Shows users how to configure automated on-call escalations and incident response workflows in AlertManager
 
 ### **OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)**
 
@@ -175,6 +228,38 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show the quick deployment workflow
 - **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
+
+### **Quick Start Section Picture (`quickstart_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot giving a thumbs up while dressed like an astronaut
+- **Format**: PNG image
+- **Usage**: Displayed at the beginning of the Quick Start section in the main README to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the Quick Start section more engaging and memorable
+- **Placement**: Positioned at the top of the Quick Start section with centered alignment
+
+### **Table of Contents Section Picture (`table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot dressed like an astronaut reading a book
+- **Format**: PNG image
+- **Usage**: Displayed in the table of contents section in the main README to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the table of contents section more engaging and memorable, with the mascot reading a book to represent documentation and learning
+- **Placement**: Positioned in the table of contents section with appropriate alignment
+
+### **Console Launch Screen (`console-launch-screen.png`)**
+
+- **Purpose**: Visual demonstration of the Terminal User Interface (TUI) console launch screen
+- **Format**: PNG screenshot
+- **Usage**: Documentation and README files to show the interactive console interface for macOS users
+- **Context**: Illustrates the TUI console that provides an intuitive interface for managing OpenEMR deployment with 10 essential commands, codebase search, and interactive features
+- **Platform**: macOS only (commands execute in separate Terminal windows to preserve script colors and interactivity)
+
+### **Console Title Image (`console-title-image.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used as a title image for console documentation
+- **Format**: PNG image
+- **Usage**: Displayed in the console guide documentation below the platform warning to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the console documentation more engaging and memorable
+- **Placement**: Positioned at the top of the console guide below the platform support notice
 
 ## Setting GitHub Social Banner
 

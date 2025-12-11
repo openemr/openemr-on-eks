@@ -18,3 +18,11 @@ env/
 ENV/
 .test-venv/
 *.venv/
+
+# Console binary
+console/console
+
+# Version management logs and reports
+version-update*.log
+version-update-report-*.md
+console/openemr-eks-console

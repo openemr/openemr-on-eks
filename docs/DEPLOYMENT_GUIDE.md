@@ -376,7 +376,7 @@ aws s3api put-bucket-encryption \
 
 ```bash
 # Clone the repository
-git clone <repository_url>
+git clone https://github.com/openemr/openemr-on-eks
 cd openemr-on-eks
 
 # Navigate to terraform directory
@@ -739,7 +739,7 @@ aws logs describe-log-groups \
 ```bash
 cd ../monitoring
 
-# Install Prometheus, Grafana, Loki, Jaeger
+# Install Prometheus, AlertManager, Grafana, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 ./install-monitoring.sh
 
 # With Slack alerts
@@ -932,10 +932,12 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v79.9.0 (metrics & alerting)
+     - Prometheus v79.11.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.46.0 (log aggregation with S3 storage)
-     - Jaeger v3.4.1 (distributed tracing)
+     - Tempo v1.57.0 (distributed tracing with S3 storage, microservice mode)
+     - Mimir v6.0.5 (long-term metrics storage)
+     - OTeBPF v0.3.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.

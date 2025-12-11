@@ -69,7 +69,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Infrastructure Deployment (Terraform)
 
-**Total Time:** 30-32 minutes
+**Total Time:** 24-25 minutes (updated December 2025)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -77,6 +77,11 @@ This guide provides measured timing data for various operations in the OpenEMR o
 | **Aurora RDS Cluster** | 10-12 min | Includes primary and replica instances |
 | **VPC & NAT Gateways** | 3-5 min | Network infrastructure setup |
 | **Other Resources** | 5-8 min | S3, EFS, ElastiCache, KMS, WAF, CloudWatch |
+
+**December 2025 Measurements:**
+- Test Run 1: 25.25 minutes (1,515 seconds)
+- Test Run 2: 24.57 minutes (1,474 seconds)
+- Average: ~25 minutes (consistent with previous measurements)
 
 **Breakdown by Resource Type:**
 - **Networking** (VPC, Subnets, Route Tables, NAT, IGW): 3-5 min
@@ -89,18 +94,26 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Application Deployment (Kubernetes)
 
-**Total Time:** 7-11 minutes (normal), can spike to 19 minutes
+**Total Time:** 22-23 minutes (updated December 2025)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
-| **OpenEMR Pods** | 5-8 min | Container image pull + startup |
+| **OpenEMR Pods** | 20-22 min | Container image pull + startup + health checks |
 | **Load Balancer** | 2-3 min | AWS ALB provisioning |
 | **Health Checks** | 1-2 min | Waiting for readiness probes |
 
+**December 2025 Measurements:**
+- Initial Deployment Run 1: 22.05 minutes (1,323 seconds)
+- Initial Deployment Run 2: 23.32 minutes (1,399 seconds)
+- Restore Deployment Run 1: 25.48 minutes (1,529 seconds)
+- Restore Deployment Run 2: 21.98 minutes (1,319 seconds)
+- Average: 22-23 minutes
+
 **Variability Factors:**
-- **First deployment:** Slower (10-11 min) - full image pull
-- **Subsequent deployments:** Faster (7-8 min) - cached images
-- **Anomalous delays:** Can spike to 19 min (pod scheduling issues, image pull timeouts)
+- Image pull times (initial deployments typically faster due to cached images on subsequent runs)
+- Pod scheduling and node availability in EKS Auto Mode
+- Health check intervals and readiness probe configuration
+- Database connectivity and initialization time
 
 ### Combined Initial Deployment
 
@@ -139,23 +152,23 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Restore from Backup
 
-**Total Time:** 38-43 minutes (comprehensive restore)
+**Total Time:** 53-55 minutes (updated December 2025)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
 | **Clean Deployment** | 3-5 min | Wipe EFS, clean database, restart CSI driver |
-| **OpenEMR Deployment** | 5-6 min | Fresh deployment with initial setup |
+| **OpenEMR Deployment** | 22-26 min | Fresh deployment with initial setup |
 | **RDS Cluster Destroy** | 11-13 min | Delete existing instances and cluster |
 | **RDS Cluster Restore** | 11-13 min | Restore from snapshot, create instances |
 | **Application Data Restore** | <1 min | Download from S3 and extract to EFS |
 | **Crypto Key Cleanup** | 40 sec | Delete sixa/sixb, wait for regeneration |
-| **Verification (with retry)** | 10 sec | Poll for pod readiness (3 attempts max) |
+| **Verification (with retry)** | 43 sec | Poll for pod readiness (3 attempts max) |
 
 **Performance Characteristics:**
-- **Consistent timing:** 38-43 min across multiple runs (±6% variation)
-- **Test Run 1:** 38 minutes 20 seconds
-- **Test Run 2:** 42 minutes 38 seconds
-- **Average:** ~40 minutes
+- **December 2025 Test Run 1:** 55.35 minutes (3,321 seconds)
+- **December 2025 Test Run 2:** 52.82 minutes (3,169 seconds)
+- **Average:** ~54 minutes
+- **Variation:** ±2.5% (very consistent)
 
 **Process Enhancements (v3.0.0):**
 - ✅ **Automatic crypto key cleanup** - Prevents encryption key mismatches
@@ -163,6 +176,25 @@ This guide provides measured timing data for various operations in the OpenEMR o
 - ✅ **Configurable polling** - Adjustable timeout and interval via environment variables
 - ✅ **IRSA for data restoration** - Secure AWS credentials for S3 access
 - ✅ **Fail-fast deployment detection** - Detects missing deployments immediately
+
+---
+
+## 🔄 Infrastructure Recreation
+
+### Full Infrastructure Recreation (After Deletion)
+
+**Total Time:** 45-49 minutes (updated December 2025)
+
+**December 2025 Measurements:**
+- Test Run 1: 49.27 minutes (2,956 seconds)
+- Test Run 2: 45.18 minutes (2,711 seconds)
+- Average: ~47 minutes
+
+**Performance Characteristics:**
+- **Very consistent:** ±4.3% variation across test runs
+- **Process:** Complete infrastructure deployment via Terraform after prior deletion
+- **Use Case:** Part of disaster recovery and restore testing scenarios
+- **Note:** This timing represents full infrastructure recreation as part of the restore test cycle, which includes all AWS resources (EKS, RDS, VPC, S3, EFS, etc.)
 
 ---
 
@@ -202,26 +234,29 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Complete Backup/Restore Test
 
-**Total Time:** 120-130 minutes (~2 hours)
+**Total Time:** 211-217 minutes (~3.5-3.6 hours)
 
 | Phase | Duration | Steps |
 |-------|----------|-------|
-| **1. Initial Deploy** | 31-32 min | Infrastructure + application |
-| **2. OpenEMR Deploy** | 7-11 min | Application deployment |
-| **3. Test Data** | 7-8 sec | Create proof file |
-| **4. Backup** | 30-35 sec | Full backup creation |
-| **5. Monitoring Test** | 6-7 min | Install/uninstall monitoring stack (updated Nov 2025) |
+| **1. Initial Deploy** | 24-25 min | Infrastructure deployment |
+| **2. OpenEMR Deploy** | 22-23 min | Application deployment |
+| **3. Test Data** | 74-75 sec | Create proof file |
+| **4. Backup** | 34-35 sec | Full backup creation |
+| **5. Monitoring Test** | 27-28 min | Install/uninstall monitoring stack |
 | **6. Deletion** | 16-17 min | Destroy all infrastructure |
-| **7. Recreation** | 40-42 min | Redeploy infrastructure |
-| **8. Restore** | 38-43 min | Full restore (clean + deploy + restore data) |
-| **9. Verification** | 10-15 sec | Verify restored data |
-| **10. Final Cleanup** | 13-14 min | Clean up all resources |
+| **7. OpenEMR Deploy (Restore)** | 22-26 min | Application deployment after infrastructure recreation |
+| **8. Recreation** | 45-49 min | Redeploy infrastructure |
+| **9. Restore** | 53-55 min | Full restore (clean + deploy + restore data) |
+| **10. Verification** | 43 sec | Verify restored data |
+| **11. Final Cleanup** | 18-18.5 min | Clean up all resources |
 
 **Total Measured Duration:** 
-- Average: 160-165 minutes (with updated restore timing)
-- Range: 155-170 minutes across multiple test runs
+- **Test Run 1 (Dec 10, 2025):** 13,025 seconds (217.1 minutes / 3.62 hours)
+- **Test Run 2 (Dec 10, 2025):** 12,673 seconds (211.2 minutes / 3.52 hours)
+- **Average:** 211-217 minutes (3.5-3.6 hours)
+- **Range:** 211-217 minutes across December 2025 test runs
 
-**Note:** Monitoring stack test timing updated to 6-7 minutes (from previous 7-8 min) based on November 2025 test runs with S3 storage configuration for Loki.
+**Updated December 2025:** Monitoring stack installation now takes 27-28 minutes (includes full install and uninstall cycle). Infrastructure recreation takes 45-49 minutes. Backup restoration takes 53-55 minutes.
 
 ---
 
@@ -229,21 +264,23 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Prometheus/Grafana/Loki Installation
 
-**Total Time:** 4-5 minutes (updated with S3 storage configuration and measured timings)
+**Total Time:** 27-28 minutes (updated December 2025 - includes full install/uninstall cycle)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
 | **Setup & Validation** | ~30 sec | Configuration validation, dependency checks, cluster connectivity |
 | **Prometheus Operator** | ~1.5-2 min | Metrics collection (includes Prometheus and Grafana) |
 | **Loki** | ~1 min | Log aggregation with S3 storage configuration |
-| **Jaeger** | ~15 sec | Distributed tracing |
-| **Total** | **~4.5 min** | Complete monitoring stack installation |
+| **Tempo** | ~30 sec | Distributed tracing (S3-backed) |
+| **Mimir** | ~45 sec | Long-term metrics storage (S3-backed) |
+| **OTeBPF** | ~20 sec | eBPF auto-instrumentation |
+| **Total** | **~5.5 min** | Complete monitoring stack installation |
 
-**Install/Uninstall Test Timing (November 2025):**
-- **Total Test Duration**: ~6-7 minutes (includes full install + uninstall)
-- **Installation**: ~4.5 minutes (measured from script start to completion)
-- **Uninstallation**: ~1.5-2 minutes (cleanup of all components)
-- **Note:** S3 storage configuration for Loki adds minimal overhead (~30 sec for Terraform output retrieval and ServiceAccount setup)
+**Install/Uninstall Test Timing (December 2025):**
+- **Test Run 1:** 26.98 minutes (1,619 seconds) - full install/uninstall cycle
+- **Test Run 2:** 27.92 minutes (1,675 seconds) - full install/uninstall cycle
+- **Average:** ~27-28 minutes (includes complete installation and uninstallation)
+- **Note:** The monitoring stack test in the end-to-end test suite includes installation of all components (Prometheus, Grafana, Loki, Tempo, Mimir, OTeBPF) followed by complete uninstallation, which accounts for the longer duration compared to standalone installation timing
 
 **Measured Installation Times (November 2025):**
 - **Total Stack Installation**: 258 seconds (4.30 minutes) - end-to-end from script start to completion
@@ -354,15 +391,18 @@ These operations can vary significantly:
 **Typical Time Budgets:**
 - **Quick iteration:** 10-15 min (app changes only)
 - **Full infrastructure test:** 45-60 min (single deployment)
-- **Complete E2E test:** 130-150 min (includes buffer for failures)
-- **Daily CI/CD run:** 180 min (includes retries and reporting)
+- **Complete E2E test:** 220-230 min (includes buffer for failures) - updated December 2025
+- **Daily CI/CD run:** 240-250 min (includes retries and reporting) - updated December 2025
 
 ### For Disaster Recovery Planning
 
-**RTO (Recovery Time Objective) Estimates:**
-- **Full restore process:** 40-43 minutes (includes all steps)
+**RTO (Recovery Time Objective) Estimates (updated December 2025):**
+- **Infrastructure recreation:** 45-49 minutes (if infrastructure was destroyed)
+- **Full restore process:** 53-55 minutes (includes all restore steps)
+- **Total restore (including infrastructure recreation):** 98-104 minutes (if starting from scratch)
 - **DNS propagation:** 5-60 minutes (not measured, varies by DNS provider)
-- **Total RTO:** 45-105 minutes
+- **Total RTO (worst case):** 103-164 minutes (~1.7-2.7 hours)
+- **Total RTO (infrastructure intact):** 58-115 minutes (~1-2 hours)
 
 **RPO (Recovery Point Objective):**
 - Based on backup frequency (manual or scheduled)
@@ -377,12 +417,14 @@ These operations can vary significantly:
 
 | Operation | Quick (Best Case) | Typical | Slow (Worst Case) | Notes |
 |-----------|-------------------|---------|-------------------|-------|
-| **Infrastructure Deploy** | 30 min | 31 min | 32 min | Very consistent |
-| **App Deploy** | 7 min | 9 min | 19 min | High variability |
-| **Backup** | 29 sec | 32 sec | 35 sec | Very consistent |
-| **Restore** | 38 min | 40 min | 43 min | Very consistent (v3.0) |
-| **Infrastructure Delete** | 13 min | 15 min | 17 min | Very consistent (v3.0) |
-| **Full E2E Test** | 155 min | 162 min | 170 min | Includes all phases |
+| **Infrastructure Deploy** | 24.6 min | 25 min | 25.3 min | Very consistent (Dec 2025) |
+| **App Deploy** | 22 min | 23 min | 25.5 min | Consistent (Dec 2025) |
+| **Backup** | 34 sec | 34.5 sec | 35 sec | Very consistent |
+| **Restore** | 52.8 min | 54 min | 55.4 min | Very consistent (Dec 2025) |
+| **Infrastructure Delete** | 16.4 min | 16.5 min | 17.4 min | Very consistent (Dec 2025) |
+| **Infrastructure Recreation** | 45.2 min | 47 min | 49.3 min | Very consistent (Dec 2025) |
+| **Monitoring Stack (install/uninstall)** | 27 min | 27.5 min | 28 min | Very consistent (Dec 2025) |
+| **Full E2E Test** | 211 min | 214 min | 217 min | Includes all phases (Dec 2025) |
 
 ---
 
@@ -412,7 +454,12 @@ These operations can vary significantly:
 
 ## 📝 Data Sources
 
-This timing data is based on multiple complete end-to-end test runs performed in October 2025.
+This timing data is based on multiple complete end-to-end test runs performed in October 2025 and December 2025.
+
+**Latest Test Runs (December 2025):**
+- **Test Run 1:** December 10, 2025 - 13,025 seconds (3.62 hours)
+- **Test Run 2:** December 10, 2025 - 12,673 seconds (3.52 hours)
+- Both tests completed successfully with all phases verified
 
 **Test Environment:**
 - AWS Region: us-west-2
@@ -424,7 +471,7 @@ This timing data is based on multiple complete end-to-end test runs performed in
 **Configuration:**
 - Standard production configuration
 - 2 OpenEMR replicas
-- Enhanced monitoring enabled
+- Enhanced monitoring enabled (Prometheus, Grafana, Loki, Tempo, Mimir, OTeBPF)
 - All security features enabled
 - Backup retention: 7 days
 
@@ -433,6 +480,7 @@ This timing data is based on multiple complete end-to-end test runs performed in
 - Measured in production-like environment
 - Real-world conditions (no artificial optimizations)
 - Includes robustness features and retry logic
+- Timing data captured via comprehensive logging with timestamps
 
 ---
 

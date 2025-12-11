@@ -93,6 +93,38 @@ repos:
         pass_filenames: false
         stages: [manual]
 
+      - id: go-fmt
+        name: Go Format Check
+        entry: bash -c 'cd console && go fmt ./...'
+        language: system
+        types: [file]
+        files: ^console/.*\.go$
+        pass_filenames: false
+
+      - id: go-vet
+        name: Go Vet Check
+        entry: bash -c 'cd console && go vet ./...'
+        language: system
+        types: [file]
+        files: ^console/.*\.go$
+        pass_filenames: false
+
+      - id: go-mod-tidy
+        name: Go Mod Tidy Check
+        entry: bash -c 'cd console && go mod tidy && git diff --exit-code go.mod go.sum'
+        language: system
+        types: [file]
+        files: ^console/go\.mod$
+        pass_filenames: false
+
+      - id: go-build-check
+        name: Go Build Check
+        entry: bash -c 'cd console && go build -o /dev/null .'
+        language: system
+        types: [file]
+        files: ^console/.*\.go$
+        pass_filenames: false
+
 ci:
   autofix_commit_msg: 'style: auto fixes from pre-commit hooks'
   autoupdate_commit_msg: 'ci: pre-commit autoupdate'

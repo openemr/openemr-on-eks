@@ -31,7 +31,9 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - [check-openemr-versions.sh](#check-openemr-versionssh)
 - [Version Management](#5-version-management)
   - [version-manager.sh](#version-managersh)
-- [Testing & Validation](#6-testing--validation)
+- [Codebase Search](#6-codebase-search)
+  - [search-codebase.sh](#search-codebasesh)
+- [Testing & Validation](#7-testing--validation)
   - [run-test-suite.sh](#run-test-suitesh)
   - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
   - [test-warp-pinned-versions.sh](#test-warp-pinned-versionssh)
@@ -376,7 +378,34 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Update codebase search patterns for new file types
 
 
-### 6. Testing & Validation
+### 6. Codebase Search
+
+#### `search-codebase.sh`
+
+- **Purpose**: Interactive tool to search for terms across the entire codebase
+- **Dependencies**: grep, bash
+- **Key Features**:
+  - Searches all files in the project for specified terms
+  - Excludes build artifacts, temporary files, and logs
+  - Displays results with file paths, line numbers, and context
+  - Case-insensitive search by default
+  - Color-coded output for easy reading
+  - Interactive mode - prompts for search term if not provided
+- **Usage Examples**:
+  ```bash
+  # Interactive search (prompts for term)
+  ./scripts/search-codebase.sh
+
+  # Direct search with term
+  ./scripts/search-codebase.sh "terraform"
+  ./scripts/search-codebase.sh "openemr"
+  ```
+- **Maintenance Notes**:
+  - Update exclusion patterns as project structure evolves
+  - Add new file types to exclusion list as needed
+  - Modify search output formatting based on user feedback
+
+### 7. Testing & Validation
 
 #### `run-test-suite.sh`
 

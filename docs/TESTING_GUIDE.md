@@ -238,7 +238,7 @@ The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) **autom
 
 The end-to-end test now includes a comprehensive monitoring stack test (Step 5) that validates:
 
-- **Installation**: Tests the complete monitoring stack installation including Prometheus, Grafana, Loki, and Jaeger
+- **Installation**: Tests the complete monitoring stack installation including Prometheus, AlertManager, Grafana, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - **Functionality**: Verifies that all monitoring components are running and accessible
 - **Integration**: Ensures monitoring components work correctly with the OpenEMR deployment
 - **Uninstallation**: Tests clean removal of all monitoring components

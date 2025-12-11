@@ -434,3 +434,478 @@ resource "aws_s3_bucket_policy" "loki_storage" {
     ]
   })
 }
+
+############################
+# Tempo Storage Bucket
+############################
+
+# S3 bucket for storing Tempo traces
+# This bucket stores all trace data managed by Tempo for distributed tracing
+resource "aws_s3_bucket" "tempo_storage" {
+  bucket = "${var.cluster_name}-tempo-storage-${random_id.bucket_suffix.hex}"
+
+  tags = {
+    Name        = "${var.cluster_name}-tempo-storage"
+    Purpose     = "Tempo Trace Storage"
+    Environment = var.environment
+    Component   = "monitoring"
+  }
+}
+
+# Set object ownership for the Tempo storage bucket
+resource "aws_s3_bucket_ownership_controls" "tempo_storage" {
+  bucket = aws_s3_bucket.tempo_storage.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# Enable versioning for the Tempo storage bucket
+resource "aws_s3_bucket_versioning" "tempo_storage" {
+  bucket = aws_s3_bucket.tempo_storage.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Configure server-side encryption for the Tempo storage bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "tempo_storage" {
+  bucket = aws_s3_bucket.tempo_storage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Configure lifecycle rules for the Tempo storage bucket
+resource "aws_s3_bucket_lifecycle_configuration" "tempo_storage" {
+  bucket = aws_s3_bucket.tempo_storage.id
+
+  rule {
+    id     = "tempo_storage_lifecycle"
+    status = "Enabled"
+
+    # Transition older traces to Intelligent-Tiering after 30 days
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+
+    # Delete after 90 days (trace retention)
+    # Note: Expiration must be greater than all transition days, so we only use Intelligent-Tiering
+    # and delete at 90 days to meet retention requirements
+    expiration {
+      days = 90
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Block public access to the Tempo storage bucket
+resource "aws_s3_bucket_public_access_block" "tempo_storage" {
+  bucket = aws_s3_bucket.tempo_storage.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Tempo bucket policy
+resource "aws_s3_bucket_policy" "tempo_storage" {
+  bucket     = aws_s3_bucket.tempo_storage.id
+  depends_on = [aws_s3_bucket_ownership_controls.tempo_storage]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowTempoAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.tempo_s3.arn
+        }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.tempo_storage.arn,
+          "${aws_s3_bucket.tempo_storage.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+############################
+# Mimir Blocks Storage Bucket
+############################
+
+# S3 bucket for storing Mimir blocks (metrics data)
+# This bucket stores all metrics blocks managed by Mimir for long-term retention
+resource "aws_s3_bucket" "mimir_blocks_storage" {
+  bucket = "${var.cluster_name}-mimir-blocks-storage-${random_id.bucket_suffix.hex}"
+
+  tags = {
+    Name        = "${var.cluster_name}-mimir-blocks-storage"
+    Purpose     = "Mimir Blocks Storage"
+    Environment = var.environment
+    Component   = "monitoring"
+  }
+}
+
+# Set object ownership for the Mimir blocks storage bucket
+resource "aws_s3_bucket_ownership_controls" "mimir_blocks_storage" {
+  bucket = aws_s3_bucket.mimir_blocks_storage.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# Enable versioning for the Mimir blocks storage bucket
+resource "aws_s3_bucket_versioning" "mimir_blocks_storage" {
+  bucket = aws_s3_bucket.mimir_blocks_storage.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Configure server-side encryption for the Mimir blocks storage bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "mimir_blocks_storage" {
+  bucket = aws_s3_bucket.mimir_blocks_storage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Configure lifecycle rules for the Mimir blocks storage bucket
+resource "aws_s3_bucket_lifecycle_configuration" "mimir_blocks_storage" {
+  bucket = aws_s3_bucket.mimir_blocks_storage.id
+
+  rule {
+    id     = "mimir_blocks_storage_lifecycle"
+    status = "Enabled"
+
+    # Transition older metrics to Intelligent-Tiering after 30 days
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+
+    # Transition to Glacier after 90 days
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    # Delete after 365 days (1 year retention)
+    expiration {
+      days = 365
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Block public access to the Mimir blocks storage bucket
+resource "aws_s3_bucket_public_access_block" "mimir_blocks_storage" {
+  bucket = aws_s3_bucket.mimir_blocks_storage.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Mimir blocks storage bucket policy
+resource "aws_s3_bucket_policy" "mimir_blocks_storage" {
+  bucket     = aws_s3_bucket.mimir_blocks_storage.id
+  depends_on = [aws_s3_bucket_ownership_controls.mimir_blocks_storage]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowMimirAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.mimir_s3.arn
+        }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.mimir_blocks_storage.arn,
+          "${aws_s3_bucket.mimir_blocks_storage.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+############################
+# Mimir Ruler Storage Bucket
+############################
+
+# S3 bucket for storing Mimir ruler data (recording rules and alerting rules)
+# This bucket stores ruler state and rule evaluation results
+resource "aws_s3_bucket" "mimir_ruler_storage" {
+  bucket = "${var.cluster_name}-mimir-ruler-storage-${random_id.bucket_suffix.hex}"
+
+  tags = {
+    Name        = "${var.cluster_name}-mimir-ruler-storage"
+    Purpose     = "Mimir Ruler Storage"
+    Environment = var.environment
+    Component   = "monitoring"
+  }
+}
+
+# Set object ownership for the Mimir ruler storage bucket
+resource "aws_s3_bucket_ownership_controls" "mimir_ruler_storage" {
+  bucket = aws_s3_bucket.mimir_ruler_storage.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# Enable versioning for the Mimir ruler storage bucket
+resource "aws_s3_bucket_versioning" "mimir_ruler_storage" {
+  bucket = aws_s3_bucket.mimir_ruler_storage.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Configure server-side encryption for the Mimir ruler storage bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "mimir_ruler_storage" {
+  bucket = aws_s3_bucket.mimir_ruler_storage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Configure lifecycle rules for the Mimir ruler storage bucket
+resource "aws_s3_bucket_lifecycle_configuration" "mimir_ruler_storage" {
+  bucket = aws_s3_bucket.mimir_ruler_storage.id
+
+  rule {
+    id     = "mimir_ruler_storage_lifecycle"
+    status = "Enabled"
+
+    # Transition older data to Intelligent-Tiering after 30 days
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+
+    # Transition to Glacier after 90 days
+    transition {
+      days          = 90
+      storage_class = "GLACIER"
+    }
+
+    # Delete after 365 days (1 year retention)
+    expiration {
+      days = 365
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Block public access to the Mimir ruler storage bucket
+resource "aws_s3_bucket_public_access_block" "mimir_ruler_storage" {
+  bucket = aws_s3_bucket.mimir_ruler_storage.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Mimir ruler storage bucket policy
+resource "aws_s3_bucket_policy" "mimir_ruler_storage" {
+  bucket     = aws_s3_bucket.mimir_ruler_storage.id
+  depends_on = [aws_s3_bucket_ownership_controls.mimir_ruler_storage]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowMimirAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.mimir_s3.arn
+        }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.mimir_ruler_storage.arn,
+          "${aws_s3_bucket.mimir_ruler_storage.arn}/*"
+        ]
+      }
+    ]
+  })
+}
+
+############################
+# AlertManager State Storage Bucket
+############################
+
+# S3 bucket for storing AlertManager state
+# This bucket stores AlertManager cluster state for high availability
+resource "aws_s3_bucket" "alertmanager_storage" {
+  bucket = "${var.cluster_name}-alertmanager-storage-${random_id.bucket_suffix.hex}"
+
+  tags = {
+    Name        = "${var.cluster_name}-alertmanager-storage"
+    Purpose     = "AlertManager State Storage"
+    Environment = var.environment
+    Component   = "monitoring"
+  }
+}
+
+# Set object ownership for the AlertManager storage bucket
+resource "aws_s3_bucket_ownership_controls" "alertmanager_storage" {
+  bucket = aws_s3_bucket.alertmanager_storage.id
+
+  rule {
+    object_ownership = "BucketOwnerEnforced"
+  }
+}
+
+# Enable versioning for the AlertManager storage bucket
+resource "aws_s3_bucket_versioning" "alertmanager_storage" {
+  bucket = aws_s3_bucket.alertmanager_storage.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+# Configure server-side encryption for the AlertManager storage bucket
+resource "aws_s3_bucket_server_side_encryption_configuration" "alertmanager_storage" {
+  bucket = aws_s3_bucket.alertmanager_storage.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      kms_master_key_id = aws_kms_key.s3.arn
+      sse_algorithm     = "aws:kms"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# Configure lifecycle rules for the AlertManager storage bucket
+# AlertManager state is small but should be retained for disaster recovery
+resource "aws_s3_bucket_lifecycle_configuration" "alertmanager_storage" {
+  bucket = aws_s3_bucket.alertmanager_storage.id
+
+  rule {
+    id     = "alertmanager_storage_lifecycle"
+    status = "Enabled"
+
+    # Transition older state files to Intelligent-Tiering after 30 days
+    transition {
+      days          = 30
+      storage_class = "INTELLIGENT_TIERING"
+    }
+
+    # Delete after 365 days (1 year retention for state files)
+    expiration {
+      days = 365
+    }
+
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+}
+
+# Block public access to the AlertManager storage bucket
+resource "aws_s3_bucket_public_access_block" "alertmanager_storage" {
+  bucket = aws_s3_bucket.alertmanager_storage.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# AlertManager bucket policy
+resource "aws_s3_bucket_policy" "alertmanager_storage" {
+  bucket     = aws_s3_bucket.alertmanager_storage.id
+  depends_on = [aws_s3_bucket_ownership_controls.alertmanager_storage]
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "AllowAlertManagerAccess"
+        Effect = "Allow"
+        Principal = {
+          AWS = aws_iam_role.alertmanager_s3.arn
+        }
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListBucket"
+        ]
+        Resource = [
+          aws_s3_bucket.alertmanager_storage.arn,
+          "${aws_s3_bucket.alertmanager_storage.arn}/*"
+        ]
+      }
+    ]
+  })
+}

@@ -57,6 +57,10 @@
 
 set -e
 
+# Disable AWS CLI pager to prevent interactive editors from opening
+export AWS_PAGER=""
+export AWS_CLI_AUTO_PROMPT=off
+
 # Color codes for terminal output - provides visual feedback during backup operations
 # These colors help distinguish between different types of messages (info, success, warnings, errors)
 RED='\033[0;31m'      # Error messages and critical failures

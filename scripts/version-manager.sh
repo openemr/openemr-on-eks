@@ -73,7 +73,7 @@ TEMP_DIR="/tmp/openemr-version-check-$$"                     # Temporary directo
 
 # Create temporary directory for processing and set cleanup trap
 mkdir -p "$TEMP_DIR"
-trap "rm -rf '$TEMP_DIR'" EXIT  # Ensure cleanup on script exit
+trap 'rm -rf "$TEMP_DIR"' EXIT  # Ensure cleanup on script exit
 
 # Logging function - provides consistent, timestamped logging
 # This function ensures all version management activities are logged with timestamps
@@ -350,7 +350,9 @@ parse_config() {
     # Monitoring stack versions
     PROMETHEUS_CURRENT=$(yq eval '.monitoring.prometheus_operator.current' "$VERSIONS_FILE")
     LOKI_CURRENT=$(yq eval '.monitoring.loki.current' "$VERSIONS_FILE")
-    JAEGER_CURRENT=$(yq eval '.monitoring.jaeger.current' "$VERSIONS_FILE")
+    TEMPO_CURRENT=$(yq eval '.monitoring.tempo.current' "$VERSIONS_FILE")
+    MIMIR_CURRENT=$(yq eval '.monitoring.mimir.current' "$VERSIONS_FILE")
+    OTEBPF_CURRENT=$(yq eval '.monitoring.otebpf.current' "$VERSIONS_FILE")
 }
 
 # Function to get the latest Docker image version from Docker Hub
@@ -363,10 +365,8 @@ get_latest_docker_version() {
 
     # Construct Docker Hub API URL for the registry
     local url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100"
-    local response=$(curl -s "$url")
-
-    # Check if curl command succeeded
-    if [ $? -ne 0 ]; then
+    local response
+    if ! response=$(curl -s "$url"); then
         log "ERROR" "Failed to fetch tags from Docker Hub for $registry"
         return 1
     fi
@@ -418,8 +418,14 @@ get_latest_helm_version() {
         "loki")
             repo_url="https://grafana.github.io/helm-charts/index.yaml"
             ;;
-        "jaeger")
-            repo_url="https://jaegertracing.github.io/helm-charts/index.yaml"
+        "tempo")
+            repo_url="https://grafana.github.io/helm-charts/index.yaml"
+            ;;
+        "tempo-distributed")
+            repo_url="https://grafana.github.io/helm-charts/index.yaml"
+            ;;
+        "mimir-distributed")
+            repo_url="https://grafana.github.io/helm-charts/index.yaml"
             ;;
         "cert-manager")
             repo_url="https://charts.jetstack.io/index.yaml"
@@ -435,10 +441,8 @@ get_latest_helm_version() {
 
     # Get the repository index and extract the latest version
     # The repository index is a YAML file containing chart metadata
-    local index_content=$(curl -s "$repo_url")
-    
-    # Check if curl command succeeded and content was retrieved
-    if [ $? -ne 0 ] || [ -z "$index_content" ]; then
+    local index_content
+    if ! index_content=$(curl -s "$repo_url") || [ -z "$index_content" ]; then
         log "ERROR" "Failed to fetch repository index for $chart"
         echo "❌ Error"
         return 1
@@ -534,37 +538,27 @@ get_latest_eks_addon_version() {
     
     # First try to get the latest version for the specific cluster version
     # This ensures compatibility with the current cluster version
-    local latest_version=$(aws eks describe-addon-versions \
+    local latest_version
+    if ! latest_version=$(aws eks describe-addon-versions \
         --addon-name "$addon_name" \
         --kubernetes-version "$cluster_version" \
         --query 'addons[0].addonVersions[0].addonVersion' \
-        --output text 2>/dev/null)
-    
-    # If that fails, try to get the latest version without specifying cluster version
-    # This provides a fallback when cluster version filtering doesn't work
-    if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
+        --output text 2>/dev/null) || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
         log "INFO" "Trying to get latest version for $addon_name without cluster version filter"
-        latest_version=$(aws eks describe-addon-versions \
+        if ! latest_version=$(aws eks describe-addon-versions \
             --addon-name "$addon_name" \
             --query 'addons[0].addonVersions[0].addonVersion' \
-            --output text 2>/dev/null)
-    fi
-    
-    # If still no luck, try to get any available version
-    # This is the final fallback to get any version of the add-on
-    if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
-        log "INFO" "Trying to get any available version for $addon_name"
-        latest_version=$(aws eks describe-addon-versions \
-            --addon-name "$addon_name" \
-            --query 'addons[0].addonVersions[-1].addonVersion' \
-            --output text 2>/dev/null)
-    fi
-    
-    # Validate that we successfully retrieved a version
-    if [ $? -ne 0 ] || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
-        log "WARN" "Failed to fetch EKS add-on version for $addon_name"
-        echo "❌ Error"
-        return 1
+            --output text 2>/dev/null) || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
+            log "INFO" "Trying to get any available version for $addon_name"
+            if ! latest_version=$(aws eks describe-addon-versions \
+                --addon-name "$addon_name" \
+                --query 'addons[0].addonVersions[-1].addonVersion' \
+                --output text 2>/dev/null) || [ -z "$latest_version" ] || [ "$latest_version" = "None" ]; then
+                log "WARN" "Failed to fetch EKS add-on version for $addon_name"
+                echo "❌ Error"
+                return 1
+            fi
+        fi
     fi
     
     log "INFO" "Latest version for EKS add-on $addon_name: $latest_version"
@@ -833,6 +827,142 @@ get_latest_pre_commit_hook_version() {
     echo "$latest_version"
 }
 
+# Function to get the latest Go package version from GitHub
+# This function retrieves the latest version of a Go package from GitHub
+get_latest_go_package_version() {
+    local package_repo="$1"  # GitHub repository (e.g., "charmbracelet/bubbletea" or "github.com/charmbracelet/bubbletea")
+
+    # Normalize repository path - remove github.com/ prefix if present
+    local repo_path="$package_repo"
+    if [[ "$package_repo" == github.com/* ]]; then
+        repo_path=$(echo "$package_repo" | sed 's|^github.com/||')
+    fi
+
+    log "INFO" "Checking latest version for Go package: $repo_path..."
+
+    # Use GitHub API to get latest release
+    local url="https://api.github.com/repos/${repo_path}/releases/latest"
+
+    # Fetch the latest release information from GitHub API
+    local response=$(curl -s "$url" 2>/dev/null || echo "")
+
+    # Check if the API call was successful and response is valid JSON
+    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
+        log "WARN" "Failed to fetch or parse GitHub API response for $repo_path, trying tags..."
+        # Try tags as fallback
+        local tags_url="https://api.github.com/repos/${repo_path}/tags"
+        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
+        
+        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
+            # Get the first tag (latest)
+            local latest_tag=$(echo "$tags_response" | jq -r '.[0].name' 2>/dev/null || echo "")
+            if [ -n "$latest_tag" ] && [ "$latest_tag" != "null" ]; then
+                log "INFO" "Latest version for $repo_path (from tags): $latest_tag"
+                echo "$latest_tag"
+                return 0
+            fi
+        fi
+        echo "❌ Error"
+        return 1
+    fi
+
+    # Check for GitHub API error messages
+    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
+        log "WARN" "GitHub API error for $repo_path: $(echo "$response" | jq -r '.message'), trying tags..."
+        # Try tags as fallback
+        local tags_url="https://api.github.com/repos/${repo_path}/tags"
+        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
+        
+        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
+            local latest_tag=$(echo "$tags_response" | jq -r '.[0].name' 2>/dev/null || echo "")
+            if [ -n "$latest_tag" ] && [ "$latest_tag" != "null" ]; then
+                log "INFO" "Latest version for $repo_path (from tags): $latest_tag"
+                echo "$latest_tag"
+                return 0
+            fi
+        fi
+        echo "❌ Error"
+        return 1
+    fi
+
+    # Extract tag name (version) from the release information
+    local version=$(echo "$response" | jq -r '.tag_name' 2>/dev/null || echo "")
+    
+    if [ -z "$version" ] || [ "$version" = "null" ]; then
+        log "WARN" "Could not determine latest version for $repo_path"
+        echo "❌ Unable to determine"
+        return 1
+    fi
+
+    log "INFO" "Latest version for $repo_path: $version"
+    echo "$version"
+}
+
+# Function to get the latest Go version
+# This function retrieves the latest Go version from the official Go repository
+get_latest_go_version() {
+    log "INFO" "Checking latest Go version..."
+
+    # Use GitHub API to get Go releases (golang/go repository)
+    local url="https://api.github.com/repos/golang/go/releases/latest"
+    local response=$(curl -s "$url" 2>/dev/null || echo "")
+
+    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
+        log "WARN" "Failed to fetch or parse GitHub API response for Go, trying tags..."
+        # Fallback to tags API
+        local tags_url="https://api.github.com/repos/golang/go/tags"
+        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
+        
+        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
+            # Get the first tag that matches go1.x.x pattern
+            local version=$(echo "$tags_response" | jq -r '.[] | select(.name | test("^go1\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^go//' || echo "")
+            if [ -n "$version" ] && [ "$version" != "null" ]; then
+                version=$(echo "$version" | cut -d. -f1,2)
+                log "INFO" "Latest Go version (from tags): $version"
+                echo "$version"
+                return 0
+            fi
+        fi
+        echo "❌ Error"
+        return 1
+    fi
+
+    # Check for GitHub API error messages
+    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
+        log "WARN" "GitHub API error for Go: $(echo "$response" | jq -r '.message'), trying tags..."
+        # Fallback to tags API
+        local tags_url="https://api.github.com/repos/golang/go/tags"
+        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
+        
+        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
+            local version=$(echo "$tags_response" | jq -r '.[] | select(.name | test("^go1\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^go//' || echo "")
+            if [ -n "$version" ] && [ "$version" != "null" ]; then
+                version=$(echo "$version" | cut -d. -f1,2)
+                log "INFO" "Latest Go version (from tags): $version"
+                echo "$version"
+                return 0
+            fi
+        fi
+        echo "❌ Error"
+        return 1
+    fi
+
+    # Extract tag name and remove 'go' prefix (e.g., "go1.25.0" -> "1.25.0")
+    local version=$(echo "$response" | jq -r '.tag_name' 2>/dev/null | sed 's/^go//' || echo "")
+    
+    if [ -z "$version" ] || [ "$version" = "null" ]; then
+        log "WARN" "Could not determine latest Go version"
+        echo "❌ Unable to determine"
+        return 1
+    fi
+
+    # Extract major.minor version (e.g., "1.25.0" -> "1.25")
+    version=$(echo "$version" | cut -d. -f1,2)
+    
+    log "INFO" "Latest Go version: $version"
+    echo "$version"
+}
+
 # Function to get the latest semver package version
 # This function retrieves the latest version of a package that follows semantic versioning
 get_latest_semver_version() {
@@ -1093,6 +1223,17 @@ EOF
             updates_found=1
         fi
 
+        # Check actions/setup-go
+        local go_action_current=$(yq eval '.github_workflows.actions_setup_go.current' "$VERSIONS_FILE")
+        local go_action_latest=$(get_latest_github_action_version "actions/setup-go")
+
+        if [ "$go_action_latest" != "❌ Error" ] && ! compare_versions "$go_action_current" "$go_action_latest"; then
+            log "INFO" "actions/setup-go update available: $go_action_current -> $go_action_latest"
+            echo "- **actions/setup-go**: $go_action_current → $go_action_latest" >> "$update_report"
+            search_version_in_codebase "actions/setup-go" "$go_action_current" "$go_action_latest"
+            updates_found=1
+        fi
+
         # Check hashicorp/setup-terraform
         local terraform_action_current=$(yq eval '.github_workflows.actions_setup_terraform.current' "$VERSIONS_FILE")
         local terraform_action_latest=$(get_latest_github_action_version "hashicorp/setup-terraform")
@@ -1282,6 +1423,54 @@ EOF
         fi
     fi
 
+    # Check Go packages if requested
+    if [ "$components" = "all" ] || [ "$components" = "go_packages" ]; then
+        log "INFO" "Checking Go package versions..."
+
+        # Check Go version
+        local go_current=$(yq eval '.go_packages.go_version.current' "$VERSIONS_FILE")
+        local go_latest=$(get_latest_go_version)
+
+        if [ "$go_latest" != "❌ Error" ] && [ "$go_latest" != "❌ Unable to determine" ] && [ "$go_latest" != "$go_current" ]; then
+            log "INFO" "Go version update available: $go_current -> $go_latest"
+            echo "- **Go**: $go_current → $go_latest" >> "$update_report"
+            search_version_in_codebase "Go" "$go_current" "$go_latest"
+            updates_found=1
+        fi
+
+        # Check bubbletea version
+        local bubbletea_current=$(yq eval '.go_packages.bubbletea.current' "$VERSIONS_FILE")
+        local bubbletea_repo=$(yq eval '.go_packages.bubbletea.repository' "$VERSIONS_FILE" 2>/dev/null || echo "charmbracelet/bubbletea")
+        # Normalize repository path - remove github.com/ prefix if present
+        if [[ "$bubbletea_repo" == github.com/* ]]; then
+            bubbletea_repo=$(echo "$bubbletea_repo" | sed 's|^github.com/||')
+        fi
+        local bubbletea_latest=$(get_latest_go_package_version "$bubbletea_repo")
+
+        if [ "$bubbletea_latest" != "❌ Error" ] && [ "$bubbletea_latest" != "❌ Unable to determine" ] && [ "$bubbletea_latest" != "$bubbletea_current" ]; then
+            log "INFO" "bubbletea update available: $bubbletea_current -> $bubbletea_latest"
+            echo "- **bubbletea**: $bubbletea_current → $bubbletea_latest" >> "$update_report"
+            search_version_in_codebase "bubbletea" "$bubbletea_current" "$bubbletea_latest"
+            updates_found=1
+        fi
+
+        # Check lipgloss version
+        local lipgloss_current=$(yq eval '.go_packages.lipgloss.current' "$VERSIONS_FILE")
+        local lipgloss_repo=$(yq eval '.go_packages.lipgloss.repository' "$VERSIONS_FILE" 2>/dev/null || echo "charmbracelet/lipgloss")
+        # Normalize repository path - remove github.com/ prefix if present
+        if [[ "$lipgloss_repo" == github.com/* ]]; then
+            lipgloss_repo=$(echo "$lipgloss_repo" | sed 's|^github.com/||')
+        fi
+        local lipgloss_latest=$(get_latest_go_package_version "$lipgloss_repo")
+
+        if [ "$lipgloss_latest" != "❌ Error" ] && [ "$lipgloss_latest" != "❌ Unable to determine" ] && [ "$lipgloss_latest" != "$lipgloss_current" ]; then
+            log "INFO" "lipgloss update available: $lipgloss_current -> $lipgloss_latest"
+            echo "- **lipgloss**: $lipgloss_current → $lipgloss_latest" >> "$update_report"
+            search_version_in_codebase "lipgloss" "$lipgloss_current" "$lipgloss_latest"
+            updates_found=1
+        fi
+    fi
+
     # Check monitoring stack versions if requested
     if [ "$components" = "all" ] || [ "$components" = "monitoring" ]; then
         log "INFO" "Checking monitoring stack versions..."
@@ -1296,7 +1485,7 @@ EOF
         fi
 
         # Loki
-        local loki_latest=$(get_latest_helm_version "loki" "grafana")
+        local loki_latest=$(get_latest_helm_version "loki")
         if [ "$loki_latest" != "$LOKI_CURRENT" ]; then
             log "INFO" "Loki update available: $LOKI_CURRENT -> $loki_latest"
             echo "- **Loki**: $LOKI_CURRENT → $loki_latest" >> "$update_report"
@@ -1304,18 +1493,39 @@ EOF
             updates_found=1
         fi
 
-        # Jaeger
-        local jaeger_latest=$(get_latest_helm_version "jaeger")
-        if [ "$jaeger_latest" != "$JAEGER_CURRENT" ]; then
-            log "INFO" "Jaeger update available: $JAEGER_CURRENT -> $jaeger_latest"
-            echo "- **Jaeger**: $JAEGER_CURRENT → $jaeger_latest" >> "$update_report"
-            search_version_in_codebase "Jaeger" "$JAEGER_CURRENT" "$jaeger_latest"
+        # Tempo (using tempo-distributed chart)
+        local tempo_latest=$(get_latest_helm_version "tempo-distributed")
+        if [ "$tempo_latest" != "$TEMPO_CURRENT" ]; then
+            log "INFO" "Tempo update available: $TEMPO_CURRENT -> $tempo_latest"
+            echo "- **Tempo**: $TEMPO_CURRENT → $tempo_latest" >> "$update_report"
+            search_version_in_codebase "Tempo" "$TEMPO_CURRENT" "$tempo_latest"
             updates_found=1
         fi
 
+        # Mimir
+        local mimir_latest=$(get_latest_helm_version "mimir-distributed")
+        if [ "$mimir_latest" != "$MIMIR_CURRENT" ]; then
+            log "INFO" "Mimir update available: $MIMIR_CURRENT -> $mimir_latest"
+            echo "- **Mimir**: $MIMIR_CURRENT → $mimir_latest" >> "$update_report"
+            search_version_in_codebase "Mimir" "$MIMIR_CURRENT" "$mimir_latest"
+            updates_found=1
+        fi
+
+        # OTeBPF (check Docker image version since it's not a Helm chart)
+        local otebpf_repo=$(yq eval '.monitoring.otebpf.repository' "$VERSIONS_FILE" 2>/dev/null || echo "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation")
+        local otebpf_latest=$(get_latest_docker_version "$otebpf_repo" "false")
+        if [ "$otebpf_latest" != "$OTEBPF_CURRENT" ]; then
+            log "INFO" "OTeBPF update available: $OTEBPF_CURRENT -> $otebpf_latest"
+            echo "- **OTeBPF**: $OTEBPF_CURRENT → $otebpf_latest" >> "$update_report"
+            search_version_in_codebase "OTeBPF" "$OTEBPF_CURRENT" "$otebpf_latest"
+            updates_found=1
+        fi
+
+
+
         # cert-manager
         local cert_manager_current=$(yq eval '.monitoring.cert_manager.current' "$VERSIONS_FILE")
-        local cert_manager_latest=$(get_latest_helm_version "cert-manager" "jetstack")
+        local cert_manager_latest=$(get_latest_helm_version "cert-manager")
         if [ "$cert_manager_latest" != "$cert_manager_current" ]; then
             log "INFO" "cert-manager update available: $cert_manager_current -> $cert_manager_latest"
             echo "- **cert-manager**: $cert_manager_current → $cert_manager_latest" >> "$update_report"
@@ -1395,7 +1605,7 @@ Commands:
   help                     Show this help message
 
 Options:
-  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, monitoring, eks_addons)
+  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, go_packages, monitoring, eks_addons)
   --create-issue          Create GitHub issue for updates (used by CI/CD)
   --month <month>         Specify month for report title (used by CI/CD)
   --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR)
@@ -1407,13 +1617,15 @@ Component Types:
   github_workflows        GitHub Actions dependencies
   pre_commit_hooks        Pre-commit hook versions
   semver_packages         Python, Terraform, kubectl versions
-  monitoring              Prometheus, Loki, Jaeger
+  go_packages             Go version, bubbletea, lipgloss
+  monitoring              Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
   eks_addons             EFS CSI Driver, Metrics Server
 
 Examples:
   $0 check                                    # Check all components
   $0 check --components applications          # Check only applications
   $0 check --components terraform_modules     # Check only Terraform modules
+  $0 check --components go_packages           # Check only Go packages
   $0 check --components eks_addons           # Check only EKS add-ons
   $0 check --create-issue --month "January 2025"  # Create GitHub issue
   $0 status                                   # Show current status
@@ -1437,10 +1649,28 @@ show_status() {
     echo -e "  Kubernetes: ${GREEN}$K8S_CURRENT${NC}"
     echo -e "  Aurora MySQL: ${GREEN}$AURORA_CURRENT${NC}"
     echo ""
+    
+    # Show Go packages if available
+    if yq eval '.go_packages' "$VERSIONS_FILE" >/dev/null 2>&1; then
+        local go_version=$(yq eval '.go_packages.go_version.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local bubbletea_version=$(yq eval '.go_packages.bubbletea.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local lipgloss_version=$(yq eval '.go_packages.lipgloss.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        
+        if [ -n "$go_version" ] || [ -n "$bubbletea_version" ] || [ -n "$lipgloss_version" ]; then
+            echo -e "${BLUE}Go Packages:${NC}"
+            [ -n "$go_version" ] && echo -e "  Go: ${GREEN}$go_version${NC}"
+            [ -n "$bubbletea_version" ] && echo -e "  bubbletea: ${GREEN}$bubbletea_version${NC}"
+            [ -n "$lipgloss_version" ] && echo -e "  lipgloss: ${GREEN}$lipgloss_version${NC}"
+            echo ""
+        fi
+    fi
+    
     echo -e "${BLUE}Monitoring:${NC}"
     echo -e "  Prometheus Operator: ${GREEN}$PROMETHEUS_CURRENT${NC}"
     echo -e "  Loki: ${GREEN}$LOKI_CURRENT${NC}"
-    echo -e "  Jaeger: ${GREEN}$JAEGER_CURRENT${NC}"
+    echo -e "  Tempo: ${GREEN}$TEMPO_CURRENT${NC}"
+    echo -e "  Mimir: ${GREEN}$MIMIR_CURRENT${NC}"
+    echo -e "  OTeBPF: ${GREEN}$OTEBPF_CURRENT${NC}"
     echo ""
 }
 

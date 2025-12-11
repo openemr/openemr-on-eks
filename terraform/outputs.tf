@@ -171,6 +171,71 @@ output "loki_s3_role_arn" {
   value       = aws_iam_role.loki_s3.arn
 }
 
+output "tempo_s3_bucket_name" {
+  description = "Name of the S3 bucket for Tempo trace storage"
+  value       = aws_s3_bucket.tempo_storage.bucket
+}
+
+output "tempo_s3_bucket_arn" {
+  description = "ARN of the S3 bucket for Tempo trace storage"
+  value       = aws_s3_bucket.tempo_storage.arn
+}
+
+output "tempo_s3_role_arn" {
+  description = "ARN of the Tempo IAM role for S3 storage access"
+  value       = aws_iam_role.tempo_s3.arn
+}
+
+output "mimir_s3_bucket_name" {
+  description = "Name of the S3 bucket for Mimir blocks storage (deprecated - use mimir_blocks_s3_bucket_name)"
+  value       = aws_s3_bucket.mimir_blocks_storage.bucket
+}
+
+output "mimir_s3_bucket_arn" {
+  description = "ARN of the S3 bucket for Mimir blocks storage (deprecated - use mimir_blocks_s3_bucket_arn)"
+  value       = aws_s3_bucket.mimir_blocks_storage.arn
+}
+
+output "mimir_blocks_s3_bucket_name" {
+  description = "Name of the S3 bucket for Mimir blocks storage"
+  value       = aws_s3_bucket.mimir_blocks_storage.bucket
+}
+
+output "mimir_blocks_s3_bucket_arn" {
+  description = "ARN of the S3 bucket for Mimir blocks storage"
+  value       = aws_s3_bucket.mimir_blocks_storage.arn
+}
+
+output "mimir_ruler_s3_bucket_name" {
+  description = "Name of the S3 bucket for Mimir ruler storage"
+  value       = aws_s3_bucket.mimir_ruler_storage.bucket
+}
+
+output "mimir_ruler_s3_bucket_arn" {
+  description = "ARN of the S3 bucket for Mimir ruler storage"
+  value       = aws_s3_bucket.mimir_ruler_storage.arn
+}
+
+output "mimir_s3_role_arn" {
+  description = "ARN of the Mimir IAM role for S3 storage access"
+  value       = aws_iam_role.mimir_s3.arn
+}
+
+output "alertmanager_s3_bucket_name" {
+  description = "Name of the S3 bucket for AlertManager state storage"
+  value       = aws_s3_bucket.alertmanager_storage.bucket
+}
+
+output "alertmanager_s3_bucket_arn" {
+  description = "ARN of the S3 bucket for AlertManager state storage"
+  value       = aws_s3_bucket.alertmanager_storage.arn
+}
+
+output "alertmanager_s3_role_arn" {
+  description = "ARN of the AlertManager IAM role for S3 storage access"
+  value       = aws_iam_role.alertmanager_s3.arn
+}
+
 # CloudWatch Logging Outputs
 # These outputs expose key information about the CloudWatch log groups that collect
 # and store logs from OpenEMR and Fluent Bit, enabling centralized log management

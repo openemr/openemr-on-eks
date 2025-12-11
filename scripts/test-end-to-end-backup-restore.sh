@@ -62,6 +62,10 @@
 
 set -euo pipefail
 
+# Disable AWS CLI pager to prevent interactive editors from opening
+export AWS_PAGER=""
+export AWS_CLI_AUTO_PROMPT=off
+
 # Color codes for terminal output - provides visual distinction between different message types
 RED='\033[0;31m'      # Error messages and failed tests
 GREEN='\033[0;32m'    # Success messages and passed tests

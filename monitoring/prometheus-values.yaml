@@ -14,8 +14,8 @@
 # =============================================================================
 # ✅ Generates secure passwords and stores them safely
 # ✅ Sets up comprehensive security contexts and RBAC
-# ✅ Integrates Prometheus, Grafana, Loki, and Jaeger
-# ✅ Configures AlertManager with optional Slack integration
+# ✅ Integrates Prometheus, Grafana, Loki, Tempo, Mimir, and OTeBPF
+# ✅ Configures AlertManager with optional Slack integration and S3 storage
 # ✅ Provides port-forwarding access for secure local access
 
 # =============================================================================
@@ -31,12 +31,54 @@
 # PROMETHEUS_MAX_REPLICAS="3"                   # Max Prometheus replicas (default: 3)
 # LOKI_MIN_REPLICAS="1"                         # Min Loki replicas (default: 1)
 # LOKI_MAX_REPLICAS="3"                         # Max Loki replicas (default: 3)
+# TEMPO_MIN_REPLICAS="1"                        # Min Tempo replicas (default: 1)
+# TEMPO_MAX_REPLICAS="3"                        # Max Tempo replicas (default: 3)
+# MIMIR_MIN_REPLICAS="1"                        # Min Mimir replicas (default: 1)
+# MIMIR_MAX_REPLICAS="3"                        # Max Mimir replicas (default: 3)
 # ALERTMANAGER_MIN_REPLICAS="1"                 # Min AlertManager replicas (default: 1)
 # ALERTMANAGER_MAX_REPLICAS="3"                 # Max AlertManager replicas (default: 3)
-# JAEGER_MIN_REPLICAS="1"                       # Min Jaeger replicas (default: 1)
-# JAEGER_MAX_REPLICAS="3"                       # Max Jaeger replicas (default: 3)
 # HPA_CPU_TARGET="70"                           # CPU target % for HPA (default: 70)
 # HPA_MEMORY_TARGET="80"                        # Memory target % for HPA (default: 80)
+
+# Component Readiness Check Configuration
+# TEMPO_READINESS_MAX_RETRIES="60"              # Maximum number of retry attempts for Tempo readiness check (default: 60)
+# TEMPO_READINESS_SLEEP_INTERVAL="5"            # Sleep interval in seconds between Tempo readiness checks (default: 5)
+# TEMPO_READINESS_MIN_RUNNING_PODS="1"          # Minimum number of running pods required for Tempo to be considered ready (default: 1)
+# OTEBPF_READINESS_MAX_RETRIES="30"             # Maximum number of retry attempts for OTeBPF readiness check (default: 30)
+# OTEBPF_READINESS_SLEEP_INTERVAL="2"           # Sleep interval in seconds between OTeBPF readiness checks (default: 2)
+# OTEBPF_READINESS_MIN_RUNNING_PODS="1"         # Minimum number of running pods required for OTeBPF to be considered ready (default: 1)
+
+# Component-Specific Retry and Delay Configuration
+# HELM_INSTALL_RETRY_DELAY="30"                 # Delay between Helm install retries in seconds (default: 30)
+# PATCH_RETRY_DELAY="5"                         # Delay between patch operation retries in seconds (default: 5)
+# PVC_WAIT_DELAY="5"                            # Delay after PVC creation before checking in seconds (default: 5)
+# QUERY_FRONTEND_READINESS_INITIAL_DELAY="10"   # Initial delay for query-frontend readiness probe in seconds (default: 10)
+
+# kubectl Wait Timeouts
+# KUBECTL_WAIT_TIMEOUT_SHORT="180s"             # Short timeout for quick operations (e.g., Grafana restart) (default: 180s)
+# KUBECTL_WAIT_TIMEOUT_MEDIUM="300s"            # Medium timeout for standard operations (default: 300s)
+# KUBECTL_WAIT_TIMEOUT_LONG="600s"              # Long timeout for slow operations (e.g., Mimir initialization) (default: 600s)
+
+# AlertManager Cluster Configuration
+# ALERTMANAGER_PEER_TIMEOUT="15s"                # Peer timeout for AlertManager cluster (default: 15s)
+# ALERTMANAGER_GOSSIP_INTERVAL="200ms"           # Gossip interval for AlertManager cluster (default: 200ms)
+# ALERTMANAGER_PUSH_PULL_INTERVAL="60s"          # Push-pull interval for AlertManager cluster (default: 60s)
+# ALERTMANAGER_REPEAT_INTERVAL="24h"             # Repeat interval for AlertManager alerts (default: 24h)
+
+# Loki Index Configuration
+# LOKI_INDEX_PERIOD="24h"                        # Period for Loki index rotation (default: 24h)
+
+# Tempo Metrics Generator Resources
+# TEMPO_METRICS_GENERATOR_CPU_REQUEST="100m"     # CPU request for Tempo metrics generator (default: 100m)
+# TEMPO_METRICS_GENERATOR_CPU_LIMIT="500m"       # CPU limit for Tempo metrics generator (default: 500m)
+# TEMPO_METRICS_GENERATOR_MEMORY_REQUEST="256Mi" # Memory request for Tempo metrics generator (default: 256Mi)
+# TEMPO_METRICS_GENERATOR_MEMORY_LIMIT="1Gi"     # Memory limit for Tempo metrics generator (default: 1Gi)
+#
+# Note: The Tempo metrics generator is required for TraceQL queries to work properly.
+# It generates metrics from traces and is automatically enabled in distributed mode.
+# The query-frontend readiness probe is automatically patched to use /metrics instead
+# of /ready to avoid a chicken-and-egg problem where queriers can't connect until
+# the frontend is ready, but the frontend won't be ready until queriers connect.
 
 # Storage Configuration
 # STORAGE_CLASS_RWO="gp3-monitoring-encrypted"  # ReadWriteOnce storage
@@ -46,13 +88,14 @@
 # Namespaces
 # MONITORING_NAMESPACE="monitoring"             # Monitoring components
 # OPENEMR_NAMESPACE="openemr"                   # OpenEMR application
-# OBSERVABILITY_NAMESPACE="observability"       # Additional observability components
 
 # Chart Versions (pinned for stability)
-# CHART_KPS_VERSION="79.9.0"                    # kube-prometheus-stack
-# CHART_LOKI_VERSION="6.46.0"                   # Loki stack
-# CHART_JAEGER_VERSION="3.4.1"                  # Jaeger
-
+# CHART_KPS_VERSION="79.11.0"                   # kube-prometheus-stack
+# CHART_LOKI_VERSION="6.46.0"                   # Grafana Loki stack
+# CHART_TEMPO_VERSION="1.57.0"                  # Grafana Tempo Distributed (distributed tracing in microservice mode)
+# CHART_MIMIR_VERSION="6.0.5"                   # Grafana Mimir (long-term metrics storage)
+# OTEBPF_VERSION="v0.3.0"                       # OTeBPF (eBPF auto-instrumentation)
+# CERT_MANAGER_VERSION="v1.19.1"                # cert-manager
 
 # AlertManager Slack Integration (optional)
 # SLACK_WEBHOOK_URL=""                          # Slack webhook URL
@@ -74,17 +117,17 @@
 #   persistence:
 #     enabled: true
 #     storageClassName: gp3-monitoring-encrypted
-#     size: 20Gi
+#     size: ${GRAFANA_STORAGE_SIZE}              # Configurable via GRAFANA_STORAGE_SIZE (default: 20Gi)
 #     accessModes: ["ReadWriteOncePod"]          # Auto-detected optimal mode
 #
 #   securityContext:
-#     runAsUser: 472
-#     runAsGroup: 472
-#     fsGroup: 472
+#     runAsUser: ${GRAFANA_RUN_AS_USER}          # Configurable via GRAFANA_RUN_AS_USER (default: 472)
+#     runAsGroup: ${GRAFANA_RUN_AS_GROUP}        # Configurable via GRAFANA_RUN_AS_GROUP (default: 472)
+#     fsGroup: ${GRAFANA_FS_GROUP}               # Configurable via GRAFANA_FS_GROUP (default: 472)
 #
 #   resources:
-#     requests: { cpu: 100m, memory: 256Mi }
-#     limits:   { cpu: 1000m, memory: 1Gi }
+#     requests: { cpu: ${GRAFANA_CPU_REQUEST}, memory: ${GRAFANA_MEMORY_REQUEST} }
+#     limits:   { cpu: ${GRAFANA_CPU_LIMIT}, memory: ${GRAFANA_MEMORY_LIMIT} }
 #
 #   autoscaling:                                 # Configurable autoscaling
 #     enabled: true
@@ -96,21 +139,38 @@
 #   sidecar:
 #     dashboards:
 #       enabled: true
+#       label: grafana_dashboard
+#       labelValue: "1"
+#       folder: /tmp/dashboards
+#       folderAnnotation: grafana_folder
 #       searchNamespace: ALL                     # Auto-discover dashboards
 #     datasources:
 #       enabled: true
+#       label: grafana_datasource
+#       labelValue: "1"
 #       searchNamespace: ALL
 #
 #   grafana.ini:
+#     server:
+#       root_url: "%(protocol)s://%(domain)s:%(http_port)s/"
+#       serve_from_sub_path: false
 #     security:
+#       admin_user: admin
+#       disable_gravatar: true
 #       cookie_secure: true
 #       cookie_samesite: strict
-#       disable_gravatar: true
 #     analytics:
 #       reporting_enabled: false
 #       check_for_updates: false
+#     log:
+#       level: info
 #     unified_alerting:
 #       enabled: true
+#     tracing:
+#       enabled: true
+#       tempo:
+#         address: "tempo-distributor.monitoring.svc.cluster.local:${TEMPO_OTLP_GRPC_PORT}"
+#         auth_type: ""
 
 # prometheus:
 #   prometheusSpec:
@@ -124,20 +184,32 @@
 #         spec:
 #           storageClassName: gp3-monitoring-encrypted
 #           accessModes: ["ReadWriteOncePod"]
-#           resources: { requests: { storage: 100Gi } }
+#           resources: { requests: { storage: ${PROMETHEUS_STORAGE_SIZE} } }
 #
 #     resources:
-#       requests: { cpu: 500m, memory: 2Gi }
-#     limits:   { cpu: 2000m, memory: 4Gi }
+#       requests: { cpu: ${PROMETHEUS_CPU_REQUEST}, memory: ${PROMETHEUS_MEMORY_REQUEST} }
+#       limits:   { cpu: ${PROMETHEUS_CPU_LIMIT}, memory: ${PROMETHEUS_MEMORY_LIMIT} }
 #
-#     replicas: 1                                # Initial replicas (min for autoscaling)
-#     retention: 30d
-#     retentionSize: 90GB
+#     replicas: ${PROMETHEUS_MIN_REPLICAS}         # Initial replicas (min for autoscaling)
+#     retention: ${PROMETHEUS_RETENTION}           # Configurable via PROMETHEUS_RETENTION (default: 30d)
+#     retentionSize: ${PROMETHEUS_RETENTION_SIZE}  # Configurable via PROMETHEUS_RETENTION_SIZE (default: 90GB)
 #
 #     securityContext:
-#       runAsUser: 1000
-#       runAsGroup: 3000
-#       fsGroup: 2000
+#       runAsUser: ${RUN_AS_USER}                  # Configurable via RUN_AS_USER (default: 1000)
+#       runAsGroup: ${RUN_AS_GROUP}                # Configurable via RUN_AS_GROUP (default: 3000)
+#       fsGroup: ${FS_GROUP}                       # Configurable via FS_GROUP (default: 2000)
+#
+#     additionalScrapeConfigs: []
+#     remoteWrite:
+#       - url: http://mimir-gateway.monitoring.svc.cluster.local:${MIMIR_PORT}/api/v1/push
+#         queueConfig:
+#           maxSamplesPerSend: 1000
+#           batchSendDeadline: 5s
+#           maxRetries: 3
+#           minBackoff: 30ms
+#           maxBackoff: 100ms
+#     evaluationInterval: ${PROMETHEUS_EVALUATION_INTERVAL}  # Configurable (default: 30s)
+#     scrapeInterval: ${PROMETHEUS_SCRAPE_INTERVAL}          # Configurable (default: 30s)
 #
 #     autoscaling:                               # Configurable autoscaling
 #       enabled: true
@@ -145,6 +217,28 @@
 #       maxReplicas: 3
 #       targetCPUUtilizationPercentage: 70
 #       targetMemoryUtilizationPercentage: 80
+
+# alertmanager:
+#   alertmanagerSpec:
+#     storage:
+#       volumeClaimTemplate:
+#         spec:
+#           storageClassName: gp3-monitoring-encrypted
+#           accessModes: ["ReadWriteOncePod"]
+#           resources: { requests: { storage: ${ALERTMANAGER_STORAGE_SIZE} } }
+#     resources:
+#       requests: { cpu: ${ALERTMANAGER_CPU_REQUEST}, memory: ${ALERTMANAGER_MEMORY_REQUEST} }
+#       limits:   { cpu: ${ALERTMANAGER_CPU_LIMIT}, memory: ${ALERTMANAGER_MEMORY_LIMIT} }
+#     securityContext:
+#       runAsUser: ${RUN_AS_USER}                 # Configurable via RUN_AS_USER (default: 1000)
+#       runAsGroup: ${RUN_AS_GROUP}               # Configurable via RUN_AS_GROUP (default: 3000)
+#       fsGroup: ${FS_GROUP}                      # Configurable via FS_GROUP (default: 2000)
+#     configSecret: alertmanager-config
+#     # Note: S3 storage for AlertManager cluster state is configured via
+#     # AlertManager configuration secret (retrieved from Terraform outputs)
+
+# nodeExporter: { enabled: true }
+# kubeStateMetrics: { enabled: true }
 
 # =============================================================================
 # ADVANCED FEATURES
@@ -155,13 +249,25 @@
 # - Network policies for pod isolation
 # - Security contexts with non-root users
 # - Encrypted storage with dedicated KMS keys
+# - IRSA (IAM Roles for Service Accounts) for S3 access
 
 # 📊 Comprehensive Observability:
 # - Prometheus metrics collection and alerting
 # - Grafana dashboards with auto-discovery
-# - Loki log aggregation with 720h retention
-# - Jaeger distributed tracing
+# - Grafana Loki log aggregation (S3-backed, configurable retention via LOKI_RETENTION_PERIOD, default: 720h)
+# - Grafana Tempo distributed tracing (S3-backed, configurable retention)
+# - Grafana Mimir long-term metrics storage (S3-backed, configurable retention)
+# - OTeBPF eBPF auto-instrumentation (no storage required)
+# - AlertManager with S3-backed cluster state
 # - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
+
+# 💾 S3-Backed Storage:
+# - Loki: S3 for log storage (lifecycle policies: Intelligent-Tiering after 30 days)
+# - Tempo: S3 for trace storage (lifecycle policies: Intelligent-Tiering after 30 days, expiration after 90 days)
+# - Mimir: S3 for metrics storage (lifecycle policies: Intelligent-Tiering after 30 days, expiration after 365 days)
+# - AlertManager: S3 for cluster state (lifecycle policies: Intelligent-Tiering after 30 days, expiration after 365 days)
+# - All S3 buckets created via Terraform with proper IAM roles (IRSA)
+# - Automatic lifecycle management for cost optimization
 
 # ⚡ Intelligent Autoscaling:
 # - Configurable HPA for all monitoring components
@@ -175,6 +281,7 @@
 # - Automatic credential generation and secure storage
 # - Detailed audit logging for regulatory compliance
 # - Retry logic with exponential backoff
+# - Prometheus remote write to Mimir for long-term retention
 
 # 🌐 Access Method:
 # - Port-forwarding for secure local access
@@ -192,13 +299,20 @@
 # export SLACK_CHANNEL="#alerts"
 # ./install-monitoring.sh
 
-# Access via port-forwarding:
-# kubectl port-forward -n monitoring svc/prometheus-stack-grafana 3000:80
+# Access via port-forwarding (ports configurable via environment variables):
+# kubectl port-forward -n monitoring svc/prometheus-stack-grafana ${GRAFANA_PORT}:80
+# kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-prometheus ${PROMETHEUS_PORT}:9090
+# kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-alertmanager ${ALERTMANAGER_PORT}:9093
+# kubectl port-forward -n monitoring svc/loki-gateway ${LOKI_PORT}:80
+# kubectl port-forward -n monitoring svc/tempo ${TEMPO_HTTP_PORT}:${TEMPO_HTTP_PORT}
+# kubectl port-forward -n monitoring svc/mimir-gateway ${MIMIR_PORT}:${MIMIR_PORT}
 
 # Custom autoscaling configuration:
 # export GRAFANA_MAX_REPLICAS="5"
 # export PROMETHEUS_MAX_REPLICAS="2"
 # export LOKI_MAX_REPLICAS="4"
+# export TEMPO_MAX_REPLICAS="2"
+# export MIMIR_MAX_REPLICAS="2"
 # export HPA_CPU_TARGET="60"
 # export HPA_MEMORY_TARGET="75"
 # ./install-monitoring.sh
@@ -211,8 +325,9 @@
 # export GRAFANA_MIN_REPLICAS="2"
 # export PROMETHEUS_MIN_REPLICAS="2"
 # export LOKI_MIN_REPLICAS="2"
+# export TEMPO_MIN_REPLICAS="2"
+# export MIMIR_MIN_REPLICAS="2"
 # export ALERTMANAGER_MIN_REPLICAS="2"
-# export JAEGER_MIN_REPLICAS="2"
 # ./install-monitoring.sh
 
 # Custom storage configuration:
@@ -223,23 +338,52 @@
 # ACCESSING SERVICES
 # =============================================================================
 
-# Port-forward access (default):
-# kubectl -n monitoring port-forward svc/prometheus-stack-grafana 3000:80
-# kubectl -n monitoring port-forward svc/prometheus-stack-kube-prom-prometheus 9090:9090
-# kubectl -n monitoring port-forward svc/loki 3100:3100
-# kubectl -n monitoring port-forward svc/jaeger-query 16686:16686
+# Port-forward access (ports configurable via environment variables):
+# kubectl -n monitoring port-forward svc/prometheus-stack-grafana ${GRAFANA_PORT}:80
+# kubectl -n monitoring port-forward svc/prometheus-stack-kube-prom-prometheus ${PROMETHEUS_PORT}:9090
+# kubectl -n monitoring port-forward svc/prometheus-stack-kube-prom-alertmanager ${ALERTMANAGER_PORT}:9093
+# kubectl -n monitoring port-forward svc/loki-gateway ${LOKI_PORT}:80
+# kubectl -n monitoring port-forward svc/tempo ${TEMPO_HTTP_PORT}:${TEMPO_HTTP_PORT}
+# kubectl -n monitoring port-forward svc/mimir-gateway ${MIMIR_PORT}:${MIMIR_PORT}
 
 # Credentials are stored in: monitoring/credentials/monitoring-credentials.txt
+
+# =============================================================================
+# COMPONENT INTEGRATION
+# =============================================================================
+
+# Grafana Datasources (auto-configured, ports configurable via environment variables):
+# - Prometheus: http://prometheus-stack-kube-prom-prometheus:${PROMETHEUS_PORT}
+# - Loki: http://loki-gateway.monitoring.svc.cluster.local/
+# - Tempo: http://tempo.monitoring.svc.cluster.local:${TEMPO_HTTP_PORT}
+# - Mimir: http://mimir-gateway.monitoring.svc.cluster.local:${MIMIR_PORT}/prometheus
+# - CloudWatch: AWS CloudWatch integration (IRSA-based)
+
+# Prometheus Remote Write:
+# - Automatically configured to write to Mimir for long-term storage
+# - Queue configuration optimized for high-throughput scenarios
+
+# AlertManager:
+# - Optional Slack integration
+# - S3-backed cluster state (when Terraform outputs available)
+# - Configurable alert routing
+
+# OTeBPF (eBPF Auto-Instrumentation):
+# - Deployed as DaemonSet for node-level instrumentation
+# - Automatically discovers and instruments pods with label app=openemr
+# - Exports traces to Tempo and metrics to Prometheus
+# - No manual pod annotations required
 
 # =============================================================================
 # TROUBLESHOOTING
 # =============================================================================
 
 # Check installation status:
-# ./install-monitoring.sh status
+# ./install-monitoring.sh verify
 
 # Verify components:
-# ./install-monitoring.sh verify
+# kubectl get pods -n monitoring
+# kubectl get svc -n monitoring
 
 # Uninstall if needed:
 # ./install-monitoring.sh uninstall
@@ -249,3 +393,15 @@
 # - monitoring/debug-*.log (on errors)
 # - monitoring/openemr-monitoring.log
 # - monitoring/openemr-monitoring-audit.log
+
+# Check S3 bucket access:
+# kubectl describe sa tempo -n monitoring         # Check IRSA annotation
+# kubectl describe sa loki -n monitoring          # Check IRSA annotation
+# kubectl describe sa mimir -n monitoring         # Check IRSA annotation
+# kubectl describe sa alertmanager -n monitoring  # Check IRSA annotation
+
+# Verify Terraform outputs:
+# cd terraform && terraform output tempo_s3_bucket_name
+# cd terraform && terraform output loki_s3_bucket_name
+# cd terraform && terraform output mimir_s3_bucket_name
+# cd terraform && terraform output alertmanager_s3_bucket_name

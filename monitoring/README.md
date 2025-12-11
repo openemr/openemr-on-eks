@@ -2,7 +2,7 @@
 
 A production-ready monitoring solution for OpenEMR on EKS Auto Mode, featuring automated deployment, intelligent autoscaling, and deep observability.
 
-> **⚠️ Important**: This is an **optional** monitoring stack. The core OpenEMR deployment includes CloudWatch logging. This stack adds enterprise-grade observability with Prometheus, Grafana, Loki, and Jaeger.
+> **⚠️ Important**: This is an **optional** monitoring stack. The core OpenEMR deployment includes CloudWatch logging. This stack adds enterprise-grade observability with Prometheus, AlertManager, Grafana, Grafana Loki (log aggregation), Grafana Tempo (distributed tracing), Grafana Mimir (long-term metrics storage), and OTeBPF (eBPF auto-instrumentation).
 
 ## 📋 Table of Contents
 
@@ -23,39 +23,76 @@ A production-ready monitoring solution for OpenEMR on EKS Auto Mode, featuring a
 
 ```mermaid
 graph TB
-    subgraph "EKS Auto Mode Cluster"
-        subgraph "Monitoring Namespace"
-            PROM[Prometheus]
-            GRAF[Grafana]
-            LOKI[Loki]
-            JAEG[Jaeger]
-            ALERT[AlertManager]
+    subgraph EKS["EKS Auto Mode Cluster"]
+        subgraph MON["monitoring namespace"]
+            direction TB
+            PROM["Prometheus<br/>Metrics Collection"]
+            GRAF["Grafana<br/>Visualization"]
+            LOKI["Loki<br/>Log Aggregation"]
+            TEMPO["Tempo<br/>Distributed Tracing"]
+            MIMIR["Mimir<br/>Long-term Metrics"]
+            OTEBPF["OTeBPF<br/>eBPF Auto-instrumentation"]
+            ALERT["AlertManager<br/>Alert Routing"]
         end
 
-        subgraph "OpenEMR Namespace"
-            OE[OpenEMR Pods]
-            SM[ServiceMonitor]
-            PR[PrometheusRules]
-        end
-
-        subgraph "Observability"
-            CM[cert-manager]
-            JO[Jaeger Operator]
+        subgraph OE_NS["openemr namespace"]
+            direction TB
+            OE_POD["OpenEMR Pods<br/>Application"]
+            FB["Fluent Bit Sidecar<br/>Log Forwarding"]
+            SM["ServiceMonitor<br/>CRD"]
+            PR["PrometheusRules<br/>CRD"]
         end
     end
 
-    subgraph "External Access"
-        PF[Port Forward]
+    subgraph S3["AWS S3 Storage<br/>(IRSA Authentication)"]
+        direction LR
+        S3_LOKI[("Loki S3 Bucket<br/>720h retention")]
+        S3_TEMPO[("Tempo S3 Bucket<br/>90 day retention")]
+        S3_MIMIR[("Mimir S3 Bucket<br/>365 day retention")]
+        S3_AM[("AlertManager S3<br/>State Storage")]
     end
 
-    OE --> SM
-    SM --> PROM
-    OE --> LOKI
-    PROM --> GRAF
-    LOKI --> GRAF
-    JAEG --> GRAF
-    PROM --> ALERT
-    PF --> GRAF
+    subgraph EXT["External Access"]
+        PF["Port Forward<br/>kubectl port-forward"]
+    end
+
+    %% Data Collection Flow
+    OE_POD -->|"Application Logs"| FB
+    FB -->|"HTTP :80<br/>/loki/api/v1/push"| LOKI
+    OE_POD -->|"eBPF Traces"| OTEBPF
+    OTEBPF -->|"OTLP HTTP :4318<br/>tempo-distributor"| TEMPO
+    OE_POD -.->|"Metrics Scraping"| SM
+    SM -->|"Prometheus Operator"| PROM
+
+    %% Metrics Flow
+    PROM -->|"Remote Write<br/>/api/v1/push"| MIMIR
+    PROM -->|"Alerts"| ALERT
+
+    %% Visualization Flow
+    PROM -->|"Query API"| GRAF
+    MIMIR -->|"Query API"| GRAF
+    LOKI -->|"Query API"| GRAF
+    TEMPO -->|"Query API"| GRAF
+
+    %% Storage Flow
+    LOKI -->|"IRSA<br/>S3 PutObject"| S3_LOKI
+    TEMPO -->|"IRSA<br/>S3 PutObject"| S3_TEMPO
+    MIMIR -->|"IRSA<br/>S3 PutObject"| S3_MIMIR
+    ALERT -->|"IRSA<br/>S3 State"| S3_AM
+
+    %% External Access
+    PF -->|":3000"| GRAF
+
+    %% Styling
+    classDef monitoring fill:#e1f5ff,stroke:#01579b,stroke-width:2px
+    classDef openemr fill:#fff3e0,stroke:#e65100,stroke-width:2px
+    classDef storage fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
+    classDef external fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
+
+    class PROM,GRAF,LOKI,TEMPO,MIMIR,OTEBPF,ALERT monitoring
+    class OE_POD,FB,SM,PR openemr
+    class S3_LOKI,S3_TEMPO,S3_MIMIR,S3_AM storage
+    class PF external
 ```
 
 ### Storage Requirements
@@ -65,19 +102,26 @@ graph TB
 | **Prometheus** | 100Gi | 30 days | gp3-monitoring-encrypted (EBS) | $8/month    |
 | **Grafana** | 20Gi | Persistent | gp3-monitoring-encrypted (EBS) | $1.60/month |
 | **Loki** | N/A | 720 hours | AWS S3 (Object Storage) | Variable (lifecycle policies) |
-| **AlertManager** | 20Gi | Persistent | gp3-monitoring-encrypted (EBS) | $1.60/month |
+| **Tempo** | N/A | 90 days | AWS S3 (Object Storage) | Variable (lifecycle policies) |
+| **Mimir** | N/A | 365 days | AWS S3 (Object Storage) | Variable (lifecycle policies) |
+| **AlertManager** | 5Gi | Persistent | gp3-monitoring-encrypted (EBS) + S3 state | $0.40/month + S3 |
 
-**Loki S3 Storage Architecture:**
-- **Production-Grade Storage**: Loki uses AWS S3 for log storage instead of filesystem storage
+**S3 Storage Architecture (Loki, Tempo, Mimir, AlertManager):**
+- **Production-Grade Storage**: All components use AWS S3 for primary storage instead of filesystem storage
 - **Recommendation**: As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments
 - **Benefits**:
   - **Durability**: 99.999999999% (11 nines) durability with S3
-  - **Scalability**: Automatically scales with log volume without storage provisioning
+  - **Scalability**: Automatically scales with data volume without storage provisioning
   - **Cost-Effectiveness**: Lifecycle policies automatically transition to cheaper storage tiers (Intelligent-Tiering after 30 days, Glacier after 90 days)
-  - **Lifecycle Management**: Automatic deletion after 720 days (30 days retention as configured in Loki)
+  - **Lifecycle Management**: Automatic deletion based on retention policies
   - **Security**: KMS encryption and IAM role-based access (IRSA) - no credentials needed
 - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- **Setup**: Terraform automatically creates the S3 bucket and IAM role, installation script retrieves and configures them
+- **Setup**: Terraform automatically creates the S3 buckets and IAM roles, installation script retrieves and configures them
+- **Components with S3 Storage**:
+  - **Loki**: Log aggregation (720h retention, 720 day S3 lifecycle)
+  - **Tempo**: Distributed tracing (90 day retention)
+  - **Mimir**: Long-term metrics storage (365 day retention, Prometheus remote write)
+  - **AlertManager**: Cluster state storage (high availability)
 
 See pricing documentation for EBS [here](https://aws.amazon.com/ebs/pricing/).
 
@@ -86,24 +130,65 @@ See pricing documentation for EBS [here](https://aws.amazon.com/ebs/pricing/).
 This monitoring stack provides **full correlation** between logs, metrics, and traces, enabling faster root-cause analysis and long-term compliance.
 
 ```mermaid
-graph LR
-    subgraph "Correlation Features"
-        LOGS[Logs in Loki] -->|Trace ID| TRACES[Traces in Jaeger]
-        TRACES -->|View Logs| LOGS
-        TRACES -->|RED Metrics| METRICS[Metrics in Prometheus]
-        METRICS -->|Exemplars| TRACES
-        LOGS -.->|Labels| METRICS
+graph TB
+    subgraph COLLECT["Data Collection"]
+        direction LR
+        OE_APP["OpenEMR Application"]
+        FB_SIDE["Fluent Bit Sidecar"]
+        OTEBPF_DS["OTeBPF DaemonSet<br/>eBPF Auto-instrumentation"]
     end
-    
-    subgraph "Data Sources"
-        LOKI[(Loki: Log Aggregation)]
-        JAEGER[(Jaeger: Distributed Tracing)]
-        PROM[(Prometheus: Metrics)]
+
+    subgraph STORE["Storage & Processing"]
+        direction TB
+        LOKI_STORE[("Loki<br/>Log Aggregation<br/>720h retention")]
+        TEMPO_STORE[("Tempo<br/>Distributed Tracing<br/>90 day retention")]
+        PROM_STORE[("Prometheus<br/>Short-term Metrics<br/>30 day retention")]
+        MIMIR_STORE[("Mimir<br/>Long-term Metrics<br/>365 day retention")]
     end
+
+    subgraph CORR["Correlation & Query"]
+        direction TB
+        GRAF_UI["Grafana UI<br/>Unified Dashboard"]
+        TRACE_ID["Trace ID Correlation"]
+        EXEMPLARS["Metric Exemplars"]
+        LABELS["Label-based Joins"]
+    end
+
+    %% Collection Flow
+    OE_APP -->|"Application Logs"| FB_SIDE
+    FB_SIDE -->|"HTTP Push"| LOKI_STORE
+    OE_APP -->|"eBPF Instrumentation"| OTEBPF_DS
+    OTEBPF_DS -->|"OTLP Traces"| TEMPO_STORE
+    OE_APP -.->|"Metrics Scraping"| PROM_STORE
+    PROM_STORE -->|"Remote Write"| MIMIR_STORE
+
+    %% Correlation Flow
+    LOKI_STORE -->|"Trace ID in Logs"| TRACE_ID
+    TEMPO_STORE -->|"Trace Context"| TRACE_ID
+    TRACE_ID -->|"Correlated View"| GRAF_UI
     
-    LOGS --> LOKI
-    TRACES --> JAEGER
-    METRICS --> PROM
+    TEMPO_STORE -->|"RED Metrics<br/>Rate/Errors/Duration"| MIMIR_STORE
+    MIMIR_STORE -->|"Exemplars<br/>Link to Traces"| EXEMPLARS
+    EXEMPLARS -->|"Trace Details"| TEMPO_STORE
+    
+    LOKI_STORE -->|"Labels<br/>job, namespace, pod"| LABELS
+    PROM_STORE -->|"Labels"| LABELS
+    LABELS -->|"Unified Query"| GRAF_UI
+
+    %% Query Flow
+    LOKI_STORE -->|"LogQL Queries"| GRAF_UI
+    TEMPO_STORE -->|"TraceQL Queries"| GRAF_UI
+    PROM_STORE -->|"PromQL Queries"| GRAF_UI
+    MIMIR_STORE -->|"PromQL Queries"| GRAF_UI
+
+    %% Styling
+    classDef collection fill:#e3f2fd,stroke:#1565c0,stroke-width:2px
+    classDef storage fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    classDef correlation fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
+
+    class OE_APP,FB_SIDE,OTEBPF_DS collection
+    class LOKI_STORE,TEMPO_STORE,PROM_STORE,MIMIR_STORE storage
+    class GRAF_UI,TRACE_ID,EXEMPLARS,LABELS correlation
 ```
 
 ### Autoscaling with EKS Auto Mode
@@ -114,8 +199,9 @@ Layer 1: Pod-level (HPA) - Fully Configurable
 ├── Grafana: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── Prometheus: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── Loki: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
-├── Jaeger: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
-└── AlertManager: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+├── Tempo: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+├── Mimir: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+├── AlertManager: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 
 Layer 2: Node-level (EKS Auto Mode)
 ├── Automatic EC2 provisioning when pods pending
@@ -126,6 +212,11 @@ Layer 2: Node-level (EKS Auto Mode)
 # ENABLE_AUTOSCALING="1"              # Enable/disable autoscaling
 # GRAFANA_MIN_REPLICAS="1"            # Min replicas per component
 # GRAFANA_MAX_REPLICAS="3"            # Max replicas per component
+# TEMPO_MIN_REPLICAS="1"              # Min Tempo replicas
+# TEMPO_MAX_REPLICAS="3"              # Max Tempo replicas
+# MIMIR_MIN_REPLICAS="1"              # Min Mimir replicas
+# MIMIR_MAX_REPLICAS="3"              # Max Mimir replicas
+# OTEBPF_ENABLED="1"                  # Enable OTeBPF (0 or 1)
 # HPA_CPU_TARGET="70"                 # CPU target percentage
 # HPA_MEMORY_TARGET="80"              # Memory target percentage
 ```
@@ -145,18 +236,18 @@ Layer 2: Node-level (EKS Auto Mode)
 ```bash
 # Verify tools are installed
 kubectl version --client  # >= 1.29
-helm version             # >= 3.12
-jq --version            # >= 1.6
-terraform version       # >= 1.0 (for S3 bucket and IAM role setup)
+helm version              # >= 3.12
+jq --version              # >= 1.6
+terraform version         # >= 1.0 (for S3 bucket and IAM role setup)
 
 # Check cluster access
 kubectl cluster-info
 kubectl get nodes  # May be empty with Auto Mode
 ```
 
-### Terraform Requirements for Loki S3 Storage
+### Terraform Requirements for S3 Storage
 
-Before installing the monitoring stack, ensure Terraform has been applied to create the Loki S3 bucket and IAM role:
+Before installing the monitoring stack, ensure Terraform has been applied to create the S3 buckets and IAM roles for all components:
 
 ```bash
 cd terraform
@@ -170,9 +261,15 @@ terraform apply
 # Verify outputs are available
 terraform output loki_s3_bucket_name
 terraform output loki_s3_role_arn
+terraform output tempo_s3_bucket_name
+terraform output tempo_s3_role_arn
+terraform output mimir_s3_bucket_name
+terraform output mimir_s3_role_arn
+terraform output alertmanager_s3_bucket_name
+terraform output alertmanager_s3_role_arn
 ```
 
-The installation script will automatically retrieve the S3 bucket name and IAM role ARN from Terraform outputs. Without these, the Loki installation will fail.
+The installation script will automatically retrieve the S3 bucket names and IAM role ARNs from Terraform outputs. Without these, component installations will fail.
 
 ### Cluster Capacity Requirements
 
@@ -221,9 +318,9 @@ cat credentials/monitoring-credentials.txt
 |-----------|------------------------------------|------------------|
 | EC2 Compute (Auto Mode) | 2 t3.small equiv. AVG ($0.0208/hr) | $30.36           |
 | Auto Mode Fee (12%) | Management overhead                | $3.64            |
-| Storage (140Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 20Gi) | $11.20           |
-| **S3 Storage (Loki)** | Variable (lifecycle policies) | ~$5-15           |
-| **Total** |                                    | **~50-60/month** |
+| Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80           |
+| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$10-30           |
+| **Total** |                                    | **~$55-75/month** |
 
 #### Hospital
 
@@ -231,9 +328,9 @@ cat credentials/monitoring-credentials.txt
 |-----------|-------------------------------------|------------------|
 | EC2 Compute (Auto Mode) | 2 t3.medium equiv. AVG ($0.0416/hr) | $60.74           |
 | Auto Mode Fee (12%) | Management overhead                 | $7.29            |
-| Storage (140Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 20Gi) | $11.20           |
-| **S3 Storage (Loki)** | Variable (lifecycle policies) | ~$10-30          |
-| **Total** |                                     | **~89-109/month** |
+| Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80           |
+| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$15-40          |
+| **Total** |                                     | **~$94-119/month** |
 
 #### Large Hospital
 
@@ -241,15 +338,18 @@ cat credentials/monitoring-credentials.txt
 |-----------|------------------------------------|-------------------|
 | EC2 Compute (Auto Mode) | 2 t3.large equiv. AVG ($0.0832/hr) | $121.47           |
 | Auto Mode Fee (12%) | Management overhead                | $14.58            |
-| Storage (140Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 20Gi) | $11.20            |
-| **S3 Storage (Loki)** | Variable (lifecycle policies) | ~$20-50           |
-| **Total** |                                    | **~167-197/month** |
+| Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80            |
+| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$25-60           |
+| **Total** |                                    | **~$172-207/month** |
 
 **S3 Storage Cost Notes:**
 - **Intelligent-Tiering**: After 30 days, data automatically transitions to lower-cost tiers
 - **Glacier**: After 90 days, data transitions to Glacier for archival storage
-- **Lifecycle Management**: Automatic deletion after 720 days (30-day retention as configured in Loki)
-- **Actual costs depend on log volume**: Typical deployments see $5-50/month for S3 storage depending on log ingestion rate
+- **Lifecycle Management**: Automatic deletion based on component retention policies
+  - Loki: 720 days (720h retention)
+  - Tempo: 90 days (trace retention)
+  - Mimir: 365 days (1 year metrics retention)
+- **Actual costs depend on data volume**: Typical deployments see $10-60/month for S3 storage depending on ingestion rate
 - **Benefits over EBS**: No need to pre-provision storage, automatic scaling, better durability (11 nines), and lower costs at scale
 
 ### Cost Optimization Strategies
@@ -270,11 +370,11 @@ export LOKI_RETENTION="360h"       # Default: 720h
 # This can be reduced if log volume is very low, but 10Gi is already minimal
 ```
 
-**Loki S3 Storage Cost Optimization:**
-- **Automatic tiering**: Data automatically moves to cheaper storage tiers (no manual intervention needed)
+**Storage Cost Optimization:**
+- **Loki S3 Storage**: Reduced from 100Gi EBS ($8/month) to 10Gi EBS ($0.80/month) + variable S3 costs ($5-50/month depending on volume)
+- **Automatic tiering**: S3 data automatically moves to cheaper storage tiers (no manual intervention needed)
 - **Cost-effective at scale**: S3 storage scales with your log volume without upfront provisioning
 - **Lifecycle management**: Old data is automatically archived and deleted according to retention policies
-- **Actual savings**: Reduced from 100Gi EBS ($8/month) to 10Gi EBS ($0.80/month) + variable S3 costs ($5-50/month depending on volume)
 
 ## ⚙️ Configuration
 
@@ -316,9 +416,18 @@ export LOKI_MAX_REPLICAS="3"      # Maximum replicas (default: 3)
 export ALERTMANAGER_MIN_REPLICAS="1"   # Minimum replicas (default: 1)
 export ALERTMANAGER_MAX_REPLICAS="3"   # Maximum replicas (default: 3)
 
-# Jaeger autoscaling
-export JAEGER_MIN_REPLICAS="1"    # Minimum replicas (default: 1)
-export JAEGER_MAX_REPLICAS="3"    # Maximum replicas (default: 3)
+# Tempo autoscaling
+export TEMPO_MIN_REPLICAS="1"    # Minimum replicas (default: 1)
+export TEMPO_MAX_REPLICAS="3"    # Maximum replicas (default: 3)
+
+# Mimir autoscaling
+export MIMIR_MIN_REPLICAS="1"    # Minimum replicas (default: 1)
+export MIMIR_MAX_REPLICAS="3"    # Maximum replicas (default: 3)
+
+
+
+# OTeBPF auto-instrumentation
+export OTEBPF_ENABLED="1"         # Enable OTeBPF (default: 1)
 ```
 
 #### Example Configurations
@@ -329,7 +438,8 @@ export GRAFANA_MIN_REPLICAS="2"
 export PROMETHEUS_MIN_REPLICAS="2"
 export LOKI_MIN_REPLICAS="2"
 export ALERTMANAGER_MIN_REPLICAS="2"
-export JAEGER_MIN_REPLICAS="2"
+export TEMPO_MIN_REPLICAS="2"
+export MIMIR_MIN_REPLICAS="2"
 ```
 
 **Cost-Optimized Setup:**
@@ -338,7 +448,8 @@ export GRAFANA_MAX_REPLICAS="2"
 export PROMETHEUS_MAX_REPLICAS="2"
 export LOKI_MAX_REPLICAS="2"
 export ALERTMANAGER_MAX_REPLICAS="2"
-export JAEGER_MAX_REPLICAS="2"
+export TEMPO_MAX_REPLICAS="2"
+export MIMIR_MAX_REPLICAS="2"
 export HPA_CPU_TARGET="80"        # Higher threshold = less scaling
 ```
 
@@ -348,7 +459,8 @@ export GRAFANA_MAX_REPLICAS="5"
 export PROMETHEUS_MAX_REPLICAS="3"
 export LOKI_MAX_REPLICAS="4"
 export ALERTMANAGER_MAX_REPLICAS="3"
-export JAEGER_MAX_REPLICAS="4"
+export TEMPO_MAX_REPLICAS="4"
+export MIMIR_MAX_REPLICAS="4"
 export HPA_CPU_TARGET="60"        # Lower threshold = more scaling
 ```
 
@@ -378,6 +490,17 @@ kubectl port-forward -n monitoring svc/prometheus-stack-kube-prom-alertmanager 9
 # Loki (log exploration)
 kubectl port-forward -n monitoring svc/loki 3100:3100
 # Access: http://localhost:3100
+
+# Tempo (distributed tracing)
+kubectl port-forward -n monitoring svc/tempo-query 3200:3200
+# Access: http://localhost:3200
+
+# Mimir (long-term metrics)
+kubectl port-forward -n monitoring svc/mimir-gateway 8080:8080
+# Access: http://localhost:8080
+
+
+# Access: http://localhost:8080
 ```
 
 
@@ -403,17 +526,64 @@ After installation, these dashboards are automatically available:
 3. View all OpenEMR pod metrics
 ```
 
+<details>
+<summary><strong>Visual Examples</strong></summary>
+
+<details>
+<summary><strong>16 Built-in Grafana Dashboards</strong></summary>
+
+<img src="../images/16_built_in_grafana_dashboards.png" alt="16 built-in Grafana dashboards" width="600">
+
+The monitoring stack includes 16 pre-configured Grafana dashboards covering Kubernetes resources, node metrics, networking, and more.
+</details>
+
+<details>
+<summary><strong>1531 Built-in Prometheus Metrics</strong></summary>
+
+<img src="../images/1531_built_in_prometheus_metrics.png" alt="1531 built-in Prometheus metrics" width="600">
+
+Prometheus automatically collects 1531+ metrics from your cluster, providing comprehensive visibility into system and application performance.
+</details>
+
+<details>
+<summary><strong>218 Built-in Alerting Rules</strong></summary>
+
+<img src="../images/218_built_in_alerting_rules.png" alt="218 built-in alerting rules" width="600">
+
+The monitoring stack includes 218 pre-configured alerting rules that monitor cluster health, resource utilization, pod failures, and application metrics.
+</details>
+
+<details>
+<summary><strong>Auto-Instrumented Traces</strong></summary>
+
+<img src="../images/auto_instrumented_traces.png" alt="Auto-instrumented traces from OTeBPF" width="600">
+
+OTeBPF automatically instruments OpenEMR pods without code changes, generating distributed traces visible in Grafana Tempo. This provides zero-code observability for request flows and performance analysis.
+</details>
+
+<details>
+<summary><strong>Automated On-Call Escalations</strong></summary>
+
+<img src="../images/automate_your_on_call_escalations.png" alt="Automated on-call escalation configuration" width="600">
+
+Grafana and AlertManager together enable automated on-call escalation workflows, ensuring critical alerts reach the right team members at the right time with configurable escalation policies.
+</details>
+
+</details>
+
 #### 📚 Data Source Reference
 
-Your Grafana has these data sources pre-configured:
+Your Grafana has **7 data sources** pre-configured:
 
 | Data Source | Purpose |
 |-------------|---------|
-| **Prometheus** | Metrics (CPU, memory, requests) |
+| **Prometheus** | Short-term metrics (CPU, memory, requests) |
+| **Mimir** | Long-term metrics storage (remote write from Prometheus) |
 | **Loki** | Logs (application, system) |
-| **Jaeger** | Distributed traces |
-| **CloudWatch** | Compliance logs (long-term) |
-| **AlertManager** | Alert management |
+| **Tempo** | Distributed traces (replaces Jaeger) |
+| **CloudWatch** | AWS CloudWatch logs and metrics (long-term compliance) |
+| **X-Ray** | AWS X-Ray distributed tracing (via CloudWatch API) |
+| **AlertManager** | Alert management and notification routing |
 
 ## 🔒 Security & Compliance
 
@@ -511,6 +681,18 @@ helm upgrade prometheus-stack prometheus-community/kube-prometheus-stack \
 
 # Upgrade Loki
 helm upgrade loki grafana/loki \
+  --namespace monitoring \
+  --version <new-version> \
+  --timeout 35m --atomic
+
+# Upgrade Tempo
+helm upgrade tempo grafana/tempo \
+  --namespace monitoring \
+  --version <new-version> \
+  --timeout 35m --atomic
+
+# Upgrade Mimir
+helm upgrade mimir grafana/mimir-distributed \
   --namespace monitoring \
   --version <new-version> \
   --timeout 35m --atomic

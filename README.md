@@ -23,6 +23,8 @@
 
 <div align="center">
 
+<img src="images/quickstart_section_picture.png" alt="OpenEMR on EKS project mascot giving a thumbs up while dressed like an astronaut" width="200">
+
 # 🚀 ⚡ Quick Start ⚡ 🚀
 
 *Deploy OpenEMR on EKS in minutes*
@@ -80,9 +82,49 @@
 </details>
 
 <details>
-<summary><strong>5 Integrated Datasources for Dashboarding/Alerting</strong></summary>
+<summary><strong>7 Integrated Datasources for Dashboarding/Alerting</strong></summary>
 
 <img src="./images/quick-deploy-openemr-grafana-datasources.png" alt="OpenEMR monitoring dashboard in Grafana" width="500">
+
+</details>
+
+<details>
+<summary><strong>Grafana Monitoring Features</strong></summary>
+
+<details>
+<summary><strong>16 Built-in Grafana Dashboards</strong></summary>
+
+<img src="./images/16_built_in_grafana_dashboards.png" alt="16 built-in Grafana dashboards" width="500">
+
+</details>
+
+<details>
+<summary><strong>1531 Built-in Prometheus Metrics</strong></summary>
+
+<img src="./images/1531_built_in_prometheus_metrics.png" alt="1531 built-in Prometheus metrics" width="500">
+
+</details>
+
+<details>
+<summary><strong>218 Built-in Alerting Rules</strong></summary>
+
+<img src="./images/218_built_in_alerting_rules.png" alt="218 built-in alerting rules" width="500">
+
+</details>
+
+<details>
+<summary><strong>Auto-Instrumented Traces</strong></summary>
+
+<img src="./images/auto_instrumented_traces.png" alt="Auto-instrumented traces from OTeBPF" width="500">
+
+</details>
+
+<details>
+<summary><strong>Automate Your On-Call Escalations</strong></summary>
+
+<img src="./images/automate_your_on_call_escalations.png" alt="Automated on-call escalation configuration" width="500">
+
+</details>
 
 </details>
 
@@ -142,7 +184,63 @@
 
 </details>
 
+## 🖥️ Interactive Console (TUI) - macOS Only
+
+Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deployment with ease:
+
+```bash
+./start_console
+```
+
+<details>
+<summary><strong>TUI Launch Screen</strong></summary>
+
+<img src="./images/console-launch-screen.png" alt="OpenEMR on EKS Console TUI launch screen" width="500">
+
+</details>
+
+<details>
+<summary><strong>What you get</strong></summary>
+
+- 🎯 **10 Essential Commands** - All common operations in one menu
+- 🔍 **Codebase Search** - Quickly find terms across the entire project
+- ✅ **Validate Prerequisites** - Pre-flight checks before deployment
+- 🚀 **Quick Deploy** - One-command infrastructure and application deployment
+- 📊 **Deployment Health** - Check current deployment status
+- 💾 **Backup Management** - Create comprehensive backups
+- 🧹 **Cleanup Tools** - Safe deployment cleanup
+- 📦 **Version Checking** - Component version awareness
+- 🔎 **Interactive Search** - Search codebase for any term
+
+**Platform Support**: Currently macOS only. Commands execute in separate Terminal windows to preserve script colors, formatting, and interactivity.
+
+</details>
+
+<details>
+<summary><strong>Available Commands</strong></summary>
+
+1. **Validate Prerequisites** - Check required tools, AWS credentials, and deployment readiness
+2. **Quick Deploy** - Deploy infrastructure, OpenEMR, and monitoring stack in one command
+3. **Check Deployment Health** - Validate current deployment status and infrastructure health
+4. **Backup Deployment** - Create comprehensive backup of RDS, Kubernetes configs, and application data
+5. **Clean Deployment** - Remove application layer while preserving infrastructure
+6. **Destroy Infrastructure** - Completely destroy all infrastructure resources (use with caution)
+7. **Check Component Versions** - Check for available updates across all project components
+8. **Check OpenEMR Versions** - Discover available OpenEMR Docker image versions from Docker Hub
+9. **Search Codebase** - Search for terms across the entire codebase (interactive)
+10. **Deploy Training Setup** - Deploy OpenEMR with synthetic patient data for training/testing
+
+</details>
+
+**📖 Complete Documentation**: See [Console Guide](docs/CONSOLE_GUIDE.md) for detailed usage instructions, troubleshooting, and advanced features.
+
 ---
+
+<div>
+
+<img src="images/table_of_contents_section_picture.png" alt="OpenEMR on EKS project mascot dressed like an astronaut reading a book" width="200">
+
+</div>
 
 ## 📋 Table of Contents
 
@@ -355,7 +453,7 @@ git push origin feature/your-feature-name
 
 ```bash
 # Clone repository
-git clone <repository-url>
+git clone https://github.com/openemr/openemr-on-eks
 cd openemr-on-eks
 
 # Install Homebrew (https://brew.sh/) on MacOS if necessary
@@ -491,10 +589,12 @@ Next steps for first-time deployment:
 • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v79.9.0 (metrics & alerting)
+     - Prometheus v79.11.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.46.0 (log aggregation with S3 storage)
-     - Jaeger v3.4.1 (distributed tracing)
+     - Tempo v1.57.0 (distributed tracing with S3 storage, microservice mode)
+     - Mimir v6.0.5 (long-term metrics storage)
+     - OTeBPF v0.3.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.
@@ -741,14 +841,28 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v79.9.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v79.11.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
 - 📝 **Loki**: v6.46.0 single-binary (log aggregation with S3 storage and 720h retention)
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Jaeger**: v3.4.1 (distributed tracing)
-- 🚨 **AlertManager**: Slack integration support with customizable notifications
+- 🔍 **Tempo**: v1.57.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+  - **S3 Storage**: All trace data stored in S3 for durability and scalability
+  - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
+- 📈 **Mimir**: v6.0.5 (long-term metrics storage with S3 backend)
+  - **Remote Write**: Prometheus automatically forwards metrics to Mimir for long-term retention
+  - **S3 Storage**: All metrics stored in S3 with lifecycle policies
+  - **Retention**: 365 days of metrics storage
+- 🎯 **OTeBPF**: v0.3.0 (eBPF auto-instrumentation)
+  - **Zero-Code Instrumentation**: Automatically instruments OpenEMR pods without code changes
+  - **Traces**: Exports traces to Tempo for distributed tracing
+  - **Integration**: Exposes metrics in Prometheus format (scraped by Prometheus)
+  - **AlertManager Integration**: Automatically receives alerts from AlertManager
+  - **On-Call Management**: Manages on-call schedules, escalations, and incident response
+  - **Unified Alerting**: Integrates with Grafana unified alerting for comprehensive incident management
+- 🚨 **AlertManager**: Slack integration support with customizable notifications and S3 state storage
+- 📊 **Grafana Datasources**: **7 pre-configured datasources** - Prometheus, Mimir, Loki, Tempo, CloudWatch, X-Ray, and AlertManager integration
 - 🎯 **OpenEMR Integration**: Automatically and continually collects a broad set of metrics from the OpenEMR namespace where your application is running so you can precisely monitor the health and performance of your OpenEMR deployment in real-time. (see [monitoring documentation](./monitoring/README.md) guidance for creating custom dashboards)
 - 💾 **Optimized Storage**: GP3 with 3000 IOPS for time-series data performance
 - 🔒 **Enhanced Security**: RBAC, network policies, security contexts, encrypted storage, WAFv2 protection
@@ -842,6 +956,7 @@ openemr-on-eks/
 │   ├── backup.sh                          # Cross-region backup procedures
 │   ├── restore.sh                         # Cross-region disaster recovery (with DB reconfiguration)
 │   ├── destroy.sh                         # Complete infrastructure destruction (bulletproof cleanup)
+│   ├── search-codebase.sh                 # Interactive codebase search tool
 │   ├── test-end-to-end-backup-restore.sh  # End-to-end backup/restore testing
 │   ├── test-warp-end-to-end.sh            # Warp end-to-end test with automatic cleanup
 │   ├── deploy-training-openemr-setup.sh   # Training setup deployment with synthetic patient data
@@ -860,7 +975,13 @@ openemr-on-eks/
 │   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.4 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
-│   └── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
+│   ├── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
+│   └── CONSOLE_GUIDE.md                   # Terminal User Interface (TUI) console guide
+├── console/                               # Terminal User Interface (TUI) for OpenEMR on EKS
+│   ├── main.go                            # Bubbletea TUI application (macOS only)
+│   ├── go.mod                             # Go module dependencies
+│   ├── go.sum                             # Go module checksums
+│   └── Makefile                           # Build and run commands for console
 ├── warp/                                  # Warp - OpenEMR Data Upload Accelerator
 │   ├── README.md                          # Warp project documentation
 │   ├── DEVELOPER.md                       # Warp developer guide and architecture
@@ -891,6 +1012,7 @@ openemr-on-eks/
 ├── .pre-commit-config.yaml                # Pre-commit hooks configuration
 ├── .yamllint                              # YAML linting configuration (relaxed rules)
 ├── .markdownlint.json                     # Markdown linting configuration (relaxed rules)
+├── start_console                          # TUI console launcher script (macOS only)
 ├── VERSION                                # Current project version
 ├── versions.yaml                          # Version awareness configuration
 └── LICENSE                                # Project license
@@ -1836,7 +1958,9 @@ cd monitoring
 # - Prometheus: Metrics collection and alerting
 # - Grafana: Dashboards and visualization
 # - Loki: Log aggregation
-# - Jaeger: Distributed tracing
+# - Tempo: Distributed tracing (replaces Jaeger)
+# - Mimir: Long-term metrics storage
+# - OTeBPF: eBPF auto-instrumentation
 # - AlertManager: Alert routing w/ optional Slack integration
 ```
 
@@ -2197,6 +2321,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[OIDC Provider Directory](oidc_provider/README.md)** - GitHub → AWS OIDC provider setup and configuration
 - **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
 - **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
+- **[Console Directory](console/README.md)** - Console folder documentation with quick start and development guide
 
 #### **📖 User Documentation**
 
@@ -2211,6 +2336,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
 - [GitHub → AWS Credentials Guide](docs/GITHUB_AWS_CREDENTIALS.md) - GitHub → AWS OIDC setup and credential management
+- [Console Guide (TUI)](docs/CONSOLE_GUIDE.md) - Terminal User Interface (TUI) console guide for macOS
 - [Monitoring Setup](monitoring/README.md) - Prometheus, Grafana, and monitoring stack configuration
 
 ### **Support**
@@ -2269,7 +2395,7 @@ The system tracks versions for:
 - **EKS Add-ons**: EFS CSI Driver, Metrics Server
 - **GitHub Workflows**: GitHub Actions dependencies and versions
 - **Infrastructure**: Kubernetes, Terraform, AWS Provider
-- **Monitoring**: Prometheus, Loki, Jaeger
+- **Monitoring**: Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - **Pre-commit Hooks**: Code quality tools and versions
 - **Security**: Cert Manager
 - **Semver Packages**: The Python package called ["Semver"](https://pypi.org/project/semver/), Python, Terraform CLI, kubectl
@@ -2306,7 +2432,7 @@ You can run version checks manually in two ways:
    - `infrastructure` - Kubernetes, Terraform, AWS Provider
    - `terraform_modules` - EKS, VPC, RDS modules
    - `github_workflows` - GitHub Actions dependencies
-   - `monitoring` - Prometheus, Loki, Jaeger
+   - `monitoring` - Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
    - `eks_addons` - EFS CSI Driver, Metrics Server
 4. Choose whether to create GitHub issue (default: true)
 5. Click **Run workflow**

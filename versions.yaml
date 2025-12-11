@@ -122,6 +122,12 @@ github_workflows:
     requires_aws_cli: false
     description: "Github action for setting up a specified Python version."
 
+  actions_setup_go:
+    current: "v6.0.0"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Github action for setting up a specified Go version."
+
   actions_setup_terraform:
     current: "v3.1.2"
     notify_on_update: true
@@ -167,7 +173,7 @@ pre_commit_hooks:
     description: "https://github.com/pre-commit/pre-commit-hooks"
 
   black:
-    current: "25.9.0"
+    current: "25.11.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/psf/black"
@@ -247,6 +253,33 @@ semver_packages:
     requires_aws_cli: false
     description: "Version of the 'Semver' Python package used in Github CI/CD workflows."
 
+# Go Package Dependencies (Console TUI)
+go_packages:
+  go_version:
+    current: "1.25"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Go programming language version required for the console TUI application"
+    min_version: "1.25"
+
+  bubbletea:
+    current: "v1.3.10"
+    package_manager: "go"
+    repository: "github.com/charmbracelet/bubbletea"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Bubbletea TUI framework for the console application"
+    min_version: "v1.3.10"
+
+  lipgloss:
+    current: "v1.1.0"
+    package_manager: "go"
+    repository: "github.com/charmbracelet/lipgloss"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Lipgloss styling library for the console TUI"
+    min_version: "v1.1.0"
+
 # Python Package Dependencies (Warp Project)
 python_packages:
   pymysql:
@@ -308,7 +341,7 @@ python_packages:
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "79.9.0"
+    current: "79.11.0"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
@@ -322,12 +355,31 @@ monitoring:
     requires_aws_cli: false
     description: "Loki for log aggregation."
 
-  jaeger:
-    current: "3.4.1"
-    chart: "jaeger"
+  tempo:
+    current: "1.57.0"
+    chart: "tempo-distributed"
+    repository: "grafana"
     notify_on_update: true
     requires_aws_cli: false
-    description: "Jaeger for trace monitoring of the setup."
+    description: "Tempo for distributed tracing with S3 storage in microservice mode (replaces Jaeger)."
+
+  mimir:
+    current: "6.0.5"
+    chart: "mimir-distributed"
+    repository: "grafana"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Mimir for long-term metrics storage with S3 backend."
+
+  otebpf:
+    current: "v0.3.0"
+    chart: null
+    repository: "otel/ebpf-instrument"
+    docker_hub_url: "https://hub.docker.com/r/otel/ebpf-instrument"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "OTeBPF (OpenTelemetry eBPF Instrumentation) for eBPF auto-instrumentation (deployed as DaemonSet, uses Docker Hub image)."
+
 
   cert_manager:
     current: "v1.19.1"
@@ -349,6 +401,7 @@ notifications:
       - "github_workflows"          # GitHub Actions dependencies used in CI/CD workflows (checkout, setup-python, setup-terraform, setup-kubectl, upload/download artifacts, CodeQL, Trivy, GitHub runner)
       - "pre_commit_hooks"          # Pre-commit hook tools for code quality (pre-commit-hooks, black, isort, flake8, bandit, terraform hooks, shellcheck, markdownlint, yamllint, commitizen)
       - "semver_packages"           # Semantic version packages used in workflows (Python version, Terraform version, kubectl version, semver Python package)
+      - "go_packages"               # Go package dependencies for the console TUI (Go version, bubbletea, lipgloss)
       - "python_packages"           # Python package dependencies for the Warp project (pymysql, boto3, pytest, pytest-cov, flake8, black, mypy)
       - "monitoring"                # Monitoring stack components (Prometheus Operator, Loki, Jaeger, cert-manager)
       - "eks_addons"                # EKS cluster add-ons managed outside of Auto Mode (EFS CSI Driver, Metrics Server)

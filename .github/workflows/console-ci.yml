@@ -1,0 +1,222 @@
+# =====================================
+# OpenEMR on EKS Console CI Workflow
+# =====================================
+# This workflow provides continuous integration (CI) for the OpenEMR on EKS Console (TUI),
+# including building, testing, and linting to ensure code quality.
+#
+# Key Features:
+# - Automatic builds on push and pull requests
+# - Go code quality checks (fmt, vet, staticcheck)
+# - Multi-platform builds (macOS, Linux) to verify cross-compilation
+# - Security scanning with Trivy
+#
+# Build Matrix:
+# - macOS (darwin/amd64, darwin/arm64)
+# - Linux (linux/amd64)
+#
+
+name: Console CI/CD
+
+# Workflow triggers
+on:
+  # Automatic triggers on console changes
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'console/**'
+      - '.github/workflows/console-ci.yml'
+      - 'go.mod'
+      - 'go.sum'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'console/**'
+      - '.github/workflows/console-ci.yml'
+      - 'go.mod'
+      - 'go.sum'
+  # Manual trigger
+  workflow_dispatch:
+
+# Required permissions
+permissions:
+  contents: read          # Read repository contents
+  security-events: write  # Write security scan results to GitHub Security tab
+  actions: read           # Read workflow information
+
+# Environment variables
+env:
+  GO_VERSION: '1.25'      # Go version required by console
+  BINARY_NAME: 'openemr-eks-console'
+  MODULE_PATH: 'console'
+
+jobs:
+  # Lint and format check job
+  lint:
+    name: Lint and Format Check
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('console/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        working-directory: ${{ env.MODULE_PATH }}
+        run: go mod download
+
+      - name: Run go fmt check
+        working-directory: ${{ env.MODULE_PATH }}
+        run: |
+          if [ "$(gofmt -s -l . | wc -l)" -gt 0 ]; then
+            echo "❌ Code is not formatted. Run 'go fmt ./...' to fix."
+            gofmt -s -d .
+            exit 1
+          fi
+          echo "✅ Code is properly formatted"
+
+      - name: Run go vet
+        working-directory: ${{ env.MODULE_PATH }}
+        run: go vet ./...
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run staticcheck
+        working-directory: ${{ env.MODULE_PATH }}
+        run: staticcheck ./...
+
+  # Build and test job
+  build:
+    name: Build and Test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-14, macos-15]
+        include:
+          - os: ubuntu-24.04
+            goos: linux
+            goarch: amd64
+            artifact_name: linux-amd64
+          - os: macos-14
+            goos: darwin
+            goarch: amd64
+            artifact_name: darwin-amd64
+          - os: macos-15
+            goos: darwin
+            goarch: arm64
+            artifact_name: darwin-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-${{ hashFiles('console/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        working-directory: ${{ env.MODULE_PATH }}
+        run: go mod download
+
+      - name: Verify dependencies
+        working-directory: ${{ env.MODULE_PATH }}
+        run: go mod verify
+
+      - name: Build console
+        working-directory: ${{ env.MODULE_PATH }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          # Get project root (parent of console directory)
+          PROJECT_ROOT="$(cd .. && pwd)"
+          go build -ldflags "-X main.embeddedProjectRoot=$PROJECT_ROOT" -o ${{ env.BINARY_NAME }} main.go
+          chmod +x ${{ env.BINARY_NAME }}
+
+      - name: Test binary exists
+        working-directory: ${{ env.MODULE_PATH }}
+        run: |
+          if [ ! -f "${{ env.BINARY_NAME }}" ]; then
+            echo "❌ Binary not found after build"
+            exit 1
+          fi
+          echo "✅ Binary built successfully: ${{ env.BINARY_NAME }}"
+          ls -lh ${{ env.BINARY_NAME }}
+
+      - name: Verify binary is executable
+        working-directory: ${{ env.MODULE_PATH }}
+        run: |
+          # Verify the binary is executable
+          if [ -x "${{ env.BINARY_NAME }}" ]; then
+            echo "✅ Binary is executable"
+            file ${{ env.BINARY_NAME }}
+          else
+            echo "❌ Binary is not executable"
+            exit 1
+          fi
+
+      - name: Upload build artifact (for debugging)
+        uses: actions/upload-artifact@v4
+        if: failure()  # Only upload artifacts if build fails for debugging
+        with:
+          name: ${{ env.BINARY_NAME }}-${{ matrix.artifact_name }}-debug
+          path: ${{ env.MODULE_PATH }}/${{ env.BINARY_NAME }}
+          retention-days: 1
+
+  # Security scanning job
+  security:
+    name: Security Scan
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.0.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download dependencies
+        working-directory: ${{ env.MODULE_PATH }}
+        run: go mod download
+
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '${{ env.MODULE_PATH }}'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH'
+
+      - name: Upload Trivy results to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+

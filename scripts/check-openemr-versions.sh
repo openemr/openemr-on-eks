@@ -152,6 +152,14 @@ get_docker_tags() {
     echo "$response" | jq -r '.results[].name' 2>/dev/null
 }
 
+# Function to sort semantic versions in descending order
+# This function properly sorts versions by semantic versioning rules (major.minor.patch)
+# Uses sort -Vr for version sorting in reverse order (newest first)
+# -V flag sorts by version numbers, -r reverses the order
+sort_versions() {
+    sort -Vr
+}
+
 # Function to filter and process version tags
 # This function applies semantic versioning filters and search patterns to the raw tag list.
 # It implements OpenEMR's versioning strategy where the second-to-latest version is considered stable.
@@ -162,13 +170,14 @@ filter_versions() {
 
     # Apply semantic versioning regex filter and optional search pattern
     # Regex matches: major.minor.patch[-suffix] format (e.g., 7.0.4, 7.0.4-beta)
+    # Then sort by semantic version (newest first) before taking the count
     local filtered_tags
     if [ -n "$search_pattern" ]; then
-        # Apply both semantic versioning filter AND search pattern
-        filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | grep "$search_pattern" | head -n "$count")
+        # Apply both semantic versioning filter AND search pattern, then sort
+        filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | grep "$search_pattern" | sort_versions | head -n "$count")
     else
-        # Apply only semantic versioning filter
-        filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | head -n "$count")
+        # Apply only semantic versioning filter, then sort
+        filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sort_versions | head -n "$count")
     fi
 
     if [ "$latest_only" = true ]; then
@@ -202,9 +211,11 @@ if [ "$LATEST_ONLY" = true ]; then
     echo -e "${BLUE}Recommended OpenEMR version (stable):${NC}"
     
     # Extract latest and stable versions using semantic versioning regex
-    # Latest version is the first match, stable is typically the second (more mature)
-    latest_version=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | head -n 1)
-    stable_version=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sed -n '2p')
+    # Sort versions properly by semantic versioning (newest first)
+    # Latest version is the first after sorting, stable is typically the second (more mature)
+    sorted_versions=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sort_versions)
+    latest_version=$(echo "$sorted_versions" | head -n 1)
+    stable_version=$(echo "$sorted_versions" | sed -n '2p')
 
     if [ -n "$stable_version" ]; then
         # Display stable version as recommended for production use

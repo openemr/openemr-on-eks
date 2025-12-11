@@ -124,6 +124,20 @@ spec:
     - protocol: TCP
       port: 6379  # Redis port
       
+  # Monitoring Namespace Access
+  # Allow Fluent Bit to send logs to Loki and traces to Tempo
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 80    # Loki gateway HTTP port
+    - protocol: TCP
+      port: 4318  # Tempo OTLP HTTP port
+    - protocol: TCP
+      port: 4317  # Tempo OTLP gRPC port (if needed)
+      
   # DNS Resolution
   # Allow DNS queries for service discovery and external lookups
   - to: []  # Allow to any destination (DNS servers)

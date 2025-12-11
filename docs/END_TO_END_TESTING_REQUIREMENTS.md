@@ -136,7 +136,7 @@ graph TD
 
 The monitoring stack test (Step 5) validates that the optional monitoring components can be properly installed and uninstalled without affecting the core OpenEMR functionality. This test:
 
-- **Installs the complete monitoring stack** including Prometheus, Grafana, Loki, and Jaeger
+- **Installs the complete monitoring stack** including Prometheus, AlertManager, Grafana, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - **Verifies all monitoring components** are running and accessible
 - **Tests monitoring functionality** to ensure metrics collection and visualization work
 - **Uninstalls the monitoring stack** cleanly without leaving orphaned resources

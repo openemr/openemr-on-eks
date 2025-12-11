@@ -21,6 +21,8 @@ This comprehensive guide helps diagnose and resolve issues with OpenEMR on EKS A
 - [EKS Auto Mode Specific Issues](#6-eks-auto-mode-specific-issues)
 - [HPA Metrics Server Issues](#7-hpa-metrics-server-issues)
 - [Logging and Monitoring Issues](#8-logging-and-monitoring-issues)
+  - [Loki Logs Not Appearing](#issue-loki-logs-not-appearing-in-grafana)
+  - [Tempo Traces Not Appearing](#issue-tempo-traces-not-appearing)
 - [Common Error Messages Reference](#-common-error-messages-reference)
 
 ### **💰 Cost and Performance**
@@ -597,6 +599,295 @@ The EKS cluster configuration now includes the Metrics Server addon by default. 
 - The addon is automatically managed by EKS and kept up to date
 
 ### 8. Logging and Monitoring Issues
+
+#### Issue: Loki Logs Not Appearing in Grafana
+
+**Symptoms:**
+- No logs visible in Grafana when querying Loki datasource
+- Loki console shows "Log volume has not been configured"
+- Fluent Bit logs show HTTP 500 errors when sending to Loki
+
+**Troubleshooting Steps:**
+
+**1. Verify Loki Volume Configuration**
+
+The Loki volume configuration must be enabled. Check and fix if needed:
+
+```bash
+# Check current Loki configuration
+helm get values loki -n monitoring
+
+# Upgrade Loki to enable volume
+helm upgrade loki grafana/loki \
+  --namespace monitoring \
+  --version 6.46.0 \
+  --reuse-values \
+  --set loki.limits_config.volume_enabled=true
+
+# Verify the configuration
+kubectl get configmap loki -n monitoring -o yaml | grep -A 5 "volume_enabled"
+
+# Restart Loki components to apply changes
+kubectl rollout restart statefulset loki-backend -n monitoring
+kubectl rollout restart deployment loki-gateway -n monitoring
+kubectl rollout restart deployment loki-read -n monitoring
+kubectl rollout restart deployment loki-write -n monitoring
+```
+
+**2. Verify Fluent Bit is Running**
+
+```bash
+# Check if Fluent Bit sidecar is running in OpenEMR pods
+kubectl get pods -n openemr -l app=openemr -o jsonpath='{.items[*].spec.containers[*].name}'
+
+# Check Fluent Bit logs (container name is fluent-bit-sidecar)
+kubectl logs -n openemr -l app=openemr --container=fluent-bit-sidecar --tail=50
+```
+
+**3. Verify Fluent Bit Configuration**
+
+Check that Fluent Bit is configured to send logs to Loki:
+
+```bash
+# View Fluent Bit configuration
+kubectl get configmap fluent-bit-sidecar-config -n openemr -o yaml
+
+# Verify Loki output configuration exists
+kubectl get configmap fluent-bit-sidecar-config -n openemr -o yaml | grep -A 10 "loki"
+```
+
+**4. Test Loki Connectivity from OpenEMR Pods**
+
+```bash
+# Get an OpenEMR pod name
+POD_NAME=$(kubectl get pods -n openemr -l app=openemr -o jsonpath='{.items[0].metadata.name}')
+
+# Test connectivity to Loki gateway
+kubectl exec -n openemr $POD_NAME --container=fluent-bit-sidecar -- wget -qO- --timeout=5 http://loki-gateway.monitoring.svc.cluster.local/ready
+```
+
+Expected output: `ready` (if successful)
+
+**5. Check Fluent Bit Logs for Errors**
+
+```bash
+# Get Fluent Bit container logs
+kubectl logs -n openemr -l app=openemr --container=fluent-bit-sidecar --tail=100 | grep -i "loki\|error\|warn"
+```
+
+Look for:
+- Connection errors to `loki-gateway.monitoring.svc.cluster.local`
+- HTTP 500 errors (indicates Loki volume_enabled issue)
+- Network connectivity problems
+
+**6. Verify Loki Service is Accessible**
+
+```bash
+# Check Loki gateway service
+kubectl get svc loki-gateway -n monitoring
+
+# Test from monitoring namespace
+kubectl run test-pod --rm -i --tty --image=curlimages/curl --restart=Never -n monitoring -- \
+  curl -s http://loki-gateway.monitoring.svc.cluster.local/ready
+```
+
+**7. Check Loki Pods Status**
+
+```bash
+# Verify Loki pods are running
+kubectl get pods -n monitoring -l app.kubernetes.io/name=loki
+
+# Check Loki backend logs
+kubectl logs -n monitoring -l app.kubernetes.io/name=loki,app.kubernetes.io/component=backend --tail=50
+```
+
+**Common Fixes:**
+
+**Fix 1: Enable Volume Configuration**
+
+If Loki console shows "Log volume has not been configured":
+
+```bash
+helm upgrade loki grafana/loki \
+  --namespace monitoring \
+  --reuse-values \
+  --set loki.limits_config.volume_enabled=true
+
+# Restart Loki pods to pick up new configuration
+kubectl rollout restart statefulset loki-backend -n monitoring
+kubectl rollout restart deployment loki-gateway -n monitoring
+```
+
+**Fix 2: Restart Fluent Bit Sidecar**
+
+If Fluent Bit isn't sending logs:
+
+```bash
+# Restart OpenEMR deployment to restart Fluent Bit sidecars
+kubectl rollout restart deployment openemr -n openemr
+```
+
+**Fix 3: Verify Container Name**
+
+The Fluent Bit container is named `fluent-bit-sidecar`, not `fluent-bit`:
+
+```bash
+# List all containers in OpenEMR pods
+kubectl get pod -n openemr -l app=openemr -o jsonpath='{.items[0].spec.containers[*].name}'
+
+# Access logs using correct container name
+kubectl logs -n openemr -l app=openemr --container=fluent-bit-sidecar
+```
+
+#### Issue: Tempo Traces Not Appearing
+
+**Symptoms:**
+- No traces visible in Grafana Tempo datasource
+- Service Name filter shows no results for "openemr"
+
+**Troubleshooting Steps:**
+
+**1. Verify OTeBPF DaemonSet is Running**
+
+```bash
+# Check OTeBPF pods status
+kubectl get pods -n monitoring -l app=otebpf
+```
+
+**2. Verify OTeBPF Configuration**
+
+Check that OTeBPF is configured to send traces to Tempo:
+
+```bash
+# Check OTeBPF DaemonSet configuration
+kubectl get daemonset otebpf -n monitoring -o yaml | grep -A 5 "OTEL_EXPORTER"
+
+# Verify Tempo endpoint configuration
+kubectl get daemonset otebpf -n monitoring -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")].value}'
+```
+
+Expected: `http://tempo-distributor.monitoring.svc.cluster.local:4318`
+
+**3. Verify Tempo Services are Running**
+
+```bash
+# Check Tempo pods
+kubectl get pods -n monitoring -l app.kubernetes.io/name=tempo
+
+# Verify Tempo distributor is accessible
+kubectl get svc tempo-distributor -n monitoring
+
+# Test connectivity
+kubectl run test-pod --rm -i --tty --image=curlimages/curl --restart=Never -n monitoring -- \
+  curl -s http://tempo-distributor.monitoring.svc.cluster.local:4318
+```
+
+**4. Check OTeBPF Pod Logs**
+
+```bash
+# Get OTeBPF pod logs
+kubectl logs -n monitoring -l app=otebpf --tail=50
+
+# Look for:
+# - Connection errors to Tempo
+# - eBPF instrumentation errors
+# - Service discovery issues
+```
+
+**5. Verify OpenEMR Pod Labels**
+
+OTeBPF auto-instruments pods with label `app=openemr`. Verify:
+
+```bash
+# Check OpenEMR pod labels
+kubectl get pods -n openemr -l app=openemr --show-labels
+```
+
+Expected: `app=openemr` label should be present.
+
+**6. Check Tempo Distributor Logs**
+
+```bash
+# Check Tempo distributor for incoming traces
+kubectl logs -n monitoring -l app.kubernetes.io/name=tempo,app.kubernetes.io/component=distributor --tail=50
+
+# Look for incoming trace requests
+kubectl logs -n monitoring -l app.kubernetes.io/name=tempo,app.kubernetes.io/component=distributor | grep -i "trace\|openemr"
+```
+
+**Common Fixes:**
+
+**Fix 1: Restart OTeBPF DaemonSet**
+
+If OTeBPF pods are running but not sending traces:
+
+```bash
+# Restart OTeBPF DaemonSet
+kubectl rollout restart daemonset otebpf -n monitoring
+```
+
+**Fix 2: Verify Service Name Configuration**
+
+Ensure OTeBPF is configured with the correct service name:
+
+```bash
+# Check service name in OTeBPF configuration
+kubectl get daemonset otebpf -n monitoring -o jsonpath='{.spec.template.spec.containers[0].env[?(@.name=="OTEL_SERVICE_NAME")].value}'
+```
+
+Expected: `openemr`
+
+**Fix 3: OTeBPF Pods in ImagePullBackOff**
+
+If OTeBPF pods fail to start:
+
+```bash
+# Reinstall with correct OTeBPF configuration
+cd monitoring
+export OTEBPF_ENABLED="1"
+./install-monitoring.sh install
+```
+
+**Verifying Log and Trace Flow:**
+
+**Test Log Flow:**
+
+1. Generate test logs in OpenEMR:
+```bash
+# Access OpenEMR pod
+POD_NAME=$(kubectl get pods -n openemr -l app=openemr -o jsonpath='{.items[0].metadata.name}')
+kubectl exec -n openemr $POD_NAME -- sh -c 'echo "Test log entry $(date)" >> /var/log/test.log'
+```
+
+2. Check Fluent Bit processed it:
+```bash
+kubectl logs -n openemr $POD_NAME --container=fluent-bit-sidecar --tail=20 | grep -i "test log"
+```
+
+3. Query Loki in Grafana:
+   - Go to Explore → Select Loki datasource
+   - Query: `{namespace="openemr", job="openemr"}`
+
+**Test Trace Flow:**
+
+1. Generate HTTP traffic to OpenEMR:
+```bash
+# Get OpenEMR LoadBalancer URL
+LB_URL=$(kubectl get svc openemr-service -n openemr -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
+# Make a request
+curl -k https://$LB_URL
+```
+
+2. Check OTeBPF detected it:
+```bash
+kubectl logs -n monitoring -l app=otebpf --tail=20 | grep -i "openemr\|trace"
+```
+
+3. Query Tempo in Grafana:
+   - Go to Explore → Select Tempo datasource
+   - Service Name: `openemr`
+   - Click "Run query"
 
 #### Issue: CloudWatch Logs Not Appearing
 
