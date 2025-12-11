@@ -336,7 +336,7 @@ The manual release workflow is located at:
 
 | Variable | Description                                                                                 | Default |
 |----------|---------------------------------------------------------------------------------------------|--------|
-| `PYTHON_VERSION` | Python [version](https://www.python.org/doc/versions/) used                                 | `3.13.7` |
+| `PYTHON_VERSION` | Python [version](https://www.python.org/doc/versions/) used                                 | `3.14.0` |
 | `SEMVER_PYTHON_PACKAGE_VERSION` | Version of the PyPi ["semver"](https://pypi.org/project/semver/) package to use             | `3.0.4` |
 
 ### Secrets
