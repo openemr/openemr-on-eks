@@ -843,7 +843,8 @@ cd ../scripts
 
 - 📊 **Prometheus**: kube-prometheus-stack v79.11.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
-- 📝 **Loki**: v6.46.0 single-binary (log aggregation with S3 storage and 720h retention)
+- 📝 **Loki**: v6.46.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
+  - **Distributed Architecture**: Uses SimpleScalable deployment mode with separate read, write, and backend components for better scalability and high availability
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access

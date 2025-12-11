@@ -198,7 +198,7 @@ graph TB
 Layer 1: Pod-level (HPA) - Fully Configurable
 ├── Grafana: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── Prometheus: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
-├── Loki: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+├── Loki (distributed mode): Read/Write/Backend components, each 2-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── Tempo: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── Mimir: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 ├── AlertManager: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
