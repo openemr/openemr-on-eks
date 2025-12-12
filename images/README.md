@@ -4,6 +4,8 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 ## 📋 Table of Contents
 
+<img src="images_table_of_contents_section_picture.png" alt="Images Table of Contents Section Picture" width="400">
+
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
   - [Visual Assets](#visual-assets)
@@ -36,7 +38,8 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Terraform Table of Contents Section Picture (`terraform_table_of_contents_section_picture.png`)](#terraform-table-of-contents-section-picture-terraform_table_of_contents_section_picturepng)
   - [K8s Table of Contents Section Picture (`k8s_table_of_contents_section_picture.png`)](#k8s-table-of-contents-section-picture-k8s_table_of_contents_section_picturepng)
   - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
-  - [Console Title Image (`console-title-image.png`)](#console-title-image-console-title-imagepng)
+  - [Console Table of Contents Section Picture (`console_table_of_contents_section_picture.png`)](#console-table-of-contents-section-picture-console_table_of_contents_section_picturepng)
+  - [Images Table of Contents Section Picture (`images_table_of_contents_section_picture.png`)](#images-table-of-contents-section-picture-images_table_of_contents_section_picturepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -109,7 +112,8 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`terraform_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the terraform README
 - **`k8s_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the k8s README
 - **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
-- **`console-title-image.png`** - Project mascot image used as a title image for the console documentation
+- **`console_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the console README
+- **`images_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the images README
 
 ## File Descriptions
 
@@ -303,13 +307,21 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Context**: Illustrates the TUI console that provides an intuitive interface for managing OpenEMR deployment with 10 essential commands, codebase search, and interactive features
 - **Platform**: macOS only (commands execute in separate Terminal windows to preserve script colors and interactivity)
 
-### **Console Title Image (`console-title-image.png`)**
+### **Console Table of Contents Section Picture (`console_table_of_contents_section_picture.png`)**
 
-- **Purpose**: Visual branding element featuring the project mascot used as a title image for console documentation
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the console README
 - **Format**: PNG image
-- **Usage**: Displayed in the console guide documentation below the platform warning to add personality and visual appeal
-- **Context**: Provides a friendly, approachable visual element that makes the console documentation more engaging and memorable
-- **Placement**: Positioned at the top of the console guide below the platform support notice
+- **Usage**: Displayed just under the table of contents header in the console README (`console/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the console documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "## Table of Contents" header in the console README
+
+### **Images Table of Contents Section Picture (`images_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the images README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the images README (`images/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the images documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "## 📋 Table of Contents" header in the images README
 
 ## Setting GitHub Social Banner
 

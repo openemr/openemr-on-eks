@@ -184,12 +184,18 @@
 
 </details>
 
-## 🖥️ Interactive Console (TUI) - macOS Only
+## 🖥️ Interactive Console (TUI) - macOS & Windows
 
 Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deployment with ease:
 
+**macOS:**
 ```bash
 ./start_console
+```
+
+**Windows:**
+```powershell
+.\start_console.ps1
 ```
 
 <details>
@@ -212,7 +218,7 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 - 📦 **Version Checking** - Component version awareness
 - 🔎 **Interactive Search** - Search codebase for any term
 
-**Platform Support**: Currently macOS only. Commands execute in separate Terminal windows to preserve script colors, formatting, and interactivity.
+**Platform Support**: macOS and Windows. Commands execute in separate Terminal windows (macOS) or PowerShell windows (Windows) to preserve script colors, formatting, and interactivity.
 
 </details>
 

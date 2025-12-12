@@ -1,3 +1,11 @@
+# =============================================================================
+# OpenEMR on EKS Console Makefile
+# =============================================================================
+# Note: This Makefile is designed for macOS systems only.
+# For Windows, use start_console.ps1 instead, which creates a static binary
+# called openemr-eks-console.exe that can be double-clicked to launch.
+# =============================================================================
+
 .PHONY: build install uninstall clean run
 
 BINARY_NAME=openemr-eks-console

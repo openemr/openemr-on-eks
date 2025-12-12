@@ -1,10 +1,12 @@
 # OpenEMR on EKS Console (TUI)
 
-A Terminal User Interface (TUI) built with Go and [Bubbletea](https://github.com/charmbracelet/bubbletea) that provides an intuitive, menu-driven interface for managing your OpenEMR on EKS deployment.
+A Terminal User Interface (TUI) built with Go, [Bubbletea](https://github.com/charmbracelet/bubbletea), and [Lipgloss](https://pkg.go.dev/github.com/charmbracelet/lipgloss) that provides an intuitive, menu-driven interface for managing your OpenEMR on EKS deployment.
 
 <img src="../images/console-launch-screen.png" alt="OpenEMR on EKS Console TUI" width="600">
 
 ## Table of Contents
+
+<img src="../images/console_table_of_contents_section_picture.png" alt="Console Table of Contents Section Picture" width="400">
 
 - [Overview](#overview)
 - [Features](#features)
@@ -38,7 +40,7 @@ A Terminal User Interface (TUI) built with Go and [Bubbletea](https://github.com
 
 Instead of remembering complex command-line arguments, you can navigate through a simple menu and execute common operations with ease. The console provides access to 10 essential deployment and management commands.
 
-**Platform Support**: Currently macOS only. Commands execute in separate Terminal windows to preserve script colors, formatting, and interactivity.
+**Platform Support**: macOS and Windows. Commands execute in separate Terminal windows (macOS) or PowerShell windows (Windows) to preserve script colors, formatting, and interactivity.
 
 ## Features
 
@@ -54,16 +56,26 @@ Instead of remembering complex command-line arguments, you can navigate through 
 
 The easiest way to launch the console is from the project root:
 
+**macOS:**
 ```bash
 ./start_console
+```
+
+**Windows:**
+```powershell
+.\start_console.ps1
 ```
 
 The launcher script will:
 1. Check for Go installation (requires Go 1.25+)
 2. Navigate to the console directory
 3. Download dependencies (if needed)
-4. Build the console application
+4. Build a static binary called `openemr-eks-console.exe` in the `console/` directory
 5. Launch the TUI
+
+**Windows Binary**: After running `start_console.ps1`, a static binary `openemr-eks-console.exe` is created in the `console/` directory. This binary can be launched anytime by double-clicking it, and it will open the console interface for deploying, managing, and monitoring your OpenEMR on EKS infrastructure. The binary is self-contained and includes the embedded project root path, so it will automatically find your project scripts and configuration.
+
+**Note for Windows Users**: The Makefile in the `console/` directory is only for macOS. On Windows, always use `start_console.ps1` to build the console, which creates the `openemr-eks-console.exe` binary that can be double-clicked to launch.
 
 ### Manual Build and Run
 
@@ -74,7 +86,9 @@ go build -o openemr-eks-console main.go
 ./openemr-eks-console
 ```
 
-### Using the Makefile
+### Using the Makefile (macOS only)
+
+**Note**: The Makefile is designed for macOS systems. For Windows, use `start_console.ps1` instead.
 
 ```bash
 cd console
@@ -112,9 +126,10 @@ openemr-eks-console
 
 ## Prerequisites
 
-- **macOS** operating system (required - console currently only supports macOS)
+- **macOS** or **Windows** operating system
 - **Go 1.25 or later** installed on your system
 - Access to the OpenEMR on EKS project directory
+- **Windows only**: Git Bash or WSL installed (required to run .sh scripts)
 
 ## Installation
 
@@ -179,7 +194,9 @@ console/
    ./openemr-eks-console
    ```
 
-## Installation to System Path
+## Installation to System Path (macOS only)
+
+**Note**: This section applies to macOS only. On Windows, the binary `openemr-eks-console.exe` is created in the `console/` directory and can be double-clicked to launch.
 
 To install the console globally so it can be run from anywhere:
 
@@ -211,12 +228,6 @@ This will:
 - Remove the binary from `/usr/local/bin/openemr-eks-console`
 - Check if the binary exists before attempting removal
 
-After installation, you can run:
-
-```bash
-openemr-eks-console
-```
-
 **Important**: The console automatically knows the project location:
 1. **During installation**: The project root path is embedded in the binary
 2. **If project is moved**: Set `OPENEMR_EKS_PROJECT_ROOT` environment variable to override the embedded path
@@ -245,6 +256,7 @@ The console will automatically find the scripts directory using the embedded pat
 **Solution**: Install or upgrade Go to version 1.25 or later:
 - Download from: https://golang.org/dl/
 - macOS: `brew install go` or `brew upgrade go`
+- Windows: Download installer from https://golang.org/dl/ and run the installer
 
 ### Scripts Not Found
 
@@ -294,15 +306,19 @@ To add new commands to the console:
 
 - **Framework**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (Go TUI framework)
 - **Language**: Go 1.25+
-- **Execution Model**: Opens commands in separate Terminal windows (macOS only)
+- **Execution Model**: Opens commands in separate Terminal windows (macOS) or PowerShell windows (Windows)
 
 ### Command Execution
 
 The console executes scripts by:
 1. Locating the script file in the `../scripts/` directory
 2. Making it executable (if needed)
-3. Opening it in a new Terminal window with `osascript` (macOS)
+3. Opening it in a new terminal window:
+   - **macOS**: Uses `osascript` to open a new Terminal window
+   - **Windows**: Uses PowerShell `Start-Process` to open a new PowerShell window (scripts run via bash)
 4. Displaying success/error messages
+
+**Note for Windows users**: The console scripts are bash scripts (`.sh` files). On Windows, these are executed through bash, which requires Git Bash or WSL to be installed and available in your PATH.
 
 ## Documentation
 
