@@ -1019,6 +1019,7 @@ openemr-on-eks/
 ├── .yamllint                              # YAML linting configuration (relaxed rules)
 ├── .markdownlint.json                     # Markdown linting configuration (relaxed rules)
 ├── start_console                          # TUI console launcher script (macOS only)
+├── start_console.ps1                      # TUI console launcher script (PowerShell/Windows)
 ├── VERSION                                # Current project version
 ├── versions.yaml                          # Version awareness configuration
 └── LICENSE                                # Project license
