@@ -6,6 +6,8 @@ A production-ready monitoring solution for OpenEMR on EKS Auto Mode, featuring a
 
 ## 📋 Table of Contents
 
+<img src="../images/monitoring_table_of_contents_section_picture.png" alt="Monitoring table of contents section picture" width="300">
+
 - [Architecture Overview](#%EF%B8%8F-architecture-overview)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)

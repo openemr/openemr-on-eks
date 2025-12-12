@@ -30,6 +30,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
   - [Quick Start Section Picture (`quickstart_section_picture.png`)](#quick-start-section-picture-quickstart_section_picturepng)
   - [Table of Contents Section Picture (`table_of_contents_section_picture.png`)](#table-of-contents-section-picture-table_of_contents_section_picturepng)
+  - [Monitoring Table of Contents Section Picture (`monitoring_table_of_contents_section_picture.png`)](#monitoring-table-of-contents-section-picture-monitoring_table_of_contents_section_picturepng)
   - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
   - [Console Title Image (`console-title-image.png`)](#console-title-image-console-title-imagepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
@@ -98,6 +99,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
 - **`quickstart_section_picture.png`** - Project mascot giving a thumbs up while dressed like an astronaut, used at the beginning of the Quick Start section
 - **`table_of_contents_section_picture.png`** - Project mascot dressed like an astronaut reading a book, used in the table of contents section
+- **`monitoring_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the monitoring README
 - **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
 - **`console-title-image.png`** - Project mascot image used as a title image for the console documentation
 
@@ -244,6 +246,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Displayed in the table of contents section in the main README to add personality and visual appeal
 - **Context**: Provides a friendly, approachable visual element that makes the table of contents section more engaging and memorable, with the mascot reading a book to represent documentation and learning
 - **Placement**: Positioned in the table of contents section with appropriate alignment
+
+### **Monitoring Table of Contents Section Picture (`monitoring_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the monitoring README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the monitoring README (`monitoring/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the monitoring documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "📋 Table of Contents" header in the monitoring README
 
 ### **Console Launch Screen (`console-launch-screen.png`)**
 
