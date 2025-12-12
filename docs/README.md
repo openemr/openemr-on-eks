@@ -4,6 +4,8 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 
 ## 📋 Table of Contents
 
+<img src="../images/docs_table_of_contents_section_picture.png" alt="Docs table of contents section picture" width="400">
+
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
 - [Documentation Dependency Graph](#documentation-dependency-graph)

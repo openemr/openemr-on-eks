@@ -2,6 +2,10 @@
 
 This directory contains all the operational scripts for the OpenEMR on EKS deployment. These scripts handle infrastructure management, application deployment, monitoring, security, and maintenance tasks.
 
+## 📋 Table of Contents
+
+<img src="../images/scripts_table_of_contents_section_picture.png" alt="Scripts table of contents section picture" width="400">
+
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
   - [Script Execution Order for Common Operations](#-script-execution-order-for-common-operations)

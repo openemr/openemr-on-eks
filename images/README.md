@@ -31,6 +31,9 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Quick Start Section Picture (`quickstart_section_picture.png`)](#quick-start-section-picture-quickstart_section_picturepng)
   - [Table of Contents Section Picture (`table_of_contents_section_picture.png`)](#table-of-contents-section-picture-table_of_contents_section_picturepng)
   - [Monitoring Table of Contents Section Picture (`monitoring_table_of_contents_section_picture.png`)](#monitoring-table-of-contents-section-picture-monitoring_table_of_contents_section_picturepng)
+  - [Docs Table of Contents Section Picture (`docs_table_of_contents_section_picture.png`)](#docs-table-of-contents-section-picture-docs_table_of_contents_section_picturepng)
+  - [Scripts Table of Contents Section Picture (`scripts_table_of_contents_section_picture.png`)](#scripts-table-of-contents-section-picture-scripts_table_of_contents_section_picturepng)
+  - [Terraform Table of Contents Section Picture (`terraform_table_of_contents_section_picture.png`)](#terraform-table-of-contents-section-picture-terraform_table_of_contents_section_picturepng)
   - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
   - [Console Title Image (`console-title-image.png`)](#console-title-image-console-title-imagepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
@@ -100,6 +103,9 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`quickstart_section_picture.png`** - Project mascot giving a thumbs up while dressed like an astronaut, used at the beginning of the Quick Start section
 - **`table_of_contents_section_picture.png`** - Project mascot dressed like an astronaut reading a book, used in the table of contents section
 - **`monitoring_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the monitoring README
+- **`docs_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the docs README
+- **`scripts_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the scripts README
+- **`terraform_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the terraform README
 - **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
 - **`console-title-image.png`** - Project mascot image used as a title image for the console documentation
 
@@ -254,6 +260,30 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Displayed just under the table of contents header in the monitoring README (`monitoring/README.md`) to add personality and visual appeal
 - **Context**: Provides a friendly, approachable visual element that makes the monitoring documentation's table of contents section more engaging and memorable
 - **Placement**: Positioned just under the "📋 Table of Contents" header in the monitoring README
+
+### **Docs Table of Contents Section Picture (`docs_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the docs README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the docs README (`docs/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "📋 Table of Contents" header in the docs README
+
+### **Scripts Table of Contents Section Picture (`scripts_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the scripts README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the scripts README (`scripts/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the scripts documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "📋 Table of Contents" header in the scripts README
+
+### **Terraform Table of Contents Section Picture (`terraform_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the terraform README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the terraform README (`terraform/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the terraform documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "📋 Table of Contents" header in the terraform README
 
 ### **Console Launch Screen (`console-launch-screen.png`)**
 

@@ -4,6 +4,8 @@ This directory contains the complete infrastructure-as-code (IaC) configuration 
 
 ## 📋 Table of Contents
 
+<img src="../images/terraform_table_of_contents_section_picture.png" alt="Terraform table of contents section picture" width="400">
+
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
   - [Core Configuration Files](#core-configuration-files)
