@@ -8,8 +8,8 @@
 //   - Linux: Not supported
 //
 // The console detects the project root directory at startup using:
-//   1. OPENEMR_EKS_PROJECT_ROOT environment variable (highest priority, allows override)
-//   2. Embedded project root path (set at build time via -ldflags)
+//  1. OPENEMR_EKS_PROJECT_ROOT environment variable (highest priority, allows override)
+//  2. Embedded project root path (set at build time via -ldflags)
 //
 // If the project is moved after building, users can set the environment variable
 // to point to the new location without rebuilding.
@@ -34,7 +34,8 @@ import (
 // locate project scripts and resources even when run from a different directory.
 //
 // Example build command:
-//   go build -ldflags "-X main.embeddedProjectRoot=$PWD" -o openemr-eks-console
+//
+//	go build -ldflags "-X main.embeddedProjectRoot=$PWD" -o openemr-eks-console
 //
 // Users can override this at runtime by setting the OPENEMR_EKS_PROJECT_ROOT
 // environment variable, which takes precedence over the embedded path.
@@ -137,16 +138,16 @@ func convertWindowsPathToUnix(windowsPath string) string {
 		// If conversion fails, just use the original path with forward slashes
 		return strings.ReplaceAll(windowsPath, "\\", "/")
 	}
-	
+
 	// Replace backslashes with forward slashes
 	unixPath := strings.ReplaceAll(absPath, "\\", "/")
-	
+
 	// Convert drive letter to Git Bash format (C: -> /c)
 	if len(unixPath) >= 2 && unixPath[1] == ':' {
 		drive := strings.ToLower(string(unixPath[0]))
 		unixPath = "/" + drive + unixPath[2:]
 	}
-	
+
 	return unixPath
 }
 
@@ -154,13 +155,13 @@ func convertWindowsPathToUnix(windowsPath string) string {
 // and command definitions. This function is called once at application startup.
 //
 // Project Root Detection Strategy (in priority order):
-//   1. OPENEMR_EKS_PROJECT_ROOT environment variable (highest priority)
-//      - Allows users to override the embedded path if the project was moved
-//      - Useful when the binary was built in one location but the project moved
-//   2. Embedded project root (set at build time via -ldflags)
-//      - Automatically embedded during compilation by start_console.ps1 (Windows)
-//      - or Makefile (macOS)
-//   3. If neither is valid, the application exits with detailed error messages
+//  1. OPENEMR_EKS_PROJECT_ROOT environment variable (highest priority)
+//     - Allows users to override the embedded path if the project was moved
+//     - Useful when the binary was built in one location but the project moved
+//  2. Embedded project root (set at build time via -ldflags)
+//     - Automatically embedded during compilation by start_console.ps1 (Windows)
+//     - or Makefile (macOS)
+//  3. If neither is valid, the application exits with detailed error messages
 //
 // The function validates that the detected project root contains all required
 // subdirectories (scripts/, terraform/, k8s/) before proceeding.
@@ -210,7 +211,7 @@ func initialModel() model {
 	// Provide platform-specific instructions to help users resolve the issue
 	if projectRoot == "" {
 		fmt.Fprintf(os.Stderr, "❌ Error: Project root not found or invalid\n\n")
-		
+
 		// Report embedded path status and issues
 		if embeddedProjectRoot != "" {
 			fmt.Fprintf(os.Stderr, "Embedded project root: %s\n", embeddedProjectRoot)
@@ -336,9 +337,9 @@ func (m model) Init() tea.Cmd {
 // This is the core of the Bubbletea Model-Update-View pattern.
 //
 // Message handling order:
-//   1. Command execution results (outputMsg, errorMsg) - handled first
-//   2. User input during command execution (only quit keys allowed)
-//   3. User input in menu mode (navigation and selection)
+//  1. Command execution results (outputMsg, errorMsg) - handled first
+//  2. User input during command execution (only quit keys allowed)
+//  3. User input in menu mode (navigation and selection)
 //
 // Returns the updated model and any commands to run (for async operations).
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -470,7 +471,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// Build the command string that will be executed in the new terminal
 			// The command changes directory, runs the script, then waits for user input
 			command := fmt.Sprintf("cd '%s' && '%s' %s; echo ''; echo 'Press any key and then return to go back to the command line'; read -n 1", escapedWorkingDir, escapedScriptPath, escapedArgs)
-			
+
 			// Use osascript to tell Terminal.app to execute the command in a new window
 			execCmd := exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "%s"`, command))
 
@@ -480,7 +481,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			}
 		} else if runtime.GOOS == "windows" {
 			// Windows: Use PowerShell Start-Process to open a new PowerShell window
-			// 
+			//
 			// Windows execution is complex because:
 			// 1. We need to detect which bash is available (Git Bash, WSL, or system bash)
 			// 2. Each bash variant requires different path formats:
@@ -494,19 +495,19 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// - Convert to Unix-style for Git Bash and system bash
 			// - Keep Windows-style for WSL (WSL will convert via wslpath)
 			// - Keep original Windows path for PowerShell Set-Location cmdlet
-			
+
 			// Convert Windows paths to Unix-style paths for Git Bash
 			scriptPathUnix := convertWindowsPathToUnix(scriptPath)
 			workingDirUnix := convertWindowsPathToUnix(workingDir)
-			
+
 			// Keep Windows paths with forward slashes for WSL (WSL prefers / over \)
 			scriptPathWin := strings.ReplaceAll(scriptPath, "\\", "/")
 			workingDirWin := strings.ReplaceAll(workingDir, "\\", "/")
-			
+
 			// Keep the original Windows path with backslashes for PowerShell Set-Location
 			// PowerShell's Set-Location cmdlet expects Windows paths, not Unix-style paths
 			workingDirWinPS := workingDir
-			
+
 			// Escape single quotes for PowerShell (PowerShell uses '' to escape single quotes)
 			// This is different from bash which uses '\'' for escaping
 			escapedScriptPathUnix := strings.ReplaceAll(scriptPathUnix, "'", "''")
@@ -529,33 +530,33 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// 4. Catch block: Display detailed error information
 			// 5. Finally block: Keep window open for user to read output
 			var scriptBuf bytes.Buffer
-			
+
 			// Set error handling: Continue on errors so we can catch and display them
 			scriptBuf.WriteString("$ErrorActionPreference = 'Continue'\r\n")
-			
+
 			// Set window title for easy identification
 			scriptBuf.WriteString("$Host.UI.RawUI.WindowTitle = 'OpenEMR EKS Console - Script Execution'\r\n")
-			
+
 			// Display header with colored output
 			scriptBuf.WriteString("Write-Host 'OpenEMR EKS Console - Script Execution' -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("Write-Host '========================================' -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("Write-Host ''\r\n")
-			
+
 			// Begin try-catch-finally block for error handling
 			scriptBuf.WriteString("try {\r\n")
 			// Set up path variables that will be used by the bash detection logic
 			scriptBuf.WriteString(fmt.Sprintf("  $workingDirUnix = '%s'\r\n", escapedWorkingDirUnix))
 			scriptBuf.WriteString(fmt.Sprintf("  $scriptPathUnix = '%s'\r\n", escapedScriptPathUnix))
 			scriptBuf.WriteString(fmt.Sprintf("  $scriptArgs = '%s'\r\n", escapedArgs))
-			
+
 			// Initialize variables that will be set during bash detection
 			scriptBuf.WriteString("  $bashCmd = $null\r\n")
 			scriptBuf.WriteString("  $finalScriptPath = $null\r\n")
 			scriptBuf.WriteString("  $finalWorkingDir = $null\r\n")
 			scriptBuf.WriteString("  $finalWorkingDirPS = $null\r\n")
-			
+
 			scriptBuf.WriteString("  Write-Host 'Looking for bash...' -ForegroundColor Cyan\r\n")
-			
+
 			// Bash detection strategy (in priority order):
 			// 1. Git Bash - Most common on Windows, uses /c/ path format
 			// 2. WSL - Windows Subsystem for Linux, uses /mnt/c/ path format
@@ -579,7 +580,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      break\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  }\r\n")
-			
+
 			// If Git Bash not found, try WSL (Windows Subsystem for Linux)
 			// WSL requires different path handling: we use wslpath to convert Windows paths
 			scriptBuf.WriteString("  # Try WSL bash\r\n")
@@ -609,7 +610,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host 'WSL not found' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  }\r\n")
-			
+
 			// Last resort: check for any bash in the system PATH
 			// This is less common but some users may have bash installed elsewhere
 			scriptBuf.WriteString("  # Try system bash\r\n")
@@ -637,7 +638,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host \"Working directory: $finalWorkingDir\" -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("      Write-Host \"Executing: $finalScriptPath $scriptArgs\" -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("      Write-Host ''\r\n")
-			
+
 			// WSL requires special handling: we need to pass the entire command as a string
 			// to bash -c, with proper escaping of quotes within the command
 			scriptBuf.WriteString("      if ($bashCmd -eq 'wsl') {\r\n")
@@ -656,7 +657,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("          & $bashCmd $finalScriptPath\r\n")
 			scriptBuf.WriteString("        }\r\n")
 			scriptBuf.WriteString("      }\r\n")
-			
+
 			// Check exit code and display warning if script failed
 			// Note: We don't treat non-zero exit codes as errors here because
 			// the script itself may have valid reasons to exit with non-zero (e.g., validation failures)
@@ -721,7 +722,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// 1. Temp files are small (a few KB)
 			// 2. Windows handles cleanup automatically
 			// 3. Immediate deletion could cause issues if PowerShell is still reading it
-			
+
 			// Write UTF-8 BOM (Byte Order Mark) for PowerShell compatibility
 			// PowerShell requires BOM to properly detect UTF-8 encoding
 			// Without BOM, PowerShell may misinterpret special characters
@@ -736,7 +737,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 				return errorMsg(fmt.Sprintf("Failed to write temporary script: %s", err.Error()))
 			}
 			tmpScript.Close()
-			
+
 			// Launch PowerShell in a new window with the temporary script
 			// Arguments:
 			//   -NoExit: Keep the window open after script execution (handled by our script's ReadKey)
@@ -746,7 +747,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			startProcessCmd := fmt.Sprintf(
 				"Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', '%s'",
 				scriptPath)
-			
+
 			execCmd := exec.Command("powershell", "-Command", startProcessCmd)
 
 			// Execute the command to open PowerShell window
@@ -772,9 +773,9 @@ type errorMsg string
 // This function is called by Bubbletea whenever the model state changes.
 //
 // The view has three modes:
-//   1. Quitting: Simple goodbye message
-//   2. Executing: Shows command execution status with output/error messages
-//   3. Menu: Displays the interactive command menu with navigation
+//  1. Quitting: Simple goodbye message
+//  2. Executing: Shows command execution status with output/error messages
+//  3. Menu: Displays the interactive command menu with navigation
 //
 // Returns the formatted string that will be displayed in the terminal.
 func (m model) View() string {
@@ -843,11 +844,11 @@ func (m model) View() string {
 			s.WriteString(itemStyle.Render(fmt.Sprintf("%s %s", cursor, cmd.title)))
 		}
 		s.WriteString("\n")
-		
+
 		// Display command description
 		s.WriteString(descStyle.Render(cmd.description))
 		s.WriteString("\n")
-		
+
 		// Display script path (relative to project root for cleaner display)
 		// Convert absolute path to relative path if possible
 		scriptPath := cmd.script
@@ -856,7 +857,7 @@ func (m model) View() string {
 				scriptPath = relPath
 			}
 		}
-		
+
 		// Format script path with arguments if any
 		scriptDisplay := scriptPath
 		if len(cmd.args) > 0 {
