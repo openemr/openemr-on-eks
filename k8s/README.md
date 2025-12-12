@@ -4,6 +4,8 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
 
 ## 📋 Table of Contents
 
+<img src="../images/k8s_table_of_contents_section_picture.png" alt="K8s table of contents section picture" width="400">
+
 ### **📁 Directory Overview**
 - [Directory Structure](#directory-structure)
 - [Core Deployment Files](#core-deployment-files)

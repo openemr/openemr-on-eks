@@ -34,6 +34,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Docs Table of Contents Section Picture (`docs_table_of_contents_section_picture.png`)](#docs-table-of-contents-section-picture-docs_table_of_contents_section_picturepng)
   - [Scripts Table of Contents Section Picture (`scripts_table_of_contents_section_picture.png`)](#scripts-table-of-contents-section-picture-scripts_table_of_contents_section_picturepng)
   - [Terraform Table of Contents Section Picture (`terraform_table_of_contents_section_picture.png`)](#terraform-table-of-contents-section-picture-terraform_table_of_contents_section_picturepng)
+  - [K8s Table of Contents Section Picture (`k8s_table_of_contents_section_picture.png`)](#k8s-table-of-contents-section-picture-k8s_table_of_contents_section_picturepng)
   - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
   - [Console Title Image (`console-title-image.png`)](#console-title-image-console-title-imagepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
@@ -106,6 +107,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`docs_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the docs README
 - **`scripts_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the scripts README
 - **`terraform_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the terraform README
+- **`k8s_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the k8s README
 - **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
 - **`console-title-image.png`** - Project mascot image used as a title image for the console documentation
 
@@ -284,6 +286,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Displayed just under the table of contents header in the terraform README (`terraform/README.md`) to add personality and visual appeal
 - **Context**: Provides a friendly, approachable visual element that makes the terraform documentation's table of contents section more engaging and memorable
 - **Placement**: Positioned just under the "📋 Table of Contents" header in the terraform README
+
+### **K8s Table of Contents Section Picture (`k8s_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the k8s README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the k8s README (`k8s/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the Kubernetes documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "📋 Table of Contents" header in the k8s README
 
 ### **Console Launch Screen (`console-launch-screen.png`)**
 
