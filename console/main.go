@@ -18,7 +18,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -712,7 +711,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// 2. More reliable than base64 encoding (which has encoding issues)
 			// 3. Easier to debug (users can inspect the generated script)
 			// 4. Handles multi-line scripts cleanly
-			tmpScript, err := ioutil.TempFile("", "openemr-console-*.ps1")
+			tmpScript, err := os.CreateTemp("", "openemr-console-*.ps1")
 			if err != nil {
 				return errorMsg(fmt.Sprintf("Failed to create temporary script: %s", err.Error()))
 			}
