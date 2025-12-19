@@ -113,7 +113,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`scripts_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the scripts README
 - **`terraform_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the terraform README
 - **`k8s_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the k8s README
-- **`tui.gif`** - Animated GIF showing the Terminal User Interface (TUI) console launch screen for macOS
+- **`tui.gif`** - Animated GIF showing the Terminal User Interface (TUI) console launch screen for macOS and Windows
 - **`console_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the console README
 - **`images_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the images README
 - **`github_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the GitHub workflows README
@@ -307,9 +307,9 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 
 - **Purpose**: Visual demonstration of the Terminal User Interface (TUI) console launch screen
 - **Format**: Animated GIF
-- **Usage**: Documentation and README files to show the interactive console interface for macOS users
+- **Usage**: Documentation and README files to show the interactive console interface for macOS and Windows users
 - **Context**: Illustrates the TUI console that provides an intuitive interface for managing OpenEMR deployment with 10 essential commands, codebase search, and interactive features
-- **Platform**: macOS only (commands execute in separate Terminal windows to preserve script colors and interactivity)
+- **Platform**: macOS and Windows (commands execute in separate Terminal windows on macOS or PowerShell windows on Windows to preserve script colors and interactivity)
 
 ### **Console Table of Contents Section Picture (`console_table_of_contents_section_picture.png`)**
 
