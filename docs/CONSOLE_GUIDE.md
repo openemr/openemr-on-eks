@@ -2,7 +2,7 @@
 
 > **Platform Support**: The console supports **macOS** and **Windows**. Commands execute in separate Terminal windows (macOS) or PowerShell windows (Windows) to preserve script colors, formatting, and interactivity.
 
-<img src="../images/console-launch-screen.png" alt="OpenEMR on EKS Console TUI" width="500">
+<img src="../images/tui.gif" alt="OpenEMR on EKS Console TUI" width="500">
 
 ## Table of Contents
 

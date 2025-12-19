@@ -186,6 +186,8 @@
 
 ## 🖥️ Interactive Console (TUI) - macOS & Windows
 
+<img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI" width="500">
+
 Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deployment with ease:
 
 **macOS:**
@@ -201,7 +203,7 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 <details>
 <summary><strong>TUI Launch Screen</strong></summary>
 
-<img src="./images/console-launch-screen.png" alt="OpenEMR on EKS Console TUI launch screen" width="500">
+<img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI launch screen" width="500">
 
 </details>
 

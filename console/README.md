@@ -2,7 +2,7 @@
 
 A Terminal User Interface (TUI) built with Go, [Bubbletea](https://github.com/charmbracelet/bubbletea), and [Lipgloss](https://pkg.go.dev/github.com/charmbracelet/lipgloss) that provides an intuitive, menu-driven interface for managing your OpenEMR on EKS deployment.
 
-<img src="../images/console-launch-screen.png" alt="OpenEMR on EKS Console TUI" width="600">
+<img src="../images/tui.gif" alt="OpenEMR on EKS Console TUI" width="600">
 
 ## Table of Contents
 
