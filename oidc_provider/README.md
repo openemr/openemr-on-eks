@@ -10,6 +10,8 @@ This Terraform module provisions the GitHub OIDC provider and IAM roles needed f
 
 ## 📋 Table of Contents
 
+<img src="../images/oidc_provider_table_of_contents_section_picture.png" alt="OIDC Provider Table of Contents Section Picture" width="400">
+
 ### **🚀 Getting Started**
 - [Overview](#overview)
 - [Prerequisites](#prerequisites)

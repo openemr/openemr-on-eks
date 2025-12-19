@@ -40,6 +40,8 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Console Launch Screen (`console-launch-screen.png`)](#console-launch-screen-console-launch-screenpng)
   - [Console Table of Contents Section Picture (`console_table_of_contents_section_picture.png`)](#console-table-of-contents-section-picture-console_table_of_contents_section_picturepng)
   - [Images Table of Contents Section Picture (`images_table_of_contents_section_picture.png`)](#images-table-of-contents-section-picture-images_table_of_contents_section_picturepng)
+  - [GitHub Table of Contents Section Picture (`github_table_of_contents_section_picture.png`)](#github-table-of-contents-section-picture-github_table_of_contents_section_picturepng)
+  - [OIDC Provider Table of Contents Section Picture (`oidc_provider_table_of_contents_section_picture.png`)](#oidc-provider-table-of-contents-section-picture-oidc_provider_table_of_contents_section_picturepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -114,6 +116,8 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`console-launch-screen.png`** - Screenshot showing the Terminal User Interface (TUI) console launch screen for macOS
 - **`console_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the console README
 - **`images_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the images README
+- **`github_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the GitHub workflows README
+- **`oidc_provider_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the OIDC provider README
 
 ## File Descriptions
 
@@ -322,6 +326,22 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Displayed just under the table of contents header in the images README (`images/README.md`) to add personality and visual appeal
 - **Context**: Provides a friendly, approachable visual element that makes the images documentation's table of contents section more engaging and memorable
 - **Placement**: Positioned just under the "## 📋 Table of Contents" header in the images README
+
+### **GitHub Table of Contents Section Picture (`github_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the GitHub workflows README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the GitHub workflows README (`.github/workflows/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the GitHub workflows documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "## 📋 Table of Contents" header in the GitHub workflows README
+
+### **OIDC Provider Table of Contents Section Picture (`oidc_provider_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the OIDC provider README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the OIDC provider README (`oidc_provider/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the OIDC provider documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "## 📋 Table of Contents" header in the OIDC provider README
 
 ## Setting GitHub Social Banner
 

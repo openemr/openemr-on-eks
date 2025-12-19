@@ -4,6 +4,8 @@ This directory contains GitHub Actions workflows and configuration for the OpenE
 
 ## 📋 Table of Contents
 
+<img src="../images/github_table_of_contents_section_picture.png" alt="GitHub Table of Contents Section Picture" width="400">
+
 ### **Repository Configuration**
 - [Branch Rulesets (Recommended)](#branch-rulesets-recommended)
   - [Required Settings for Main Branch](#required-settings-for-main-branch)
