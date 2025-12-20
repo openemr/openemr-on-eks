@@ -13,10 +13,12 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 ### **📄 File Documentation**
 - [File Descriptions](#file-descriptions)
   - [Deploy Training Setup Screenshot (`deploy-training-setup.png`)](#deploy-training-setup-screenshot-deploy-training-setuppng)
+  - [Deploy Training Setup Animated Demo (`deploy-training-setup.gif`)](#deploy-training-setup-animated-demo-deploy-training-setupgif)
   - [Deploy Training Setup OpenEMR Login (`deploy-training-setup-openemr-login.png`)](#deploy-training-setup-openemr-login-deploy-training-setup-openemr-loginpng)
   - [Deploy Training Setup Patient Finder (`deploy-training-setup-patient-finder.png`)](#deploy-training-setup-patient-finder-deploy-training-setup-patient-finderpng)
   - [Deploy Training Setup Warp Data Upload (`deploy-training-setup-warp-data-upload.png`)](#deploy-training-setup-warp-data-upload-deploy-training-setup-warp-data-uploadpng)
   - [Destroy Screenshot (`destroy.png`)](#destroy-screenshot-destroypng)
+  - [Destroy Animated Demo (`destroy.gif`)](#destroy-animated-demo-destroygif)
   - [GitHub Banner (`openemr_on_eks_github_banner.png`)](#github-banner-openemr_on_eks_github_bannerpng)
   - [Grafana Login Screenshot (`quick-deploy-grafana-login.png`)](#grafana-login-screenshot-quick-deploy-grafana-loginpng)
   - [OpenEMR Admin Dashboard Screenshot (`quick-deploy-openemr-admin-landing-page.png`)](#openemr-admin-dashboard-screenshot-quick-deploy-openemr-admin-landing-pagepng)
@@ -90,10 +92,12 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 ### **Visual Assets**
 
 - **`deploy-training-setup.png`** - Screenshot showing the training environment setup process
+- **`deploy-training-setup.gif`** - Animated GIF showing the training environment setup process in action
 - **`deploy-training-setup-openemr-login.png`** - Screenshot showing the OpenEMR login page with newly generated admin credentials
 - **`deploy-training-setup-patient-finder.png`** - Screenshot showing synthetic patients in OpenEMR's Patient Finder
 - **`deploy-training-setup-warp-data-upload.png`** - Screenshot showing Warp uploading 100 synthetic patients in less than 1 minute
 - **`destroy.png`** - Screenshot showing successful infrastructure destruction
+- **`destroy.gif`** - Animated GIF showing the infrastructure destruction process in action
 - **`openemr_on_eks_github_banner.png`** - GitHub repository banner for social media and repository display
 - **`openemr_on_eks_logo.png`** - Main project logo for documentation and branding (optimized for web)
 - **`quick-deploy-grafana-login.png`** - Screenshot showing the Grafana login page after deployment
@@ -130,6 +134,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Documentation and README files to show the training setup workflow
 - **Context**: Illustrates the process for deploying OpenEMR training environments with pre-configured settings
 
+### **Deploy Training Setup Animated Demo (`deploy-training-setup.gif`)**
+
+- **Purpose**: Animated visual demonstration of the training environment setup script (`scripts/deploy-training-openemr-setup.sh`) in action
+- **Format**: Animated GIF
+- **Usage**: Documentation and README files to show the training setup workflow in motion
+- **Context**: Illustrates the process for deploying OpenEMR training environments with pre-configured settings and synthetic patient data upload with animated terminal output
+- **Note**: Recording is sped up 5x
+
 ### **Deploy Training Setup OpenEMR Login (`deploy-training-setup-openemr-login.png`)**
 
 - **Purpose**: Visual demonstration of accessing the OpenEMR application after training setup deployment
@@ -157,6 +169,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show the cleanup workflow
 - **Context**: Illustrates the complete infrastructure destruction process with the "DESTRUCTION COMPLETE!" success message
+
+### **Destroy Animated Demo (`destroy.gif`)**
+
+- **Purpose**: Animated visual demonstration of the infrastructure destruction script (`scripts/destroy.sh`) in action
+- **Format**: Animated GIF
+- **Usage**: Documentation and README files to show the cleanup workflow in motion
+- **Context**: Illustrates the complete infrastructure destruction process with animated terminal output showing the bulletproof cleanup workflow
+- **Note**: Recording is sped up 5x
 
 ### **GitHub Banner (`openemr_on_eks_github_banner.png`)**
 
@@ -255,7 +275,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: Animated GIF
 - **Usage**: Documentation and README files to show the quick deployment workflow in motion
 - **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly with animated terminal output
-- **Note**: Recording is sped up and without normal colors for easy viewing
+- **Note**: Recording is sped up 5x
 
 ### **Quick Start Section Picture (`quickstart_section_picture.png`)**
 

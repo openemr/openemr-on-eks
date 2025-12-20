@@ -153,6 +153,15 @@
 </details>
 
 <details>
+<summary><strong>Animated Demo</strong></summary>
+
+*Note: Recording is sped up 5x.*
+
+<img src="./images/deploy-training-setup.gif" alt="Animated demonstration of deploy-training-openemr-setup.sh" width="500">
+
+</details>
+
+<details>
 <summary><strong>Warp Uploading 100 Synthetic Patients in <1 minute</strong></summary>
 
 <img src="./images/deploy-training-setup-warp-data-upload.png" alt="Warp uploading 100 patients in <1 min." width="500">
@@ -185,6 +194,15 @@
 ```bash
 ./scripts/destroy.sh
 ```
+
+<details>
+<summary><strong>Animated Demo</strong></summary>
+
+*Note: Recording is sped up 5x.*
+
+<img src="./images/destroy.gif" alt="Animated demonstration of destroy.sh" width="500">
+
+</details>
 
 <details>
 <summary><strong>Terminal Output</strong></summary>
