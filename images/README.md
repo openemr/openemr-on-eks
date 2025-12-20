@@ -275,7 +275,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: Animated GIF
 - **Usage**: Documentation and README files to show the quick deployment workflow in motion
 - **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly with animated terminal output
-- **Note**: Recording is sped up 5x
+- **Note**: Recording is sped up and without normal colors for easy viewing
 
 ### **Quick Start Section Picture (`quickstart_section_picture.png`)**
 
