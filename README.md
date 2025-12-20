@@ -47,18 +47,18 @@
 </details>
 
 <details>
-<summary><strong>Terminal Output</strong></summary>
-
-<img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
-
-</details>
-
-<details>
 <summary><strong>Animated Demo</strong></summary>
 
 *Note: Recording is sped up and without normal colors for easy viewing.*
 
 <img src="./images/quick_deploy.gif" alt="Animated demonstration of quick-deploy.sh" width="500">
+
+</details>
+
+<details>
+<summary><strong>Terminal Output</strong></summary>
+
+<img src="./images/quick-deploy.png" alt="Terminal output after running quick-deploy.sh" width="500">
 
 </details>
 
@@ -209,8 +209,6 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 
 <details>
 <summary><strong>Animated Demo</strong></summary>
-
-*Note: Recording is sped up and without normal colors for easy viewing.*
 
 <img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI launch screen" width="500">
 
