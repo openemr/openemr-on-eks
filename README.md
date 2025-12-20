@@ -54,6 +54,15 @@
 </details>
 
 <details>
+<summary><strong>Animated Demo</strong></summary>
+
+*Note: Recording is sped up and without normal colors for easy viewing.*
+
+<img src="./images/quick_deploy.gif" alt="Animated demonstration of quick-deploy.sh" width="500">
+
+</details>
+
+<details>
 <summary><strong>Access OpenEMR</strong></summary>
 
 <img src="./images/quick-deploy-openemr-login.png" alt="OpenEMR login page" width="500">
@@ -186,8 +195,6 @@
 
 ## 🖥️ Interactive Console (TUI) - macOS & Windows
 
-<img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI" width="500">
-
 Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deployment with ease:
 
 **macOS:**
@@ -201,7 +208,9 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 ```
 
 <details>
-<summary><strong>TUI Launch Screen</strong></summary>
+<summary><strong>Animated Demo</strong></summary>
+
+*Note: Recording is sped up and without normal colors for easy viewing.*
 
 <img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI launch screen" width="500">
 

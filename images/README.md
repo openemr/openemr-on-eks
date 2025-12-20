@@ -30,6 +30,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [OpenEMR Login Screenshot (`quick-deploy-openemr-login.png`)](#openemr-login-screenshot-quick-deploy-openemr-loginpng)
   - [Project Logo (`openemr_on_eks_logo.png`)](#project-logo-openemr_on_eks_logopng)
   - [Quick Deploy Screenshot (`quick-deploy.png`)](#quick-deploy-screenshot-quick-deploypng)
+  - [Quick Deploy Animated Demo (`quick_deploy.gif`)](#quick-deploy-animated-demo-quick_deploygif)
   - [Quick Start Section Picture (`quickstart_section_picture.png`)](#quick-start-section-picture-quickstart_section_picturepng)
   - [Table of Contents Section Picture (`table_of_contents_section_picture.png`)](#table-of-contents-section-picture-table_of_contents_section_picturepng)
   - [Monitoring Table of Contents Section Picture (`monitoring_table_of_contents_section_picture.png`)](#monitoring-table-of-contents-section-picture-monitoring_table_of_contents_section_picturepng)
@@ -106,6 +107,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`quick-deploy-openemr-grafana.png`** - Screenshot showing OpenEMR monitoring dashboard in Grafana
 - **`quick-deploy-openemr-login.png`** - Screenshot showing the OpenEMR login page after deployment
 - **`quick-deploy.png`** - Screenshot demonstrating the quick deployment script workflow
+- **`quick_deploy.gif`** - Animated GIF showing the quick deployment script workflow in action
 - **`quickstart_section_picture.png`** - Project mascot giving a thumbs up while dressed like an astronaut, used at the beginning of the Quick Start section
 - **`table_of_contents_section_picture.png`** - Project mascot dressed like an astronaut reading a book, used in the table of contents section
 - **`monitoring_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the monitoring README
@@ -246,6 +248,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Format**: PNG screenshot
 - **Usage**: Documentation and README files to show the quick deployment workflow
 - **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly
+
+### **Quick Deploy Animated Demo (`quick_deploy.gif`)**
+
+- **Purpose**: Animated visual demonstration of the quick deployment script (`scripts/quick-deploy.sh`) in action
+- **Format**: Animated GIF
+- **Usage**: Documentation and README files to show the quick deployment workflow in motion
+- **Context**: Illustrates the streamlined deployment process for getting OpenEMR running on EKS quickly with animated terminal output
+- **Note**: Recording is sped up and without normal colors for easy viewing
 
 ### **Quick Start Section Picture (`quickstart_section_picture.png`)**
 
