@@ -29,6 +29,8 @@
 
 ## Table of Contents
 
+<img src="../images/warp_table_of_contents_section_picture.png" alt="Warp Table of Contents Section Picture" width="400">
+
 - [Overview](#overview)
 - [Features](#features)
 - [Installation](#installation)
