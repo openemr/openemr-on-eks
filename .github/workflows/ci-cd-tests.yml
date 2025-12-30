@@ -54,9 +54,9 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.0'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.14.0' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.34.2'  # kubectl version for Kubernetes manifest validation
+  PYTHON_VERSION: '3.14.2'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.14.3' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.35.0'  # kubectl version for Kubernetes manifest validation
 
 jobs:
   # Primary test job - runs test suites in parallel using matrix strategy
@@ -85,7 +85,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for testing
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
@@ -179,7 +179,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for validation
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
@@ -280,7 +280,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for security scanning
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Run Trivy vulnerability scanner in table format
       # This scan produces human-readable output in the workflow logs
@@ -373,7 +373,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Set up Python environment for quality checks
       - name: Set up Python
@@ -425,7 +425,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Set up Python environment
       - name: Set up Python
@@ -452,7 +452,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
           # Install test dependencies (versions pinned to match versions.yaml)
-          pip install pytest==9.0.1 pytest-cov==7.0.0 flake8==7.3.0 black==25.11.0 mypy==1.19.0
+          pip install pytest==9.0.1 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.0
 
       # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
@@ -526,7 +526,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for summary generation
       - name: Checkout code
-        uses: actions/checkout@v6.0.0
+        uses: actions/checkout@v6.0.1
 
       # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results

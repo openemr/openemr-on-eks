@@ -620,7 +620,7 @@ helm get values loki -n monitoring
 # Upgrade Loki to enable volume
 helm upgrade loki grafana/loki \
   --namespace monitoring \
-  --version 6.46.0 \
+  --version 6.49.0 \
   --reuse-values \
   --set loki.limits_config.volume_enabled=true
 

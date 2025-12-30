@@ -621,10 +621,10 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v79.11.0 (metrics & alerting)
+     - Prometheus v80.9.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.46.0 (log aggregation with S3 storage)
-     - Tempo v1.57.0 (distributed tracing with S3 storage, microservice mode)
+     - Loki v6.49.0 (log aggregation with S3 storage)
+     - Tempo v1.60.0 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
      - OTeBPF v0.3.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
@@ -873,16 +873,16 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v79.11.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v80.9.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
-- 📝 **Loki**: v6.46.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
+- 📝 **Loki**: v6.49.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
   - **Distributed Architecture**: Uses SimpleScalable deployment mode with separate read, write, and backend components for better scalability and high availability
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Tempo**: v1.57.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+- 🔍 **Tempo**: v1.60.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
 - 📈 **Mimir**: v6.0.5 (long-term metrics storage with S3 backend)

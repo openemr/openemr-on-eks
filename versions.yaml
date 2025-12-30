@@ -14,7 +14,7 @@ applications:
     description: "Version of OpenEMR docker image we use."
 
   fluent_bit:
-    current: "4.2.0"
+    current: "4.2.2"
     registry: "fluent/fluent-bit"
     notify_on_update: true
     requires_aws_cli: false
@@ -39,7 +39,7 @@ infrastructure:
     description: "Amazon EKS cluster version"
 
   terraform:
-    current: "1.14.0"
+    current: "1.14.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "Terraform version used in documentation"
@@ -65,7 +65,7 @@ eks_addons:
     description: "EFS CSI Driver for persistent storage"
 
   metrics_server:
-    current: "v0.8.0-eksbuild.5"
+    current: "v0.8.0-eksbuild.6"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "metrics-server"
@@ -89,7 +89,7 @@ terraform_modules:
 
   aws_pod_identity:
     source: "terraform-aws-modules/eks-pod-identity/aws"
-    current: "2.5.0"
+    current: "2.6.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS pod identities for Terraform."
@@ -111,7 +111,7 @@ terraform_modules:
 # GitHub Workflow Actions Dependencies
 github_workflows:
   actions_checkout:
-    current: "v6.0.0"
+    current: "v6.0.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for checking out code from a registry."
@@ -123,7 +123,7 @@ github_workflows:
     description: "Github action for setting up a specified Python version."
 
   actions_setup_go:
-    current: "v6.0.0"
+    current: "v6.1.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Go version."
@@ -173,7 +173,7 @@ pre_commit_hooks:
     description: "https://github.com/pre-commit/pre-commit-hooks"
 
   black:
-    current: "25.11.0"
+    current: "25.12.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/psf/black"
@@ -209,7 +209,7 @@ pre_commit_hooks:
     description: "https://github.com/koalaman/shellcheck-precommit"
 
   markdownlint:
-    current: "v0.46.0"
+    current: "v0.47.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/igorshubovych/markdownlint-cli"
@@ -221,7 +221,7 @@ pre_commit_hooks:
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.10.0"
+    current: "v4.11.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -229,19 +229,19 @@ pre_commit_hooks:
 # Semver Package Versions (used in workflows)
 semver_packages:
   python_version:
-    current: "3.14.0"
+    current: "3.14.2"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Python used in Github CI/CD workflows."
 
   terraform_version:
-    current: "1.14.0"
+    current: "1.14.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Terraform used in Github CI/CD workflows."
 
   kubectl_version:
-    current: "v1.34.2"
+    current: "v1.35.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Kubectl used in Github CI/CD workflows."
@@ -323,7 +323,7 @@ python_packages:
     min_version: "7.0.0"
 
   black:
-    current: "25.11.0"
+    current: "25.12.0"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
@@ -341,14 +341,14 @@ python_packages:
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "79.11.0"
+    current: "80.9.0"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
     description: "Hosts custom monitoring dashboards for the setup and integrates with pager duty for automated alerting."
 
   loki:
-    current: "6.46.0"
+    current: "6.49.0"
     chart: "loki"
     repository: "grafana"
     notify_on_update: true
@@ -356,7 +356,7 @@ monitoring:
     description: "Loki for log aggregation."
 
   tempo:
-    current: "1.57.0"
+    current: "1.60.0"
     chart: "tempo-distributed"
     repository: "grafana"
     notify_on_update: true

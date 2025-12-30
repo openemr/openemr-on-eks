@@ -123,7 +123,7 @@ resource "aws_cloudwatch_log_group" "fluent_bit_metrics" {
     Name        = "${var.cluster_name}-fluent-bit-metrics"
     Application = "FluentBit"
     LogType     = "Metrics"
-    Version     = "4.2.0"
+    Version     = "4.2.2"
     Description = "Fluent Bit operational metrics and health checks"
   }
 }

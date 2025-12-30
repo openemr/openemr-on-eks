@@ -123,7 +123,7 @@ resource "time_sleep" "wait_for_compute" {
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "metrics-server"    # Essential for autoscaling
-  addon_version               = "v0.8.0-eksbuild.5" # Latest stable version for Kubernetes 1.34
+  addon_version               = "v0.8.0-eksbuild.6" # Latest stable version for Kubernetes 1.34
   resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
 
@@ -184,7 +184,7 @@ resource "aws_eks_addon" "efs_csi_driver" {
 module "aws_efs_csi_pod_identity" {
   # Source module for Pod Identity configuration
   source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "2.5.0"
+  version = "2.6.0"
 
   name = "aws-efs-csi" # Name for the Pod Identity configuration
 
