@@ -241,7 +241,7 @@ jobs:
       # Step 9: Upload version check logs as artifacts
       # This step preserves detailed logs for analysis and troubleshooting
       - name: Upload Version Check Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()  # Upload artifacts regardless of job outcome
         with:
           name: version-check-logs-${{ github.run_number }}
@@ -470,7 +470,7 @@ jobs:
 
       # Step 12: Upload detailed report as artifact
       - name: Upload Detailed Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()  # Upload regardless of job outcome
         with:
           name: detailed-version-report-${{ github.run_number }}

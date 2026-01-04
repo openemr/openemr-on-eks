@@ -182,7 +182,7 @@ jobs:
           fi
 
       - name: Upload build artifact (for debugging)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: failure()  # Only upload artifacts if build fails for debugging
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.artifact_name }}-debug
