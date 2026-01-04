@@ -85,7 +85,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for testing
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
@@ -179,7 +179,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for validation
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
@@ -280,7 +280,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for security scanning
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Run Trivy vulnerability scanner in table format
       # This scan produces human-readable output in the workflow logs
@@ -373,7 +373,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Set up Python environment for quality checks
       - name: Set up Python
@@ -425,7 +425,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Set up Python environment
       - name: Set up Python
@@ -526,7 +526,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for summary generation
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6
 
       # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results
