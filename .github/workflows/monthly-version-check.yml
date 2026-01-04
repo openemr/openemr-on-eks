@@ -126,7 +126,7 @@ jobs:
       # This step enables AWS API access for enhanced version checking via OIDC
       - name: Configure AWS credentials (OIDC preferred)
         if: env.AWS_OIDC_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
@@ -136,7 +136,7 @@ jobs:
       # This step falls back to static credentials if OIDC is not configured
       - name: Configure AWS credentials (static fallback)
         if: env.AWS_OIDC_ROLE_ARN == '' && env.AWS_ACCESS_KEY_ID != ''
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@v5
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
