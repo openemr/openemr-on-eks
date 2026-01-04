@@ -74,6 +74,23 @@ The version awareness system provides:
 - **Graceful fallback** when AWS credentials are not available
 - **Comprehensive codebase search** to locate version strings in files
 - **Dual run modes** for both automated monthly and manual on-demand checks
+- **Dependabot integration** - Automated pull requests for dependency updates
+
+### Dependency Management Approach
+
+This project uses a **hybrid approach** combining two complementary systems:
+
+1. **Dependabot (Automated Updates)**
+   - Creates automatic pull requests for dependency updates
+   - Monitors Python, Go, Terraform, GitHub Actions, and Docker dependencies
+   - Weekly/monthly schedule with configurable PR limits
+   - See [DEPENDENCIES.md](./DEPENDENCIES.md) for complete details
+
+2. **Version Manager (Awareness & Tracking)**
+   - Monthly version checking across all components
+   - Creates GitHub issues for awareness
+   - Tracks versions in `versions.yaml`
+   - No automatic changes - read-only awareness
 
 ## 📁 System Components
 
@@ -596,6 +613,7 @@ export LOG_LEVEL=DEBUG
 
 The version management system integrates with:
 - **GitHub Actions:** Automated checking and reporting
+- **Dependabot:** Automated dependency pull requests
 - **Terraform:** Infrastructure version management
 - **Kubernetes:** Application deployment updates
 - **Docker Hub:** Container image version tracking
@@ -607,15 +625,18 @@ The version management system integrates with:
 - **Helm Repositories:** Chart version checking
 - **AWS APIs:** Service version checking
 - **GitHub API:** Issue creation and management
+- **Dependabot:** Automated dependency updates (see [DEPENDENCIES.md](./DEPENDENCIES.md))
 
 ## 📈 Best Practices
 
 ### Update Strategy
 
 1. **Staged Rollouts:** Test in dev before production
-2. **Regular Updates:** monthly checks, monthly updates
-3. **Security First:** Prioritize security updates
+2. **Regular Updates:** Monthly checks, monthly updates
+3. **Security First:** Prioritize security updates (Dependabot alerts)
 4. **Documentation:** Keep release notes updated
+5. **Review Dependabot PRs:** Check and test automated pull requests weekly
+6. **Update versions.yaml:** Sync with Dependabot merges
 
 ### Risk Management
 
@@ -623,6 +644,7 @@ The version management system integrates with:
 2. **Test Thoroughly:** Comprehensive testing before production
 3. **Monitor Closely:** Watch for issues after updates
 4. **Have Rollback Plan:** Know how to revert changes
+5. **Review Breaking Changes:** Check release notes in Dependabot PRs
 
 ### Maintenance
 

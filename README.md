@@ -2363,6 +2363,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Deployment Timings Guide](docs/DEPLOYMENT_TIMINGS.md) - Measured timing data for all operations (infrastructure, backup, restore, etc.)
 - [Autoscaling Guide](docs/AUTOSCALING_GUIDE.md) - Horizontal Pod Autoscaler configuration and management
 - [Version Management Guide](docs/VERSION_MANAGEMENT.md) - Version awareness and dependency management
+- [Dependencies Guide](docs/DEPENDENCIES.md) - Automated dependency updates with Dependabot
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
@@ -2402,6 +2403,28 @@ This project includes comprehensive version management and awareness capabilitie
 - **📝 GitHub Issues**: Automatic issue creation for available updates
 - **🎯 Manual Control**: Read-only awareness system - no automatic updates applied
 - **🔧 Component Selection**: Choose specific component types for targeted checks
+- **🤖 Automated Dependency Updates**: Dependabot creates pull requests for dependency updates
+
+### **Dependabot Integration**
+
+The project uses GitHub Dependabot to automatically create pull requests for dependency updates:
+
+#### **Monitored Ecosystems**
+- **Python** (Warp project) - Weekly checks for `boto3`, `pymysql`
+- **Go** (Console TUI) - Weekly checks for `bubbletea`, `lipgloss`, and dependencies
+- **Terraform** - Weekly checks for AWS provider, Kubernetes provider, and modules
+- **GitHub Actions** - Weekly checks for workflow dependencies
+- **Docker** - Monthly checks for base images
+
+#### **Configuration**
+Dependabot is configured in `.github/dependabot.yml` with:
+- **Weekly schedules** for most dependencies (Mondays at 9:00 AM)
+- **Monthly schedules** for Docker images
+- **PR limits** to avoid overwhelming the team (3-5 per ecosystem)
+- **Auto-labeling** for easy filtering and review
+- **Major version protection** for critical dependencies
+
+For complete details, see the [Dependencies Guide](docs/DEPENDENCIES.md).
 
 ### **Automated Version Checking**
 
