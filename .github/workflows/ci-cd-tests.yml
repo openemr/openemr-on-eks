@@ -345,7 +345,7 @@ jobs:
       # Step 5: Upload SARIF results to GitHub Security tab (optional)
       # This step enables GitHub Advanced Security features if available
       - name: Upload Trivy scan results to GitHub Security tab (Optional)
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()  # Upload regardless of scan results
         continue-on-error: true  # Don't fail workflow if upload fails
         with:
