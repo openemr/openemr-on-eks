@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="warp",
-    version="0.1.2",
+    version="0.2.0",
     author="OpenEMR on EKS",
     description="Warp - OpenEMR Data Upload Accelerator",
     long_description=long_description,
@@ -31,7 +31,7 @@ setup(
     python_requires=">=3.8",
     install_requires=[
         "pymysql==1.1.2",  # Pinned to match versions.yaml
-        "boto3==1.42.21",   # Pinned to match versions.yaml
+        "boto3==1.42.24",   # Pinned to match versions.yaml
     ],
     entry_points={
         "console_scripts": [

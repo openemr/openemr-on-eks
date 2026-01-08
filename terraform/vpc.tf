@@ -9,7 +9,7 @@
 module "vpc" {
   # Source module for VPC creation with EKS-specific configurations
   source  = "terraform-aws-modules/vpc/aws"
-  version = "6.5.1" # Latest stable version with EKS support
+  version = "6.6.0" # Latest stable version with EKS support
 
   # VPC naming and CIDR configuration
   name = "${var.cluster_name}-vpc" # VPC name based on cluster name

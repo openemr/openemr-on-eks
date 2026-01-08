@@ -1,6 +1,6 @@
 module github.com/openemr-on-eks/console
 
-go 1.25
+go 1.25.5
 
 require (
 	github.com/charmbracelet/bubbletea v1.3.10

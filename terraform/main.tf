@@ -15,13 +15,13 @@ terraform {
     # Version 6.16.0 provides support for latest AWS services and features
     aws = {
       source  = "hashicorp/aws"
-      version = "6.23.0"
+      version = "6.28.0"
     }
     # Kubernetes Provider - For managing Kubernetes resources
     # Version 2.38.0 supports latest Kubernetes API versions and features
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "2.38.0"
+      version = "3.0.1"
     }
   }
 }
