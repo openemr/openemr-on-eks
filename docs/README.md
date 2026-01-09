@@ -48,7 +48,6 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
 - **`VERSION_MANAGEMENT.md`** - Version awareness and dependency management
-- **`DEPENDENCIES.md`** - Automated dependency updates with Dependabot
 - **`TROUBLESHOOTING.md`** - Common issues and resolution procedures
 
 ## Documentation Dependency Graph
@@ -248,38 +247,14 @@ graph TD
   - Centralized configuration via `versions.yaml`
   - Visual dashboard for version status
   - AWS CLI integration for accurate version checking
-  - Hybrid approach combining Dependabot and manual tracking
-- **Dependencies**: `versions.yaml`, `scripts/version-manager.sh`, `.github/workflows/monthly-version-check.yml`, `.github/dependabot.yml`
-- **Related Documentation**: `DEPENDENCIES.md`
+  - Manual tracking and approval for all updates
+- **Dependencies**: `versions.yaml`, `scripts/version-manager.sh`, `.github/workflows/monthly-version-check.yml`
+- **Related Documentation**: `VERSION_MANAGEMENT.md`
 - **Maintenance Notes**:
   - Update `versions.yaml` when versions change
   - Keep version checking logic current
   - Adjust AWS CLI integration as APIs evolve
-  - Review Dependabot configuration periodically
   - Update tracking for new components
-
-#### `DEPENDENCIES.md`
-
-- **Purpose**: Automated dependency update management with Dependabot
-- **Key Features**:
-  - Dependabot configuration and management
-  - Dependency update review process
-  - Security update procedures
-  - Pull request handling workflows
-  - Integration with version management system
-- **Dependencies**: `.github/dependabot.yml`, `VERSION_MANAGEMENT.md`
-- **Maintenance Notes**:
-  - Update Dependabot schedules as needed
-  - Adjust PR limits based on team capacity
-  - Review ignored dependencies periodically
-  - Update ecosystem configurations for new dependencies
-  - Manual control - no automatic updates
-- **Dependencies**: `versions.yaml`, `scripts/version-manager.sh`, `.github/workflows/version-check.yml`
-- **Maintenance Notes**:
-  - Update tracked components as project evolves
-  - Modify notification settings as needed
-  - Add new component types for comprehensive coverage
-  - Update version checking logic for new APIs
 
 ### Troubleshooting and Support
 
