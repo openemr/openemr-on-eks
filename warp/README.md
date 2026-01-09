@@ -9,7 +9,7 @@
 **High-performance direct database and file system import for OpenEMR on EKS**
 
 [![CI/CD Tests](https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml/badge.svg)](https://github.com/jm-openemr-dev-namespace/openemr-on-eks/actions/workflows/ci-cd-tests.yml)
-[![Version](https://img.shields.io/badge/version-0.1.2-blue)](../warp/setup.py#L12)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](../warp/setup.py#L12)
 
 </div>
 
