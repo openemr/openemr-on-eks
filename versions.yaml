@@ -111,7 +111,7 @@ terraform_modules:
 # GitHub Workflow Actions Dependencies
 github_workflows:
   actions_checkout:
-    current: "v6"
+    current: "v6.0.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for checking out code from a registry."

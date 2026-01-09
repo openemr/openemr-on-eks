@@ -87,7 +87,7 @@ jobs:
     steps:
       # Step 1: Checkout repository with full history for version analysis
       - name: Checkout Repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v6.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for comprehensive analysis
 
