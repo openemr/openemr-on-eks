@@ -70,6 +70,44 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory 
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"                      # Terraform configuration directory
 K8S_DIR="$PROJECT_ROOT/k8s"                                  # Kubernetes manifests directory
 
+# Get AWS region from environment or Terraform state
+get_aws_region() {
+    # Priority 1: Try to get region from Terraform state file (existing deployment takes precedence)
+    if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
+        cd "$TERRAFORM_DIR"
+        local terraform_region
+        
+        # Extract region directly from state file JSON
+        terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
+            head -1 | \
+            sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
+        
+        cd - >/dev/null
+        
+        # Validate region format
+        if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            AWS_REGION="$terraform_region"
+            echo -e "${BLUE}ℹ️  Found AWS region from Terraform state: $AWS_REGION${NC}"
+            return 0
+        fi
+    fi
+    
+    # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
+    if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
+        # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
+        if [[ "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            echo -e "${BLUE}ℹ️  Using AWS region from environment: $AWS_REGION${NC}"
+            return 0
+        else
+            echo -e "${YELLOW}⚠️  Invalid AWS_REGION format in environment: $AWS_REGION${NC}"
+        fi
+    fi
+    
+    # Priority 3: Fall back to default
+    AWS_REGION="us-west-2"
+    echo -e "${YELLOW}⚠️  Could not determine AWS region, using default: $AWS_REGION${NC}"
+}
+
 # Help function
 show_help() {
     echo "Usage: $0 {enable|disable|status} {api|portal|all}"
@@ -316,6 +354,9 @@ disable_feature() {
             ;;
     esac
 }
+
+# Detect AWS region from Terraform state if not explicitly set
+get_aws_region
 
 # Main script logic
 if [ $# -eq 0 ]; then

@@ -272,20 +272,43 @@ readonly KUBECTL_WAIT_TIMEOUT_LONG="${KUBECTL_WAIT_TIMEOUT_LONG:-600s}"      # L
 readonly SLACK_WEBHOOK_URL="${SLACK_WEBHOOK_URL:-}"
 readonly SLACK_CHANNEL="${SLACK_CHANNEL:-}"
 
+# Project root for Terraform state access
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+
 # AWS Configuration
-# Detect AWS region from EKS cluster or environment variable
+# Detect AWS region from environment, Terraform state, or EKS cluster
 get_aws_region() {
-  # Try to get region from AWS_REGION or AWS_DEFAULT_REGION environment variables
-  if [[ -n "${AWS_REGION:-}" ]]; then
-    echo "${AWS_REGION}"
-    return 0
+  # Priority 1: Try to get region from Terraform state file (existing deployment takes precedence)
+  if [[ -f "$TERRAFORM_DIR/terraform.tfstate" ]]; then
+    local terraform_region
+    terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' "$TERRAFORM_DIR/terraform.tfstate" 2>/dev/null | \
+        head -1 | \
+        sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
+    
+    # Validate region format
+    if [[ -n "$terraform_region" && "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+      echo "$terraform_region"
+      return 0
+    fi
   fi
+  
+  # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
+  if [[ -n "${AWS_REGION:-}" && "${AWS_REGION}" != "us-west-2" ]]; then
+    # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
+    if [[ "${AWS_REGION}" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+      echo "${AWS_REGION}"
+      return 0
+    fi
+  fi
+  
+  # Priority 3: Try to get from AWS_DEFAULT_REGION environment variable
   if [[ -n "${AWS_DEFAULT_REGION:-}" ]]; then
     echo "${AWS_DEFAULT_REGION}"
     return 0
   fi
   
-  # Try to get region from kubectl cluster info
+  # Priority 4: Try to get region from kubectl cluster info
   local cluster_endpoint
   cluster_endpoint=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
   if [[ -n "$cluster_endpoint" && "$cluster_endpoint" =~ eks\.([a-z0-9-]+)\.amazonaws\.com ]]; then
@@ -293,7 +316,7 @@ get_aws_region() {
     return 0
   fi
   
-  # Try to get from EC2 metadata (if running on EC2)
+  # Priority 5: Try to get from EC2 metadata (if running on EC2)
   if command -v curl >/dev/null 2>&1; then
     local region
     region=$(curl -s --max-time 2 http://169.254.169.254/latest/meta-data/placement/region 2>/dev/null || echo "")

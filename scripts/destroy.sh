@@ -214,18 +214,7 @@ get_aws_account_id() {
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {
-    # Priority 1: If AWS_REGION is already set via environment AND it's not the default, use it
-    if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
-        # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
-        if [[ "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
-            log_info "Using AWS region from environment: $AWS_REGION"
-            return 0
-        else
-            log_warning "Invalid AWS_REGION format in environment: $AWS_REGION"
-        fi
-    fi
-    
-    # Priority 2: Try to get region from Terraform state file
+    # Priority 1: Try to get region from Terraform state file (existing deployment takes precedence)
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
@@ -242,6 +231,17 @@ get_aws_region() {
             AWS_REGION="$terraform_region"
             log_info "Found AWS region from Terraform state: $AWS_REGION"
             return 0
+        fi
+    fi
+    
+    # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
+    if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
+        # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
+        if [[ "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            log_info "Using AWS region from environment: $AWS_REGION"
+            return 0
+        else
+            log_warning "Invalid AWS_REGION format in environment: $AWS_REGION"
         fi
     fi
     

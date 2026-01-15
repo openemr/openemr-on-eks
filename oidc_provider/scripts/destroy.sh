@@ -61,9 +61,11 @@ readonly NC='\033[0m'          # Reset to default color (No Color)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OIDC_PROVIDER_DIR="$(dirname "$SCRIPT_DIR")"
 PROJECT_ROOT="$(dirname "$OIDC_PROVIDER_DIR")"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 readonly SCRIPT_DIR        # Directory containing this destroy.sh script
 readonly OIDC_PROVIDER_DIR # Directory containing oidc_provider Terraform files
 readonly PROJECT_ROOT      # Root directory of the OpenEMR project
+readonly TERRAFORM_DIR     # Main Terraform directory for region detection
 
 # AWS region configuration with auto-detection
 AWS_REGION=${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "us-west-2")}
@@ -101,6 +103,44 @@ log_header() {
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${CYAN}$*${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+}
+
+# Get AWS region from environment or Terraform state
+get_aws_region() {
+    # Priority 1: Try to get region from Terraform state file (existing deployment takes precedence)
+    if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
+        cd "$TERRAFORM_DIR"
+        local terraform_region
+        
+        # Extract region directly from state file JSON
+        terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
+            head -1 | \
+            sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
+        
+        cd - >/dev/null
+        
+        # Validate region format
+        if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            AWS_REGION="$terraform_region"
+            log_info "Found AWS region from Terraform state: $AWS_REGION"
+            return 0
+        fi
+    fi
+    
+    # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
+    if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
+        # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
+        if [[ "$AWS_REGION" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
+            log_info "Using AWS region from environment: $AWS_REGION"
+            return 0
+        else
+            log_warning "Invalid AWS_REGION format in environment: $AWS_REGION"
+        fi
+    fi
+    
+    # Priority 3: Fall back to default
+    AWS_REGION="us-west-2"
+    log_warning "Could not determine AWS region, using default: $AWS_REGION"
 }
 
 # =============================================================================
@@ -204,6 +244,9 @@ done
 # =============================================================================
 # MAIN EXECUTION
 # =============================================================================
+
+# Detect AWS region from Terraform state if not explicitly set
+get_aws_region
 
 log_header "GitHub OIDC Provider Destruction"
 
