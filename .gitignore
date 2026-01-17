@@ -19,6 +19,11 @@ ENV/
 .test-venv/
 *.venv/
 
+# Security tool caches and outputs
+.trivycache/
+results.sarif
+terraform/.external_modules/
+
 # Console binary
 console/console
 

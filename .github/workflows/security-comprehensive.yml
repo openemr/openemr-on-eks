@@ -1,0 +1,579 @@
+# =====================================
+# Comprehensive Security Scanning Workflow
+# =====================================
+# This workflow provides ZERO-TOLERANCE security scanning using multiple
+# industry-leading security tools. The pipeline FAILS on ANY detected finding.
+#
+# Security Scanners Included:
+# 1. Trivy - Vulnerability, secret, and misconfiguration scanning
+# 2. Checkov - Infrastructure as Code (IaC) security analysis
+# 3. KICS - Keeping Infrastructure as Code Secure
+# 4. Bandit - Python security linter
+# 5. gosec - Go security checker
+# 6. ShellCheck - Shell script static analysis
+#
+# Policy: FAIL-FAST, ZERO-TOLERANCE
+# All findings at any severity level will fail the pipeline.
+
+name: Security Comprehensive Scan
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      scan_type:
+        description: 'Type of scan to run'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+        - all
+        - trivy
+        - checkov
+        - kics
+        - bandit
+        - gosec
+        - shellcheck
+  schedule:
+    # Run weekly at 2 AM UTC on Mondays for security monitoring
+    - cron: '0 2 * * 1'
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: write
+
+env:
+  # Tool versions for reproducibility (synced with versions.yaml)
+  TRIVY_VERSION: '0.68.2'
+  CHECKOV_VERSION: '3.2.497'
+  KICS_VERSION: 'v2.1.19'
+  GOSEC_VERSION: 'v2.22.11'
+  PYTHON_VERSION: '3.14'
+  GO_VERSION: '1.25'
+
+jobs:
+  # =====================================================================
+  # Job 1: Trivy Comprehensive Scan
+  # =====================================================================
+  trivy-scan:
+    name: Trivy Security Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'trivy' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Run Trivy filesystem scan (STRICT)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          output: 'trivy-fs-results.txt'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          scanners: 'vuln,secret,misconfig,license'
+          exit-code: '1'
+          trivyignores: '.trivyignore'
+
+      - name: Run Trivy config scan for IaC
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'config'
+          scan-ref: '.'
+          format: 'table'
+          output: 'trivy-config-results.txt'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          exit-code: '1'
+          trivyignores: '.trivyignore'
+
+      - name: Run Trivy SARIF scan
+        uses: aquasecurity/trivy-action@master
+        if: always()
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          scanners: 'vuln,secret,misconfig'
+          trivyignores: '.trivyignore'
+
+      - name: Display Trivy results
+        if: always()
+        run: |
+          echo "🔍 Trivy Filesystem Scan Results:"
+          echo "=================================="
+          [ -f "trivy-fs-results.txt" ] && cat trivy-fs-results.txt || echo "No results"
+          echo ""
+          echo "🔍 Trivy Config Scan Results:"
+          echo "=================================="
+          [ -f "trivy-config-results.txt" ] && cat trivy-config-results.txt || echo "No results"
+
+      - name: Upload Trivy SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'trivy-results.sarif'
+          category: 'trivy'
+
+      - name: Upload Trivy results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: trivy-results
+          path: trivy-*.txt
+          retention-days: 30
+
+  # =====================================================================
+  # Job 2: Checkov IaC Security Scanner
+  # =====================================================================
+  checkov-scan:
+    name: Checkov IaC Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'checkov' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Checkov
+        run: |
+          pip install checkov==${{ env.CHECKOV_VERSION }}
+
+      - name: Run Checkov on Terraform
+        id: checkov-terraform
+        run: |
+          echo "🔍 Running Checkov on Terraform files..."
+          checkov -d terraform/ \
+            --framework terraform \
+            --output cli \
+            --output sarif \
+            --output-file-path . \
+            --soft-fail-on LOW \
+            --hard-fail-on CRITICAL,HIGH,MEDIUM \
+            --compact \
+            --skip-check CKV_TF_1 \
+            2>&1 | tee checkov-terraform-results.txt
+
+      - name: Run Checkov on Kubernetes manifests
+        id: checkov-k8s
+        run: |
+          echo "🔍 Running Checkov on Kubernetes manifests..."
+          checkov -d k8s/ \
+            --framework kubernetes \
+            --output cli \
+            --output sarif \
+            --output-file-path . \
+            --soft-fail-on LOW \
+            --hard-fail-on CRITICAL,HIGH,MEDIUM \
+            --compact \
+            2>&1 | tee checkov-k8s-results.txt
+
+      - name: Run Checkov on Dockerfiles
+        id: checkov-docker
+        run: |
+          echo "🔍 Running Checkov on Dockerfiles..."
+          if [ -f "warp/Dockerfile" ]; then
+            checkov -f warp/Dockerfile \
+              --framework dockerfile \
+              --output cli \
+              --soft-fail-on LOW \
+              --hard-fail-on CRITICAL,HIGH,MEDIUM \
+              --compact \
+              2>&1 | tee checkov-docker-results.txt
+          else
+            echo "No Dockerfile found" > checkov-docker-results.txt
+          fi
+
+      - name: Run Checkov on GitHub Actions
+        id: checkov-gha
+        run: |
+          echo "🔍 Running Checkov on GitHub Actions workflows..."
+          checkov -d .github/workflows/ \
+            --framework github_actions \
+            --output cli \
+            --soft-fail-on LOW \
+            --hard-fail-on CRITICAL,HIGH,MEDIUM \
+            --compact \
+            2>&1 | tee checkov-gha-results.txt
+
+      - name: Display Checkov results
+        if: always()
+        run: |
+          echo "📊 Checkov Scan Summary:"
+          echo "========================"
+          for f in checkov-*-results.txt; do
+            if [ -f "$f" ]; then
+              echo ""
+              echo "=== $f ==="
+              cat "$f"
+            fi
+          done
+
+      - name: Upload Checkov SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: 'results_sarif.sarif'
+          category: 'checkov'
+
+      - name: Upload Checkov results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: checkov-results
+          path: checkov-*.txt
+          retention-days: 30
+
+  # =====================================================================
+  # Job 3: KICS (Keeping Infrastructure as Code Secure)
+  # =====================================================================
+  kics-scan:
+    name: KICS IaC Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'kics' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Run KICS scan
+        uses: Checkmarx/kics-github-action@v2.1.3
+        with:
+          path: '.'
+          fail_on: high,medium,low
+          output_path: kics-results/
+          output_formats: 'json,sarif'
+          exclude_paths: '.git,node_modules,venv,.trivycache'
+          enable_comments: true
+          ignore_on_exit: results
+
+      - name: Display KICS results
+        if: always()
+        run: |
+          echo "🔍 KICS Infrastructure Security Scan Results:"
+          echo "=============================================="
+          if [ -f "kics-results/results.json" ]; then
+            cat kics-results/results.json | jq '.queries_total, .total_counter'
+          fi
+
+      - name: Upload KICS SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: kics-results/results.sarif
+          category: 'kics'
+
+      - name: Upload KICS results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: kics-results
+          path: kics-results/
+          retention-days: 30
+
+  # =====================================================================
+  # Job 4: Bandit Python Security Linter
+  # =====================================================================
+  bandit-scan:
+    name: Bandit Python Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'bandit' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.1.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Bandit
+        run: pip install bandit[toml] sarif-om jschema-to-python
+
+      - name: Run Bandit on warp project
+        run: |
+          echo "🔍 Running Bandit Python Security Scanner..."
+          bandit -r warp/ \
+            -f sarif \
+            -o bandit-results.sarif \
+            --severity-level low \
+            --confidence-level low \
+            -x '**/tests/**,**/test_*.py,**/*_test.py' \
+            2>&1 | tee bandit-results.txt || true
+
+          # Also run with text output
+          bandit -r warp/ \
+            -f txt \
+            --severity-level low \
+            --confidence-level low \
+            -x '**/tests/**,**/test_*.py,**/*_test.py' \
+            2>&1 | tee -a bandit-results.txt
+
+      - name: Check Bandit results
+        run: |
+          echo "📊 Bandit Scan Summary:"
+          echo "======================="
+          cat bandit-results.txt
+
+          # Fail if any issues found
+          if grep -q "Issue:" bandit-results.txt; then
+            echo "❌ Bandit found security issues!"
+            exit 1
+          else
+            echo "✅ No security issues found by Bandit"
+          fi
+
+      - name: Upload Bandit SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: bandit-results.sarif
+          category: 'bandit'
+
+      - name: Upload Bandit results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: bandit-results
+          path: bandit-results.*
+          retention-days: 30
+
+  # =====================================================================
+  # Job 5: gosec Go Security Checker
+  # =====================================================================
+  gosec-scan:
+    name: gosec Go Security Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'gosec' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Set up Go
+        uses: actions/setup-go@v6.2.0
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
+      - name: Run gosec
+        working-directory: console/
+        run: |
+          echo "🔍 Running gosec Go Security Scanner..."
+          gosec -fmt sarif -out ../gosec-results.sarif -severity low ./... 2>&1 | tee ../gosec-results.txt || true
+          gosec -fmt text -severity low ./... 2>&1 | tee -a ../gosec-results.txt
+
+      - name: Check gosec results
+        run: |
+          echo "📊 gosec Scan Summary:"
+          echo "======================"
+          cat gosec-results.txt
+
+          # Fail if any issues found (excluding informational)
+          if grep -q "\[HIGH\]\|\[MEDIUM\]\|\[LOW\]" gosec-results.txt; then
+            echo "❌ gosec found security issues!"
+            exit 1
+          else
+            echo "✅ No security issues found by gosec"
+          fi
+
+      - name: Upload gosec SARIF
+        uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: gosec-results.sarif
+          category: 'gosec'
+
+      - name: Upload gosec results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: gosec-results
+          path: gosec-results.*
+          retention-days: 30
+
+  # =====================================================================
+  # Job 6: ShellCheck Shell Script Analysis
+  # =====================================================================
+  shellcheck-scan:
+    name: ShellCheck Shell Scan (Zero-Tolerance)
+    runs-on: ubuntu-24.04
+    if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'shellcheck' || github.event_name != 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.1
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run ShellCheck on all shell scripts
+        run: |
+          echo "🔍 Running ShellCheck Shell Script Analysis..."
+          
+          # Find all shell scripts and run shellcheck
+          # -S warning: Include warnings and above (warning, error)
+          # -f gcc: Output in GCC format for easy parsing
+          find . -name "*.sh" -type f \
+            ! -path "./.git/*" \
+            ! -path "./node_modules/*" \
+            ! -path "./.terraform/*" \
+            -print0 | xargs -0 shellcheck -S warning -f gcc 2>&1 | tee shellcheck-results.txt
+          
+          # Check if any issues were found
+          if [ -s shellcheck-results.txt ]; then
+            echo ""
+            echo "📊 ShellCheck Summary:"
+            echo "======================"
+            cat shellcheck-results.txt
+            echo ""
+            echo "❌ ShellCheck found issues!"
+            exit 1
+          else
+            echo "✅ No ShellCheck issues found"
+          fi
+
+      - name: Upload ShellCheck results as artifact
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: shellcheck-results
+          path: shellcheck-results.txt
+          retention-days: 30
+
+  # =====================================================================
+  # Job 7: Security Summary and Enforcement
+  # =====================================================================
+  security-summary:
+    name: Security Summary & Enforcement
+    runs-on: ubuntu-24.04
+    needs: [trivy-scan, checkov-scan, kics-scan, bandit-scan, gosec-scan, shellcheck-scan]
+    if: always()
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v7
+        with:
+          path: security-results/
+
+      - name: Generate security summary
+        run: |
+          echo "# 🔒 Comprehensive Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Zero-Tolerance Policy Enforcement" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Scanner | Status | Description |" >> $GITHUB_STEP_SUMMARY
+          echo "|---------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
+
+          # Check each job result
+          if [ "${{ needs.trivy-scan.result }}" == "success" ]; then
+            echo "| ✅ Trivy | PASSED | Vulnerability, Secret, Config scan |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ Trivy | FAILED | Vulnerability, Secret, Config scan |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.checkov-scan.result }}" == "success" ]; then
+            echo "| ✅ Checkov | PASSED | IaC security (Terraform, K8s, Docker) |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ Checkov | FAILED | IaC security (Terraform, K8s, Docker) |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.kics-scan.result }}" == "success" ]; then
+            echo "| ✅ KICS | PASSED | IaC security analysis |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ KICS | FAILED | IaC security analysis |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.bandit-scan.result }}" == "success" ]; then
+            echo "| ✅ Bandit | PASSED | Python security |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ Bandit | FAILED | Python security |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.gosec-scan.result }}" == "success" ]; then
+            echo "| ✅ gosec | PASSED | Go security |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ gosec | FAILED | Go security |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ needs.shellcheck-scan.result }}" == "success" ]; then
+            echo "| ✅ ShellCheck | PASSED | Shell script analysis |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| ❌ ShellCheck | FAILED | Shell script analysis |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Policy" >> $GITHUB_STEP_SUMMARY
+          echo "- **Mode**: Zero-Tolerance" >> $GITHUB_STEP_SUMMARY
+          echo "- **Severity Threshold**: LOW, MEDIUM, HIGH, CRITICAL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Action on Finding**: FAIL pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "---" >> $GITHUB_STEP_SUMMARY
+          echo "*All findings must be remediated before merging.*" >> $GITHUB_STEP_SUMMARY
+
+      - name: Enforce zero-tolerance policy
+        run: |
+          FAILED=false
+
+          if [ "${{ needs.trivy-scan.result }}" != "success" ]; then
+            echo "❌ Trivy scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.checkov-scan.result }}" != "success" ]; then
+            echo "❌ Checkov scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.kics-scan.result }}" != "success" ]; then
+            echo "❌ KICS scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.bandit-scan.result }}" != "success" ]; then
+            echo "❌ Bandit scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.gosec-scan.result }}" != "success" ]; then
+            echo "❌ gosec scan failed"
+            FAILED=true
+          fi
+
+          if [ "${{ needs.shellcheck-scan.result }}" != "success" ]; then
+            echo "❌ ShellCheck scan failed"
+            FAILED=true
+          fi
+
+          if [ "$FAILED" = true ]; then
+            echo ""
+            echo "🚫 SECURITY SCAN FAILED - Zero-tolerance policy violated"
+            echo "All findings must be remediated before merging."
+            exit 1
+          else
+            echo ""
+            echo "✅ ALL SECURITY SCANS PASSED"
+            echo "🔒 Zero-tolerance policy enforced successfully"
+          fi

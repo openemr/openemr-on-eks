@@ -448,6 +448,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 
 		// Ensure the script has execute permissions (important for Unix-like systems)
 		// On Windows, this is a no-op but doesn't hurt
+		// #nosec G302 -- Script must be executable to run; this is intentional behavior
 		os.Chmod(cmd.script, 0755)
 
 		// Prepare script path, arguments, and working directory
@@ -472,6 +473,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			command := fmt.Sprintf("cd '%s' && '%s' %s; echo ''; echo 'Press any key and then return to go back to the command line'; read -n 1", escapedWorkingDir, escapedScriptPath, escapedArgs)
 
 			// Use osascript to tell Terminal.app to execute the command in a new window
+			// #nosec G204 -- Command constructed from internal script paths, not user input
 			execCmd := exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "%s"`, command))
 
 			// Execute the command to open terminal
@@ -747,6 +749,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 				"Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', '%s'",
 				scriptPath)
 
+			// #nosec G204 -- Command constructed from internal script paths, not user input
 			execCmd := exec.Command("powershell", "-Command", startProcessCmd)
 
 			// Execute the command to open PowerShell window

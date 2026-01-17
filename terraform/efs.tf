@@ -37,14 +37,15 @@ resource "aws_efs_mount_target" "openemr" {
 # Restricts EFS access to resources within the VPC
 resource "aws_security_group" "efs" {
   name_prefix = "${var.cluster_name}-efs-" # Security group name with prefix
-  vpc_id      = module.vpc.vpc_id          # Associate with the VPC
+  description = "Security group for EFS file system - allows NFS connections from VPC"
+  vpc_id      = module.vpc.vpc_id # Associate with the VPC
 
   # Ingress rule: Allow NFS connections from VPC
   ingress {
-    from_port = 2049  # NFS port (EFS uses NFS protocol)
-    to_port   = 2049  # NFS port
-    protocol  = "tcp" # TCP protocol
-    # Auto Mode nodes will be in the cluster security group
+    description = "NFS connections from VPC CIDR for EFS access"
+    from_port   = 2049           # NFS port (EFS uses NFS protocol)
+    to_port     = 2049           # NFS port
+    protocol    = "tcp"          # TCP protocol
     cidr_blocks = [var.vpc_cidr] # Allow access from entire VPC CIDR
   }
 

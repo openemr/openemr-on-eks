@@ -12,6 +12,7 @@ resource "random_id" "cloudtrail_suffix" {
 
 # S3 bucket for storing CloudTrail logs
 # This bucket receives detailed API call logs from CloudTrail for audit and compliance purposes
+# tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "cloudtrail" {
   bucket        = "${var.cluster_name}-cloudtrail-logs-${random_id.cloudtrail_suffix.hex}"
   force_destroy = true

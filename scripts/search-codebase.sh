@@ -65,7 +65,8 @@ search_codebase() {
         grep_cmd="$grep_cmd -i"
     fi
     
-    grep_cmd="$grep_cmd ${exclude_patterns[@]}"
+    # shellcheck disable=SC2124  # Intentionally concatenating array to string for grep command
+    grep_cmd="$grep_cmd ${exclude_patterns[*]}"
     
     # Search and display results
     local results

@@ -29,9 +29,10 @@ module "vpc" {
 
   # VPC Flow Logs for regulatory compliance and security monitoring
   # Flow logs capture network traffic information for audit and troubleshooting
-  enable_flow_log                      = true # Enable VPC flow logging
-  create_flow_log_cloudwatch_iam_role  = true # Create IAM role for flow logs
-  create_flow_log_cloudwatch_log_group = true # Create CloudWatch log group
+  enable_flow_log                      = true  # Enable VPC flow logging
+  create_flow_log_cloudwatch_iam_role  = true  # Create IAM role for flow logs
+  create_flow_log_cloudwatch_log_group = true  # Create CloudWatch log group
+  flow_log_traffic_type                = "ALL" # Capture all traffic (ACCEPT and REJECT)
 
   # Kubernetes-specific subnet tagging
   # These tags enable the AWS Load Balancer Controller to automatically

@@ -621,7 +621,7 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v80.9.0 (metrics & alerting)
+     - Prometheus v80.14.4 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.49.0 (log aggregation with S3 storage)
      - Tempo v1.60.0 (distributed tracing with S3 storage, microservice mode)
@@ -873,7 +873,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v80.9.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v80.14.4 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
@@ -912,6 +912,7 @@ openemr-on-eks/
 │   ├── README.md                          # Comprehensive GitHub workflows documentation
 │   └── workflows/                         # CI/CD automation workflows
 │       ├── ci-cd-tests.yml                # Automated testing and quality assurance (includes Warp CI/CD)
+│       ├── security-comprehensive.yml     # Comprehensive security scanning (Trivy, Checkov, KICS, etc.)
 │       ├── manual-releases.yml            # Manual release workflow for version management
 │       └── monthly-version-check.yml      # Automated version awareness checking
 ├── terraform/                             # Infrastructure as Code (Modular Structure)
@@ -1007,6 +1008,7 @@ openemr-on-eks/
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
 │   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.4 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
+│   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
 │   ├── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
 │   └── CONSOLE_GUIDE.md                   # Terminal User Interface (TUI) console guide
@@ -1042,9 +1044,13 @@ openemr-on-eks/
 │   ├── README.md                          # Complete images documentation and usage guidelines
 │   ├── openemr_on_eks_logo.png            # Main project logo for documentation and branding (optimized for web)
 │   └── openemr_on_eks_github_banner.png   # GitHub repository banner for social media display
-├── .pre-commit-config.yaml                # Pre-commit hooks configuration
-├── .yamllint                              # YAML linting configuration (relaxed rules)
+├── .checkov.yaml                          # Checkov IaC security scanner configuration
 ├── .markdownlint.json                     # Markdown linting configuration (relaxed rules)
+├── .pre-commit-config.yaml                # Pre-commit hooks configuration
+├── .shellcheckrc                          # ShellCheck shell script linter configuration
+├── .trivyignore                           # Trivy security scanner exemptions
+├── .yamllint                              # YAML linting configuration (relaxed rules)
+├── trivy.yaml                             # Trivy scanner configuration
 ├── start_console                          # TUI console launcher script (macOS only)
 ├── start_console.ps1                      # TUI console launcher script (PowerShell/Windows)
 ├── VERSION                                # Current project version
@@ -2368,6 +2374,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
 - [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.4 Enhanced Logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
+- [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
 - [GitHub → AWS Credentials Guide](docs/GITHUB_AWS_CREDENTIALS.md) - GitHub → AWS OIDC setup and credential management
 - [Console Guide (TUI)](docs/CONSOLE_GUIDE.md) - Terminal User Interface (TUI) console guide for macOS

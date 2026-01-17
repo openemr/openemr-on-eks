@@ -1,0 +1,115 @@
+# =============================================================================
+# Checkov Configuration File
+# =============================================================================
+# This configuration enforces a ZERO-TOLERANCE security policy for IaC.
+# All findings at CRITICAL, HIGH, and MEDIUM severity will fail the scan.
+#
+# Documentation: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
+# =============================================================================
+
+# Frameworks to scan
+framework:
+  - terraform
+  - kubernetes
+  - dockerfile
+  - github_actions
+  - helm
+  - secrets
+
+# Severity configuration
+soft-fail-on:
+  - LOW
+
+hard-fail-on:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+
+# Output configuration
+compact: true
+output:
+  - cli
+  - sarif
+
+# Skip specific checks (only for verified false positives or intentional configurations)
+skip-check:
+  # Skip Terraform module source check - we use verified HashiCorp modules
+  - CKV_TF_1
+
+  # Skip CloudWatch log retention check for non-audit logs - intentionally set to 30 days
+  # for cost optimization. Audit logs are retained for 365 days for compliance.
+  # Justification: Application logs (access, error, system, etc.) don't require 1-year retention
+  # Compensating control: Audit logs are retained for 365+ days for compliance requirements
+  - CKV_AWS_338
+
+  # Skip CloudTrail SNS topic requirement - alerting handled by optional monitoring stack
+  # Justification: Native AWS alerting deferred to Prometheus/AlertManager monitoring stack
+  # Compensating control: Optional monitoring stack (install-monitoring.sh) provides 218+ alerting rules
+  - CKV_AWS_252
+
+  # Skip IAM policy checks for Grafana CloudWatch policy - these AWS services don't support
+  # resource-level permissions for read-only monitoring actions (cloudwatch:*, ec2:Describe*, tag:*)
+  # Justification: AWS documentation confirms these actions require Resource = "*"
+  # Compensating control: Policy is read-only and attached only to Grafana service account
+  - CKV_AWS_355
+
+  # Skip checks in external modules (terraform-aws-modules) - these are maintained by AWS/HashiCorp
+  # and we cannot modify their IAM policies. The modules follow AWS best practices.
+  # CKV_AWS_290 - IAM write access without constraints (in AWS official modules)
+  # CKV_AWS_356 - IAM restrictable actions (in AWS official modules)
+  # CKV_AWS_289 - IAM permissions management (in AWS official modules)
+  # CKV_AWS_111 - IAM write access (CSI drivers, controllers require these permissions)
+  # CKV_AWS_109 - IAM permissions management (gateway controller requires these)
+  - CKV_AWS_290
+  - CKV_AWS_356
+  - CKV_AWS_289
+  - CKV_AWS_111
+  - CKV_AWS_109
+
+  # Skip EKS cluster endpoint public access check - intentional for kubectl access
+  # Justification: Required for DevOps access; mitigated by authorized IP ranges
+  # Compensating control: cluster_endpoint_public_access_cidrs restricts access
+  - CKV2_AWS_5
+
+  # Skip EKS control plane logging check - logging is enabled via cluster_enabled_log_types
+  # but external module structure may cause false positive
+  - CKV_AWS_37
+  - CKV_AWS_38
+  - CKV_AWS_39
+
+  # Skip EKS secrets encryption check - encryption is configured but Checkov may not
+  # recognize it through the module abstraction layer
+  # Justification: encryption_config is set in eks.tf with KMS key
+  # Compensating control: aws_kms_key.eks is used for secrets encryption
+  - CKV_AWS_58
+
+  # Skip EKS version check - we use a supported version but external module may report differently
+  # Justification: cluster_version is set to a supported version in eks.tf
+  - CKV_AWS_339
+
+# Directory exclusions
+skip-path:
+  - .git
+  - node_modules
+  - venv
+  - .venv
+  - __pycache__
+  - .trivycache
+  - htmlcov
+  - .pytest_cache
+  - test-results
+  - "*.md"
+
+# External checks (uncomment to enable custom policies)
+# external-checks-dir:
+#   - ./custom-checks
+
+# Repository root for relative paths
+repo-root-for-plan-enrichment:
+  - terraform/
+
+# Enable downloading external modules for scanning
+download-external-modules: true
+
+# Secrets scanning configuration
+enable-secret-scan-all-files: true

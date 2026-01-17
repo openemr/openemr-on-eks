@@ -9,7 +9,7 @@
 module "eks" {
   # Source module for EKS cluster creation with Auto Mode support
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.12.0" # Latest stable version with Auto Mode support
+  version = "21.14.0" # Latest stable version with Auto Mode support
 
   # Cluster identification and version configuration
   name               = var.cluster_name       # EKS cluster name
@@ -184,7 +184,7 @@ resource "aws_eks_addon" "efs_csi_driver" {
 module "aws_efs_csi_pod_identity" {
   # Source module for Pod Identity configuration
   source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "2.6.0"
+  version = "2.7.0"
 
   name = "aws-efs-csi" # Name for the Pod Identity configuration
 

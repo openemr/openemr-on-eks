@@ -21,23 +21,27 @@ resource "aws_db_subnet_group" "openemr" {
 # Restricts database access to resources within the VPC
 resource "aws_security_group" "rds" {
   name_prefix = "${var.cluster_name}-rds-" # Security group name with prefix
-  vpc_id      = module.vpc.vpc_id          # Associate with the VPC
+  description = "Security group for Aurora MySQL RDS cluster - allows MySQL connections from VPC"
+  vpc_id      = module.vpc.vpc_id # Associate with the VPC
 
   # Ingress rule: Allow MySQL/Aurora connections from VPC
   ingress {
-    from_port = 3306  # MySQL/Aurora port
-    to_port   = 3306  # MySQL/Aurora port
-    protocol  = "tcp" # TCP protocol
-    # Auto Mode nodes will be in the cluster security group
+    description = "MySQL/Aurora connections from VPC CIDR"
+    from_port   = 3306           # MySQL/Aurora port
+    to_port     = 3306           # MySQL/Aurora port
+    protocol    = "tcp"          # TCP protocol
     cidr_blocks = [var.vpc_cidr] # Allow access from entire VPC CIDR
   }
 
-  # Egress rule: Allow all outbound traffic (required for Aurora operations)
+  # Egress rule: Allow HTTPS for AWS API calls within VPC
+  # Aurora uses VPC endpoints or NAT gateway for AWS API calls
+  # tfsec:ignore:AVD-AWS-0104 Aurora requires egress for AWS API calls via NAT/endpoints
   egress {
-    from_port   = 0             # All ports
-    to_port     = 0             # All ports
-    protocol    = "-1"          # All protocols
-    cidr_blocks = ["0.0.0.0/0"] # All destinations
+    description = "HTTPS for AWS API calls via VPC"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -68,10 +72,15 @@ resource "aws_rds_cluster" "openemr" {
   preferred_backup_window      = "03:00-04:00"         # Backup window (UTC)
   preferred_maintenance_window = "sun:04:00-sun:05:00" # Maintenance window (UTC)
 
-  # Regulatory compliance and security features
-  enabled_cloudwatch_logs_exports = ["error", "general", "slowquery"] # Export logs to CloudWatch
-  storage_encrypted               = true                              # Encrypt storage at rest
-  kms_key_id                      = aws_kms_key.rds.arn               # KMS key for encryption
+  # Security and compliance features
+  iam_database_authentication_enabled = true                                  # Enable IAM database authentication
+  copy_tags_to_snapshot               = true                                  # Copy tags to snapshots for tracking
+  enabled_cloudwatch_logs_exports     = ["error", "general", "slowquery", "audit"] # Export logs including audit
+  storage_encrypted                   = true                                  # Encrypt storage at rest
+  kms_key_id                          = aws_kms_key.rds.arn                   # KMS key for encryption
+
+  # Backtracking for point-in-time recovery (72 hours = 259200 seconds)
+  backtrack_window = 259200 # 72 hours backtracking window
 
   # Serverless V2 scaling configuration
   # Aurora automatically scales between min and max capacity based on demand
@@ -105,6 +114,9 @@ resource "aws_rds_cluster_instance" "openemr" {
   instance_class     = "db.serverless"                             # Serverless V2 instance class
   engine             = aws_rds_cluster.openemr.engine              # Aurora MySQL engine
   engine_version     = aws_rds_cluster.openemr.engine_version      # Engine version
+
+  # Auto minor version upgrade for security patches
+  auto_minor_version_upgrade = true # Automatically apply minor version upgrades
 
   # Enhanced monitoring and performance insights for operational visibility
   monitoring_interval             = 60                              # 60-second monitoring interval

@@ -59,7 +59,7 @@ jobs:
         uses: actions/checkout@v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.1.0
+        uses: actions/setup-go@v6.2.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -125,7 +125,7 @@ jobs:
         uses: actions/checkout@v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.1.0
+        uses: actions/setup-go@v6.2.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -189,16 +189,16 @@ jobs:
           path: ${{ env.MODULE_PATH }}/${{ env.BINARY_NAME }}
           retention-days: 1
 
-  # Security scanning job
+  # Security scanning job - ZERO-TOLERANCE policy
   security:
-    name: Security Scan
+    name: Security Scan (Zero-Tolerance)
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v6.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.1.0
+        uses: actions/setup-go@v6.2.0
         with:
           go-version: ${{ env.GO_VERSION }}
 
@@ -206,17 +206,56 @@ jobs:
         working-directory: ${{ env.MODULE_PATH }}
         run: go mod download
 
-      - name: Run Trivy vulnerability scanner
+      # Run Trivy with table format first for readable output
+      - name: Run Trivy vulnerability scanner (Table format - STRICT)
         uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '${{ env.MODULE_PATH }}'
+          format: 'table'
+          output: 'trivy-results.txt'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'     # All severities - zero tolerance
+          scanners: 'vuln,secret,misconfig'        # Enable all scanners
+          exit-code: '1'                           # FAIL on any finding
+          trivyignores: '.trivyignore'             # Use ignore file for false positives only
+
+      # Run Trivy in SARIF format for GitHub Security tab
+      - name: Run Trivy vulnerability scanner (SARIF format)
+        uses: aquasecurity/trivy-action@master
+        if: success()
         with:
           scan-type: 'fs'
           scan-ref: '${{ env.MODULE_PATH }}'
           format: 'sarif'
           output: 'trivy-results.sarif'
-          severity: 'CRITICAL,HIGH'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'  # All severities
+          scanners: 'vuln,secret,misconfig'
+          exit-code: '1'                        # FAIL on any finding
+          trivyignores: '.trivyignore'
+
+      # Display scan results
+      - name: Display Trivy results
+        if: always()
+        run: |
+          echo "🔍 Trivy Security Scan Results for Console (ZERO-TOLERANCE):"
+          echo "============================================================="
+          if [ -f "trivy-results.txt" ]; then
+            cat trivy-results.txt
+          else
+            echo "✅ No vulnerabilities found - scan passed"
+          fi
+          echo "============================================================="
 
       - name: Upload Trivy results to GitHub Security
         uses: github/codeql-action/upload-sarif@v4
+        if: always()
+        continue-on-error: true  # Don't fail if GitHub Advanced Security is not enabled
         with:
           sarif_file: 'trivy-results.sarif'
+
+      - name: Security scan enforcement status
+        if: success()
+        run: |
+          echo "✅ Security scan PASSED - No findings detected"
+          echo "🔒 Zero-tolerance policy enforced for Console"
 

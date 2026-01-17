@@ -132,9 +132,9 @@ jobs:
           cd ${{ env.WARP_DIR }}
           mypy warp/ --ignore-missing-imports || echo "Type checking completed with warnings"
 
-  # Security scanning job - performs comprehensive security analysis
+  # Security scanning job - ZERO-TOLERANCE policy for comprehensive security analysis
   security-scan:
-    name: Security Scan
+    name: Security Scan (Zero-Tolerance)
     runs-on: ubuntu-24.04
 
     steps:
@@ -142,25 +142,25 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6.0.1
 
-      # Step 2: Run Trivy vulnerability scanner (Table format)
-      - name: Run Trivy vulnerability scanner (Table format)
+      # Step 2: Run Trivy vulnerability scanner (Table format - STRICT MODE)
+      - name: Run Trivy vulnerability scanner (Table format - STRICT)
         uses: aquasecurity/trivy-action@master
-        continue-on-error: true
         with:
           scan-type: 'fs'
           scan-ref: '${{ env.WARP_DIR }}'
           format: 'table'
           output: 'trivy-results.txt'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'  # All severities - zero tolerance
           scanners: 'vuln,secret,config'
-          exit-code: '0'
+          exit-code: '1'                        # FAIL on any finding
           skip-db-update: false
           cache-dir: '.trivycache'
+          trivyignores: '.trivyignore'          # Use ignore file for false positives only
 
       # Step 3: Run Trivy vulnerability scanner (SARIF format)
       - name: Run Trivy vulnerability scanner (SARIF format)
         uses: aquasecurity/trivy-action@master
-        continue-on-error: true
+        if: success()
         with:
           scan-type: 'fs'
           scan-ref: '${{ env.WARP_DIR }}'
@@ -168,30 +168,38 @@ jobs:
           output: 'trivy-results.sarif'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           scanners: 'vuln,secret,config'
-          exit-code: '0'
+          exit-code: '1'                        # FAIL on any finding
+          trivyignores: '.trivyignore'
 
       # Step 4: Display Trivy scan results
       - name: Display Trivy results
-        continue-on-error: true
+        if: always()
         run: |
-          echo "🔍 Trivy Security Scan Results for Warp:"
-          echo "=================================="
+          echo "🔍 Trivy Security Scan Results for Warp (ZERO-TOLERANCE):"
+          echo "=========================================================="
           if [ -f "trivy-results.txt" ]; then
             cat trivy-results.txt
           else
-            echo "No vulnerabilities found or scan completed successfully"
+            echo "✅ No vulnerabilities found - scan passed"
           fi
-          echo "=================================="
+          echo "=========================================================="
 
       # Step 5: Upload SARIF results to GitHub Security tab
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
-        continue-on-error: true
+        continue-on-error: true  # Don't fail if GitHub Advanced Security is not enabled
         with:
           sarif_file: 'trivy-results.sarif'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Step 6: Security scan enforcement status
+      - name: Security scan enforcement status
+        if: success()
+        run: |
+          echo "✅ Security scan PASSED - No findings detected"
+          echo "🔒 Zero-tolerance policy enforced for Warp"
 
   # Summary job - generates comprehensive test results summary
   summary:
@@ -230,13 +238,15 @@ jobs:
             echo "❌ **Linting or formatting checks failed. Please review the logs above.**"
           fi
           echo ""
-          echo "### 🔒 Security Scan Status"
+          echo "### 🔒 Security Scan Status (Zero-Tolerance Policy)"
           if [ "${{ needs.security-scan.result }}" == "success" ]; then
-            echo "✅ **Security scan completed successfully**"
-            echo "- Check the security-scan job logs for detailed vulnerability results"
-            echo "- If GitHub Advanced Security is enabled, results are also available in the Security tab"
+            echo "✅ **Security scan PASSED - No findings detected**"
+            echo "- Zero-tolerance policy enforced: All severity levels checked (CRITICAL, HIGH, MEDIUM, LOW)"
+            echo "- Scanners: Vulnerability, Secret Detection, Configuration"
           else
-            echo "⚠️ **Security scan had issues** - Check the security-scan job logs"
+            echo "❌ **Security scan FAILED - Findings detected**"
+            echo "- ALL findings must be remediated before merging (zero-tolerance policy)"
+            echo "- Check the security-scan job logs for detailed vulnerability results"
           fi
           echo ""
           echo "## 📊 Overall Status"

@@ -1,0 +1,33 @@
+# =============================================================================
+# ShellCheck Configuration
+# =============================================================================
+# This file configures ShellCheck for this repository.
+# See: https://www.shellcheck.net/wiki/
+#
+# Policy: Zero-Tolerance for errors, warnings reviewed case-by-case
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Disabled Checks (with justification)
+# -----------------------------------------------------------------------------
+
+# SC2155: Declare and assign separately to avoid masking return values
+# Reason: This pattern is used extensively for local variable assignment from
+# command substitution. The return value masking is acceptable in our scripts
+# because we check command success separately or handle errors explicitly.
+# Example: local var=$(command) - we use this for readability
+disable=SC2155
+
+# SC2034: Variable appears unused
+# Reason: Many variables are used for documentation, exported to environment,
+# or used in sourced scripts. False positives are common with color variables.
+disable=SC2034
+
+# -----------------------------------------------------------------------------
+# Enabled Checks (errors and important warnings)
+# -----------------------------------------------------------------------------
+# All other checks remain enabled, including:
+# - SC2164: Use 'cd ... || exit' (important for script safety)
+# - SC2206: Quote array assignments (important for correctness)
+# - SC2124: Array to string assignment (important for correctness)
+# - All error-level checks

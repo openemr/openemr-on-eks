@@ -17,20 +17,22 @@ resource "aws_elasticache_subnet_group" "openemr" {
 # Restricts cache access to EKS cluster nodes and provides fallback access
 resource "aws_security_group" "elasticache" {
   name_prefix = "${var.cluster_name}-cache-" # Security group name with prefix
-  vpc_id      = module.vpc.vpc_id            # Associate with the VPC
+  description = "Security group for ElastiCache Valkey cluster - allows Redis connections from EKS"
+  vpc_id      = module.vpc.vpc_id # Associate with the VPC
 
   # Primary ingress rule: Allow Redis/Valkey connections from EKS cluster
   ingress {
-    from_port = 6379  # Standard Redis/Valkey port
-    to_port   = 6379  # Standard Redis/Valkey port
-    protocol  = "tcp" # TCP protocol
-    # Allow access from EKS cluster security group for Auto Mode
+    description     = "Redis/Valkey connections from EKS cluster security group"
+    from_port       = 6379 # Standard Redis/Valkey port
+    to_port         = 6379 # Standard Redis/Valkey port
+    protocol        = "tcp" # TCP protocol
     security_groups = [module.eks.cluster_security_group_id] # EKS cluster security group
   }
 
   # Fallback ingress rule: Allow Redis/Valkey connections from VPC CIDR
   # This provides backup access in case cluster security group doesn't cover all cases
   ingress {
+    description = "Redis/Valkey connections from VPC CIDR (fallback)"
     from_port   = 6379           # Standard Redis/Valkey port
     to_port     = 6379           # Standard Redis/Valkey port
     protocol    = "tcp"          # TCP protocol

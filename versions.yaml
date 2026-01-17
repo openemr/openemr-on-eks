@@ -89,14 +89,14 @@ terraform_modules:
 
   aws_pod_identity:
     source: "terraform-aws-modules/eks-pod-identity/aws"
-    current: "2.6.0"
+    current: "2.7.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS pod identities for Terraform."
 
   aws_eks:
     source: "terraform-aws-modules/eks/aws"
-    current: "21.12.0"
+    current: "21.14.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS for Terraform."
@@ -123,7 +123,7 @@ github_workflows:
     description: "Github action for setting up a specified Python version."
 
   actions_setup_go:
-    current: "v6.1.0"
+    current: "v6.2.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Go version."
@@ -203,7 +203,7 @@ pre_commit_hooks:
     description: "https://github.com/pycqa/bandit"
 
   terraform_hooks:
-    current: "v1.104.0"
+    current: "v1.105.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/antonbabenko/pre-commit-terraform"
@@ -221,13 +221,13 @@ pre_commit_hooks:
     description: "https://github.com/igorshubovych/markdownlint-cli"
 
   yamllint:
-    current: "v1.37.1"
+    current: "v1.38.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.11.0"
+    current: "v4.11.6"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -347,7 +347,7 @@ python_packages:
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "80.9.0"
+    current: "80.14.4"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
@@ -395,6 +395,37 @@ monitoring:
     requires_aws_cli: false
     description: "cert-manager for TLS certificate management"
 
+# Security Tools Versions (Zero-Tolerance Policy)
+security_tools:
+  trivy:
+    current: "0.68.2"
+    repository: "aquasecurity/trivy"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Trivy vulnerability, secret, and misconfiguration scanner"
+
+  checkov:
+    current: "3.2.497"
+    package_manager: "pip"
+    repository: "bridgecrewio/checkov"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Checkov IaC security scanner for Terraform, Kubernetes, Docker"
+
+  kics:
+    current: "v2.1.19"
+    repository: "Checkmarx/kics"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "KICS (Keeping Infrastructure as Code Secure) scanner"
+
+  gosec:
+    current: "v2.22.11"
+    repository: "securego/gosec"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "gosec Go security checker"
+
 # Notification Settings
 notifications:
   github_issues:
@@ -411,6 +442,7 @@ notifications:
       - "python_packages"           # Python package dependencies for the Warp project (pymysql, boto3, pytest, pytest-cov, flake8, black, mypy)
       - "monitoring"                # Monitoring stack components (Prometheus Operator, Loki, Jaeger, cert-manager)
       - "eks_addons"                # EKS cluster add-ons managed outside of Auto Mode (EFS CSI Driver, Metrics Server)
+      - "security_tools"            # Security scanning tools (Trivy, Checkov, KICS, gosec) - Zero-Tolerance Policy
     priority_threshold: "medium" # low, medium, high, critical
     monthly_schedule: true
     issue_title_template: "Version Check Report for Month of {month}"

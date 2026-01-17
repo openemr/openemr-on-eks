@@ -21,6 +21,7 @@ resource "random_id" "bucket_suffix" {
 # S3 bucket for storing ALB (Application Load Balancer) access logs
 # This bucket receives detailed access logs from the ALB, including request details,
 # response codes, and timing information for monitoring and troubleshooting.
+# tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "alb_logs" {
   bucket = "${var.cluster_name}-alb-logs-${random_id.bucket_suffix.hex}"
 
@@ -71,6 +72,7 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
 resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
+  # Rule for ALB logs with prefix
   rule {
     id     = "alb_logs_lifecycle"
     status = "Enabled"
@@ -86,6 +88,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "alb_logs" {
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
+  }
+
+  # Rule for aborting incomplete multipart uploads (applies to all objects)
+  rule {
+    id     = "abort_incomplete_multipart_uploads"
+    status = "Enabled"
+
+    filter {} # Empty filter applies to all objects
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -166,6 +176,7 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 # S3 bucket for storing WAF (Web Application Firewall) logs
 # This bucket receives detailed logs from the WAF, including blocked requests,
 # allowed requests, and security events for monitoring and analysis.
+# tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "waf_logs" {
   count = var.enable_waf ? 1 : 0
 
@@ -230,6 +241,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
 
   bucket = aws_s3_bucket.waf_logs[0].id
 
+  # Rule for WAF logs with prefix
   rule {
     id     = "waf_logs_lifecycle"
     status = "Enabled"
@@ -245,6 +257,14 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
     noncurrent_version_expiration {
       noncurrent_days = 30
     }
+  }
+
+  # Rule for aborting incomplete multipart uploads (applies to all objects)
+  rule {
+    id     = "abort_incomplete_multipart_uploads"
+    status = "Enabled"
+
+    filter {} # Empty filter applies to all objects
 
     abort_incomplete_multipart_upload {
       days_after_initiation = 7
@@ -314,6 +334,7 @@ resource "aws_s3_bucket_policy" "waf_logs" {
 
 # S3 bucket for storing Loki logs and chunks
 # This bucket stores all log data managed by Loki for long-term retention
+# tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "loki_storage" {
   bucket = "${var.cluster_name}-loki-storage-${random_id.bucket_suffix.hex}"
 
@@ -441,6 +462,7 @@ resource "aws_s3_bucket_policy" "loki_storage" {
 
 # S3 bucket for storing Tempo traces
 # This bucket stores all trace data managed by Tempo for distributed tracing
+# tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "tempo_storage" {
   bucket = "${var.cluster_name}-tempo-storage-${random_id.bucket_suffix.hex}"
 
@@ -558,6 +580,7 @@ resource "aws_s3_bucket_policy" "tempo_storage" {
 
 # S3 bucket for storing Mimir blocks (metrics data)
 # This bucket stores all metrics blocks managed by Mimir for long-term retention
+# tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_blocks_storage" {
   bucket = "${var.cluster_name}-mimir-blocks-storage-${random_id.bucket_suffix.hex}"
 
@@ -679,6 +702,7 @@ resource "aws_s3_bucket_policy" "mimir_blocks_storage" {
 
 # S3 bucket for storing Mimir ruler data (recording rules and alerting rules)
 # This bucket stores ruler state and rule evaluation results
+# tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_ruler_storage" {
   bucket = "${var.cluster_name}-mimir-ruler-storage-${random_id.bucket_suffix.hex}"
 
@@ -800,6 +824,7 @@ resource "aws_s3_bucket_policy" "mimir_ruler_storage" {
 
 # S3 bucket for storing AlertManager state
 # This bucket stores AlertManager cluster state for high availability
+# tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "alertmanager_storage" {
   bucket = "${var.cluster_name}-alertmanager-storage-${random_id.bucket_suffix.hex}"
 

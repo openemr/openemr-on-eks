@@ -21,9 +21,19 @@ spec:
       restartPolicy: Never
       
       containers:
-      - name: warp
+      - name: warp-ccda-upload
         image: openemr/warp:latest  # Update with your image
         imagePullPolicy: Always
+        
+        # Security context for container hardening
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 1000
+          capabilities:
+            drop:
+            - ALL
         
         env:
         # Database connection (from Kubernetes secrets)

@@ -106,23 +106,23 @@ search_version_in_codebase() {
     # Define exclusion patterns for the search
     # Exclude build artifacts, temporary files, and version reports to focus on source code
     local exclude_patterns=(
-        "--exclude-dir=.git"           # Git repository metadata
-        "--exclude-dir=node_modules"   # Node.js dependencies
-        "--exclude-dir=.terraform"     # Terraform state and cache
-        "--exclude-dir=venv"           # Python virtual environment
-        "--exclude-dir=__pycache__"    # Python bytecode cache
-        "--exclude-dir=.pytest_cache"  # Pytest cache
-        "--exclude-dir=dist"           # Distribution files
-        "--exclude-dir=build"          # Build artifacts
-        "--exclude=*.log"              # Log files
+        "--exclude-dir=.git"                    # Git repository metadata
+        "--exclude-dir=node_modules"            # Node.js dependencies
+        "--exclude-dir=.terraform"              # Terraform state and cache
+        "--exclude-dir=venv"                    # Python virtual environment
+        "--exclude-dir=__pycache__"             # Python bytecode cache
+        "--exclude-dir=.pytest_cache"           # Pytest cache
+        "--exclude-dir=dist"                    # Distribution files
+        "--exclude-dir=build"                   # Build artifacts
+        "--exclude=*.log"                       # Log files
         "--exclude=version-update-report-*.md"  # Previous version reports
-        "--exclude=*.pyc"              # Python compiled files
-        "--exclude=*.pyo"              # Python optimized files
-        "--exclude=*.so"               # Shared object files
-        "--exclude=*.o"                # Object files
-        "--exclude=*.a"                # Archive files
-        "--exclude=*.tmp"              # Temporary files
-        "--exclude=*.temp"             # Temporary files
+        "--exclude=*.pyc"                       # Python compiled files
+        "--exclude=*.pyo"                       # Python optimized files
+        "--exclude=*.so"                        # Shared object files
+        "--exclude=*.o"                         # Object files
+        "--exclude=*.a"                         # Archive files
+        "--exclude=*.tmp"                       # Temporary files
+        "--exclude=*.temp"                      # Temporary files
     )
     
     # Escape special characters in the version string for grep regex
@@ -1534,6 +1534,64 @@ EOF
         fi
     fi
 
+    # Check security tools versions if requested
+    if [ "$components" = "all" ] || [ "$components" = "security_tools" ]; then
+        log "INFO" "Checking security tools versions..."
+
+        # Check Trivy version
+        local trivy_current=$(yq eval '.security_tools.trivy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        if [ -n "$trivy_current" ]; then
+            local trivy_latest=$(get_latest_go_package_version "aquasecurity/trivy")
+            trivy_latest=$(echo "$trivy_latest" | sed 's/^v//')  # Remove 'v' prefix for comparison
+            if [ "$trivy_latest" != "❌ Error" ] && [ "$trivy_latest" != "❌ Unable to determine" ] && [ "$trivy_latest" != "$trivy_current" ]; then
+                log "INFO" "Trivy update available: $trivy_current -> $trivy_latest"
+                echo "- **Trivy**: $trivy_current → $trivy_latest" >> "$update_report"
+                search_version_in_codebase "Trivy" "$trivy_current" "$trivy_latest"
+                updates_found=1
+            fi
+        fi
+
+        # Check Checkov version (PyPI)
+        local checkov_current=$(yq eval '.security_tools.checkov.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        if [ -n "$checkov_current" ]; then
+            local checkov_url="https://pypi.org/pypi/checkov/json"
+            local checkov_response=$(curl -s "$checkov_url" 2>/dev/null || echo "")
+            if [ -n "$checkov_response" ]; then
+                local checkov_latest=$(echo "$checkov_response" | jq -r '.info.version' 2>/dev/null || echo "")
+                if [ -n "$checkov_latest" ] && [ "$checkov_latest" != "null" ] && [ "$checkov_latest" != "$checkov_current" ]; then
+                    log "INFO" "Checkov update available: $checkov_current -> $checkov_latest"
+                    echo "- **Checkov**: $checkov_current → $checkov_latest" >> "$update_report"
+                    search_version_in_codebase "Checkov" "$checkov_current" "$checkov_latest"
+                    updates_found=1
+                fi
+            fi
+        fi
+
+        # Check KICS version
+        local kics_current=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        if [ -n "$kics_current" ]; then
+            local kics_latest=$(get_latest_go_package_version "Checkmarx/kics")
+            if [ "$kics_latest" != "❌ Error" ] && [ "$kics_latest" != "❌ Unable to determine" ] && [ "$kics_latest" != "$kics_current" ]; then
+                log "INFO" "KICS update available: $kics_current -> $kics_latest"
+                echo "- **KICS**: $kics_current → $kics_latest" >> "$update_report"
+                search_version_in_codebase "KICS" "$kics_current" "$kics_latest"
+                updates_found=1
+            fi
+        fi
+
+        # Check gosec version
+        local gosec_current=$(yq eval '.security_tools.gosec.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        if [ -n "$gosec_current" ]; then
+            local gosec_latest=$(get_latest_go_package_version "securego/gosec")
+            if [ "$gosec_latest" != "❌ Error" ] && [ "$gosec_latest" != "❌ Unable to determine" ] && [ "$gosec_latest" != "$gosec_current" ]; then
+                log "INFO" "gosec update available: $gosec_current -> $gosec_latest"
+                echo "- **gosec**: $gosec_current → $gosec_latest" >> "$update_report"
+                search_version_in_codebase "gosec" "$gosec_current" "$gosec_latest"
+                updates_found=1
+            fi
+        fi
+    fi
+
     # Check EKS add-ons versions if requested
     if [ "$components" = "all" ] || [ "$components" = "eks_addons" ]; then
         log "INFO" "Checking EKS add-ons versions..."
@@ -1605,7 +1663,7 @@ Commands:
   help                     Show this help message
 
 Options:
-  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, go_packages, monitoring, eks_addons)
+  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, go_packages, monitoring, eks_addons, security_tools)
   --create-issue          Create GitHub issue for updates (used by CI/CD)
   --month <month>         Specify month for report title (used by CI/CD)
   --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR)
@@ -1619,14 +1677,16 @@ Component Types:
   semver_packages         Python, Terraform, kubectl versions
   go_packages             Go version, bubbletea, lipgloss
   monitoring              Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
-  eks_addons             EFS CSI Driver, Metrics Server
+  eks_addons              EFS CSI Driver, Metrics Server
+  security_tools          Trivy, Checkov, KICS, gosec
 
 Examples:
   $0 check                                    # Check all components
   $0 check --components applications          # Check only applications
   $0 check --components terraform_modules     # Check only Terraform modules
   $0 check --components go_packages           # Check only Go packages
-  $0 check --components eks_addons           # Check only EKS add-ons
+  $0 check --components eks_addons            # Check only EKS add-ons
+  $0 check --components security_tools        # Check only security tools
   $0 check --create-issue --month "January 2025"  # Create GitHub issue
   $0 status                                   # Show current status
 
@@ -1672,6 +1732,23 @@ show_status() {
     echo -e "  Mimir: ${GREEN}$MIMIR_CURRENT${NC}"
     echo -e "  OTeBPF: ${GREEN}$OTEBPF_CURRENT${NC}"
     echo ""
+
+    # Show security tools if available
+    if yq eval '.security_tools' "$VERSIONS_FILE" >/dev/null 2>&1; then
+        local trivy_version=$(yq eval '.security_tools.trivy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local checkov_version=$(yq eval '.security_tools.checkov.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local kics_version=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local gosec_version=$(yq eval '.security_tools.gosec.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+
+        if [ -n "$trivy_version" ] || [ -n "$checkov_version" ] || [ -n "$kics_version" ] || [ -n "$gosec_version" ]; then
+            echo -e "${BLUE}Security Tools (Zero-Tolerance):${NC}"
+            [ -n "$trivy_version" ] && echo -e "  Trivy: ${GREEN}$trivy_version${NC}"
+            [ -n "$checkov_version" ] && echo -e "  Checkov: ${GREEN}$checkov_version${NC}"
+            [ -n "$kics_version" ] && echo -e "  KICS: ${GREEN}$kics_version${NC}"
+            [ -n "$gosec_version" ] && echo -e "  gosec: ${GREEN}$gosec_version${NC}"
+            echo ""
+        fi
+    fi
 }
 
 # Main function - entry point for the script

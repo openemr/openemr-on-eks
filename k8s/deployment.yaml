@@ -259,15 +259,18 @@ spec:
         image: fluent/fluent-bit:4.2.2                                        # Fluent Bit log processor and forwarder
         
         # Container-level security context for Fluent Bit
+        # trivy:ignore:AVD-KSV-0012 Fluent Bit needs root to read log files
+        # trivy:ignore:AVD-KSV-0014 Fluent Bit needs write access for buffers
         securityContext:
           allowPrivilegeEscalation: false                                     # No privilege escalation needed
           readOnlyRootFilesystem: false                                       # Allow writes for log processing
-          runAsUser: 0                                                        # Run as root for system metrics access
+          runAsUser: 0                                                        # Run as root for log file access
           runAsGroup: 0                                                       # Run as root group
           capabilities:
+            drop:
+            - ALL                                                             # Drop all capabilities first
             add:
-            - SYS_ADMIN                                                       # Required for accessing /sys filesystem
-            - DAC_READ_SEARCH                                                 # Required for reading system files
+            - DAC_READ_SEARCH                                                 # Required for reading log files
             
         ports:
         - containerPort: 2020

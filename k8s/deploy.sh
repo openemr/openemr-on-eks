@@ -370,6 +370,7 @@ kubectl_get_json() {
 # Creates cryptographically secure random passwords suitable for database
 # and application credentials. The password is base64 encoded but filtered
 # to remove characters that might cause issues in various contexts.
+# shellcheck disable=SC2120  # Function has optional parameter with default value
 generate_password() {
     local length="${1:-32}"  # Password length (default: 32 characters)
     # Generate base64 random data, remove problematic characters, and truncate to desired length

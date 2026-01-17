@@ -9,7 +9,7 @@ import io
 import bz2
 from pathlib import Path
 from typing import Optional, Dict, List
-from xml.etree.ElementTree import Element, SubElement, tostring
+from xml.etree.ElementTree import Element, SubElement, tostring  # nosec B405
 from datetime import datetime
 
 import boto3

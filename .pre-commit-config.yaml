@@ -1,4 +1,18 @@
+# =============================================================================
+# Pre-commit Configuration
+# =============================================================================
+# This configuration enforces code quality, security, and consistency checks.
+# Security hooks are configured with ZERO-TOLERANCE policy.
+#
+# Install: pre-commit install
+# Run all: pre-commit run --all-files
+# Run security only: pre-commit run --all-files --hook-stage manual
+# =============================================================================
+
 repos:
+  # ===========================================================================
+  # General Code Quality Hooks
+  # ===========================================================================
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
@@ -7,6 +21,7 @@ repos:
       - id: check-yaml
         args: ["--multi"]
       - id: check-added-large-files
+        args: ['--maxkb=1000']
       - id: check-merge-conflict
       - id: check-case-conflict
       - id: check-json
@@ -15,10 +30,14 @@ repos:
       - id: detect-private-key
       - id: check-docstring-first
       - id: check-executables-have-shebangs
+      - id: check-symlinks
+      - id: check-toml
+      - id: mixed-line-ending
+        args: ['--fix=lf']
 
-  # Python-specific hooks are included for future machine learning and analytics capabilities.
-  # Any ML/analytics features will almost certainly be implemented in Python, so we enforce
-  # Python best practices, code quality, and security from the start.
+  # ===========================================================================
+  # Python Code Quality
+  # ===========================================================================
   - repo: https://github.com/psf/black
     rev: 25.12.0
     hooks:
@@ -38,26 +57,92 @@ repos:
       - id: flake8
         args: [--max-line-length=88, --extend-ignore=E203,W503]
 
+  # ===========================================================================
+  # SECURITY HOOKS - ZERO-TOLERANCE POLICY
+  # ===========================================================================
+
+  # Bandit - Python Security Linter (ZERO-TOLERANCE)
   - repo: https://github.com/pycqa/bandit
     rev: 1.9.2
     hooks:
       - id: bandit
-        args: ["-r", ".", "-f", "json", "-o", "bandit-report.json"]
-        exclude: ^(tests/|test_|.*_test\.py)
+        args: ["-r", "-ll", "-ii", "-x", "tests/,**/tests/,*_test.py,test_*.py"]
+        exclude: ^(tests/|test_|.*_test\.py|warp/tests/)
 
+  # Gitleaks - Secret Detection (ZERO-TOLERANCE)
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks
+        args: ['--verbose', '--no-banner']
+
+  # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
+  - repo: https://github.com/bridgecrewio/checkov
+    rev: 3.2.497
+    hooks:
+      - id: checkov
+        args: [
+          '--framework', 'terraform,kubernetes,dockerfile,github_actions',
+          '--soft-fail-on', 'LOW',
+          '--hard-fail-on', 'CRITICAL,HIGH,MEDIUM',
+          '--compact',
+          '--skip-check', 'CKV_TF_1'
+        ]
+
+  # tfsec - Terraform Security Scanner (ZERO-TOLERANCE)
+  - repo: https://github.com/aquasecurity/tfsec
+    rev: v1.28.14
+    hooks:
+      - id: tfsec
+        args: ['--minimum-severity', 'LOW']
+        files: \.tf$
+
+  # Trivy - Comprehensive Security Scanner (ZERO-TOLERANCE)
+  - repo: local
+    hooks:
+      - id: trivy-fs
+        name: Trivy Filesystem Scan (Zero-Tolerance)
+        entry: bash -c 'if command -v trivy &> /dev/null; then trivy fs --exit-code 1 --severity CRITICAL,HIGH,MEDIUM,LOW --scanners vuln,secret,config --ignorefile .trivyignore .; else echo "Trivy not installed, skipping..."; fi'
+        language: system
+        pass_filenames: false
+        stages: [manual]
+
+  # ===========================================================================
+  # Terraform Hooks
+  # ===========================================================================
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.104.0
+    rev: v1.105.0
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
+      - id: terraform_tflint
+        args:
+          - '--args=--only=terraform_deprecated_interpolation'
+          - '--args=--only=terraform_deprecated_index'
+          - '--args=--only=terraform_unused_declarations'
+          - '--args=--only=terraform_comment_syntax'
+          - '--args=--only=terraform_documented_outputs'
+          - '--args=--only=terraform_documented_variables'
+          - '--args=--only=terraform_typed_variables'
+          - '--args=--only=terraform_naming_convention'
+          - '--args=--only=terraform_required_version'
+          - '--args=--only=terraform_required_providers'
+      - id: terraform_docs
+        args:
+          - '--args=--lockfile=false'
 
-
+  # ===========================================================================
+  # Shell Script Validation
+  # ===========================================================================
   - repo: https://github.com/koalaman/shellcheck-precommit
     rev: v0.11.0
     hooks:
       - id: shellcheck
-        args: ["--severity=error"]
+        args: ["--severity=warning"]
 
+  # ===========================================================================
+  # Documentation and YAML
+  # ===========================================================================
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.47.0
     hooks:
@@ -65,17 +150,23 @@ repos:
         args: ["--fix", "--config", ".markdownlint.json"]
 
   - repo: https://github.com/adrienverge/yamllint
-    rev: v1.37.1
+    rev: v1.38.0
     hooks:
       - id: yamllint
         args: ["-c", ".yamllint"]
 
+  # ===========================================================================
+  # Commit Message Validation
+  # ===========================================================================
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.11.0
+    rev: v4.11.6
     hooks:
       - id: commitizen
         stages: [commit-msg]
 
+  # ===========================================================================
+  # Local Custom Hooks
+  # ===========================================================================
   - repo: local
     hooks:
       - id: kubernetes-manifest-validate
@@ -125,6 +216,25 @@ repos:
         files: ^console/.*\.go$
         pass_filenames: false
 
+      # Go Security Scanner (gosec)
+      - id: gosec
+        name: Go Security Check (Zero-Tolerance)
+        entry: bash -c 'cd console && if command -v gosec &> /dev/null; then gosec -severity low ./...; else echo "gosec not installed, skipping..."; fi'
+        language: system
+        types: [file]
+        files: ^console/.*\.go$
+        pass_filenames: false
+        stages: [manual]
+
+      # KICS IaC Security Scanner
+      - id: kics
+        name: KICS IaC Security Scan (Zero-Tolerance)
+        entry: bash -c 'if command -v kics &> /dev/null; then kics scan -p . --fail-on high,medium,low --exclude-paths .git,node_modules,venv,.trivycache; else echo "KICS not installed, skipping..."; fi'
+        language: system
+        pass_filenames: false
+        stages: [manual]
+
 ci:
   autofix_commit_msg: 'style: auto fixes from pre-commit hooks'
   autoupdate_commit_msg: 'ci: pre-commit autoupdate'
+  skip: [trivy-fs, gosec, kics]  # Skip tools that may not be installed in CI (handled by dedicated workflow)

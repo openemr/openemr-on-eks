@@ -220,6 +220,7 @@ test_shell_syntax() {
     local expanded_files
     if [[ "$files" == *"*"* ]]; then
         # This is a glob pattern, expand it
+        # shellcheck disable=SC2206  # Intentional glob expansion
         expanded_files=($PROJECT_ROOT/$files)
         log_info "Expanded glob pattern to: ${expanded_files[*]}"
 
@@ -269,6 +270,7 @@ test_yaml_validation() {
     local expanded_files
     if [[ "$files" == *"*"* ]]; then
         # This is a glob pattern, expand it
+        # shellcheck disable=SC2206  # Intentional glob expansion
         expanded_files=($PROJECT_ROOT/$files)
         log_info "Expanded glob pattern to: ${expanded_files[*]}"
 
@@ -319,7 +321,7 @@ test_terraform_validation() {
         return 0
     fi
 
-    cd "$PROJECT_ROOT/terraform"
+    cd "$PROJECT_ROOT/terraform" || return 1
     log_info "Initializing Terraform..."
     if ! output=$(terraform init -backend=false 2>&1); then
         log_error "Terraform init failed"
@@ -336,7 +338,7 @@ test_terraform_validation() {
         log_info "✓ Terraform configuration is valid"
     fi
 
-    cd "$PROJECT_ROOT"
+    cd "$PROJECT_ROOT" || return 1
 
     if [[ $failed -eq 1 ]]; then
         return 1
@@ -359,6 +361,7 @@ test_k8s_syntax() {
     local expanded_files
     if [[ "$files" == *"*"* ]]; then
         # This is a glob pattern, expand it
+        # shellcheck disable=SC2206  # Intentional glob expansion
         expanded_files=($PROJECT_ROOT/$files)
         log_info "Expanded glob pattern to: ${expanded_files[*]}"
 
@@ -456,6 +459,7 @@ test_markdown_validation() {
     local expanded_files
     if [[ "$files" == *"*"* ]]; then
         # This is a glob pattern, expand it
+        # shellcheck disable=SC2206  # Intentional glob expansion
         expanded_files=($PROJECT_ROOT/$files)
         log_info "Expanded glob pattern to: ${expanded_files[*]}"
 

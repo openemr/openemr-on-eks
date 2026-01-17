@@ -1,0 +1,88 @@
+# =============================================================================
+# Trivy Configuration File
+# =============================================================================
+# This configuration enforces a ZERO-TOLERANCE security policy.
+# All findings at any severity level will fail the scan.
+#
+# Documentation: https://aquasecurity.github.io/trivy/latest/docs/configuration/
+# =============================================================================
+
+# Scan configuration
+scan:
+  # Enable all security scanners
+  scanners:
+    - vuln      # Vulnerability scanning
+    - secret    # Secret detection
+    - misconfig # Misconfiguration scanning
+    - license   # License scanning
+
+# Severity configuration - ZERO TOLERANCE
+severity:
+  - CRITICAL
+  - HIGH
+  - MEDIUM
+  - LOW
+
+# Exit code configuration
+exit:
+  # Exit with code 1 on ANY finding (zero-tolerance)
+  code: 1
+
+# Package scanning options
+pkg:
+  # Scan all package types
+  types:
+    - os
+    - library
+
+# Secret scanning options
+secret:
+  # Enable built-in secret detection rules
+  config: ""
+
+# Misconfiguration scanning options
+misconfiguration:
+  # Enable all IaC scanners
+  scanners:
+    - terraform
+    - cloudformation
+    - kubernetes
+    - dockerfile
+    - helm
+
+# Cache configuration
+cache:
+  # Use local cache for faster subsequent scans
+  dir: ".trivycache"
+
+# Database configuration
+db:
+  # Always use latest vulnerability database
+  skip-update: false
+
+# Output configuration
+output:
+  # Use table format for readable output
+  format: table
+
+# Ignore configuration
+ignorefile: ".trivyignore"
+
+# File patterns to skip
+skip-files:
+  - "**/*.md"
+  - "**/test/**"
+  - "**/tests/**"
+  - "**/*_test.go"
+  - "**/*_test.py"
+
+# Directory patterns to skip
+skip-dirs:
+  - ".git"
+  - "node_modules"
+  - "venv"
+  - ".venv"
+  - "__pycache__"
+  - ".trivycache"
+  - "htmlcov"
+  - ".pytest_cache"

@@ -3,7 +3,7 @@ Automatic credential discovery for OpenEMR
 """
 
 import logging
-import subprocess
+import subprocess  # nosec B404
 import json
 import base64
 import os
@@ -29,7 +29,7 @@ class CredentialDiscovery:
         """Get database credentials for direct DB access"""
         # Try Kubernetes secret first
         try:
-            result = subprocess.run(
+            result = subprocess.run(  # nosec B603 B607
                 [
                     "kubectl",
                     "get",
@@ -71,7 +71,7 @@ class CredentialDiscovery:
         # Try Terraform outputs
         if self.terraform_dir:
             try:
-                result = subprocess.run(
+                result = subprocess.run(  # nosec B603 B607
                     ["terraform", "-chdir", self.terraform_dir, "output", "-json"],
                     capture_output=True,
                     text=True,

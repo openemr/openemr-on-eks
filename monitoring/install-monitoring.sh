@@ -67,7 +67,7 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 80.9.0)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 80.14.4)
 #   CHART_LOKI_VERSION         Loki chart version (default: 6.49.0)
 #   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 1.60.0)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
@@ -229,7 +229,7 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-80.9.0}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-80.14.4}"
 readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.49.0}"
 readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-1.60.0}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"
@@ -966,13 +966,20 @@ alertmanager_enabled(){ [[ -n "$SLACK_WEBHOOK_URL" && -n "$SLACK_CHANNEL" && "$S
 validate_helm_values(){
   local vf="$1"; log_debug "Validating Helm values file: $vf"
   [[ -r "$vf" ]] || { log_error "Values file not readable: $vf"; return 1; }
-  if command -v python3 >/dev/null 2>&1; then python3 - "$vf" 2>/dev/null <<'PY' || { echo "YAML invalid"; exit 1; }
+  
+  # Try yq first (more reliable), fall back to Python
+  if command -v yq >/dev/null 2>&1; then
+    yq eval '.' "$vf" >/dev/null 2>&1 || { log_error "Invalid YAML syntax"; return 1; }
+  elif command -v python3 >/dev/null 2>&1 && python3 -c "import yaml" 2>/dev/null; then
+    python3 - "$vf" 2>/dev/null <<'PY' || { log_error "Invalid YAML syntax"; return 1; }
 import sys, yaml
 with open(sys.argv[1]) as f:
     yaml.safe_load(f)
 PY
-  elif command -v yq >/dev/null 2>&1; then yq eval '.' "$vf" >/dev/null || { log_error "Invalid YAML syntax"; return 1; }
+  else
+    log_warn "No YAML validator available (yq or python3 with PyYAML), skipping validation"
   fi
+  
   grep -q "existingSecret:" "$vf" || { log_error "Grafana not configured to use existingSecret"; return 1; }
   log_success "Values file validation passed"
 }

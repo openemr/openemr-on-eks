@@ -16,6 +16,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Backup & Restore Guide](#backup_restore_guidemd)
 - [Autoscaling Guide](#autoscaling_guidemd)
 - [Logging Guide](#logging_guidemd)
+- [Security Scanning Guide](#security_scanningmd)
 - [Testing Guide](#testing_guidemd)
 - [End-to-End Testing Requirements](#end_to_end_testing_requirementsmd)
 - [Manual Releases](#manual_releasesmd)
@@ -44,6 +45,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`BACKUP_RESTORE_GUIDE.md`** - Comprehensive backup and disaster recovery procedures
 - **`AUTOSCALING_GUIDE.md`** - Autoscaling configuration and optimization guide
 - **`LOGGING_GUIDE.md`** - Logging configuration with CloudWatch and Loki integration
+- **`SECURITY_SCANNING.md`** - Comprehensive security scanning with zero-tolerance policy
 - **`TESTING_GUIDE.md`** - Testing framework and CI/CD procedures
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
@@ -68,10 +70,12 @@ graph TD
 
     F --> G[TESTING_GUIDE.md]
     G --> H[MANUAL_RELEASES.md]
+    G --> S[SECURITY_SCANNING.md]
 
     A --> M[VERSION_MANAGEMENT.md]
     M --> H
     M --> I[VERSION]
+    M --> S
     L[scripts/] --> M
 
     I --> H
@@ -79,16 +83,20 @@ graph TD
     K[k8s/] --> A
     L[scripts/] --> A
 
+    S --> J
+    S --> K
+
     style A fill:#e1f5fe
-    style A1 fill:#e3f2fd
-    style B fill:#f3e5f5
-    style C fill:#e8f5e8
-    style D fill:#fff3e0
-    style E fill:#ffebee
-    style F fill:#fce4ec
-    style G fill:#f1f8e9
-    style H fill:#e0f2f1
-    style M fill:#fff8e1
+    style A1 fill:#e1f5fe
+    style B fill:#e1f5fe
+    style C fill:#e1f5fe
+    style D fill:#e1f5fe
+    style E fill:#e1f5fe
+    style F fill:#e1f5fe
+    style G fill:#e1f5fe
+    style H fill:#e1f5fe
+    style M fill:#e1f5fe
+    style S fill:#e1f5fe
 ```
 
 ## File Descriptions
@@ -183,6 +191,25 @@ graph TD
   - Modify Fluent Bit configuration for new versions
   - Update CloudWatch integration as AWS services evolve
   - Keep Loki configuration aligned with Grafana monitoring stack
+
+### Security
+
+#### `SECURITY_SCANNING.md`
+
+- **Purpose**: Comprehensive security scanning configuration with zero-tolerance policy
+- **Key Features**:
+  - Multiple security scanners (Trivy, Checkov, KICS, Bandit, gosec, ShellCheck)
+  - Zero-tolerance policy - fails on ANY finding
+  - GitHub Security tab integration
+  - Pre-commit hooks for local security scanning
+  - Configuration files for each scanner
+  - Remediation and exception handling procedures
+- **Dependencies**: `.github/workflows/security-comprehensive.yml`, `trivy.yaml`, `.trivyignore`, `.checkov.yaml`
+- **Maintenance Notes**:
+  - Update scanner versions in `versions.yaml` when new versions are released
+  - Review and update ignore files only with security team approval
+  - Add new scanners as security requirements evolve
+  - Update remediation procedures as new finding types are identified
 
 ### Testing and Quality Assurance
 

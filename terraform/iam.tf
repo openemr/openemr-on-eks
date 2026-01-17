@@ -53,12 +53,19 @@ resource "aws_iam_policy" "openemr" {
     Statement = [
       {
         # Secrets Manager permissions for database credentials and other secrets
+        # Restricted to secrets with the cluster name prefix for security
         Effect = "Allow"
         Action = [
           "secretsmanager:GetSecretValue", # Retrieve secret values
           "secretsmanager:DescribeSecret"  # Describe secret metadata
         ]
-        Resource = "*" # Allow access to all secrets (can be restricted for production)
+        Resource = [
+          # Allow access to secrets prefixed with cluster name (OpenEMR secrets)
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.cluster_name}/*",
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:${var.cluster_name}-*",
+          # Allow access to RDS-generated secrets (Aurora credentials)
+          "arn:aws:secretsmanager:${var.aws_region}:${data.aws_caller_identity.current.account_id}:secret:rds!*"
+        ]
       },
       {
         # CloudWatch Logs permissions for application and Fluent Bit logging

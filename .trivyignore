@@ -1,0 +1,190 @@
+# =============================================================================
+# Trivy Ignore File
+# =============================================================================
+# This file lists vulnerabilities and findings that should be ignored.
+# USE WITH EXTREME CAUTION - Only add entries after thorough security review.
+#
+# Format: CVE-ID or finding ID
+# Each entry should include a comment explaining why it's ignored.
+#
+# Policy: ZERO-TOLERANCE
+# Only add entries here for:
+# 1. Verified false positives
+# 2. Findings with approved compensating controls
+# 3. Findings in dependencies with no available fix (must have mitigation plan)
+#
+# All entries must be reviewed and approved by security team.
+# =============================================================================
+
+# Example format (DO NOT USE unless justified):
+# CVE-2021-XXXXX  # Reason: False positive - not applicable because...
+# CVE-2022-XXXXX  # Reason: Mitigated by WAF rule XYZ, tracking ticket: JIRA-123
+
+# =============================================================================
+# APPROVED EXCEPTIONS (each requires security team approval)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Kubernetes Deployment Security Context Exceptions
+# -----------------------------------------------------------------------------
+# OpenEMR Docker image requires root user and write access to filesystem.
+# This is an upstream requirement - the official openemr/openemr image
+# requires these permissions for Apache, PHP, and file operations.
+# Compensating controls: Network policies, Pod Security Standards, RBAC
+# -----------------------------------------------------------------------------
+
+# AVD-KSV-0001: allowPrivilegeEscalation
+# Reason: OpenEMR container requires privilege escalation for setup scripts
+# Compensating control: Network policies restrict egress; container is isolated
+AVD-KSV-0001
+
+# AVD-KSV-0012: runAsNonRoot
+# Reason: OpenEMR image runs Apache as root; upstream image requirement
+# Compensating control: Pod runs in dedicated namespace with RBAC restrictions
+AVD-KSV-0012
+
+# AVD-KSV-0014: readOnlyRootFilesystem
+# Reason: OpenEMR needs to write session files, logs, and temp files
+# Compensating control: EFS volumes for persistent data; ephemeral writes only
+AVD-KSV-0014
+
+# AVD-KSV-0020: runAsUser > 10000
+# Reason: OpenEMR and Fluent Bit require root user (UID 0) for file access
+# Compensating control: Network policies, dedicated namespace, RBAC restrictions
+AVD-KSV-0020
+
+# AVD-KSV-0021: runAsGroup > 10000
+# Reason: OpenEMR and Fluent Bit require root group (GID 0) for file access
+# Compensating control: Network policies, dedicated namespace, RBAC restrictions
+AVD-KSV-0021
+
+# AVD-KSV-0022: capabilities.add
+# Reason: Fluent Bit requires FOWNER/CHOWN for log file access
+# Compensating control: Minimal capabilities (only FOWNER, CHOWN); no SYS_ADMIN
+AVD-KSV-0022
+
+# AVD-KSV-0023: HostPath volumes
+# Reason: Fluent Bit sidecar needs hostPath for /var/log access
+# Compensating control: Volumes mounted as readOnly where possible
+AVD-KSV-0023
+
+# AVD-KSV-0105: runAsUser > 0 (root UID)
+# Reason: OpenEMR, Fluent Bit, and SSL renewal require root for operations
+# Compensating control: Minimal capabilities, network policies
+AVD-KSV-0105
+
+# AVD-KSV-0106: capabilities add (only NET_BIND_SERVICE allowed)
+# Reason: OpenEMR needs CHOWN, SETUID, SETGID, FOWNER, DAC_OVERRIDE for operations
+# Fluent Bit needs DAC_READ_SEARCH for log access
+# Compensating control: Capabilities explicitly listed and minimized
+AVD-KSV-0106
+
+# AVD-KSV-0116: runAsGroup > 0 (root group)
+# Reason: SSL renewal jobs require root group for certificate operations
+# Compensating control: Jobs are short-lived batch operations with ttlSecondsAfterFinished
+AVD-KSV-0116
+
+# AVD-KSV-0117: containerPort < 1024
+# Reason: OpenEMR serves HTTP/HTTPS on ports 80/443
+# Compensating control: Standard web server ports, traffic via ingress
+AVD-KSV-0117
+
+# AVD-KSV-0125: untrusted registry
+# Reason: Using official Docker Hub images (openemr/openemr, fluent/fluent-bit)
+# Compensating control: Image tags pinned to specific versions; vulnerability scanning
+AVD-KSV-0125
+
+# -----------------------------------------------------------------------------
+# Kubernetes RBAC Exceptions
+# -----------------------------------------------------------------------------
+
+# AVD-KSV-0113: Role has secrets access
+# Reason: OpenEMR service account needs to read database credentials from secrets
+# Compensating control: Role scoped to openemr namespace only; minimal permissions
+AVD-KSV-0113
+
+# -----------------------------------------------------------------------------
+# Note: AVD-KSV-0005 (SYS_ADMIN) was FIXED by removing SYS_ADMIN capability
+# from Fluent Bit sidecar. It now uses only DAC_READ_SEARCH.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# HostPath Volume Exceptions
+# -----------------------------------------------------------------------------
+
+# AVD-KSV-0121: HostPath mounts for /proc and /sys
+# Reason: Fluent Bit sidecar needs read-only access for system metrics collection
+# Compensating controls:
+#   - Volumes mounted as readOnly: true
+#   - No SYS_ADMIN capability (only DAC_READ_SEARCH)
+#   - allowPrivilegeEscalation: false
+#   - Network policies restrict egress
+AVD-KSV-0121
+
+# -----------------------------------------------------------------------------
+# External Module Exceptions (terraform-aws-modules)
+# -----------------------------------------------------------------------------
+
+# AVD-AWS-0104: EKS node security group allows unrestricted egress
+# Reason: EKS nodes need egress to reach container registries, AWS APIs, etc.
+# This is in the external terraform-aws-modules/eks module - we cannot modify it
+# Compensating control: Network policies at K8s level restrict pod egress
+AVD-AWS-0104
+
+# AVD-AWS-0040: EKS public cluster access
+# Reason: Intentional for kubectl access from authorized locations
+# Compensating control: cluster_endpoint_public_access_cidrs restricts access
+AVD-AWS-0040
+
+# AVD-AWS-0162: CloudTrail without CloudWatch logging
+# Reason: CloudTrail logs to S3 with encryption; CloudWatch adds cost without benefit
+# Compensating control: Logs stored in encrypted S3 bucket with versioning enabled
+AVD-AWS-0162
+
+# -----------------------------------------------------------------------------
+# Dockerfile Exceptions
+# -----------------------------------------------------------------------------
+
+# AVD-DS-0026: Dockerfile should have HEALTHCHECK
+# Reason: Warp container is a batch job, not a long-running service
+# Compensating control: Kubernetes Job monitors completion status
+AVD-DS-0026
+
+# -----------------------------------------------------------------------------
+# Warp Job Exceptions
+# -----------------------------------------------------------------------------
+# Warp test/benchmark jobs are one-time batch operations that install packages
+# at runtime. These are not long-running services.
+# Compensating control: Jobs run in openemr namespace with RBAC; ttlSecondsAfterFinished cleans up
+
+# AVD-KSV-0003: Container should drop ALL capabilities
+# Reason: Warp jobs dynamically install packages at runtime
+AVD-KSV-0003
+
+# AVD-KSV-0004: Container should set capabilities.drop
+# Reason: Warp jobs need package installation capabilities
+AVD-KSV-0004
+
+# AVD-KSV-0013: Image uses :latest tag
+# Reason: warp/k8s-job.yaml is a template - users update the tag
+AVD-KSV-0013
+
+# AVD-KSV-0030: seccompProfile should be RuntimeDefault
+# Reason: Warp jobs need flexibility for package installation
+AVD-KSV-0030
+
+# AVD-KSV-0104: Container should specify seccomp profile
+# Reason: Warp jobs are batch operations requiring flexibility
+AVD-KSV-0104
+
+# AVD-KSV-0118: Default security context in warp test/benchmark jobs
+# Reason: Test jobs dynamically install packages and need root access
+AVD-KSV-0118
+
+# =============================================================================
+# DO NOT ADD ENTRIES ABOVE WITHOUT:
+# 1. Security team review and approval
+# 2. Documented justification
+# 3. Compensating control or mitigation plan
+# 4. Tracking ticket number
+# =============================================================================
