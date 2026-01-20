@@ -130,7 +130,7 @@
 #   MIMIR_PORT                      Mimir gateway port for port-forwarding (default: 8080)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │ Tempo Configuration                                                      │
+# │ Tempo Configuration                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
 #   TEMPO_MAX_BLOCK_DURATION          Maximum duration before flushing a block (default: 5m)
 #   TEMPO_TRACE_IDLE_PERIOD           Time to wait before considering trace complete (default: 10s)
@@ -142,7 +142,7 @@
 #   TEMPO_SPAN_END_TIME_SHIFT         Time shift for trace-to-log correlation end (default: -1h)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │ Resource Requests and Limits (CPU in millicores, Memory in Mi/Gi)      │
+# │ Resource Requests and Limits (CPU in millicores, Memory in Mi/Gi)       │
 # └─────────────────────────────────────────────────────────────────────────┘
 #   See openemr-monitoring.conf.example for complete list of resource variables.
 #   Examples: TEMPO_DISTRIBUTOR_CPU_REQUEST, PROMETHEUS_MEMORY_LIMIT, etc.
@@ -176,7 +176,7 @@
 #   ALERT_FOR_DURATION               How long condition must persist (default: 5m)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
-# │ Component-Specific Configuration                                         │
+# │ Component-Specific Configuration                                        │
 # └─────────────────────────────────────────────────────────────────────────┘
 #   LOKI_RETENTION_PERIOD        How long to retain logs (default: 720h = 30 days)
 #   ALERTMANAGER_GROUP_WAIT      Time to wait before first notification (default: 10s)
