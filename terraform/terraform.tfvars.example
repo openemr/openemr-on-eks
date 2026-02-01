@@ -7,7 +7,7 @@ environment   = "production"
 cluster_name  = "openemr-eks"
 
 # Kubernetes Configuration
-kubernetes_version = "1.34"
+kubernetes_version = "1.35"
 
 # Network Configuration
 vpc_cidr        = "10.0.0.0/16"
@@ -28,7 +28,7 @@ enable_public_access = true   # Set to false for maximum security
 enable_waf = true
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.4"  # OpenEMR version to deploy (e.g., "7.0.4", "latest")
+openemr_version = "7.0.5"  # OpenEMR version to deploy (e.g., "7.0.5", "latest")
 
 # OpenEMR Feature Configuration (SECURITY: Disabled by default)
 # Only enable these features if specifically needed for your use case

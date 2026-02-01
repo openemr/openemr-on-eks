@@ -2,7 +2,7 @@
 
 This comprehensive guide provides step-by-step instructions for deploying a production-ready OpenEMR system on Amazon EKS with Auto Mode.
 
-> **📌 Prerequisites**: This guide assumes you're deploying to AWS region `us-west-2` with EKS version `1.34`. Adjust accordingly for your region.
+> **📌 Prerequisites**: This guide assumes you're deploying to AWS region `us-west-2` with EKS version `1.35`. Adjust accordingly for your region.
 
 ## 📋 Table of Contents
 
@@ -397,10 +397,10 @@ environment  = "production"
 cluster_name = "openemr-eks"
 
 # Kubernetes Configuration (MUST be 1.29+ for Auto Mode)
-kubernetes_version = "1.34"
+kubernetes_version = "1.35"
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.4"  # Latest stable OpenEMR version
+openemr_version = "7.0.5"  # Latest stable OpenEMR version
 
 # Network Configuration
 vpc_cidr        = "10.0.0.0/16"
@@ -496,7 +496,7 @@ aws eks describe-cluster --name openemr-eks \
 # Expected output:
 # {
 #    "Status": "ACTIVE",
-#    "Version": "1.34",
+#    "Version": "1.35",
 #    "ComputeConfig": {
 #        "enabled": true,
 #        "nodePools": [
@@ -603,14 +603,14 @@ The deployment supports configurable OpenEMR versions through Terraform variable
 
 ```hcl
 # In terraform.tfvars
-openemr_version = "7.0.4"    # Latest stable version (recommended)
+openemr_version = "7.0.5"    # Latest stable version (recommended)
 # openemr_version = "7.0.3"  # Previous stable version (deprecated)
 # openemr_version = "latest" # Latest development version (not recommended for production)
 ```
 
 **Available Versions:**
 
-- `7.0.4` - Latest stable release (recommended for production)
+- `7.0.5` - Latest stable release (recommended for production)
 - `7.0.2` - Previous stable release
 - `7.0.1` - Older stable release
 - `latest` - Latest development build (use with caution)
@@ -637,7 +637,7 @@ cd scripts
 ./check-openemr-versions.sh --latest
 
 # 2. Update terraform.tfvars
-openemr_version = "7.0.4"
+openemr_version = "7.0.5"
 
 # 3. Apply infrastructure changes
 cd ../terraform
@@ -932,10 +932,10 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v80.14.4 (metrics & alerting)
+     - Prometheus v81.4.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.49.0 (log aggregation with S3 storage)
-     - Tempo v1.60.0 (distributed tracing with S3 storage, microservice mode)
+     - Loki v6.51.0 (log aggregation with S3 storage)
+     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
      - OTeBPF v0.3.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
@@ -944,7 +944,7 @@ Next steps:
    • Configure alerting for critical issues
    • Regular backup testing
 
-🔍 **Enhanced OpenEMR 7.0.4 Logging Configuration:**
+🔍 **Enhanced OpenEMR 7.0.5 Logging Configuration:**
    • **Comprehensive Log Capture**: All OpenEMR application logs, audit trails, and system events
    • **CloudWatch Log Groups**:
      - `/aws/eks/${CLUSTER_NAME}/openemr/application` - Application logs and events

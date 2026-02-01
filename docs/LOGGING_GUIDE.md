@@ -1,6 +1,6 @@
 # OpenEMR on EKS Logging Guide
 
-This comprehensive guide covers the enhanced logging configuration for OpenEMR 7.0.4 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
+This comprehensive guide covers the enhanced logging configuration for OpenEMR 7.0.5 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
 
 ## 📋 Table of Contents
 
@@ -18,7 +18,7 @@ This comprehensive guide covers the enhanced logging configuration for OpenEMR 7
 
 ## Overview
 
-OpenEMR 7.0.4 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
+OpenEMR 7.0.5 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
 
 - **Multi-layer logging**: Application, system, audit, and infrastructure logs
 - **Real-time processing**: Fluent Bit with 5-second refresh intervals
@@ -333,7 +333,7 @@ The configuration includes a record modifier filter that adds metadata to all lo
     Match               *
     Record              cluster_name ${CLUSTER_NAME}
     Record              region ${AWS_REGION}
-    Record              openemr_version 7.0.4
+    Record              openemr_version 7.0.5
     Record              pod_name ${HOSTNAME}
 ```
 

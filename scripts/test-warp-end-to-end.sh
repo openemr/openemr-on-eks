@@ -27,7 +27,7 @@
 # Prerequisites:
 #   - AWS CLI configured with appropriate permissions
 #   - Terraform >= 1.14.0
-#   - kubectl >= 1.34.0
+#   - kubectl >= 1.35.0
 #   - jq, tar, gzip
 #
 # =============================================================================

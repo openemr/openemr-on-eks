@@ -330,7 +330,7 @@ graph TB
     subgraph "AWS Cloud"
         subgraph "VPC - Private Network"
             subgraph "EKS Auto Mode Cluster"
-                AM[Auto Mode Controller<br/>Kubernetes 1.34]
+                AM[Auto Mode Controller<br/>Kubernetes 1.35]
                 BN[Bottlerocket Nodes<br/>SELinux Enforced]
                 OP[OpenEMR Pods<br/>PHI Processing]
             end
@@ -373,8 +373,8 @@ graph TB
   - **Fully Managed Compute**:
     - [AWS EKS Auto Mode Documentation](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
     - EC2 instances provisioned automatically with 12% management fee
-  - **Kubernetes 1.34**:
-    - [Kubernetes v1.34 "Of Wind & Will" Release Blog](https://kubernetes.io/blog/2025/08/27/kubernetes-v1-34-release/)
+  - **Kubernetes 1.35**:
+    - [Kubernetes v1.35 "Timbernetes (The World Tree Release)" Release Blog](https://kubernetes.io/blog/2025/12/17/kubernetes-v1-35-release/)
     - Latest stable version with Auto Mode support
   - **Bottlerocket OS**:
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
@@ -432,7 +432,7 @@ aws --version  # Must be 2.15.0 or higher
 
 # EKS Auto Mode specific requirements
 - Authentication mode: API or API_AND_CONFIG_MAP
-- Kubernetes version: 1.29 or higher (1.34 configured)
+- Kubernetes version: 1.29 or higher (1.35 configured)
 ```
 
 **(Recommended) Configure GitHub OIDC → AWS IAM role for CI/CD.** See `docs/GITHUB_AWS_CREDENTIALS.md`.
@@ -574,7 +574,7 @@ Checking Kubernetes resources...
 Checking security configuration...
 ℹ️  EKS cluster not found - security configuration will be applied during deployment
 📋 Planned deployment features:
-   • OpenEMR 7.0.4 with HTTPS-only access (port 443)
+   • OpenEMR 7.0.5 with HTTPS-only access (port 443)
    • EKS Auto Mode for managed EC2 compute
    • Aurora Serverless V2 MySQL database
    • Valkey Serverless cache (Redis-compatible)
@@ -621,10 +621,10 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v80.14.4 (metrics & alerting)
+     - Prometheus v81.4.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.49.0 (log aggregation with S3 storage)
-     - Tempo v1.60.0 (distributed tracing with S3 storage, microservice mode)
+     - Loki v6.51.0 (log aggregation with S3 storage)
+     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
      - OTeBPF v0.3.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
@@ -646,11 +646,11 @@ cp terraform.tfvars.example terraform.tfvars
 cat > terraform.tfvars <<EOF
 # Cluster Configuration
 cluster_name = "openemr-eks"
-kubernetes_version = "1.34"  # Latest stable with Auto Mode
+kubernetes_version = "1.35"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.4"    # Latest stable OpenEMR version
+openemr_version = "7.0.5"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -873,16 +873,16 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v80.14.4 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v81.4.2 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
-- 📝 **Loki**: v6.49.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
+- 📝 **Loki**: v6.51.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
   - **Distributed Architecture**: Uses SimpleScalable deployment mode with separate read, write, and backend components for better scalability and high availability
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Tempo**: v1.60.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+- 🔍 **Tempo**: v1.61.3 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
 - 📈 **Mimir**: v6.0.5 (long-term metrics storage with S3 backend)
@@ -1006,7 +1006,7 @@ openemr-on-eks/
 │   ├── VERSION_MANAGEMENT.md              # Version awareness and dependency management
 │   ├── TROUBLESHOOTING.md                 # Troubleshooting and solutions
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
-│   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.4 Enhanced Logging
+│   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.5 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
@@ -2372,7 +2372,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
-- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.4 Enhanced Logging
+- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.5 Enhanced Logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures

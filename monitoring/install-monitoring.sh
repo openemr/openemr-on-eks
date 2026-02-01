@@ -67,9 +67,9 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 80.14.4)
-#   CHART_LOKI_VERSION         Loki chart version (default: 6.49.0)
-#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 1.60.0)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 81.4.2)
+#   CHART_LOKI_VERSION         Loki chart version (default: 6.51.0)
+#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 1.61.3)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
 #   OTEBPF_VERSION             OTeBPF version (default: v0.3.0)
 #   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
@@ -229,9 +229,9 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-80.14.4}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.49.0}"
-readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-1.60.0}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-81.4.2}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.51.0}"
+readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-1.61.3}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"
 # OpenTelemetry eBPF Instrumentation version (OTeBPF)
 # Using Docker Hub image: otel/ebpf-instrument

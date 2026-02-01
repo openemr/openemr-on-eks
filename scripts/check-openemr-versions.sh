@@ -169,7 +169,7 @@ filter_versions() {
     local count="$3"           # Maximum number of versions to return
 
     # Apply semantic versioning regex filter and optional search pattern
-    # Regex matches: major.minor.patch[-suffix] format (e.g., 7.0.4, 7.0.4-beta)
+    # Regex matches: major.minor.patch[-suffix] format (e.g., 7.0.5, 7.0.5-beta)
     # Then sort by semantic version (newest first) before taking the count
     local filtered_tags
     if [ -n "$search_pattern" ]; then
@@ -297,7 +297,7 @@ echo -e "${BLUE}  • OpenEMR stable versions are typically the second-to-latest
 echo -e "${BLUE}  • Use stable versions for production deployments${NC}"
 echo -e "${BLUE}  • Test version upgrades in a development environment first${NC}"
 echo -e "${BLUE}  • Check OpenEMR release notes before upgrading${NC}"
-echo -e "${BLUE}  • Current recommended version: 7.0.4 (stable)${NC}"
+echo -e "${BLUE}  • Current recommended version: 7.0.5 (stable)${NC}"
 echo ""
 echo -e "${BLUE}🔗 Resources:${NC}"
 echo -e "${BLUE}  • OpenEMR Releases: https://github.com/openemr/openemr/tags${NC}"

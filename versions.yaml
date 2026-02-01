@@ -6,7 +6,7 @@
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.4"
+    current: "7.0.5"
     registry: "openemr/openemr"
     release_notes_url: "https://hub.docker.com/r/openemr/openemr/tags"
     notify_on_update: true
@@ -32,14 +32,14 @@ applications:
 # Infrastructure Versions
 infrastructure:
   eks:
-    current: "1.34"
-    aws_supported_versions: ["1.29", "1.30", "1.31", "1.32", "1.33", "1.34"]
+    current: "1.35"
+    aws_supported_versions: ["1.30", "1.31", "1.32", "1.33", "1.34", "1.35"]
     notify_on_update: true
     requires_aws_cli: true
     description: "Amazon EKS cluster version"
 
   terraform:
-    current: "1.14.3"
+    current: "1.14.4"
     notify_on_update: true
     requires_aws_cli: false
     description: "Terraform version used in documentation"
@@ -58,7 +58,7 @@ databases:
 # Note: CoreDNS, kube-proxy, VPC CNI, and EBS CSI Driver are managed by EKS Auto Mode
 eks_addons:
   efs_csi_driver:
-    current: "v2.2.0-eksbuild.1"
+    current: "v2.3.0-eksbuild.1"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "aws-efs-csi-driver"
@@ -96,7 +96,7 @@ terraform_modules:
 
   aws_eks:
     source: "terraform-aws-modules/eks/aws"
-    current: "21.14.0"
+    current: "21.15.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS for Terraform."
@@ -117,7 +117,7 @@ github_workflows:
     description: "Github action for checking out code from a registry."
 
   actions_setup_python:
-    current: "v6.1.0"
+    current: "v6.2.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Python version."
@@ -179,7 +179,7 @@ pre_commit_hooks:
     description: "https://github.com/pre-commit/pre-commit-hooks"
 
   black:
-    current: "25.12.0"
+    current: "26.1.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/psf/black"
@@ -197,7 +197,7 @@ pre_commit_hooks:
     description: "https://github.com/pycqa/flake8"
 
   bandit:
-    current: "1.9.2"
+    current: "1.9.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/pycqa/bandit"
@@ -227,7 +227,7 @@ pre_commit_hooks:
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.11.6"
+    current: "v4.12.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -241,7 +241,7 @@ semver_packages:
     description: "Version of Python used in Github CI/CD workflows."
 
   terraform_version:
-    current: "1.14.3"
+    current: "1.14.4"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Terraform used in Github CI/CD workflows."
@@ -329,7 +329,7 @@ python_packages:
     min_version: "7.0.0"
 
   black:
-    current: "25.12.0"
+    current: "26.1.0"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
@@ -347,14 +347,14 @@ python_packages:
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "80.14.4"
+    current: "81.4.2"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
     description: "Hosts custom monitoring dashboards for the setup and integrates with pager duty for automated alerting."
 
   loki:
-    current: "6.49.0"
+    current: "6.51.0"
     chart: "loki"
     repository: "grafana"
     notify_on_update: true
@@ -362,7 +362,7 @@ monitoring:
     description: "Loki for log aggregation."
 
   tempo:
-    current: "1.60.0"
+    current: "1.61.3"
     chart: "tempo-distributed"
     repository: "grafana"
     notify_on_update: true
@@ -398,14 +398,14 @@ monitoring:
 # Security Tools Versions (Zero-Tolerance Policy)
 security_tools:
   trivy:
-    current: "0.68.2"
+    current: "0.69.0"
     repository: "aquasecurity/trivy"
     notify_on_update: true
     requires_aws_cli: false
     description: "Trivy vulnerability, secret, and misconfiguration scanner"
 
   checkov:
-    current: "3.2.497"
+    current: "3.2.499"
     package_manager: "pip"
     repository: "bridgecrewio/checkov"
     notify_on_update: true

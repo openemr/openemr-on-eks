@@ -283,7 +283,7 @@ Compute config is not supported for Kubernetes version 1.28
 
 ```hcl
 # In terraform.tfvars, ensure:
-kubernetes_version = "1.34"  # Must be 1.29 or higher
+kubernetes_version = "1.35"  # Must be 1.29 or higher
 ```
 
 #### Issue: Insufficient IAM Permissions
@@ -620,7 +620,7 @@ helm get values loki -n monitoring
 # Upgrade Loki to enable volume
 helm upgrade loki grafana/loki \
   --namespace monitoring \
-  --version 6.49.0 \
+  --version 6.51.0 \
   --reuse-values \
   --set loki.limits_config.volume_enabled=true
 
@@ -996,7 +996,7 @@ chmod 644 /var/log/openemr/*.log
 # Add logging configuration to sqlconf.php
 kubectl exec -n openemr deployment/openemr -- bash -c '
 echo "" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "// OpenEMR 7.0.4 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "// OpenEMR 7.0.5 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"log_dir\"] = \"/var/log/openemr\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"error_log\"] = \"/var/log/openemr/error.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"access_log\"] = \"/var/log/openemr/access.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
@@ -1306,7 +1306,7 @@ kubectl logs -n openemr -l app=openemr --since=1h | grep ERROR | tail -5
 # 2. Review and optimize HPA settings
 
 # 3. Check for security updates
-aws eks describe-addon-versions --kubernetes-version 1.34 \
+aws eks describe-addon-versions --kubernetes-version 1.35 \
   --query 'addons[].{AddonName:addonName,LatestVersion:addonVersions[0].addonVersion}'
 ```
 

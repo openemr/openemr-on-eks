@@ -39,7 +39,7 @@ repos:
   # Python Code Quality
   # ===========================================================================
   - repo: https://github.com/psf/black
-    rev: 25.12.0
+    rev: 26.1.0
     hooks:
       - id: black
         language_version: python3
@@ -63,7 +63,7 @@ repos:
 
   # Bandit - Python Security Linter (ZERO-TOLERANCE)
   - repo: https://github.com/pycqa/bandit
-    rev: 1.9.2
+    rev: 1.9.3
     hooks:
       - id: bandit
         args: ["-r", "-ll", "-ii", "-x", "tests/,**/tests/,*_test.py,test_*.py"]
@@ -78,7 +78,7 @@ repos:
 
   # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
   - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.497
+    rev: 3.2.499
     hooks:
       - id: checkov
         args: [
@@ -159,7 +159,7 @@ repos:
   # Commit Message Validation
   # ===========================================================================
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.11.6
+    rev: v4.12.1
     hooks:
       - id: commitizen
         stages: [commit-msg]

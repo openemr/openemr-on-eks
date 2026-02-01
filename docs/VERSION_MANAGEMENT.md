@@ -96,7 +96,7 @@ The `versions.yaml` file serves as the single source of truth for all version in
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.4"
+    current: "7.0.5"
     registry: "openemr/openemr"
 ```
 
@@ -192,8 +192,9 @@ chmod +x scripts/version-manager.sh
 ### Kubernetes Version
 
 **Version Source:** AWS EKS supported versions
-**Current Version:** 1.34 (Released: August 27, 2025)
-**Release Notes:** [Kubernetes v1.34 "Of Wind & Will"](https://kubernetes.io/blog/2025/08/27/kubernetes-v1-34-release/)
+**Current Version:** 1.35 (Latest stable)
+**Release Notes:** [Kubernetes v1.35 "Timbernetes (The World Tree Release)" Release Blog](https://kubernetes.io/blog/2025/12/17/kubernetes-v1-35-release/)
+
 
 **Files Updated:**
 - `terraform/terraform.tfvars`

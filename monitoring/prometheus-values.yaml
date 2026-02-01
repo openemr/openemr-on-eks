@@ -90,9 +90,9 @@
 # OPENEMR_NAMESPACE="openemr"                   # OpenEMR application
 
 # Chart Versions (pinned for stability)
-# CHART_KPS_VERSION="80.14.4"                   # kube-prometheus-stack
-# CHART_LOKI_VERSION="6.49.0"                   # Grafana Loki stack
-# CHART_TEMPO_VERSION="1.60.0"                  # Grafana Tempo Distributed (distributed tracing in microservice mode)
+# CHART_KPS_VERSION="81.4.2"                    # kube-prometheus-stack
+# CHART_LOKI_VERSION="6.51.0"                   # Grafana Loki stack
+# CHART_TEMPO_VERSION="1.61.3"                  # Grafana Tempo Distributed (distributed tracing in microservice mode)
 # CHART_MIMIR_VERSION="6.0.5"                   # Grafana Mimir (long-term metrics storage)
 # OTEBPF_VERSION="v0.3.0"                       # OTeBPF (eBPF auto-instrumentation)
 # CERT_MANAGER_VERSION="v1.19.1"                # cert-manager
