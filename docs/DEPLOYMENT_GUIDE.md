@@ -400,7 +400,7 @@ cluster_name = "openemr-eks"
 kubernetes_version = "1.35"
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.5"  # Latest stable OpenEMR version
+openemr_version = "7.0.4"  # Latest stable OpenEMR version
 
 # Network Configuration
 vpc_cidr        = "10.0.0.0/16"
@@ -603,14 +603,14 @@ The deployment supports configurable OpenEMR versions through Terraform variable
 
 ```hcl
 # In terraform.tfvars
-openemr_version = "7.0.5"    # Latest stable version (recommended)
+openemr_version = "7.0.4"    # Latest stable version (recommended)
 # openemr_version = "7.0.3"  # Previous stable version (deprecated)
 # openemr_version = "latest" # Latest development version (not recommended for production)
 ```
 
 **Available Versions:**
 
-- `7.0.5` - Latest stable release (recommended for production)
+- `7.0.4` - Latest stable release (recommended for production)
 - `7.0.2` - Previous stable release
 - `7.0.1` - Older stable release
 - `latest` - Latest development build (use with caution)
@@ -637,7 +637,7 @@ cd scripts
 ./check-openemr-versions.sh --latest
 
 # 2. Update terraform.tfvars
-openemr_version = "7.0.5"
+openemr_version = "7.0.4"
 
 # 3. Apply infrastructure changes
 cd ../terraform
@@ -944,7 +944,7 @@ Next steps:
    • Configure alerting for critical issues
    • Regular backup testing
 
-🔍 **Enhanced OpenEMR 7.0.5 Logging Configuration:**
+🔍 **Enhanced OpenEMR 7.0.4 Logging Configuration:**
    • **Comprehensive Log Capture**: All OpenEMR application logs, audit trails, and system events
    • **CloudWatch Log Groups**:
      - `/aws/eks/${CLUSTER_NAME}/openemr/application` - Application logs and events
