@@ -6,7 +6,7 @@
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.5"
+    current: "7.0.4"
     registry: "openemr/openemr"
     release_notes_url: "https://hub.docker.com/r/openemr/openemr/tags"
     notify_on_update: true
@@ -47,7 +47,7 @@ infrastructure:
 # Database Versions
 databases:
   aurora_mysql:
-    current: "8.0.mysql_aurora.3.11.0"
+    current: "8.0.mysql_aurora.3.11.1"
     aws_available_versions_url: "https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.AuroraMysqlEngineVersion.html"
     notify_on_update: true
     requires_aws_cli: true

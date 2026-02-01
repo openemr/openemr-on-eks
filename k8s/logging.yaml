@@ -138,7 +138,7 @@ data:
         Match               *
         Record              cluster_name ${CLUSTER_NAME}
         Record              region ${AWS_REGION}
-        Record              openemr_version 7.0.5
+        Record              openemr_version 7.0.4
         Record              pod_name ${HOSTNAME}
 
     # Test logs output (for verification)

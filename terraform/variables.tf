@@ -226,7 +226,7 @@ variable "audit_logs_retention_days" {
 variable "rds_engine_version" {
   description = "Aurora MySQL engine version (check AWS docs for available versions)"
   type        = string
-  default     = "8.0.mysql_aurora.3.11.0" # Stable Aurora MySQL 8.0 version
+  default     = "8.0.mysql_aurora.3.11.1" # Stable Aurora MySQL 8.0 version
 }
 
 # =============================================================================
@@ -335,12 +335,12 @@ variable "openemr_scale_up_stabilization_seconds" {
 variable "openemr_version" {
   description = "OpenEMR Docker image version to deploy (use specific versions for production)"
   type        = string
-  default     = "7.0.5" # Stable OpenEMR version
+  default     = "7.0.4" # Stable OpenEMR version
 
   # Validation ensures proper version format
   validation {
     condition     = can(regex("^(latest|[0-9]+\\.[0-9]+\\.[0-9]+(-[a-zA-Z0-9]+)?)$", var.openemr_version))
-    error_message = "OpenEMR version must be 'latest' or follow semantic versioning (e.g., '7.0.5', '7.0.5-dev')."
+    error_message = "OpenEMR version must be 'latest' or follow semantic versioning (e.g., '7.0.4', '7.0.4-dev')."
   }
 }
 

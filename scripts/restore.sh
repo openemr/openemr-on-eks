@@ -82,7 +82,7 @@ readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}           # Stora
 # Default configuration values
 readonly DEFAULT_NAMESPACE="openemr"
 readonly DEFAULT_AWS_REGION="us-west-2"
-readonly DEFAULT_OPENEMR_VERSION="7.0.5"
+readonly DEFAULT_OPENEMR_VERSION="7.0.4"
 
 # Script directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1519,7 +1519,7 @@ restore_rds_cluster_from_snapshot() {
     # Get configuration from Terraform
     local db_subnet_group_name vpc_security_group_ids engine_version
     db_subnet_group_name=$(terraform_with_retry output -raw aurora_db_subnet_group_name 2>/dev/null || echo "")
-    engine_version=$(terraform_with_retry output -raw aurora_engine_version 2>/dev/null || echo "8.0.mysql_aurora.3.11.0")
+    engine_version=$(terraform_with_retry output -raw aurora_engine_version 2>/dev/null || echo "8.0.mysql_aurora.3.11.1")
     
     # Log the engine version being used
     echo -e "${BLUE}   Using engine version: $engine_version${NC}"
@@ -1765,7 +1765,7 @@ spec:
       
       # Install required tools
       echo "Installing required tools..."
-      # OpenEMR 7.0.5 uses Alpine Linux, so we use apk
+      # OpenEMR 7.0.4 uses Alpine Linux, so we use apk
       echo "Installing AWS CLI..."
       apk add --no-cache aws-cli
       
