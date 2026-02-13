@@ -201,8 +201,8 @@ check_status() {
 
         # Get certificate info by running a temporary pod
         echo -e "${BLUE}Checking certificate validity...${NC}"
-        kubectl run ssl-check --rm -i --restart=Never --image=openemr/openemr:7.0.4 -n "$NAMESPACE" \
-            --overrides='{"spec":{"containers":[{"name":"ssl-check","image":"openemr/openemr:7.0.4","command":["/bin/sh","-c","if [ -f /etc/ssl/certs/selfsigned.cert.pem ]; then echo \"Certificate found:\"; openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem -noout -dates -subject; else echo \"No certificate found\"; fi"],"volumeMounts":[{"name":"ssl-vol","mountPath":"/etc/ssl"}]}],"volumes":[{"name":"ssl-vol","persistentVolumeClaim":{"claimName":"openemr-ssl-pvc"}}],"serviceAccountName":"openemr-sa"}}' \
+        kubectl run ssl-check --rm -i --restart=Never --image=openemr/openemr:8.0.0 -n "$NAMESPACE" \
+            --overrides='{"spec":{"containers":[{"name":"ssl-check","image":"openemr/openemr:8.0.0","command":["/bin/sh","-c","if [ -f /etc/ssl/certs/selfsigned.cert.pem ]; then echo \"Certificate found:\"; openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem -noout -dates -subject; else echo \"No certificate found\"; fi"],"volumeMounts":[{"name":"ssl-vol","mountPath":"/etc/ssl"}]}],"volumes":[{"name":"ssl-vol","persistentVolumeClaim":{"claimName":"openemr-ssl-pvc"}}],"serviceAccountName":"openemr-sa"}}' \
             2>/dev/null || echo -e "${YELLOW}Could not check certificate (pod may still be starting)${NC}"
     else
         echo -e "${RED}SSL PVC does not exist${NC}"

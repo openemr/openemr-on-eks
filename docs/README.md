@@ -177,7 +177,7 @@ graph TD
 
 - **Purpose**: Comprehensive logging configuration with CloudWatch and Loki integration
 - **Key Features**:
-  - OpenEMR 7.0.4 logging architecture
+  - OpenEMR 8.0.0 logging architecture
   - Fluent Bit sidecar configuration
   - Dual output to CloudWatch and Loki
   - CloudWatch log groups and retention

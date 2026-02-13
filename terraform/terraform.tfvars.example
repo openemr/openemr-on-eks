@@ -28,7 +28,7 @@ enable_public_access = true   # Set to false for maximum security
 enable_waf = true
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.4"  # OpenEMR version to deploy (e.g., "7.0.4", "latest")
+openemr_version = "8.0.0"  # OpenEMR version to deploy (e.g., "8.0.0", "latest")
 
 # OpenEMR Feature Configuration (SECURITY: Disabled by default)
 # Only enable these features if specifically needed for your use case

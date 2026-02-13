@@ -574,7 +574,7 @@ Checking Kubernetes resources...
 Checking security configuration...
 ℹ️  EKS cluster not found - security configuration will be applied during deployment
 📋 Planned deployment features:
-   • OpenEMR 7.0.4 with HTTPS-only access (port 443)
+   • OpenEMR 8.0.0 with HTTPS-only access (port 443)
    • EKS Auto Mode for managed EC2 compute
    • Aurora Serverless V2 MySQL database
    • Valkey Serverless cache (Redis-compatible)
@@ -650,7 +650,7 @@ kubernetes_version = "1.35"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "7.0.4"    # Latest stable OpenEMR version
+openemr_version = "8.0.0"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -1006,7 +1006,7 @@ openemr-on-eks/
 │   ├── VERSION_MANAGEMENT.md              # Version awareness and dependency management
 │   ├── TROUBLESHOOTING.md                 # Troubleshooting and solutions
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
-│   ├── LOGGING_GUIDE.md                   # OpenEMR 7.0.4 Enhanced Logging
+│   ├── LOGGING_GUIDE.md                   # OpenEMR 8.0.0 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
@@ -2372,7 +2372,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
-- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 7.0.4 Enhanced Logging
+- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 8.0.0 Enhanced Logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures

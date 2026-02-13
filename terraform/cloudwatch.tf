@@ -15,7 +15,7 @@ resource "aws_cloudwatch_log_group" "openemr_app" {
     Name        = "${var.cluster_name}-openemr-app-logs"
     Application = "OpenEMR"
     LogType     = "Application"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
   }
 }
 
@@ -28,7 +28,7 @@ resource "aws_cloudwatch_log_group" "openemr_access" {
     Name        = "${var.cluster_name}-openemr-access-logs"
     Application = "OpenEMR"
     LogType     = "Access"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
   }
 }
 
@@ -41,7 +41,7 @@ resource "aws_cloudwatch_log_group" "openemr_error" {
     Name        = "${var.cluster_name}-openemr-error-logs"
     Application = "OpenEMR"
     LogType     = "Error"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
   }
 }
 
@@ -56,11 +56,11 @@ resource "aws_cloudwatch_log_group" "openemr_audit" {
     Name        = "${var.cluster_name}-openemr-audit-logs"
     Application = "OpenEMR"
     LogType     = "Audit"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
   }
 }
 
-# Enhanced OpenEMR 7.0.4 Logging Groups
+# Enhanced OpenEMR 8.0.0 Logging Groups
 # These log groups provide more granular logging capabilities for better monitoring
 # and troubleshooting of the OpenEMR application.
 
@@ -74,7 +74,7 @@ resource "aws_cloudwatch_log_group" "openemr_audit_detailed" {
     Name        = "${var.cluster_name}-openemr-audit-detailed-logs"
     Application = "OpenEMR"
     LogType     = "AuditDetailed"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "Detailed audit logs with patient ID and event categorization"
   }
 }
@@ -89,7 +89,7 @@ resource "aws_cloudwatch_log_group" "openemr_system" {
     Name        = "${var.cluster_name}-openemr-system-logs"
     Application = "OpenEMR"
     LogType     = "System"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "System-level logs with component status and operational events"
   }
 }
@@ -104,7 +104,7 @@ resource "aws_cloudwatch_log_group" "openemr_php_error" {
     Name        = "${var.cluster_name}-openemr-php-error-logs"
     Application = "OpenEMR"
     LogType     = "PHPError"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "PHP application errors with file and line information"
   }
 }
@@ -141,7 +141,7 @@ resource "aws_cloudwatch_log_group" "openemr_test" {
     Name        = "${var.cluster_name}-openemr-test-logs"
     Application = "OpenEMR"
     LogType     = "Test"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "Test logs for Fluent Bit sidecar verification"
   }
 }
@@ -156,7 +156,7 @@ resource "aws_cloudwatch_log_group" "openemr_apache" {
     Name        = "${var.cluster_name}-openemr-apache-logs"
     Application = "OpenEMR"
     LogType     = "Apache"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "Apache access and error logs"
   }
 }
@@ -171,7 +171,7 @@ resource "aws_cloudwatch_log_group" "openemr_forward" {
     Name        = "${var.cluster_name}-openemr-forward-logs"
     Application = "OpenEMR"
     LogType     = "Forward"
-    Version     = "7.0.4"
+    Version     = "8.0.0"
     Description = "Forward protocol logs from external sources"
   }
 }

@@ -996,7 +996,7 @@ chmod 644 /var/log/openemr/*.log
 # Add logging configuration to sqlconf.php
 kubectl exec -n openemr deployment/openemr -- bash -c '
 echo "" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "// OpenEMR 7.0.4 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "// OpenEMR 8.0.0 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"log_dir\"] = \"/var/log/openemr\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"error_log\"] = \"/var/log/openemr/error.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"access_log\"] = \"/var/log/openemr/access.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php

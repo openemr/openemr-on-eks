@@ -445,7 +445,7 @@ check_security_config() {
     if ! aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
         echo -e "${BLUE}ℹ️  EKS cluster not found - security configuration will be applied during deployment${NC}"
         echo -e "${BLUE}📋 Planned deployment features:${NC}"
-        echo -e "${BLUE}   • OpenEMR 7.0.4 with HTTPS-only access (port 443)${NC}"
+        echo -e "${BLUE}   • OpenEMR 8.0.0 with HTTPS-only access (port 443)${NC}"
         echo -e "${BLUE}   • EKS Auto Mode for managed EC2 compute${NC}"
         echo -e "${BLUE}   • Aurora Serverless V2 MySQL database${NC}"
         echo -e "${BLUE}   • Valkey Serverless cache (Redis-compatible)${NC}"

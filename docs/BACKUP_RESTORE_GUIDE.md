@@ -215,9 +215,9 @@ AWS Backup storage costs vary by service and storage tier. Pricing is based on t
 - Cross-region backup information
 - Timestamp and versioning data
 
-### 🔍 Logging Configuration (OpenEMR 7.0.4)
+### 🔍 Logging Configuration (OpenEMR 8.0.0)
 
-The restore process now includes comprehensive logging configuration for OpenEMR 7.0.4:
+The restore process now includes comprehensive logging configuration for OpenEMR 8.0.0:
 
 **Log Directory Structure:**
 

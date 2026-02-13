@@ -6,7 +6,7 @@
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.4"
+    current: "8.0.0"
     registry: "openemr/openemr"
     release_notes_url: "https://hub.docker.com/r/openemr/openemr/tags"
     notify_on_update: true

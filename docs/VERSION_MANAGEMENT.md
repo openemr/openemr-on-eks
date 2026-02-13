@@ -96,7 +96,7 @@ The `versions.yaml` file serves as the single source of truth for all version in
 # Core Application Versions
 applications:
   openemr:
-    current: "7.0.4"
+    current: "8.0.0"
     registry: "openemr/openemr"
 ```
 

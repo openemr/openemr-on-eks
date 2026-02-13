@@ -464,7 +464,7 @@ This timing data is based on multiple complete end-to-end test runs performed in
 **Test Environment:**
 - AWS Region: us-west-2
 - EKS Version: 1.35
-- OpenEMR Version: 7.0.4
+- OpenEMR Version: 8.0.0
 - Aurora: Serverless v2 (0.5-16 ACU)
 - ElastiCache: Serverless (Valkey 8.0)
 
