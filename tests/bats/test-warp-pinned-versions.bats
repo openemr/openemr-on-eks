@@ -26,13 +26,26 @@ SCRIPT="${SCRIPTS_DIR}/test-warp-pinned-versions.sh"
 # ── Dependency gate: yq ─────────────────────────────────────────────────────
 
 @test "fails clearly when yq is unavailable" {
-  run env PATH="/usr/bin:/bin" bash "$SCRIPT"
+  # Create a temp dir with a fake PATH that has bash but NOT yq
+  local tmpbin
+  tmpbin=$(mktemp -d)
+  ln -s "$(command -v bash)" "$tmpbin/bash"
+  ln -s "$(command -v echo)" "$tmpbin/echo"
+  ln -s "$(command -v command)" "$tmpbin/command" 2>/dev/null || true
+  run env PATH="$tmpbin" bash "$SCRIPT"
+  rm -rf "$tmpbin"
   [ "$status" -ne 0 ]
   [[ "$output" =~ (yq is required|Install yq|ERROR) ]]
 }
 
 @test "yq error message includes install URL" {
-  run env PATH="/usr/bin:/bin" bash "$SCRIPT"
+  local tmpbin
+  tmpbin=$(mktemp -d)
+  ln -s "$(command -v bash)" "$tmpbin/bash"
+  ln -s "$(command -v echo)" "$tmpbin/echo"
+  ln -s "$(command -v command)" "$tmpbin/command" 2>/dev/null || true
+  run env PATH="$tmpbin" bash "$SCRIPT"
+  rm -rf "$tmpbin"
   [[ "$output" =~ (github.com/mikefarah/yq|Install yq) ]]
 }
 
