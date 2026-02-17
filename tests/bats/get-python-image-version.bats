@@ -48,17 +48,24 @@ SCRIPT="${SCRIPTS_DIR}/get-python-image-version.sh"
 
 @test "suffix 'alpine' produces python:X.Y-alpine" {
   run_script_stdout "get-python-image-version.sh" "alpine"
-  [[ "$output" =~ ^python:[0-9]+\.[0-9]+-alpine$ ]]
+  # Output may be multi-line when auto-detect is enabled; check last line
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  [[ "$last_line" =~ ^python:[0-9]+\.[0-9]+-alpine$ ]]
 }
 
 @test "suffix 'bullseye' produces python:X.Y-bullseye" {
   run_script_stdout "get-python-image-version.sh" "bullseye"
-  [[ "$output" =~ ^python:[0-9]+\.[0-9]+-bullseye$ ]]
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  [[ "$last_line" =~ ^python:[0-9]+\.[0-9]+-bullseye$ ]]
 }
 
 @test "suffix 'bookworm' produces python:X.Y-bookworm" {
   run_script_stdout "get-python-image-version.sh" "bookworm"
-  [[ "$output" =~ ^python:[0-9]+\.[0-9]+-bookworm$ ]]
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  [[ "$last_line" =~ ^python:[0-9]+\.[0-9]+-bookworm$ ]]
 }
 
 @test "explicit 'slim' suffix matches default output" {
@@ -72,18 +79,28 @@ SCRIPT="${SCRIPTS_DIR}/get-python-image-version.sh"
 
 @test "output version matches versions.yaml python current" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local auto_detect
+  auto_detect=$(yq eval '.applications.python.auto_detect_latest' "${PROJECT_ROOT}/versions.yaml" 2>/dev/null || echo "false")
+  if [ "$auto_detect" = "true" ]; then skip "auto_detect_latest is enabled; version may differ from versions.yaml"; fi
   local expected
   expected=$(yq eval '.applications.python.current' "${PROJECT_ROOT}/versions.yaml")
   run_script_stdout "get-python-image-version.sh"
-  [[ "$output" == "python:${expected}-slim" ]]
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  [[ "$last_line" == "python:${expected}-slim" ]]
 }
 
 @test "output with alpine matches versions.yaml python current" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local auto_detect
+  auto_detect=$(yq eval '.applications.python.auto_detect_latest' "${PROJECT_ROOT}/versions.yaml" 2>/dev/null || echo "false")
+  if [ "$auto_detect" = "true" ]; then skip "auto_detect_latest is enabled; version may differ from versions.yaml"; fi
   local expected
   expected=$(yq eval '.applications.python.current' "${PROJECT_ROOT}/versions.yaml")
   run_script_stdout "get-python-image-version.sh" "alpine"
-  [[ "$output" == "python:${expected}-alpine" ]]
+  local last_line
+  last_line=$(echo "$output" | tail -1)
+  [[ "$last_line" == "python:${expected}-alpine" ]]
 }
 
 # ── DEFAULT_VERSION fallback ────────────────────────────────────────────────

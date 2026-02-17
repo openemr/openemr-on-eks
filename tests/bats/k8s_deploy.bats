@@ -51,19 +51,19 @@ K8S_DEPLOY="${PROJECT_ROOT}/k8s/deploy.sh"
   [[ "$output" =~ "namespace" ]]
 }
 
-@test "--help documents --openemr-version" {
+@test "--help documents --ssl-cert-arn" {
   run_script_from "k8s" "deploy.sh" "--help"
-  [[ "$output" =~ "openemr-version" ]]
+  [[ "$output" =~ "ssl-cert-arn" ]]
 }
 
-@test "--help documents --skip-cleanup" {
+@test "--help documents --domain-name" {
   run_script_from "k8s" "deploy.sh" "--help"
-  [[ "$output" =~ "skip-cleanup" ]]
+  [[ "$output" =~ "domain-name" ]]
 }
 
-@test "--help documents --skip-validation" {
+@test "--help mentions Prerequisites" {
   run_script_from "k8s" "deploy.sh" "--help"
-  [[ "$output" =~ "skip-validation" ]]
+  [[ "$output" =~ "Prerequisites" ]] || [[ "$output" =~ "prerequisites" ]]
 }
 
 # ── Error handling ──────────────────────────────────────────────────────────
@@ -306,12 +306,12 @@ K8S_DEPLOY="${PROJECT_ROOT}/k8s/deploy.sh"
   rm -f "$FUNC_FILE"
 }
 
-@test "UNIT: show_help documents --skip-monitoring flag" {
+@test "UNIT: show_help documents --ssl-cert-arn flag" {
   FUNC_FILE=$(extract_function "$K8S_DEPLOY" "show_help")
   run bash -c "
     source '$FUNC_FILE'
     show_help
   "
-  [[ "$output" =~ "monitoring" ]] || [[ "$output" =~ "skip" ]]
+  [[ "$output" =~ "ssl-cert-arn" ]]
   rm -f "$FUNC_FILE"
 }

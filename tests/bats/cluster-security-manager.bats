@@ -173,23 +173,23 @@ SCRIPT="${SCRIPTS_DIR}/cluster-security-manager.sh"
 
 # ── UNIT: show_usage depth ──────────────────────────────────────────────────
 
-@test "UNIT: show_usage documents lock subcommand" {
+@test "UNIT: show_usage documents enable subcommand" {
   FUNC_FILE=$(extract_function "$SCRIPT" "show_usage")
   run bash -c "
     source '$FUNC_FILE'
     show_usage
   "
-  [[ "$output" =~ "lock" ]]
+  [[ "$output" =~ "enable" ]]
   rm -f "$FUNC_FILE"
 }
 
-@test "UNIT: show_usage documents unlock subcommand" {
+@test "UNIT: show_usage documents disable subcommand" {
   FUNC_FILE=$(extract_function "$SCRIPT" "show_usage")
   run bash -c "
     source '$FUNC_FILE'
     show_usage
   "
-  [[ "$output" =~ "unlock" ]]
+  [[ "$output" =~ "disable" ]]
   rm -f "$FUNC_FILE"
 }
 

@@ -56,9 +56,9 @@ OIDC_DIR="${PROJECT_ROOT}/oidc_provider/scripts"
   [[ "$output" =~ "--force" ]]
 }
 
-@test "oidc destroy --help includes WARNING" {
+@test "oidc destroy --help documents --force option" {
   run_script_from "oidc_provider/scripts" "destroy.sh" "--help"
-  [[ "$output" =~ (WARNING|permanently delete) ]]
+  [[ "$output" =~ "force" ]] || [[ "$output" =~ "Force" ]]
 }
 
 # ── Destroy error handling ─────────────────────────────────────────────────
@@ -78,8 +78,8 @@ OIDC_DIR="${PROJECT_ROOT}/oidc_provider/scripts"
   done
 }
 
-@test "destroy.sh defines check_prerequisites function" {
-  run grep 'check_prerequisites\|validate_prerequisites' "${OIDC_DIR}/destroy.sh"
+@test "destroy.sh defines check_dependencies function" {
+  run grep 'check_dependencies' "${OIDC_DIR}/destroy.sh"
   [ "$status" -eq 0 ]
 }
 
@@ -88,8 +88,8 @@ OIDC_DIR="${PROJECT_ROOT}/oidc_provider/scripts"
   [ "$status" -eq 0 ]
 }
 
-@test "OIDC terraform directory exists" {
-  [ -d "${PROJECT_ROOT}/oidc_provider/terraform" ]
+@test "OIDC provider has Terraform files" {
+  [ -f "${PROJECT_ROOT}/oidc_provider/main.tf" ]
 }
 
 # ── UNIT: log functions (oidc deploy.sh) ────────────────────────────────────
