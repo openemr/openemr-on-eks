@@ -164,13 +164,14 @@ Validates script functionality and error handling.
 
 **Tests included:**
 
-- Shell script syntax checking
-- Script logic validation
+- Shell script syntax checking (`bash -n`)
+- **BATS (Bash Automated Testing System)** – behavior tests for key scripts (e.g. `get-python-image-version.sh`, `version-manager.sh`, `search-codebase.sh`, `run-test-suite.sh --help`)
 - Dependency checking
 
 **Files tested:**
 
 - `scripts/*.sh` - All shell scripts
+- `tests/bats/*.bats` - BATS test files (run when `bats` is installed; see `tests/README.md`)
 
 ### 4. Documentation Tests
 

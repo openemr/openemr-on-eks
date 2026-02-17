@@ -117,6 +117,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y shellcheck
 
+      # Step 6b: Install BATS (Bash Automated Testing System) for script behavior tests
+      - name: Set up BATS
+        run: |
+          sudo apt-get install -y bats || true
+          bats --version 2>/dev/null || echo "BATS not available (optional)"
+
       # Step 7: Validate environment and dependencies before testing
       # This step ensures all required tools are properly installed and accessible
       - name: Check environment and dependencies

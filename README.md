@@ -1017,6 +1017,15 @@ openemr-on-eks/
 │   ├── go.mod                             # Go module dependencies
 │   ├── go.sum                             # Go module checksums
 │   └── Makefile                           # Build and run commands for console
+├── tests/                                 # BATS test suite and test infrastructure
+│   ├── README.md                          # Test documentation, design standards, and coverage summary
+│   └── bats/                              # BATS test files and shared helpers
+│       ├── test_helper.bash               # Shared helpers: script runners, function extraction, assertions
+│       ├── scripts_common.bats            # Cross-cutting conventions (executability, shebangs, structure)
+│       ├── config_defaults.bats           # Default value drift detection across all scripts
+│       ├── versions_yaml.bats             # versions.yaml structural contract validation
+│       ├── *.bats                         # Per-script BATS test suites (CLI contract + UNIT tests)
+│       └── ...                            # One .bats file per script with function-level unit tests
 ├── warp/                                  # Warp - OpenEMR Data Upload Accelerator
 │   ├── README.md                          # Warp project documentation
 │   ├── DEVELOPER.md                       # Warp developer guide and architecture
@@ -2362,6 +2371,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Images Directory](images/README.md)** - Visual assets and branding materials documentation
 - **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
 - **[Console Directory](console/README.md)** - Console folder documentation with quick start and development guide
+- **[Tests Directory](tests/README.md)** - BATS test suite documentation, design standards, and coverage summary
 
 #### **📖 User Documentation**
 

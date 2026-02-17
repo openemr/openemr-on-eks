@@ -192,6 +192,10 @@ run_test() {
             test_markdown_validation "$test_files"
             local test_result=$?
             ;;
+        "bats")
+            test_bats "$test_files"
+            local test_result=$?
+            ;;
         *)
             record_test_result "$test_name" "SKIP" "Unknown test type: $test_type" "0"
             return
@@ -495,6 +499,38 @@ test_markdown_validation() {
     return 0
 }
 
+test_bats() {
+    local test_path="$1"
+    local failed=0
+
+    log_info "Running BATS tests for: $test_path"
+
+    if ! command -v bats &> /dev/null; then
+        log_warning "bats not installed, skipping BATS tests (install with: apt-get install bats, or see https://bats-core.readthedocs.io)"
+        return 0
+    fi
+
+    local bats_dir="$PROJECT_ROOT/$test_path"
+    if [[ ! -d "$bats_dir" ]]; then
+        log_warning "BATS test directory not found: $bats_dir"
+        return 0
+    fi
+
+    local output
+    if ! output=$(cd "$PROJECT_ROOT" && bats "$bats_dir" 2>&1); then
+        log_error "BATS tests failed"
+        log_error "$output"
+        failed=1
+    else
+        log_info "✓ BATS tests passed"
+    fi
+
+    if [[ $failed -eq 1 ]]; then
+        return 1
+    fi
+    return 0
+}
+
 # Parse test configuration
 parse_test_config() {
     if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -579,6 +615,9 @@ run_script_tests() {
 
     # Script syntax
     run_test "Script Syntax Check" "shell_syntax" "scripts/*.sh"
+
+    # BATS (Bash Automated Testing System) tests for script behavior
+    run_test "BATS Script Tests" "bats" "tests/bats"
 
     # Additional script-specific tests could be added here
 }
