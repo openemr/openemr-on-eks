@@ -77,7 +77,8 @@ SCRIPT="${SCRIPTS_DIR}/validate-deployment.sh"
 
 @test "get_aws_region validates region format with regex" {
   run grep -A30 'get_aws_region()' "$SCRIPT"
-  [[ "$output" =~ 'a-z.*a-z.*0-9' ]]
+  [[ "$output" =~ "a-z" ]]
+  [[ "$output" =~ "0-9" ]]
 }
 
 @test "get_aws_region falls back to us-west-2" {

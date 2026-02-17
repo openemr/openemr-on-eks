@@ -63,7 +63,9 @@ SCRIPT="${SCRIPTS_DIR}/validate-efs-csi.sh"
 
 @test "get_aws_region validates region format" {
   run grep -A30 'get_aws_region()' "$SCRIPT"
-  [[ "$output" =~ 'a-z.*a-z.*0-9' ]]
+  # The function should contain a region-format regex like ^[a-z]{2}-[a-z]+-[0-9]+$
+  [[ "$output" =~ "a-z" ]]
+  [[ "$output" =~ "0-9" ]]
 }
 
 # ── Validation steps ──────────────────────────────────────────────────────

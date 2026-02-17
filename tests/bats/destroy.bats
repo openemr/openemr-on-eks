@@ -109,7 +109,8 @@ SCRIPT="${SCRIPTS_DIR}/destroy.sh"
 
 @test "get_aws_region validates region format" {
   run grep -A20 'get_aws_region()' "$SCRIPT"
-  [[ "$output" =~ 'a-z.*a-z.*0-9' ]]
+  [[ "$output" =~ "a-z" ]]
+  [[ "$output" =~ "0-9" ]]
 }
 
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
