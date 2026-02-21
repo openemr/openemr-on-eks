@@ -109,9 +109,9 @@ Or use the provided Makefile (macOS only):
 
 ```bash
 cd console
-make build    # Build the console
-make install  # Install to /usr/local/bin (requires sudo)
-make run      # Build and run
+make build   # Build the console
+make install # Install to /usr/local/bin (requires sudo)
+make run     # Build and run
 ```
 
 **Windows Users**: Running `start_console.ps1` creates a static binary `openemr-eks-console.exe` in the `console/` directory. This binary can be launched anytime by double-clicking it, and it will open the console interface for deploying, managing, and monitoring your OpenEMR on EKS infrastructure. The binary is self-contained and includes the embedded project root path.
@@ -420,11 +420,11 @@ For issues or questions:
 ```
 .
 ├── console/
-│   ├── main.go          # Main console application
-│   ├── go.mod           # Go module definition
-│   └── Makefile         # Build automation
-├── scripts/             # Scripts executed by console
-└── start_console        # Launcher script
+│   ├── main.go   # Main console application
+│   ├── go.mod    # Go module definition
+│   └── Makefile  # Build automation
+├── scripts/      # Scripts executed by console
+└── start_console # Launcher script
 ```
 
 ### Script Execution

@@ -113,9 +113,9 @@ bump_type = os.environ["BUMP"]
 if bump_type == "major":
     new = current.bump_major()      # 1.0.0 (resets minor and patch to 0)
 elif bump_type == "minor":
-    new = current.bump_minor()      # 0.2.0 (resets patch to 0)
-else:  # patch
-    new = current.bump_patch()      # 0.1.1 (increments patch only)
+    new = current.bump_minor() # 0.2.0 (resets patch to 0)
+else:                          # patch
+    new = current.bump_patch() # 0.1.1 (increments patch only)
 ```
 
 **Version Reset Rules:**

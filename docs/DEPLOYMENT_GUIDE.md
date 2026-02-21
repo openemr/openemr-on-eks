@@ -248,14 +248,14 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
         aurora = 87
         valkey = 22
         efs = 30
-        aws_backup = 18  # Small deployment: ~200 GB backup 
+        aws_backup = 18 # Small deployment: ~200 GB backup 
     elif users <= 200:  # Medium practice
         ec2_compute = 135
         aurora = 173
         valkey = 55
         efs = 150
-        aws_backup = 40  # Medium deployment: ~500 GB backup
-    else:  # Large hospital
+        aws_backup = 40 # Medium deployment: ~500 GB backup
+    else:               # Large hospital
         ec2_compute = 1104
         aurora = 518
         valkey = 138
@@ -409,22 +409,22 @@ public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
 # Database Configuration (Aurora Serverless V2)
 # IMPORTANT: 0.5 ACUs minimum = ~$43/month always-on cost
-aurora_min_capacity = 0.5  # Cannot scale to zero
-aurora_max_capacity = 16   # Adjust based on user count
+aurora_min_capacity = 0.5 # Cannot scale to zero
+aurora_max_capacity = 16  # Adjust based on user count
 
 # Cache Configuration (Valkey Serverless)
 redis_max_data_storage    = 20   # GB
 redis_max_ecpu_per_second = 5000 # ECPUs
 
 # Security Configuration
-enable_public_access = true  # Set to false after deployment
-enable_waf          = true   # Recommended for production
+enable_public_access = true # Set to false after deployment
+enable_waf          = true  # Recommended for production
 
 # Compliance Settings
-backup_retention_days     = 30   # RDS backups
-alb_logs_retention_days   = 90   # ALB access logs
-app_logs_retention_days   = 30   # Application logs
-audit_logs_retention_days = 365  # Audit logs
+backup_retention_days     = 30  # RDS backups
+alb_logs_retention_days   = 90  # ALB access logs
+app_logs_retention_days   = 30  # Application logs
+audit_logs_retention_days = 365 # Audit logs
 
 # Optional: Custom domain
 # domain_name = "openemr.yourhospital.org"

@@ -658,8 +658,8 @@ audit_logs_retention_days = 365
 enable_waf = true
 
 # Healthcare Workload Scaling
-aurora_min_capacity = 0.5  # Always-on minimum
-aurora_max_capacity = 16   # Peak capacity
+aurora_min_capacity = 0.5 # Always-on minimum
+aurora_max_capacity = 16  # Peak capacity
 redis_max_data_storage = 20
 redis_max_ecpu_per_second = 5000
 
@@ -669,8 +669,8 @@ private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.103.0/24"]
 public_subnets = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
 # Security Configuration
-rds_deletion_protection = false  # Set to false for testing, true for production
-enable_waf = true                # Enable AWS WAF for additional security (recommended for production)
+rds_deletion_protection = false # Set to false for testing, true for production
+enable_waf = true               # Enable AWS WAF for additional security (recommended for production)
 EOF
 ```
 
@@ -747,9 +747,9 @@ The modular structure allows for **targeted deployments** and **efficient develo
 
 ```bash
 # Plan changes for specific services
-terraform plan -target=module.vpc                   # VPC changes only
-terraform plan -target=aws_rds_cluster.openemr      # Database changes only
-terraform plan -target=aws_eks_cluster.openemr      # EKS changes only
+terraform plan -target=module.vpc              # VPC changes only
+terraform plan -target=aws_rds_cluster.openemr # Database changes only
+terraform plan -target=aws_eks_cluster.openemr # EKS changes only
 ```
 
 #### **🔧 Selective Deployment**
@@ -764,17 +764,17 @@ terraform apply -target=aws_efs_file_system.openemr # Update EFS configuration
 
 ```bash
 # View resources by file/service
-terraform state list | grep rds                      # All RDS resources
-terraform state list | grep kms                      # All KMS resources
+terraform state list | grep rds # All RDS resources
+terraform state list | grep kms # All KMS resources
 ```
 
 #### **🔍 Validation by Service**
 
 ```bash
 # Validate specific configurations
-terraform validate                                   # Validate all files
-terraform fmt -check                                 # Check formatting
-terraform fmt -recursive                             # Format all files
+terraform validate       # Validate all files
+terraform fmt -check     # Check formatting
+terraform fmt -recursive # Format all files
 ```
 
 #### **🎭 Environment-Specific Configurations**
@@ -1488,9 +1488,9 @@ cd scripts && ./clean-deployment.sh [OPTIONS]
 **Examples:**
 
 ```bash
-./clean-deployment.sh              # Interactive cleanup with prompts
-./clean-deployment.sh --force      # Force cleanup without prompts
-./clean-deployment.sh -f           # Force cleanup without prompts (short form)
+./clean-deployment.sh         # Interactive cleanup with prompts
+./clean-deployment.sh --force # Force cleanup without prompts
+./clean-deployment.sh -f      # Force cleanup without prompts (short form)
 ```
 
 #### **`restore-defaults.sh`** - Restore Files to Default Template State
@@ -1542,8 +1542,8 @@ cd scripts && ./destroy.sh [--force]
 **Examples:**
 
 ```bash
-./destroy.sh                              # Interactive destruction with prompts
-./destroy.sh --force                      # Automated destruction (CI/CD) - no prompts
+./destroy.sh         # Interactive destruction with prompts
+./destroy.sh --force # Automated destruction (CI/CD) - no prompts
 ```
 
 **⚠️ Important Notes:**
@@ -1609,9 +1609,9 @@ cd scripts && ./backup.sh
 **Environment Variables:**
 
 ```bash
-export CLUSTER_AVAILABILITY_TIMEOUT=1800   # 30 min default
-export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
-export POLLING_INTERVAL=30                 # 30 sec default
+export CLUSTER_AVAILABILITY_TIMEOUT=1800  # 30 min default
+export SNAPSHOT_AVAILABILITY_TIMEOUT=1800 # 30 min default
+export POLLING_INTERVAL=30                # 30 sec default
 ```
 
 #### **`restore.sh`** - Simple, Reliable Disaster Recovery
@@ -1640,9 +1640,9 @@ cd scripts && ./restore.sh <backup-bucket> <snapshot-id> [backup-region]
 **Environment Variables:**
 
 ```bash
-export CLUSTER_AVAILABILITY_TIMEOUT=1800   # 30 min default
-export SNAPSHOT_AVAILABILITY_TIMEOUT=1800  # 30 min default
-export POLLING_INTERVAL=30                 # 30 sec default
+export CLUSTER_AVAILABILITY_TIMEOUT=1800  # 30 min default
+export SNAPSHOT_AVAILABILITY_TIMEOUT=1800 # 30 min default
+export POLLING_INTERVAL=30                # 30 sec default
 ```
 
 ### **Script Usage Patterns**
@@ -1736,46 +1736,46 @@ The Kubernetes manifests are organized for clear separation of concerns:
 
 ```bash
 # Deploy specific components
-kubectl apply -f namespace.yaml                    # Namespaces only
-kubectl apply -f storage.yaml                      # Storage resources
-kubectl apply -f security.yaml                     # Security policies
-kubectl apply -f network-policies.yaml             # Network policies for our deployment
-kubectl apply -f deployment.yaml                   # Application only
+kubectl apply -f namespace.yaml        # Namespaces only
+kubectl apply -f storage.yaml          # Storage resources
+kubectl apply -f security.yaml         # Security policies
+kubectl apply -f network-policies.yaml # Network policies for our deployment
+kubectl apply -f deployment.yaml       # Application only
 ```
 
 #### **📊 Resource Management**
 
 ```bash
 # Check resource status by type
-kubectl get all -n openemr                         # All resources
-kubectl get pvc -n openemr                         # Storage claims
-kubectl get secrets -n openemr                     # Secret resources
+kubectl get all -n openemr     # All resources
+kubectl get pvc -n openemr     # Storage claims
+kubectl get secrets -n openemr # Secret resources
 ```
 
 #### **🔍 Debugging & Troubleshooting**
 
 ```bash
 # Application debugging
-kubectl describe deployment openemr -n openemr            # Deployment status
-kubectl logs -f deployment/openemr -n openemr             # Application logs
-kubectl get events -n openemr --sort-by='.lastTimestamp'  # Recent events
+kubectl describe deployment openemr -n openemr           # Deployment status
+kubectl logs -f deployment/openemr -n openemr            # Application logs
+kubectl get events -n openemr --sort-by='.lastTimestamp' # Recent events
 
 # Storage debugging
-kubectl describe pvc openemr-sites-pvc -n openemr  # Storage status
-kubectl get storageclass                           # Available storage
+kubectl describe pvc openemr-sites-pvc -n openemr # Storage status
+kubectl get storageclass                          # Available storage
 
 # Security debugging
-kubectl auth can-i --list --as=system:serviceaccount:openemr:openemr-sa  # Permissions
-kubectl get rolebindings -n openemr                                      # RBAC bindings
+kubectl auth can-i --list --as=system:serviceaccount:openemr:openemr-sa # Permissions
+kubectl get rolebindings -n openemr                                     # RBAC bindings
 
 # Network policy debugging
-kubectl get networkpolicies -n openemr                         # Network policies
-kubectl describe networkpolicy openemr-base-access -n openemr  # Policy details
+kubectl get networkpolicies -n openemr                        # Network policies
+kubectl describe networkpolicy openemr-base-access -n openemr # Policy details
 
 # WAF debugging
-kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn  # WAF association
-terraform output waf_enabled                                 # WAF deployment status
-terraform output waf_web_acl_arn                             # WAF ACL ARN
+kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn # WAF association
+terraform output waf_enabled                                # WAF deployment status
+terraform output waf_web_acl_arn                            # WAF ACL ARN
 ```
 
 ### **🔄 Resilient Deployment Architecture**
@@ -1872,9 +1872,9 @@ export SNAPSHOT_AVAILABILITY_TIMEOUT=1800
 export POLLING_INTERVAL=30
 
 # Example: Set longer timeouts for large databases
-export CLUSTER_AVAILABILITY_TIMEOUT=3600   # 1 hour
-export SNAPSHOT_AVAILABILITY_TIMEOUT=3600  # 1 hour
-export POLLING_INTERVAL=60                 # 1 minute updates
+export CLUSTER_AVAILABILITY_TIMEOUT=3600  # 1 hour
+export SNAPSHOT_AVAILABILITY_TIMEOUT=3600 # 1 hour
+export POLLING_INTERVAL=60                # 1 minute updates
 ```
 
 #### **What the Polling Does**
@@ -1895,9 +1895,9 @@ export POLLING_INTERVAL=60                 # 1 minute updates
 
 ```bash
 # Set in your environment or .bashrc for production
-export CLUSTER_AVAILABILITY_TIMEOUT=7200   # 2 hours for large clusters
-export SNAPSHOT_AVAILABILITY_TIMEOUT=7200  # 2 hours for large snapshots
-export POLLING_INTERVAL=60                 # 1 minute updates for production
+export CLUSTER_AVAILABILITY_TIMEOUT=7200  # 2 hours for large clusters
+export SNAPSHOT_AVAILABILITY_TIMEOUT=7200 # 2 hours for large snapshots
+export POLLING_INTERVAL=60                # 1 minute updates for production
 
 # Run backup with custom timeouts
 BACKUP_REGION=us-east-1 ./scripts/backup.sh

@@ -73,8 +73,8 @@ cd scripts
 ./openemr-feature-manager.sh status all
 
 # Enable/disable features for testing
-./openemr-feature-manager.sh disable api    # Disable API if causing issues
-./openemr-feature-manager.sh enable portal  # Enable portal for testing
+./openemr-feature-manager.sh disable api   # Disable API if causing issues
+./openemr-feature-manager.sh enable portal # Enable portal for testing
 ```
 
 #### **Infrastructure Issues**
@@ -386,8 +386,8 @@ See [deployment.yaml](../k8s/deployment.yaml) for correct configurations.
 # Adjust resource requests
 resources:
   requests:
-    cpu: 500m     # Reduced from 2000m
-    memory: 1Gi   # Reduced from 4Gi
+    cpu: 500m   # Reduced from 2000m
+    memory: 1Gi # Reduced from 4Gi
   limits:
     cpu: 2000m
     memory: 2Gi

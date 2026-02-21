@@ -321,8 +321,8 @@ self.connection = pymysql.connect(
 
 ```
 tests/
-├── test_omop_to_ccda.py       # Converter/data loader tests
-├── test_uploader.py           # Uploader tests
+├── test_omop_to_ccda.py # Converter/data loader tests
+├── test_uploader.py     # Uploader tests
 └── benchmarks/
     └── test_performance.py    # Performance benchmarks
 ```

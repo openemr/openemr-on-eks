@@ -260,10 +260,10 @@ The restore process now includes comprehensive logging configuration for OpenEMR
 
 ```bash
 # Verify required tools are installed
-aws --version        # AWS CLI v2
-kubectl version      # Kubernetes CLI
-terraform --version  # Terraform (for infrastructure queries)
-jq --version         # JSON processor
+aws --version       # AWS CLI v2
+kubectl version     # Kubernetes CLI
+terraform --version # Terraform (for infrastructure queries)
+jq --version        # JSON processor
 ```
 
 ### AWS Permissions

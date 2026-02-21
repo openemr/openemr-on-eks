@@ -184,8 +184,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Comprehensive verification of cleanup completion
 - **Usage Examples**:
   ```bash
-  ./destroy.sh                              # Interactive destruction with prompts
-  ./destroy.sh --force                      # Automated destruction (CI/CD) - no prompts
+  ./destroy.sh         # Interactive destruction with prompts
+  ./destroy.sh --force # Automated destruction (CI/CD) - no prompts
   ```
 - **⚠️ Important Notes**:
   - **Irreversible**: This action completely destroys all infrastructure and cannot be undone

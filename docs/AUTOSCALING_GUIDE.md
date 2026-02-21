@@ -81,8 +81,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr
-  minReplicas: 2  # High availability minimum
-  maxReplicas: 6  # Cost-conscious maximum
+  minReplicas: 2 # High availability minimum
+  maxReplicas: 6 # Cost-conscious maximum
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 60   # Quick response
@@ -132,8 +132,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr
-  minReplicas: 3   # Better load distribution
-  maxReplicas: 12  # Handle seasonal peaks
+  minReplicas: 3  # Better load distribution
+  maxReplicas: 12 # Handle seasonal peaks
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 45  # Faster response
@@ -180,8 +180,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr
-  minReplicas: 5   # Always maintain capacity
-  maxReplicas: 30  # Handle major incidents
+  minReplicas: 5  # Always maintain capacity
+  maxReplicas: 30 # Handle major incidents
   behavior:
     scaleUp:
       stabilizationWindowSeconds: 30  # Rapid response
@@ -373,8 +373,8 @@ behavior:
   scaleUp:
     policies:
     - type: Pods
-      value: 4           # Increased from 2
-      periodSeconds: 30  # Reduced from 60
+      value: 4          # Increased from 2
+      periodSeconds: 30 # Reduced from 60
 ```
 
 ### Issue: Pods Stuck Pending with Auto Mode
@@ -654,8 +654,8 @@ def calculate_capacity(patient_count, visit_duration_min=20,
     pods_needed = concurrent_users / (25 * utilization_target)
 
     return {
-        'min_replicas': max(2, int(pods_needed * 0.5)),             # 50% of peak
-        'max_replicas': int(max(2, int(pods_needed * 0.5)) * 1.5),  # 150% of peak for headroom
+        'min_replicas': max(2, int(pods_needed * 0.5)),            # 50% of peak
+        'max_replicas': int(max(2, int(pods_needed * 0.5)) * 1.5), # 150% of peak for headroom
         'cpu_threshold': int(utilization_target * 100),
         'expected_peak_users': int(concurrent_users)
     }

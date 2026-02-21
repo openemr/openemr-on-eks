@@ -150,11 +150,11 @@ go version
 
 ```
 console/
-├── main.go          # Main console application
-├── go.mod           # Go module definition
-├── go.sum           # Go module checksums
-├── Makefile         # Build automation
-└── README.md        # This file
+├── main.go   # Main console application
+├── go.mod    # Go module definition
+├── go.sum    # Go module checksums
+├── Makefile  # Build automation
+└── README.md # This file
 ```
 
 ## Dependencies

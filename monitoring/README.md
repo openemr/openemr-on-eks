@@ -237,10 +237,10 @@ Layer 2: Node-level (EKS Auto Mode)
 
 ```bash
 # Verify tools are installed
-kubectl version --client  # >= 1.29
-helm version              # >= 3.12
-jq --version              # >= 1.6
-terraform version         # >= 1.0 (for S3 bucket and IAM role setup)
+kubectl version --client # >= 1.29
+helm version             # >= 3.12
+jq --version             # >= 1.6
+terraform version        # >= 1.0 (for S3 bucket and IAM role setup)
 
 # Check cluster access
 kubectl cluster-info
@@ -358,8 +358,8 @@ cat credentials/monitoring-credentials.txt
 
 ```bash
 # 1. Reduce retention periods
-export PROMETHEUS_RETENTION="15d"  # Default: 30d
-export LOKI_RETENTION="360h"       # Default: 720h
+export PROMETHEUS_RETENTION="15d" # Default: 30d
+export LOKI_RETENTION="360h"      # Default: 720h
 
 # 2. S3 Lifecycle Policies (automatically configured)
 # - Intelligent-Tiering after 30 days (reduces storage cost)
@@ -395,36 +395,36 @@ The monitoring stack includes comprehensive autoscaling capabilities that can be
 export ENABLE_AUTOSCALING="1"
 
 # CPU and Memory targets for scaling decisions
-export HPA_CPU_TARGET="70"        # CPU usage percentage (default: 70%)
-export HPA_MEMORY_TARGET="80"     # Memory usage percentage (default: 80%)
+export HPA_CPU_TARGET="70"    # CPU usage percentage (default: 70%)
+export HPA_MEMORY_TARGET="80" # Memory usage percentage (default: 80%)
 ```
 
 #### Component-Specific Replica Limits
 
 ```bash
 # Grafana autoscaling
-export GRAFANA_MIN_REPLICAS="1"   # Minimum replicas (default: 1)
-export GRAFANA_MAX_REPLICAS="3"   # Maximum replicas (default: 3)
+export GRAFANA_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export GRAFANA_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 # Prometheus autoscaling
-export PROMETHEUS_MIN_REPLICAS="1"   # Minimum replicas (default: 1)
-export PROMETHEUS_MAX_REPLICAS="3"   # Maximum replicas (default: 3)
+export PROMETHEUS_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export PROMETHEUS_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 # Loki autoscaling
-export LOKI_MIN_REPLICAS="1"      # Minimum replicas (default: 1)
-export LOKI_MAX_REPLICAS="3"      # Maximum replicas (default: 3)
+export LOKI_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export LOKI_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 # AlertManager autoscaling (when Slack alerts enabled)
-export ALERTMANAGER_MIN_REPLICAS="1"   # Minimum replicas (default: 1)
-export ALERTMANAGER_MAX_REPLICAS="3"   # Maximum replicas (default: 3)
+export ALERTMANAGER_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export ALERTMANAGER_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 # Tempo autoscaling
-export TEMPO_MIN_REPLICAS="1"    # Minimum replicas (default: 1)
-export TEMPO_MAX_REPLICAS="3"    # Maximum replicas (default: 3)
+export TEMPO_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export TEMPO_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 # Mimir autoscaling
-export MIMIR_MIN_REPLICAS="1"    # Minimum replicas (default: 1)
-export MIMIR_MAX_REPLICAS="3"    # Maximum replicas (default: 3)
+export MIMIR_MIN_REPLICAS="1" # Minimum replicas (default: 1)
+export MIMIR_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
 
 

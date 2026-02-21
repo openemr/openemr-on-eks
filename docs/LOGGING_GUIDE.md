@@ -537,21 +537,21 @@ class ADODB_mysqli_log extends ADODB_mysqli
 ├── openemr/
 │   ├── placeholder.log      # Placeholder for application logs
 ├── apache2/
-│   ├── access.log           # Web server access logs
-│   ├── error.log            # Web server error logs
-│   └── ssl_error.log        # SSL error logs
-└── php_errors.log           # PHP application error logs
+│   ├── access.log    # Web server access logs
+│   ├── error.log     # Web server error logs
+│   └── ssl_error.log # SSL error logs
+└── php_errors.log    # PHP application error logs
 ```
 
 ### OpenEMR-Specific Directories
 
 ```
 /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/
-├── system_logs/             # System-level operational logs
-│   └── placeholder.log      # Placeholder for system logs
-├── audit_logs/              # Detailed audit trails
-│   └── placeholder.log      # Placeholder for audit logs
-└── methods/                 # Legacy method logs
+├── system_logs/        # System-level operational logs
+│   └── placeholder.log # Placeholder for system logs
+├── audit_logs/         # Detailed audit trails
+│   └── placeholder.log # Placeholder for audit logs
+└── methods/            # Legacy method logs
     └── existing_logs.log
 ```
 
