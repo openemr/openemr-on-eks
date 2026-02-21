@@ -56,17 +56,17 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
 # Configuration variables - can be overridden via environment variables
-NAMESPACE=${NAMESPACE:-"openemr"}                          # Kubernetes namespace for OpenEMR
-CRONJOB_NAME=${CRONJOB_NAME:-"ssl-cert-renewal"}           # Name of the SSL renewal CronJob
-TEST_JOB_NAME=${TEST_JOB_NAME:-"ssl-cert-renewal-test"}    # Name for test jobs
-AWS_REGION=${AWS_REGION:-"us-west-2"}                      # AWS region
+NAMESPACE=${NAMESPACE:-"openemr"}                       # Kubernetes namespace for OpenEMR
+CRONJOB_NAME=${CRONJOB_NAME:-"ssl-cert-renewal"}        # Name of the SSL renewal CronJob
+TEST_JOB_NAME=${TEST_JOB_NAME:-"ssl-cert-renewal-test"} # Name for test jobs
+AWS_REGION=${AWS_REGION:-"us-west-2"}                   # AWS region
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {

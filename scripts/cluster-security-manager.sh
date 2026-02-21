@@ -54,9 +54,9 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
 # Configuration variables - can be overridden by environment variables
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}  # EKS cluster name to manage
-AWS_REGION=${AWS_REGION:-"us-west-2"}        # AWS region where the cluster is located
-REGION="$AWS_REGION"                          # Alias for backward compatibility
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name to manage
+AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where the cluster is located
+REGION="$AWS_REGION"                        # Alias for backward compatibility
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {
@@ -176,8 +176,8 @@ case "$1" in
         echo "📊 This typically takes 2-3 minutes..."
 
         # Configure polling parameters for status monitoring
-        TIMEOUT_MINUTES=${CLUSTER_UPDATE_TIMEOUT:-5}  # Default 5-minute timeout
-        POLLING_INTERVAL=10                           # Check every 10 seconds for responsive updates
+        TIMEOUT_MINUTES=${CLUSTER_UPDATE_TIMEOUT:-5} # Default 5-minute timeout
+        POLLING_INTERVAL=10                          # Check every 10 seconds for responsive updates
         TIMEOUT_SECONDS=$((TIMEOUT_MINUTES * 60))
         START_TIME=$(date +%s)
 

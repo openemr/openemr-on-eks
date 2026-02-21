@@ -93,8 +93,8 @@ spec:
     matchLabels:
       app: openemr  # Apply to OpenEMR pods
   policyTypes:
-  - Ingress  # Ingress rules for incoming traffic
-  - Egress   # Egress rules for outgoing traffic
+  - Ingress # Ingress rules for incoming traffic
+  - Egress  # Egress rules for outgoing traffic
   
   # Ingress Rules (Incoming Traffic)
   ingress:

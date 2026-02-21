@@ -23,9 +23,9 @@ metadata:
     component: loadbalancer
   annotations:
     # AWS Load Balancer Controller annotations
-    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"                              # Network Load Balancer for Layer 4 routing
-    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"                # Public internet access
-    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "${BACKEND_PROTOCOL}"  # TCP or SSL based on SSL mode
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"                             # Network Load Balancer for Layer 4 routing
+    service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"               # Public internet access
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "${BACKEND_PROTOCOL}" # TCP or SSL based on SSL mode
     
     # SSL Configuration (conditionally enabled by deploy script)
     # These annotations are uncommented when SSL_CERT_ARN is provided

@@ -45,15 +45,15 @@
 set -e
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and stable versions
-YELLOW='\033[1;33m'   # Warning messages and latest/development versions
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and stable versions
+YELLOW='\033[1;33m' # Warning messages and latest/development versions
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Configuration variables
-DOCKER_REGISTRY="openemr/openemr"  # Docker Hub repository for OpenEMR images
-DEFAULT_TAGS_TO_SHOW=10            # Default number of versions to display when no specific count is requested
+DOCKER_REGISTRY="openemr/openemr" # Docker Hub repository for OpenEMR images
+DEFAULT_TAGS_TO_SHOW=10           # Default number of versions to display when no specific count is requested
 
 # Help function - displays usage information and examples
 # This function provides comprehensive documentation for script usage,
@@ -80,23 +80,23 @@ show_help() {
 # Parse command line arguments
 # This section processes command-line options and sets corresponding variables
 # Each option modifies the behavior of the version checking and display logic
-TAGS_TO_SHOW=$DEFAULT_TAGS_TO_SHOW  # Number of versions to display (can be overridden by --count)
-SEARCH_PATTERN=""                   # Pattern to filter versions (set by --search)
-LATEST_ONLY=false                   # Flag to show only the latest version (set by --latest)
+TAGS_TO_SHOW=$DEFAULT_TAGS_TO_SHOW # Number of versions to display (can be overridden by --count)
+SEARCH_PATTERN=""                  # Pattern to filter versions (set by --search)
+LATEST_ONLY=false                  # Flag to show only the latest version (set by --latest)
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         --count)
-            TAGS_TO_SHOW="$2"       # Override default count with user-specified number
-            shift 2                 # Consume both the option and its value
+            TAGS_TO_SHOW="$2" # Override default count with user-specified number
+            shift 2           # Consume both the option and its value
             ;;
         --search)
-            SEARCH_PATTERN="$2"     # Set search pattern for version filtering
-            shift 2                 # Consume both the option and its value
+            SEARCH_PATTERN="$2" # Set search pattern for version filtering
+            shift 2             # Consume both the option and its value
             ;;
         --latest)
-            LATEST_ONLY=true        # Enable latest-only mode
-            shift                   # Consume only the option (no value)
+            LATEST_ONLY=true # Enable latest-only mode
+            shift            # Consume only the option (no value)
             ;;
         --help)
             show_help               # Display help and exit
@@ -164,9 +164,9 @@ sort_versions() {
 # This function applies semantic versioning filters and search patterns to the raw tag list.
 # It implements OpenEMR's versioning strategy where the second-to-latest version is considered stable.
 filter_versions() {
-    local search_pattern="$1"  # Pattern to match (e.g., "7.0" for 7.0.x versions)
-    local latest_only="$2"     # Boolean flag to return only the recommended stable version
-    local count="$3"           # Maximum number of versions to return
+    local search_pattern="$1" # Pattern to match (e.g., "7.0" for 7.0.x versions)
+    local latest_only="$2"    # Boolean flag to return only the recommended stable version
+    local count="$3"          # Maximum number of versions to return
 
     # Apply semantic versioning regex filter and optional search pattern
     # Regex matches: major.minor.patch[-suffix] format (e.g., 7.0.4, 7.0.4-beta)

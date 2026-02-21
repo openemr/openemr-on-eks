@@ -24,9 +24,9 @@ spec:
   # Schedule: Run every 2 days at 2 AM UTC
   # This ensures certificates are always fresh and reduces browser warnings
   schedule: "0 2 */2 * *"
-  concurrencyPolicy: Forbid      # Prevent overlapping renewal jobs
-  successfulJobsHistoryLimit: 3  # Keep history of successful renewals
-  failedJobsHistoryLimit: 3      # Keep history of failed renewals for debugging
+  concurrencyPolicy: Forbid     # Prevent overlapping renewal jobs
+  successfulJobsHistoryLimit: 3 # Keep history of successful renewals
+  failedJobsHistoryLimit: 3     # Keep history of failed renewals for debugging
   jobTemplate:
     spec:
       template:
@@ -50,19 +50,19 @@ spec:
             image: openemr/openemr:${OPENEMR_VERSION}
             imagePullPolicy: IfNotPresent
             securityContext:
-              allowPrivilegeEscalation: false  # Security: prevent privilege escalation
-              readOnlyRootFilesystem: false    # Allow writing to SSL directories
-              runAsNonRoot: false              # Required for SSL certificate operations
-              runAsUser: 0                     # Run as root for certificate management
+              allowPrivilegeEscalation: false # Security: prevent privilege escalation
+              readOnlyRootFilesystem: false   # Allow writing to SSL directories
+              runAsNonRoot: false             # Required for SSL certificate operations
+              runAsUser: 0                    # Run as root for certificate management
               capabilities:
                 drop:
                 - ALL                          # Drop all capabilities by default
                 add:
-                - CHOWN                        # Required for changing file ownership
-                - SETUID                       # Required for user ID operations
-                - SETGID                       # Required for group ID operations
-                - FOWNER                       # Required for file ownership changes
-                - DAC_OVERRIDE                 # Required for permission overrides
+                - CHOWN        # Required for changing file ownership
+                - SETUID       # Required for user ID operations
+                - SETGID       # Required for group ID operations
+                - FOWNER       # Required for file ownership changes
+                - DAC_OVERRIDE # Required for permission overrides
             command: ["/bin/sh", "-c"]
             args:
             - |

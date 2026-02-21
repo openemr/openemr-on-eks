@@ -432,17 +432,17 @@ notifications:
     enabled: true
     labels: ["version-update", "maintenance", "dependencies", "monthly-check"]
     create_for:
-      - "applications"              # Core application Docker images (OpenEMR, Fluent Bit, Python)
-      - "infrastructure"            # Infrastructure components (EKS cluster version, Terraform)
-      - "terraform_modules"         # Terraform provider modules and AWS modules (AWS provider, Kubernetes provider, EKS module, VPC module, Pod Identity module)
-      - "github_workflows"          # GitHub Actions dependencies used in CI/CD workflows (checkout, setup-python, setup-terraform, setup-kubectl, upload/download artifacts, CodeQL, Trivy, GitHub runner)
-      - "pre_commit_hooks"          # Pre-commit hook tools for code quality (pre-commit-hooks, black, isort, flake8, bandit, terraform hooks, shellcheck, markdownlint, yamllint, commitizen)
-      - "semver_packages"           # Semantic version packages used in workflows (Python version, Terraform version, kubectl version, semver Python package)
-      - "go_packages"               # Go package dependencies for the console TUI (Go version, bubbletea, lipgloss)
-      - "python_packages"           # Python package dependencies for the Warp project (pymysql, boto3, pytest, pytest-cov, flake8, black, mypy)
-      - "monitoring"                # Monitoring stack components (Prometheus Operator, Loki, Jaeger, cert-manager)
-      - "eks_addons"                # EKS cluster add-ons managed outside of Auto Mode (EFS CSI Driver, Metrics Server)
-      - "security_tools"            # Security scanning tools (Trivy, Checkov, KICS, gosec) - Zero-Tolerance Policy
+      - "applications"           # Core application Docker images (OpenEMR, Fluent Bit, Python)
+      - "infrastructure"         # Infrastructure components (EKS cluster version, Terraform)
+      - "terraform_modules"      # Terraform provider modules and AWS modules (AWS provider, Kubernetes provider, EKS module, VPC module, Pod Identity module)
+      - "github_workflows"       # GitHub Actions dependencies used in CI/CD workflows (checkout, setup-python, setup-terraform, setup-kubectl, upload/download artifacts, CodeQL, Trivy, GitHub runner)
+      - "pre_commit_hooks"       # Pre-commit hook tools for code quality (pre-commit-hooks, black, isort, flake8, bandit, terraform hooks, shellcheck, markdownlint, yamllint, commitizen)
+      - "semver_packages"        # Semantic version packages used in workflows (Python version, Terraform version, kubectl version, semver Python package)
+      - "go_packages"            # Go package dependencies for the console TUI (Go version, bubbletea, lipgloss)
+      - "python_packages"        # Python package dependencies for the Warp project (pymysql, boto3, pytest, pytest-cov, flake8, black, mypy)
+      - "monitoring"             # Monitoring stack components (Prometheus Operator, Loki, Jaeger, cert-manager)
+      - "eks_addons"             # EKS cluster add-ons managed outside of Auto Mode (EFS CSI Driver, Metrics Server)
+      - "security_tools"         # Security scanning tools (Trivy, Checkov, KICS, gosec) - Zero-Tolerance Policy
     priority_threshold: "medium" # low, medium, high, critical
     monthly_schedule: true
     issue_title_template: "Version Check Report for Month of {month}"

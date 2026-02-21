@@ -52,15 +52,15 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Configuration variables - can be overridden by environment variables
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}  # EKS cluster name for Pod Identity checks
-AWS_REGION=${AWS_REGION:-"us-west-2"}        # AWS region where EFS and cluster are located
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name for Pod Identity checks
+AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where EFS and cluster are located
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {

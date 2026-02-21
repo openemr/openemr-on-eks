@@ -39,9 +39,9 @@ on:
 
 # Required permissions
 permissions:
-  contents: read          # Read repository contents
-  security-events: write  # Write security scan results to GitHub Security tab
-  actions: read           # Read workflow information
+  contents: read         # Read repository contents
+  security-events: write # Write security scan results to GitHub Security tab
+  actions: read          # Read workflow information
 
 # Environment variables
 env:
@@ -214,10 +214,10 @@ jobs:
           scan-ref: '${{ env.MODULE_PATH }}'
           format: 'table'
           output: 'trivy-results.txt'
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'     # All severities - zero tolerance
-          scanners: 'vuln,secret,misconfig'        # Enable all scanners
-          exit-code: '1'                           # FAIL on any finding
-          trivyignores: '.trivyignore'             # Use ignore file for false positives only
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW' # All severities - zero tolerance
+          scanners: 'vuln,secret,misconfig'    # Enable all scanners
+          exit-code: '1'                       # FAIL on any finding
+          trivyignores: '.trivyignore'         # Use ignore file for false positives only
 
       # Run Trivy in SARIF format for GitHub Security tab
       - name: Run Trivy vulnerability scanner (SARIF format)

@@ -45,12 +45,12 @@ set -euo pipefail
 # Using ANSI escape sequences that work across most modern terminals.
 # The NC (No Color) constant is used to reset formatting after colored text.
 
-readonly RED='\033[0;31m'      # Error messages and critical failures
-readonly GREEN='\033[0;32m'    # Success messages and completed operations
-readonly YELLOW='\033[1;33m'   # Warning messages and important notices
-readonly BLUE='\033[0;34m'     # Information messages and status updates
-readonly CYAN='\033[0;36m'     # Step headers and section dividers
-readonly NC='\033[0m'          # Reset to default color (No Color)
+readonly RED='\033[0;31m'    # Error messages and critical failures
+readonly GREEN='\033[0;32m'  # Success messages and completed operations
+readonly YELLOW='\033[1;33m' # Warning messages and important notices
+readonly BLUE='\033[0;34m'   # Information messages and status updates
+readonly CYAN='\033[0;36m'   # Step headers and section dividers
+readonly NC='\033[0m'        # Reset to default color (No Color)
 
 # =============================================================================
 # CONFIGURATION & CONSTANTS

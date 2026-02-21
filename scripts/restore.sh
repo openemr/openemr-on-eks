@@ -57,27 +57,27 @@ readonly CYAN='\033[0;36m'
 readonly NC='\033[0m' # No Color
 
 # Configurable timeout constants (can be overridden via environment variables)
-readonly DB_CLUSTER_WAIT_TIMEOUT=${DB_CLUSTER_WAIT_TIMEOUT:-1200}         # 20 minutes
-readonly DB_INSTANCE_DELETE_TIMEOUT=${DB_INSTANCE_DELETE_TIMEOUT:-1200}   # 20 minutes
-readonly POD_READY_WAIT_TIMEOUT=${POD_READY_WAIT_TIMEOUT:-600}            # 10 minutes
-readonly TEMP_POD_START_TIMEOUT=${TEMP_POD_START_TIMEOUT:-300}            # 5 minutes
-readonly TEMP_POD_COMPLETION_TIMEOUT=${TEMP_POD_COMPLETION_TIMEOUT:-300}  # 5 minutes
-readonly TEMP_POD_CHECK_INTERVAL=${TEMP_POD_CHECK_INTERVAL:-5}            # 5 seconds
-readonly DB_CONNECTION_CHECK_INTERVAL=${DB_CONNECTION_CHECK_INTERVAL:-2}  # 2 seconds
-readonly STATUS_CHECK_INTERVAL=${STATUS_CHECK_INTERVAL:-30}               # 30 seconds
-readonly EFS_PROPAGATION_WAIT=${EFS_PROPAGATION_WAIT:-30}                 # 30 seconds
-readonly HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-10}               # 10 seconds
-readonly VERIFICATION_TIMEOUT=${VERIFICATION_TIMEOUT:-300}                # 5 minutes for final verification
-readonly VERIFICATION_INTERVAL=${VERIFICATION_INTERVAL:-10}               # 10 seconds between verification checks
-readonly VERIFICATION_MAX_ATTEMPTS=${VERIFICATION_MAX_ATTEMPTS:-6}        # 6 attempts with crypto key cleanup retry
+readonly DB_CLUSTER_WAIT_TIMEOUT=${DB_CLUSTER_WAIT_TIMEOUT:-1200}        # 20 minutes
+readonly DB_INSTANCE_DELETE_TIMEOUT=${DB_INSTANCE_DELETE_TIMEOUT:-1200}  # 20 minutes
+readonly POD_READY_WAIT_TIMEOUT=${POD_READY_WAIT_TIMEOUT:-600}           # 10 minutes
+readonly TEMP_POD_START_TIMEOUT=${TEMP_POD_START_TIMEOUT:-300}           # 5 minutes
+readonly TEMP_POD_COMPLETION_TIMEOUT=${TEMP_POD_COMPLETION_TIMEOUT:-300} # 5 minutes
+readonly TEMP_POD_CHECK_INTERVAL=${TEMP_POD_CHECK_INTERVAL:-5}           # 5 seconds
+readonly DB_CONNECTION_CHECK_INTERVAL=${DB_CONNECTION_CHECK_INTERVAL:-2} # 2 seconds
+readonly STATUS_CHECK_INTERVAL=${STATUS_CHECK_INTERVAL:-30}              # 30 seconds
+readonly EFS_PROPAGATION_WAIT=${EFS_PROPAGATION_WAIT:-30}                # 30 seconds
+readonly HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-10}              # 10 seconds
+readonly VERIFICATION_TIMEOUT=${VERIFICATION_TIMEOUT:-300}               # 5 minutes for final verification
+readonly VERIFICATION_INTERVAL=${VERIFICATION_INTERVAL:-10}              # 10 seconds between verification checks
+readonly VERIFICATION_MAX_ATTEMPTS=${VERIFICATION_MAX_ATTEMPTS:-6}       # 6 attempts with crypto key cleanup retry
 
 # Temp pod resource configuration
-readonly TEMP_POD_MEMORY_REQUEST=${TEMP_POD_MEMORY_REQUEST:-1Gi}         # Memory request
-readonly TEMP_POD_MEMORY_LIMIT=${TEMP_POD_MEMORY_LIMIT:-2Gi}             # Memory limit
-readonly TEMP_POD_CPU_REQUEST=${TEMP_POD_CPU_REQUEST:-500m}              # CPU request
-readonly TEMP_POD_CPU_LIMIT=${TEMP_POD_CPU_LIMIT:-1000m}                 # CPU limit
-readonly TEMP_POD_STORAGE_REQUEST=${TEMP_POD_STORAGE_REQUEST:-2Gi}       # Storage request
-readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}           # Storage limit
+readonly TEMP_POD_MEMORY_REQUEST=${TEMP_POD_MEMORY_REQUEST:-1Gi}   # Memory request
+readonly TEMP_POD_MEMORY_LIMIT=${TEMP_POD_MEMORY_LIMIT:-2Gi}       # Memory limit
+readonly TEMP_POD_CPU_REQUEST=${TEMP_POD_CPU_REQUEST:-500m}        # CPU request
+readonly TEMP_POD_CPU_LIMIT=${TEMP_POD_CPU_LIMIT:-1000m}           # CPU limit
+readonly TEMP_POD_STORAGE_REQUEST=${TEMP_POD_STORAGE_REQUEST:-2Gi} # Storage request
+readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}     # Storage limit
 
 # Default configuration values
 readonly DEFAULT_NAMESPACE="openemr"
@@ -93,8 +93,8 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 readonly PROJECT_ROOT
 BACKUP_BUCKET=""
 SNAPSHOT_ID=""
-POD_SPEC_FILE=""  # Global variable to track pod spec file for cleanup
-EARLY_DB_RESTORE_NEEDED=false  # Flag to indicate if early database restore is needed
+POD_SPEC_FILE=""              # Global variable to track pod spec file for cleanup
+EARLY_DB_RESTORE_NEEDED=false # Flag to indicate if early database restore is needed
 CLUSTER_NAME=""
 NAMESPACE="$DEFAULT_NAMESPACE"
 AWS_REGION="$DEFAULT_AWS_REGION"

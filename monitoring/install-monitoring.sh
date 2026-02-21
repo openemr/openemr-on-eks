@@ -248,24 +248,24 @@ readonly BASE_DELAY="${BASE_DELAY:-30}"
 readonly MAX_DELAY="${MAX_DELAY:-300}"
 
 # Component-specific retry and delay configuration
-readonly HELM_INSTALL_RETRY_DELAY="${HELM_INSTALL_RETRY_DELAY:-30}"                              # Delay between Helm install retries (seconds)
-readonly PATCH_RETRY_DELAY="${PATCH_RETRY_DELAY:-5}"                                             # Delay between patch operation retries (seconds)
-readonly PVC_WAIT_DELAY="${PVC_WAIT_DELAY:-5}"                                                   # Delay after PVC creation before checking (seconds)
-readonly QUERY_FRONTEND_READINESS_INITIAL_DELAY="${QUERY_FRONTEND_READINESS_INITIAL_DELAY:-10}"  # Initial delay for query-frontend readiness probe (seconds)
+readonly HELM_INSTALL_RETRY_DELAY="${HELM_INSTALL_RETRY_DELAY:-30}"                             # Delay between Helm install retries (seconds)
+readonly PATCH_RETRY_DELAY="${PATCH_RETRY_DELAY:-5}"                                            # Delay between patch operation retries (seconds)
+readonly PVC_WAIT_DELAY="${PVC_WAIT_DELAY:-5}"                                                  # Delay after PVC creation before checking (seconds)
+readonly QUERY_FRONTEND_READINESS_INITIAL_DELAY="${QUERY_FRONTEND_READINESS_INITIAL_DELAY:-10}" # Initial delay for query-frontend readiness probe (seconds)
 
 # AlertManager cluster configuration
-readonly ALERTMANAGER_PEER_TIMEOUT="${ALERTMANAGER_PEER_TIMEOUT:-15s}"              # Peer timeout for AlertManager cluster
-readonly ALERTMANAGER_GOSSIP_INTERVAL="${ALERTMANAGER_GOSSIP_INTERVAL:-200ms}"      # Gossip interval for AlertManager cluster
-readonly ALERTMANAGER_PUSH_PULL_INTERVAL="${ALERTMANAGER_PUSH_PULL_INTERVAL:-60s}"  # Push-pull interval for AlertManager cluster
-readonly ALERTMANAGER_REPEAT_INTERVAL="${ALERTMANAGER_REPEAT_INTERVAL:-24h}"        # Repeat interval for AlertManager alerts
+readonly ALERTMANAGER_PEER_TIMEOUT="${ALERTMANAGER_PEER_TIMEOUT:-15s}"             # Peer timeout for AlertManager cluster
+readonly ALERTMANAGER_GOSSIP_INTERVAL="${ALERTMANAGER_GOSSIP_INTERVAL:-200ms}"     # Gossip interval for AlertManager cluster
+readonly ALERTMANAGER_PUSH_PULL_INTERVAL="${ALERTMANAGER_PUSH_PULL_INTERVAL:-60s}" # Push-pull interval for AlertManager cluster
+readonly ALERTMANAGER_REPEAT_INTERVAL="${ALERTMANAGER_REPEAT_INTERVAL:-24h}"       # Repeat interval for AlertManager alerts
 
 # Loki index configuration
 readonly LOKI_INDEX_PERIOD="${LOKI_INDEX_PERIOD:-24h}"  # Period for Loki index rotation
 
 # kubectl wait timeouts (can be shorter than TIMEOUT_KUBECTL for specific operations)
-readonly KUBECTL_WAIT_TIMEOUT_SHORT="${KUBECTL_WAIT_TIMEOUT_SHORT:-180s}"    # Short timeout for quick operations (e.g., Grafana restart)
-readonly KUBECTL_WAIT_TIMEOUT_MEDIUM="${KUBECTL_WAIT_TIMEOUT_MEDIUM:-300s}"  # Medium timeout for standard operations
-readonly KUBECTL_WAIT_TIMEOUT_LONG="${KUBECTL_WAIT_TIMEOUT_LONG:-600s}"      # Long timeout for slow operations (e.g., Mimir initialization)
+readonly KUBECTL_WAIT_TIMEOUT_SHORT="${KUBECTL_WAIT_TIMEOUT_SHORT:-180s}"   # Short timeout for quick operations (e.g., Grafana restart)
+readonly KUBECTL_WAIT_TIMEOUT_MEDIUM="${KUBECTL_WAIT_TIMEOUT_MEDIUM:-300s}" # Medium timeout for standard operations
+readonly KUBECTL_WAIT_TIMEOUT_LONG="${KUBECTL_WAIT_TIMEOUT_LONG:-600s}"     # Long timeout for slow operations (e.g., Mimir initialization)
 
 
 # Alertmanager Slack (optional)
@@ -2330,14 +2330,14 @@ spec:
             add:
             # Required capabilities for OTeBPF application observability with trace context propagation
             # See: https://opentelemetry.io/docs/zero-code/obi/security/
-            - BPF                    # General BPF functionality
-            - DAC_READ_SEARCH        # Access to /proc/self/mem (not DAC_OVERRIDE)
-            - CHECKPOINT_RESTORE     # Access to symlinks in /proc filesystem
-            - SYS_ADMIN              # Required for EKS (kernel.perf_event_paranoid > 1)
-            - NET_RAW                # Create AF_PACKET raw sockets
-            - SYS_PTRACE             # Access to /proc/pid/exe and executable modules
-            - NET_ADMIN              # Load BPF_PROG_TYPE_SCHED_CLS TC programs
-            - SYS_RESOURCE           # Increase locked memory (kernels < 5.11)
+            - BPF                # General BPF functionality
+            - DAC_READ_SEARCH    # Access to /proc/self/mem (not DAC_OVERRIDE)
+            - CHECKPOINT_RESTORE # Access to symlinks in /proc filesystem
+            - SYS_ADMIN          # Required for EKS (kernel.perf_event_paranoid > 1)
+            - NET_RAW            # Create AF_PACKET raw sockets
+            - SYS_PTRACE         # Access to /proc/pid/exe and executable modules
+            - NET_ADMIN          # Load BPF_PROG_TYPE_SCHED_CLS TC programs
+            - SYS_RESOURCE       # Increase locked memory (kernels < 5.11)
           allowPrivilegeEscalation: true
         volumeMounts:
         - name: sys

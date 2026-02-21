@@ -27,8 +27,8 @@ spec:
     
   # Scaling Boundaries
   # Configured via Terraform variables for flexibility
-  minReplicas: ${OPENEMR_MIN_REPLICAS}  # Minimum pods (typically 2)
-  maxReplicas: ${OPENEMR_MAX_REPLICAS}  # Maximum pods (typically 10)
+  minReplicas: ${OPENEMR_MIN_REPLICAS} # Minimum pods (typically 2)
+  maxReplicas: ${OPENEMR_MAX_REPLICAS} # Maximum pods (typically 10)
   
   # Scaling Metrics
   metrics:

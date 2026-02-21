@@ -67,13 +67,13 @@ export AWS_PAGER=""
 export AWS_CLI_AUTO_PROMPT=off
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and failed tests
-GREEN='\033[0;32m'    # Success messages and passed tests
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-PURPLE='\033[0;35m'   # Test execution messages
-CYAN='\033[0;36m'     # Special test categories
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and failed tests
+GREEN='\033[0;32m'  # Success messages and passed tests
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+PURPLE='\033[0;35m' # Test execution messages
+CYAN='\033[0;36m'   # Special test categories
+NC='\033[0m'        # Reset color to default
 
 # Script directories for consistent path resolution
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -98,21 +98,21 @@ if [ -z "${CLUSTER_NAME:-}" ]; then
     fi
 fi
 
-NAMESPACE=${NAMESPACE:-"openemr"}      # Kubernetes namespace for OpenEMR
-BACKUP_BUCKET=""                       # S3 bucket for backup storage (set during test)
-SNAPSHOT_ID=""                         # RDS snapshot ID (set during test)
-TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S)  # Unique timestamp for test identification
+NAMESPACE=${NAMESPACE:-"openemr"}     # Kubernetes namespace for OpenEMR
+BACKUP_BUCKET=""                      # S3 bucket for backup storage (set during test)
+SNAPSHOT_ID=""                        # RDS snapshot ID (set during test)
+TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S) # Unique timestamp for test identification
 PROOF_FILE_CONTENT="OpenEMR Backup/Restore Test - Created: $(date '+%Y-%m-%d %H:%M:%S UTC') - Test ID: ${TEST_TIMESTAMP}"
 
 # Test results tracking
-TEST_RESULTS=()                    # Array to store test results
-TEST_START_TIME=$(date +%s)        # Start time for overall test duration
+TEST_RESULTS=()             # Array to store test results
+TEST_START_TIME=$(date +%s) # Start time for overall test duration
 
 # Global variables for cleanup tracking
-INFRASTRUCTURE_CREATED=false      # Flag to track if infrastructure was created during test
-BACKUP_BUCKET_CREATED=""          # Name of backup bucket created during test
-SNAPSHOT_ID_CREATED=""            # ID of snapshot created during test
-CLEANUP_REQUIRED=false            # Flag indicating if cleanup is needed
+INFRASTRUCTURE_CREATED=false # Flag to track if infrastructure was created during test
+BACKUP_BUCKET_CREATED=""     # Name of backup bucket created during test
+SNAPSHOT_ID_CREATED=""       # ID of snapshot created during test
+CLEANUP_REQUIRED=false       # Flag indicating if cleanup is needed
 
 
 # Emergency cleanup function for when tests fail
@@ -822,8 +822,8 @@ cleanup_manual_snapshots() {
             # Poll until all snapshots are completely deleted
             if [ ${#deleted_snapshots[@]} -gt 0 ]; then
                 log_info "Polling until all snapshots are completely deleted..."
-                local max_wait_time=600  # 10 minutes
-                local poll_interval=30   # Check every 30 seconds
+                local max_wait_time=600 # 10 minutes
+                local poll_interval=30  # Check every 30 seconds
                 local elapsed=0
                 local remaining_snapshots=("${deleted_snapshots[@]}")
                 
@@ -1211,8 +1211,8 @@ deploy_test_data() {
     log_info "This may take 15-20 minutes for OpenEMR containers to fully start..."
 
     # Use a more robust wait with progress feedback
-    local wait_timeout=2400  # 40 minutes
-    local check_interval=30  # Check every 30 seconds
+    local wait_timeout=2400 # 40 minutes
+    local check_interval=30 # Check every 30 seconds
     local elapsed=0
 
     while [ $elapsed -lt $wait_timeout ]; do
@@ -2050,8 +2050,8 @@ restore_from_backup() {
 
     # Wait for restoration to complete with progress feedback
     log_info "Waiting for restoration to complete..."
-    local wait_time=180  # 3 minutes
-    local check_interval=10  # Check every 10 seconds
+    local wait_time=180     # 3 minutes
+    local check_interval=10 # Check every 10 seconds
     local elapsed=0
 
     while [ $elapsed -lt $wait_time ]; do
@@ -2100,8 +2100,8 @@ verify_restoration() {
     else
         # Wait for deployment to be progressing or have available replicas
         log_info "Waiting for OpenEMR deployment to be progressing or have available replicas..."
-        local wait_timeout=1800  # 30 minutes (reduced from 40)
-        local check_interval=30  # Check every 30 seconds
+        local wait_timeout=1800 # 30 minutes (reduced from 40)
+        local check_interval=30 # Check every 30 seconds
         local elapsed=0
 
         while [ $elapsed -lt $wait_timeout ]; do

@@ -346,7 +346,7 @@ class OMOPToCCDAConverter:
         gender_map = {
             8507: "M",  # Male
             8532: "F",  # Female
-            8570: "UN",  # Unknown
+            8570: "UN", # Unknown
         }
         return gender_map.get(int(gender_concept_id))
 

@@ -34,10 +34,10 @@ parameters:
   uid: "0"
   gid: "0"
 mountOptions:
-  - tls  # Enable TLS encryption in transit
-reclaimPolicy: Retain                    # Retain volumes when PVCs are deleted (data preservation)
-volumeBindingMode: WaitForFirstConsumer  # Delay binding until pod is scheduled
-allowVolumeExpansion: true               # Allow volume expansion for growing data needs
+  - tls                                 # Enable TLS encryption in transit
+reclaimPolicy: Retain                   # Retain volumes when PVCs are deleted (data preservation)
+volumeBindingMode: WaitForFirstConsumer # Delay binding until pod is scheduled
+allowVolumeExpansion: true              # Allow volume expansion for growing data needs
 ---
 # OpenEMR Sites Data Persistent Volume Claim
 # Stores patient data, documents, images, and application files
@@ -121,10 +121,10 @@ parameters:
   uid: "0"
   gid: "0"
 mountOptions:
-  - tls                                  # Enable TLS encryption in transit for backup data
-reclaimPolicy: Retain                    # Retain backup volumes (critical for data recovery)
-volumeBindingMode: WaitForFirstConsumer  # Delay binding until backup job is scheduled
-allowVolumeExpansion: true               # Allow expansion for growing backup requirements
+  - tls                                 # Enable TLS encryption in transit for backup data
+reclaimPolicy: Retain                   # Retain backup volumes (critical for data recovery)
+volumeBindingMode: WaitForFirstConsumer # Delay binding until backup job is scheduled
+allowVolumeExpansion: true              # Allow expansion for growing backup requirements
 ---
 # Backup Data Persistent Volume Claim
 # Stores database backups, file system snapshots, and archival data
@@ -159,11 +159,11 @@ metadata:
     storageclass.kubernetes.io/description: "Encrypted EBS gp3 storage for monitoring time-series data"
 provisioner: ebs.csi.eks.amazonaws.com
 parameters:
-  type: gp3                              # Latest generation EBS volume type with better price/performance
-  encrypted: "true"                      # Enable encryption at rest for monitoring data
-  iops: "3000"                           # Provisioned IOPS for high-performance time-series writes
-  throughput: "125"                      # MB/s throughput for monitoring data ingestion
-  fsType: ext4                           # Standard Linux filesystem for monitoring tools
-volumeBindingMode: WaitForFirstConsumer  # Delay binding until monitoring pod is scheduled
-allowVolumeExpansion: true               # Allow expansion for growing monitoring data
-reclaimPolicy: Delete                    # Delete volumes when PVCs are deleted (monitoring data can be recreated)
+  type: gp3                             # Latest generation EBS volume type with better price/performance
+  encrypted: "true"                     # Enable encryption at rest for monitoring data
+  iops: "3000"                          # Provisioned IOPS for high-performance time-series writes
+  throughput: "125"                     # MB/s throughput for monitoring data ingestion
+  fsType: ext4                          # Standard Linux filesystem for monitoring tools
+volumeBindingMode: WaitForFirstConsumer # Delay binding until monitoring pod is scheduled
+allowVolumeExpansion: true              # Allow expansion for growing monitoring data
+reclaimPolicy: Delete                   # Delete volumes when PVCs are deleted (monitoring data can be recreated)

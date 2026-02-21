@@ -63,11 +63,11 @@ export AWS_CLI_AUTO_PROMPT=off
 
 # Color codes for terminal output - provides visual feedback during backup operations
 # These colors help distinguish between different types of messages (info, success, warnings, errors)
-RED='\033[0;31m'      # Error messages and critical failures
-GREEN='\033[0;32m'    # Success messages and completed operations
-YELLOW='\033[1;33m'   # Warning messages and non-critical issues
-BLUE='\033[0;34m'     # Information messages and progress updates
-NC='\033[0m'          # No Color - reset to default terminal color
+RED='\033[0;31m'    # Error messages and critical failures
+GREEN='\033[0;32m'  # Success messages and completed operations
+YELLOW='\033[1;33m' # Warning messages and non-critical issues
+BLUE='\033[0;34m'   # Information messages and progress updates
+NC='\033[0m'        # No Color - reset to default terminal color
 
 # Script directory for Terraform state access
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -76,26 +76,26 @@ TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
 # Configuration variables with defaults
 # These can be overridden via command-line arguments or environment variables
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}           # EKS cluster name for resource discovery
-AWS_REGION=${AWS_REGION:-"us-west-2"}                 # AWS region where OpenEMR resources are deployed
-BACKUP_REGION=${BACKUP_REGION:-"$AWS_REGION"}         # AWS region where backup data will be stored (defaults to source region)
-NAMESPACE=${NAMESPACE:-"openemr"}                     # Kubernetes namespace containing OpenEMR resources
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}   # EKS cluster name for resource discovery
+AWS_REGION=${AWS_REGION:-"us-west-2"}         # AWS region where OpenEMR resources are deployed
+BACKUP_REGION=${BACKUP_REGION:-"$AWS_REGION"} # AWS region where backup data will be stored (defaults to source region)
+NAMESPACE=${NAMESPACE:-"openemr"}             # Kubernetes namespace containing OpenEMR resources
 
 # Enhanced backup configuration for new RDS cross-Region/cross-account capabilities
-BACKUP_STRATEGY=${BACKUP_STRATEGY:-"same-region"}    # Backup strategy: same-region, cross-region, cross-account
-TARGET_ACCOUNT_ID=${TARGET_ACCOUNT_ID:-""}           # Target AWS account ID for cross-account backups (optional)
-KMS_KEY_ID=${KMS_KEY_ID:-""}                         # KMS key ID for encrypted snapshots (optional, uses default if empty)
-COPY_TAGS=${COPY_TAGS:-"true"}                       # Whether to copy tags to backup snapshots
+BACKUP_STRATEGY=${BACKUP_STRATEGY:-"same-region"} # Backup strategy: same-region, cross-region, cross-account
+TARGET_ACCOUNT_ID=${TARGET_ACCOUNT_ID:-""}        # Target AWS account ID for cross-account backups (optional)
+KMS_KEY_ID=${KMS_KEY_ID:-""}                      # KMS key ID for encrypted snapshots (optional, uses default if empty)
+COPY_TAGS=${COPY_TAGS:-"true"}                    # Whether to copy tags to backup snapshots
 
 # Backup identification and organization
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)                     # Timestamp for backup identification and organization
-BACKUP_ID="openemr-backup-${TIMESTAMP}"              # Unique identifier for this backup operation
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)        # Timestamp for backup identification and organization
+BACKUP_ID="openemr-backup-${TIMESTAMP}" # Unique identifier for this backup operation
 
 # Polling configuration for AWS resource availability checks
 # These timeouts prevent the script from hanging indefinitely while waiting for AWS resources
-CLUSTER_AVAILABILITY_TIMEOUT=${CLUSTER_AVAILABILITY_TIMEOUT:-1800}    # 30 minutes - max wait for RDS cluster to be available
-SNAPSHOT_AVAILABILITY_TIMEOUT=${SNAPSHOT_AVAILABILITY_TIMEOUT:-1800}  # 30 minutes - max wait for snapshot to be available
-POLLING_INTERVAL=${POLLING_INTERVAL:-30}                              # 30 seconds - interval between availability checks
+CLUSTER_AVAILABILITY_TIMEOUT=${CLUSTER_AVAILABILITY_TIMEOUT:-1800}   # 30 minutes - max wait for RDS cluster to be available
+SNAPSHOT_AVAILABILITY_TIMEOUT=${SNAPSHOT_AVAILABILITY_TIMEOUT:-1800} # 30 minutes - max wait for snapshot to be available
+POLLING_INTERVAL=${POLLING_INTERVAL:-30}                             # 30 seconds - interval between availability checks
 
 # Help function - displays comprehensive usage information and examples
 # This function provides users with clear guidance on how to use the backup script
@@ -282,9 +282,9 @@ get_aws_region() {
 wait_for_cluster_availability() {
     # Wait for an RDS Aurora cluster to become available before proceeding
     # This ensures the cluster is in a stable state before creating snapshots
-    local cluster_id=$1      # RDS cluster identifier to monitor
-    local region=$2          # AWS region where the cluster is located
-    local timeout=$3         # Maximum time to wait in seconds
+    local cluster_id=$1 # RDS cluster identifier to monitor
+    local region=$2     # AWS region where the cluster is located
+    local timeout=$3    # Maximum time to wait in seconds
     local start_time
     start_time=$(date +%s)   # Record start time for timeout calculation
     local elapsed=0
@@ -327,9 +327,9 @@ wait_for_cluster_availability() {
 wait_for_snapshot_availability() {
     # Wait for an RDS Aurora cluster snapshot to become available
     # This ensures the snapshot is complete and ready for restore operations
-    local snapshot_id=$1     # RDS cluster snapshot identifier to monitor
-    local region=$2          # AWS region where the snapshot is located
-    local timeout=$3         # Maximum time to wait in seconds
+    local snapshot_id=$1 # RDS cluster snapshot identifier to monitor
+    local region=$2      # AWS region where the snapshot is located
+    local timeout=$3     # Maximum time to wait in seconds
     local start_time
     start_time=$(date +%s)   # Record start time for timeout calculation
     local elapsed=0

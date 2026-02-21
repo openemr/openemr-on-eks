@@ -54,32 +54,32 @@
 # set -e  # Commented out to prevent premature exit on grep commands that may return non-zero
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and failed tests
-GREEN='\033[0;32m'    # Success messages and passed tests
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-PURPLE='\033[0;35m'   # Test execution messages
-CYAN='\033[0;36m'     # Special test categories
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and failed tests
+GREEN='\033[0;32m'  # Success messages and passed tests
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+PURPLE='\033[0;35m' # Test execution messages
+CYAN='\033[0;36m'   # Special test categories
+NC='\033[0m'        # Reset color to default
 
 # Path resolution and configuration
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
-CONFIG_FILE="$SCRIPT_DIR/test-config.yaml"                   # Test configuration file
-TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"                # Directory for test results
-TIMESTAMP=$(date +%Y%m%d-%H%M%S)                             # Timestamp for result files
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                    # Parent directory (project root)
+CONFIG_FILE="$SCRIPT_DIR/test-config.yaml"                 # Test configuration file
+TEST_RESULTS_DIR="$PROJECT_ROOT/test-results"              # Directory for test results
+TIMESTAMP=$(date +%Y%m%d-%H%M%S)                           # Timestamp for result files
 
 # Test execution parameters - can be overridden by environment variables
-TEST_SUITE=${TEST_SUITE:-"all"}     # Test suite to run (all, code-quality, k8s, scripts, docs)
-PARALLEL=${PARALLEL:-"true"}        # Whether to run tests in parallel
-DRY_RUN=${DRY_RUN:-"false"}         # Whether to show what would be tested without executing
-VERBOSE=${VERBOSE:-"false"}         # Whether to show detailed test output
+TEST_SUITE=${TEST_SUITE:-"all"} # Test suite to run (all, code-quality, k8s, scripts, docs)
+PARALLEL=${PARALLEL:-"true"}    # Whether to run tests in parallel
+DRY_RUN=${DRY_RUN:-"false"}     # Whether to show what would be tested without executing
+VERBOSE=${VERBOSE:-"false"}     # Whether to show detailed test output
 
 # Test result tracking variables
-TEST_RESULTS=()    # Array to store test results
-PASSED_TESTS=0     # Counter for passed tests
-FAILED_TESTS=0     # Counter for failed tests
-SKIPPED_TESTS=0    # Counter for skipped tests
+TEST_RESULTS=() # Array to store test results
+PASSED_TESTS=0  # Counter for passed tests
+FAILED_TESTS=0  # Counter for failed tests
+SKIPPED_TESTS=0 # Counter for skipped tests
 
 # Initialize test results directory for storing output files
 mkdir -p "$TEST_RESULTS_DIR"
@@ -125,10 +125,10 @@ log_info "Current working directory: $(pwd)"
 # Function to record test results and update counters
 # This function maintains the test result tracking system and provides consistent logging
 record_test_result() {
-    local test_name="$1"   # Name of the test that was executed
-    local status="$2"      # Test result status (PASS, FAIL, SKIP)
-    local message="$3"     # Descriptive message about the test result
-    local duration="$4"    # Time taken to execute the test
+    local test_name="$1" # Name of the test that was executed
+    local status="$2"    # Test result status (PASS, FAIL, SKIP)
+    local message="$3"   # Descriptive message about the test result
+    local duration="$4"  # Time taken to execute the test
 
     # Store result in array and update counters based on status
     case $status in
@@ -153,9 +153,9 @@ record_test_result() {
 # Generic test execution function
 # This function provides a standardized way to run individual tests with timing and error handling
 run_test() {
-    local test_name="$1"   # Human-readable name of the test
-    local test_type="$2"   # Type of test (syntax, validation, etc.)
-    local test_files="$3"  # Files or patterns to test
+    local test_name="$1"  # Human-readable name of the test
+    local test_type="$2"  # Type of test (syntax, validation, etc.)
+    local test_files="$3" # Files or patterns to test
 
     log_test "Running $test_name ($test_type)"
     local start_time=$(date +%s)

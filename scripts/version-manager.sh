@@ -56,20 +56,20 @@
 set -euo pipefail
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-PURPLE='\033[0;35m'   # Version management messages
-CYAN='\033[0;36m'     # Special categories and highlights
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+PURPLE='\033[0;35m' # Version management messages
+CYAN='\033[0;36m'   # Special categories and highlights
+NC='\033[0m'        # Reset color to default
 
 # Configuration variables - paths and file locations
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
-VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"                  # File containing version tracking data
-LOG_FILE="$PROJECT_ROOT/version-updates.log"                 # Log file for version update activities
-TEMP_DIR="/tmp/openemr-version-check-$$"                     # Temporary directory for processing
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                    # Parent directory (project root)
+VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"                # File containing version tracking data
+LOG_FILE="$PROJECT_ROOT/version-updates.log"               # Log file for version update activities
+TEMP_DIR="/tmp/openemr-version-check-$$"                   # Temporary directory for processing
 
 # Create temporary directory for processing and set cleanup trap
 mkdir -p "$TEMP_DIR"
@@ -79,10 +79,10 @@ trap 'rm -rf "$TEMP_DIR"' EXIT  # Ensure cleanup on script exit
 # This function ensures all version management activities are logged with timestamps
 # and appropriate log levels for audit trails and debugging
 log() {
-    local level="$1"    # Log level (INFO, WARN, ERROR, DEBUG)
-    shift               # Remove first argument (level) from arguments
-    local message="$*"  # Remaining arguments form the log message
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')  # Current timestamp for log entries
+    local level="$1"                             # Log level (INFO, WARN, ERROR, DEBUG)
+    shift                                        # Remove first argument (level) from arguments
+    local message="$*"                           # Remaining arguments form the log message
+    local timestamp=$(date '+%Y-%m-%d %H:%M:%S') # Current timestamp for log entries
     
     # Output to both console (stderr) and log file with timestamp and level
     echo -e "${timestamp} [${level}] ${message}" | tee -a "$LOG_FILE" >&2
@@ -106,23 +106,23 @@ search_version_in_codebase() {
     # Define exclusion patterns for the search
     # Exclude build artifacts, temporary files, and version reports to focus on source code
     local exclude_patterns=(
-        "--exclude-dir=.git"                    # Git repository metadata
-        "--exclude-dir=node_modules"            # Node.js dependencies
-        "--exclude-dir=.terraform"              # Terraform state and cache
-        "--exclude-dir=venv"                    # Python virtual environment
-        "--exclude-dir=__pycache__"             # Python bytecode cache
-        "--exclude-dir=.pytest_cache"           # Pytest cache
-        "--exclude-dir=dist"                    # Distribution files
-        "--exclude-dir=build"                   # Build artifacts
-        "--exclude=*.log"                       # Log files
-        "--exclude=version-update-report-*.md"  # Previous version reports
-        "--exclude=*.pyc"                       # Python compiled files
-        "--exclude=*.pyo"                       # Python optimized files
-        "--exclude=*.so"                        # Shared object files
-        "--exclude=*.o"                         # Object files
-        "--exclude=*.a"                         # Archive files
-        "--exclude=*.tmp"                       # Temporary files
-        "--exclude=*.temp"                      # Temporary files
+        "--exclude-dir=.git"                   # Git repository metadata
+        "--exclude-dir=node_modules"           # Node.js dependencies
+        "--exclude-dir=.terraform"             # Terraform state and cache
+        "--exclude-dir=venv"                   # Python virtual environment
+        "--exclude-dir=__pycache__"            # Python bytecode cache
+        "--exclude-dir=.pytest_cache"          # Pytest cache
+        "--exclude-dir=dist"                   # Distribution files
+        "--exclude-dir=build"                  # Build artifacts
+        "--exclude=*.log"                      # Log files
+        "--exclude=version-update-report-*.md" # Previous version reports
+        "--exclude=*.pyc"                      # Python compiled files
+        "--exclude=*.pyo"                      # Python optimized files
+        "--exclude=*.so"                       # Shared object files
+        "--exclude=*.o"                        # Object files
+        "--exclude=*.a"                        # Archive files
+        "--exclude=*.tmp"                      # Temporary files
+        "--exclude=*.temp"                     # Temporary files
     )
     
     # Escape special characters in the version string for grep regex
@@ -278,8 +278,8 @@ normalize_version() {
 # Function to compare two version strings for equality
 # This function normalizes both versions and compares them, returning 0 if equal, 1 if different
 compare_versions() {
-    local version1="$1"  # First version to compare
-    local version2="$2"  # Second version to compare
+    local version1="$1" # First version to compare
+    local version2="$2" # Second version to compare
     
     # Normalize both versions to ensure consistent comparison
     local norm1=$(normalize_version "$version1")
@@ -296,8 +296,8 @@ compare_versions() {
 # Error handling function
 # This function provides consistent error handling and logging throughout the script
 error_exit() {
-    log "ERROR" "$1"  # Log the error message
-    exit 1            # Exit with error code 1
+    log "ERROR" "$1" # Log the error message
+    exit 1           # Exit with error code 1
 }
 
 # Function to check for required dependencies
@@ -358,8 +358,8 @@ parse_config() {
 # Function to get the latest Docker image version from Docker Hub
 # This function queries Docker Hub's API to retrieve the latest available version
 get_latest_docker_version() {
-    local registry="$1"      # Docker registry name (e.g., "openemr/openemr")
-    local use_stable="$2"    # Set to "true" for OpenEMR (second-to-latest), "false" for others (latest)
+    local registry="$1"   # Docker registry name (e.g., "openemr/openemr")
+    local use_stable="$2" # Set to "true" for OpenEMR (second-to-latest), "false" for others (latest)
 
     log "INFO" "Checking latest version for $registry..."
 
@@ -1681,14 +1681,14 @@ Component Types:
   security_tools          Trivy, Checkov, KICS, gosec
 
 Examples:
-  $0 check                                    # Check all components
-  $0 check --components applications          # Check only applications
-  $0 check --components terraform_modules     # Check only Terraform modules
-  $0 check --components go_packages           # Check only Go packages
-  $0 check --components eks_addons            # Check only EKS add-ons
-  $0 check --components security_tools        # Check only security tools
-  $0 check --create-issue --month "January 2025"  # Create GitHub issue
-  $0 status                                   # Show current status
+  $0 check                                       # Check all components
+  $0 check --components applications             # Check only applications
+  $0 check --components terraform_modules        # Check only Terraform modules
+  $0 check --components go_packages              # Check only Go packages
+  $0 check --components eks_addons               # Check only EKS add-ons
+  $0 check --components security_tools           # Check only security tools
+  $0 check --create-issue --month "January 2025" # Create GitHub issue
+  $0 status                                      # Show current status
 
 Note: Some version checks require AWS CLI credentials to be configured.
       The system will gracefully handle missing credentials and report what
@@ -1755,10 +1755,10 @@ show_status() {
 # This function handles command-line argument parsing and dispatches to appropriate functions
 main() {
     # Set default values for command-line options
-    local command="${1:-check}"     # Default command is 'check'
-    local components="all"          # Default to checking all components
-    local create_issue="false"      # Don't create GitHub issues by default
-    local month=""                  # No month filtering by default
+    local command="${1:-check}" # Default command is 'check'
+    local components="all"      # Default to checking all components
+    local create_issue="false"  # Don't create GitHub issues by default
+    local month=""              # No month filtering by default
 
     # Parse command-line arguments
     shift || true  # Remove the command from arguments
@@ -1791,7 +1791,7 @@ main() {
     done
 
     # Initialize script dependencies and configuration
-    check_dependencies  # Validate required tools are available
+    check_dependencies # Validate required tools are available
     parse_config       # Load version configuration from YAML file
 
     # Execute the specified command

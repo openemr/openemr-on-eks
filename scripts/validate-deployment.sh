@@ -54,16 +54,16 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Configuration variables - can be overridden by environment variables
-CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"}   # EKS cluster name to validate
-AWS_REGION=${AWS_REGION:-"us-west-2"}         # AWS region where resources are located
-NAMESPACE=${NAMESPACE:-"openemr"}             # Kubernetes namespace for OpenEMR
+CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name to validate
+AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where resources are located
+NAMESPACE=${NAMESPACE:-"openemr"}           # Kubernetes namespace for OpenEMR
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {
@@ -332,8 +332,8 @@ check_terraform_state() {
 check_required_resources() {
     echo -e "${BLUE}Checking AWS resources...${NC}"
 
-    local resources_found=0  # Counter for found resources
-    local total_resources=4  # Total number of required resources to check
+    local resources_found=0 # Counter for found resources
+    local total_resources=4 # Total number of required resources to check
 
     # Check VPC (Virtual Private Cloud)
     # VPC provides network isolation and routing for the EKS cluster
@@ -395,8 +395,8 @@ check_required_resources() {
 check_k8s_resources() {
     echo -e "${BLUE}Checking Kubernetes resources...${NC}"
 
-    local resources_found=0  # Counter for found resources
-    local total_resources=2  # Total number of resources to check
+    local resources_found=0 # Counter for found resources
+    local total_resources=2 # Total number of resources to check
 
     # Check if the OpenEMR namespace exists
     # Namespaces provide logical separation and resource isolation
@@ -566,10 +566,10 @@ main() {
 
     # Step 1: Validate required command-line tools
     echo -e "${BLUE}1. Checking prerequisites...${NC}"
-    check_command "kubectl" || ((errors++))  # Kubernetes command-line tool
-    check_command "aws" || ((errors++))      # AWS CLI tool
-    check_command "helm" || ((errors++))     # Helm package manager
-    check_command "jq" || echo -e "${YELLOW}⚠️  jq not installed (optional but recommended)${NC}"  # JSON processor (optional)
+    check_command "kubectl" || ((errors++))                                                       # Kubernetes command-line tool
+    check_command "aws" || ((errors++))                                                           # AWS CLI tool
+    check_command "helm" || ((errors++))                                                          # Helm package manager
+    check_command "jq" || echo -e "${YELLOW}⚠️  jq not installed (optional but recommended)${NC}" # JSON processor (optional)
     echo ""
 
     # Step 2: Validate AWS credentials and authentication

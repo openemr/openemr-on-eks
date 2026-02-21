@@ -34,9 +34,9 @@ on:
         default: 'patch'
         type: choice
         options:
-          - major  # Breaking changes - increment major version
-          - minor  # New features - increment minor version
-          - patch  # Bug fixes - increment patch version
+          - major # Breaking changes - increment major version
+          - minor # New features - increment minor version
+          - patch # Bug fixes - increment patch version
       release_notes:
         description: 'Release notes (required)'
         required: true
@@ -49,8 +49,8 @@ on:
 
 # Environment variables for consistent tool versions
 env:
-  PYTHON_VERSION: '3.14.0'                    # Python version for semantic versioning
-  SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4"      # Specific semver package version
+  PYTHON_VERSION: '3.14.0'               # Python version for semantic versioning
+  SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4" # Specific semver package version
 
 # Required permissions for release operations
 permissions:
@@ -64,9 +64,9 @@ jobs:
   determine-release-type:
     runs-on: ubuntu-24.04
     outputs:
-      release-type: ${{ steps.determine-type.outputs.release-type }}    # Type of release (major/minor/patch)
-      bump-version: ${{ steps.determine-type.outputs.bump-version }}    # Version bump type for semver
-      triggered-by: ${{ steps.determine-type.outputs.triggered-by }}    # User who triggered the release
+      release-type: ${{ steps.determine-type.outputs.release-type }} # Type of release (major/minor/patch)
+      bump-version: ${{ steps.determine-type.outputs.bump-version }} # Version bump type for semver
+      triggered-by: ${{ steps.determine-type.outputs.triggered-by }} # User who triggered the release
     steps:
       # Step 1: Process and validate release type input
       - name: Determine release type
@@ -77,10 +77,10 @@ jobs:
 
           # Validate release type and set appropriate semver bump type
           case "${{ github.event.inputs.release_type }}" in
-            major) echo "bump-version=major" >> $GITHUB_OUTPUT ;;  # Breaking changes
-            minor) echo "bump-version=minor" >> $GITHUB_OUTPUT ;;  # New features
-            patch) echo "bump-version=patch" >> $GITHUB_OUTPUT ;;  # Bug fixes
-            *) echo "::error::Invalid release type" && exit 1 ;;   # Invalid input
+            major) echo "bump-version=major" >> $GITHUB_OUTPUT ;; # Breaking changes
+            minor) echo "bump-version=minor" >> $GITHUB_OUTPUT ;; # New features
+            patch) echo "bump-version=patch" >> $GITHUB_OUTPUT ;; # Bug fixes
+            *) echo "::error::Invalid release type" && exit 1 ;;  # Invalid input
           esac
 
   # Job 2: Check for changes since last release
@@ -90,8 +90,8 @@ jobs:
     needs: determine-release-type  # Wait for release type determination
     runs-on: ubuntu-24.04
     outputs:
-      has-changes: ${{ steps.check-changes.outputs.has-changes }}  # Boolean indicating if changes exist
-      last-tag: ${{ steps.check-changes.outputs.last-tag }}        # Last release tag for reference
+      has-changes: ${{ steps.check-changes.outputs.has-changes }} # Boolean indicating if changes exist
+      last-tag: ${{ steps.check-changes.outputs.last-tag }}       # Last release tag for reference
     steps:
       # Step 1: Checkout repository with full history for change detection
       - uses: actions/checkout@v6.0.1
@@ -127,12 +127,12 @@ jobs:
   # Job 3: Create the actual release (only if changes exist)
   # This job handles version calculation, release notes generation, and GitHub release creation
   create-release:
-    needs: [determine-release-type, check-changes]         # Wait for previous jobs
-    if: needs.check-changes.outputs.has-changes == 'true'  # Only run if changes exist
+    needs: [determine-release-type, check-changes]        # Wait for previous jobs
+    if: needs.check-changes.outputs.has-changes == 'true' # Only run if changes exist
     runs-on: ubuntu-24.04
     outputs:
-      new-version: ${{ steps.new-version.outputs.new-version }}      # Calculated new version
-      release-url: ${{ steps.create-release.outputs.html_url }}      # GitHub release URL
+      new-version: ${{ steps.new-version.outputs.new-version }} # Calculated new version
+      release-url: ${{ steps.create-release.outputs.html_url }} # GitHub release URL
     steps:
       # Step 1: Checkout repository with full history for release creation
       - uses: actions/checkout@v6.0.1

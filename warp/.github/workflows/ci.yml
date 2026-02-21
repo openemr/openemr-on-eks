@@ -39,14 +39,14 @@ on:
 
 # Required permissions for the workflow
 permissions:
-  contents: read          # Read repository contents for testing
-  security-events: write  # Write security scan results to GitHub Security tab
-  actions: read           # Read workflow information for reporting
+  contents: read         # Read repository contents for testing
+  security-events: write # Write security scan results to GitHub Security tab
+  actions: read          # Read workflow information for reporting
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.0'    # Python version (matches main CI/CD workflow)
-  WARP_DIR: 'warp'            # Warp project directory
+  PYTHON_VERSION: '3.14.0' # Python version (matches main CI/CD workflow)
+  WARP_DIR: 'warp'         # Warp project directory
 
 jobs:
   # Test job - runs pytest with coverage

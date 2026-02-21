@@ -73,11 +73,11 @@ resource "aws_rds_cluster" "openemr" {
   preferred_maintenance_window = "sun:04:00-sun:05:00" # Maintenance window (UTC)
 
   # Security and compliance features
-  iam_database_authentication_enabled = true                                  # Enable IAM database authentication
-  copy_tags_to_snapshot               = true                                  # Copy tags to snapshots for tracking
+  iam_database_authentication_enabled = true                                       # Enable IAM database authentication
+  copy_tags_to_snapshot               = true                                       # Copy tags to snapshots for tracking
   enabled_cloudwatch_logs_exports     = ["error", "general", "slowquery", "audit"] # Export logs including audit
-  storage_encrypted                   = true                                  # Encrypt storage at rest
-  kms_key_id                          = aws_kms_key.rds.arn                   # KMS key for encryption
+  storage_encrypted                   = true                                       # Encrypt storage at rest
+  kms_key_id                          = aws_kms_key.rds.arn                        # KMS key for encryption
 
   # Backtracking for point-in-time recovery (72 hours = 259200 seconds)
   backtrack_window = 259200 # 72 hours backtracking window

@@ -52,11 +52,11 @@
 set -e
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical issues
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical issues
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Configuration variables - can be overridden by environment variables
 NAMESPACE=${NAMESPACE:-"openemr"}           # Kubernetes namespace for OpenEMR
@@ -65,10 +65,10 @@ AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where resources are loc
 
 # Path resolution for script portability
 # These variables ensure the script works regardless of the current working directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
-TERRAFORM_DIR="$PROJECT_ROOT/terraform"                      # Terraform configuration directory
-K8S_DIR="$PROJECT_ROOT/k8s"                                  # Kubernetes manifests directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                    # Parent directory (project root)
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"                    # Terraform configuration directory
+K8S_DIR="$PROJECT_ROOT/k8s"                                # Kubernetes manifests directory
 
 # Get AWS region from environment or Terraform state
 get_aws_region() {
@@ -156,8 +156,8 @@ check_terraform_config() {
 # Function to update Terraform variable values in terraform.tfvars
 # This function safely updates or adds variables to the Terraform configuration file
 update_terraform_var() {
-    local var_name="$1"   # Name of the Terraform variable to update
-    local var_value="$2"  # New value for the variable
+    local var_name="$1"  # Name of the Terraform variable to update
+    local var_value="$2" # New value for the variable
 
     echo -e "${YELLOW}Updating $var_name to $var_value in terraform.tfvars...${NC}"
 

@@ -24,34 +24,34 @@ metadata:
     ingressClassName: alb  # Use AWS Load Balancer Controller
     
     # Load Balancer Configuration
-    alb.ingress.kubernetes.io/scheme: internet-facing  # Public internet access
-    alb.ingress.kubernetes.io/target-type: ip          # Route to pod IPs (better for EKS)
+    alb.ingress.kubernetes.io/scheme: internet-facing # Public internet access
+    alb.ingress.kubernetes.io/target-type: ip         # Route to pod IPs (better for EKS)
     
     # SSL/TLS Configuration
-    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'    # HTTPS only for security
-    alb.ingress.kubernetes.io/certificate-arn: "${SSL_CERT_ARN}"  # ACM certificate ARN
-    alb.ingress.kubernetes.io/backend-protocol: HTTPS             # Backend uses HTTPS
-    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS         # Health checks use HTTPS
-    alb.ingress.kubernetes.io/ssl-redirect: "443"                 # Redirect HTTP to HTTPS
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'   # HTTPS only for security
+    alb.ingress.kubernetes.io/certificate-arn: "${SSL_CERT_ARN}" # ACM certificate ARN
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS            # Backend uses HTTPS
+    alb.ingress.kubernetes.io/healthcheck-protocol: HTTPS        # Health checks use HTTPS
+    alb.ingress.kubernetes.io/ssl-redirect: "443"                # Redirect HTTP to HTTPS
     
     # Health Check Configuration
     # Custom health check endpoint for OpenEMR login page
     alb.ingress.kubernetes.io/healthcheck-path: /interface/login/login.php
-    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30"  # Check every 30 seconds
-    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"    # 5 second timeout
-    alb.ingress.kubernetes.io/healthy-threshold-count: "2"        # 2 consecutive successes = healthy
-    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"      # 3 consecutive failures = unhealthy
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "30" # Check every 30 seconds
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"   # 5 second timeout
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"       # 2 consecutive successes = healthy
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"     # 3 consecutive failures = unhealthy
     
     # Advanced Load Balancer Attributes
     alb.ingress.kubernetes.io/load-balancer-attributes: |
-      idle_timeout.timeout_seconds=300,  # 5 minute idle timeout for long sessions
-      routing.http.drop_invalid_header_fields.enabled=true,  # Security: drop invalid headers
-      routing.http.preserve_host_header.enabled=true,  # Preserve original host header
-      routing.http.x_amzn_tls_version_and_cipher_suite.enabled=true,  # TLS information
-      routing.http.xff_client_port.enabled=true,  # Include client port in X-Forwarded-For
-      access_logs.s3.enabled=true,  # Enable access logging for audit trails
-      access_logs.s3.bucket=${S3_BUCKET_NAME},  # S3 bucket for access logs
-      access_logs.s3.prefix=alb-logs  # Log prefix for organization
+      idle_timeout.timeout_seconds=300,                              # 5 minute idle timeout for long sessions
+      routing.http.drop_invalid_header_fields.enabled=true,          # Security: drop invalid headers
+      routing.http.preserve_host_header.enabled=true,                # Preserve original host header
+      routing.http.x_amzn_tls_version_and_cipher_suite.enabled=true, # TLS information
+      routing.http.xff_client_port.enabled=true,                     # Include client port in X-Forwarded-For
+      access_logs.s3.enabled=true,                                   # Enable access logging for audit trails
+      access_logs.s3.bucket=${S3_BUCKET_NAME},                       # S3 bucket for access logs
+      access_logs.s3.prefix=alb-logs                                 # Log prefix for organization
     
     # WAF Integration for Security
     # Web Application Firewall ACL for protection against common attacks

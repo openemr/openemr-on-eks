@@ -102,8 +102,8 @@ CLUSTER_NAME=""
 AWS_REGION="us-west-2"
 
 # Backup job handling configuration (some jobs like Aurora cannot be stopped)
-BACKUP_JOB_WAIT_TIMEOUT="${BACKUP_JOB_WAIT_TIMEOUT:-180}"      # Max seconds to wait for backup jobs
-BACKUP_JOB_POLL_INTERVAL="${BACKUP_JOB_POLL_INTERVAL:-15}"     # Seconds between job status checks
+BACKUP_JOB_WAIT_TIMEOUT="${BACKUP_JOB_WAIT_TIMEOUT:-180}"  # Max seconds to wait for backup jobs
+BACKUP_JOB_POLL_INTERVAL="${BACKUP_JOB_POLL_INTERVAL:-15}" # Seconds between job status checks
 
 # =============================================================================
 # LOGGING FUNCTIONS

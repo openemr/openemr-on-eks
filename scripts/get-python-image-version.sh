@@ -53,8 +53,8 @@
 set -e
 
 # Configuration variables - default values used when versions.yaml unavailable
-DEFAULT_VERSION="3.14"                        # Default Python version fallback
-SUFFIX="${1:-slim}"                           # Image variant suffix (default: slim)
+DEFAULT_VERSION="3.14" # Default Python version fallback
+SUFFIX="${1:-slim}"    # Image variant suffix (default: slim)
 
 # Script directory detection - allows script to be run from any location
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -47,27 +47,27 @@
 set -e
 
 # Color codes for terminal output - provides visual distinction between different message types
-RED='\033[0;31m'      # Error messages and critical warnings
-GREEN='\033[0;32m'    # Success messages and positive feedback
-YELLOW='\033[1;33m'   # Warning messages and cautionary information
-BLUE='\033[0;34m'     # Info messages and general information
-NC='\033[0m'          # Reset color to default
+RED='\033[0;31m'    # Error messages and critical warnings
+GREEN='\033[0;32m'  # Success messages and positive feedback
+YELLOW='\033[1;33m' # Warning messages and cautionary information
+BLUE='\033[0;34m'   # Info messages and general information
+NC='\033[0m'        # Reset color to default
 
 # Parse command line arguments
 # This section processes command-line options to control script behavior
 # The --force flag bypasses safety confirmations for automated/scripted usage
-FORCE=false  # Flag to skip confirmation prompts (set by --force or -f)
-SKIP_DB_CLEANUP=false  # Flag to skip database cleanup (set by --skip-db-cleanup)
+FORCE=false           # Flag to skip confirmation prompts (set by --force or -f)
+SKIP_DB_CLEANUP=false # Flag to skip database cleanup (set by --skip-db-cleanup)
 
 while [[ $# -gt 0 ]]; do
     case $1 in
         -f|--force)
-            FORCE=true        # Enable force mode - skip all confirmation prompts
-            shift             # Consume the option
+            FORCE=true # Enable force mode - skip all confirmation prompts
+            shift      # Consume the option
             ;;
         --skip-db-cleanup)
-            SKIP_DB_CLEANUP=true  # Skip database cleanup
-            shift                 # Consume the option
+            SKIP_DB_CLEANUP=true # Skip database cleanup
+            shift                # Consume the option
             ;;
         -h|--help)
             # Display comprehensive help information including usage examples
@@ -94,8 +94,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Configuration variables - can be overridden by environment variables
-NAMESPACE=${NAMESPACE:-"openemr"}                       # Kubernetes namespace to clean
-DB_CLEANUP_MAX_ATTEMPTS=${DB_CLEANUP_MAX_ATTEMPTS:-24}  # Maximum attempts to wait for database cleanup pod completion
+NAMESPACE=${NAMESPACE:-"openemr"}                      # Kubernetes namespace to clean
+DB_CLEANUP_MAX_ATTEMPTS=${DB_CLEANUP_MAX_ATTEMPTS:-24} # Maximum attempts to wait for database cleanup pod completion
 
 # Timeout recommendations based on scenario
 # - Normal database cleanup: 12 attempts (60 seconds) - default
@@ -105,9 +105,9 @@ DB_CLEANUP_MAX_ATTEMPTS=${DB_CLEANUP_MAX_ATTEMPTS:-24}  # Maximum attempts to wa
 
 # Path resolution for script portability
 # These variables ensure the script works regardless of the current working directory
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"   # Directory containing this script
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                      # Parent directory (project root)
-TERRAFORM_DIR="$PROJECT_ROOT/terraform"                      # Terraform configuration directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)" # Directory containing this script
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"                    # Parent directory (project root)
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"                    # Terraform configuration directory
 
 # Configuration defaults
 AWS_REGION=${AWS_REGION:-"us-west-2"}
@@ -982,8 +982,8 @@ echo ""
 # Remove any .bak files and credential files that may have been generated
 echo -e "${YELLOW}8. Cleaning up backup files...${NC}"
 cd "$PROJECT_ROOT/k8s"
-rm -f ./*.yaml.bak              # Remove backup files created during deployment
-rm -f openemr-credentials*.txt  # Remove any credential files
+rm -f ./*.yaml.bak             # Remove backup files created during deployment
+rm -f openemr-credentials*.txt # Remove any credential files
 echo -e "${GREEN}✅ Backup files cleaned${NC}"
 echo ""
 

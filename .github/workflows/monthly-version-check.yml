@@ -59,10 +59,10 @@ on:
 
 # Environment variables for consistent tool versions and configuration
 env:
-  VERSION_CHECK_ENABLED: "true"  # Enable version checking functionality
-  LOG_LEVEL: INFO                # Logging level for detailed output
-  TF_VERSION: "1.14.3"           # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.35.0"     # kubectl version for Kubernetes checks
+  VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
+  LOG_LEVEL: INFO               # Logging level for detailed output
+  TF_VERSION: "1.14.3"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.35.0"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -71,11 +71,11 @@ env:
 
 # Required permissions for version checking and issue creation
 permissions:
-  id-token: write       # Required for OIDC authentication (more secure than and preferred over static credentials)
-  contents: read        # Read repository contents for version analysis
-  issues: write         # Create GitHub issues for update notifications
-  pull-requests: read   # Read pull request information
-  actions: read         # Read workflow information for reporting
+  id-token: write     # Required for OIDC authentication (more secure than and preferred over static credentials)
+  contents: read      # Read repository contents for version analysis
+  issues: write       # Create GitHub issues for update notifications
+  pull-requests: read # Read pull request information
+  actions: read       # Read workflow information for reporting
 
 jobs:
   # Primary job - performs comprehensive version checking across all components
@@ -520,8 +520,8 @@ jobs:
   notification:
     name: Send Notifications
     runs-on: ubuntu-24.04
-    needs: version-check  # Wait for version-check job to complete
-    if: always()          # Run regardless of version-check outcome
+    needs: version-check # Wait for version-check job to complete
+    if: always()         # Run regardless of version-check outcome
 
     steps:
       # Step 1: Send success notification

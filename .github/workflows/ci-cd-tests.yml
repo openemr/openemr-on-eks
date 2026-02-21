@@ -48,9 +48,9 @@ on:
 
 # Required permissions for the workflow
 permissions:
-  contents: read          # Read repository contents for testing
-  security-events: write  # Write security scan results to GitHub Security tab
-  actions: read           # Read workflow information for reporting
+  contents: read         # Read repository contents for testing
+  security-events: write # Write security scan results to GitHub Security tab
+  actions: read          # Read workflow information for reporting
 
 # Environment variables for consistent tool versions across all jobs
 env:
@@ -215,8 +215,8 @@ jobs:
       - name: Validate Terraform configuration
         run: |
           cd terraform
-          terraform init -backend=false  # Initialize without backend for validation only
-          terraform validate             # Validate Terraform configuration syntax
+          terraform init -backend=false # Initialize without backend for validation only
+          terraform validate            # Validate Terraform configuration syntax
 
       # Step 7: Validate Kubernetes manifest YAML syntax
       # This step ensures all K8s manifests have valid YAML syntax before deployment
@@ -293,16 +293,16 @@ jobs:
       - name: Run Trivy vulnerability scanner (Table format - STRICT)
         uses: aquasecurity/trivy-action@master
         with:
-          scan-type: 'fs'                          # File system scan of entire repository
-          scan-ref: '.'                            # Scan current directory
-          format: 'table'                          # Use table format for better readability in logs
-          output: 'trivy-results.txt'              # Output file for table format results
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'     # Include all severities - zero tolerance
-          scanners: 'vuln,secret,misconfig'        # Enable vulnerability, secret, and misconfig scanners
-          exit-code: '1'                           # FAIL the build on ANY finding (zero-tolerance)
-          skip-db-update: false                    # Allow database updates
-          cache-dir: '.trivycache'                 # Use local cache directory
-          trivyignores: '.trivyignore'             # Use ignore file for false positives only
+          scan-type: 'fs'                      # File system scan of entire repository
+          scan-ref: '.'                        # Scan current directory
+          format: 'table'                      # Use table format for better readability in logs
+          output: 'trivy-results.txt'          # Output file for table format results
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW' # Include all severities - zero tolerance
+          scanners: 'vuln,secret,misconfig'    # Enable vulnerability, secret, and misconfig scanners
+          exit-code: '1'                       # FAIL the build on ANY finding (zero-tolerance)
+          skip-db-update: false                # Allow database updates
+          cache-dir: '.trivycache'             # Use local cache directory
+          trivyignores: '.trivyignore'         # Use ignore file for false positives only
 
       # Step 3: Run Trivy vulnerability scanner in SARIF format for GitHub Security tab
       # This runs only if table scan passes (no findings)
@@ -310,14 +310,14 @@ jobs:
         uses: aquasecurity/trivy-action@master
         if: success()
         with:
-          scan-type: 'fs'                          # File system scan of entire repository
-          scan-ref: '.'                            # Scan current directory
-          format: 'sarif'                          # SARIF format for GitHub Security tab
-          output: 'trivy-results.sarif'            # Output file for SARIF format results
-          severity: 'CRITICAL,HIGH,MEDIUM,LOW'     # Include all severities
-          scanners: 'vuln,secret,misconfig'        # Enable vulnerability, secret, and misconfig scanners
-          exit-code: '1'                           # FAIL on any finding
-          trivyignores: '.trivyignore'             # Use ignore file for false positives only
+          scan-type: 'fs'                      # File system scan of entire repository
+          scan-ref: '.'                        # Scan current directory
+          format: 'sarif'                      # SARIF format for GitHub Security tab
+          output: 'trivy-results.sarif'        # Output file for SARIF format results
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW' # Include all severities
+          scanners: 'vuln,secret,misconfig'    # Enable vulnerability, secret, and misconfig scanners
+          exit-code: '1'                       # FAIL on any finding
+          trivyignores: '.trivyignore'         # Use ignore file for false positives only
 
       # Step 4: Display Trivy scan results in workflow logs
       - name: Display Trivy results
@@ -499,8 +499,8 @@ jobs:
           output: 'trivy-warp-results.txt'
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'
           scanners: 'vuln,secret,misconfig'
-          exit-code: '1'                        # FAIL on any finding (zero-tolerance)
-          trivyignores: '.trivyignore'          # Use ignore file for false positives only
+          exit-code: '1'               # FAIL on any finding (zero-tolerance)
+          trivyignores: '.trivyignore' # Use ignore file for false positives only
 
       # Step 12: Display Trivy results
       - name: Display Trivy results

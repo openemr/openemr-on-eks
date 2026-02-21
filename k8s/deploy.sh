@@ -52,12 +52,12 @@ set -euo pipefail
 # Using ANSI escape sequences that work across most modern terminals.
 # The NC (No Color) constant is used to reset formatting after colored text.
 
-readonly RED='\033[0;31m'      # Error messages and critical failures
-readonly GREEN='\033[0;32m'    # Success messages and completed operations
-readonly YELLOW='\033[1;33m'   # Warning messages and important notices
-readonly BLUE='\033[0;34m'     # Information messages and status updates
-readonly CYAN='\033[0;36m'     # Step headers and section dividers
-readonly NC='\033[0m'          # Reset to default color (No Color)
+readonly RED='\033[0;31m'    # Error messages and critical failures
+readonly GREEN='\033[0;32m'  # Success messages and completed operations
+readonly YELLOW='\033[1;33m' # Warning messages and important notices
+readonly BLUE='\033[0;34m'   # Information messages and status updates
+readonly CYAN='\033[0;36m'   # Step headers and section dividers
+readonly NC='\033[0m'        # Reset to default color (No Color)
 
 # =============================================================================
 # CONFIGURATION & CONSTANTS
@@ -72,26 +72,26 @@ readonly NC='\033[0m'          # Reset to default color (No Color)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 TERRAFORM_DIR="$PROJECT_ROOT/terraform"
-readonly SCRIPT_DIR      # Directory containing this deploy.sh script
-readonly PROJECT_ROOT    # Root directory of the OpenEMR project
-readonly TERRAFORM_DIR   # Terraform directory for state access
+readonly SCRIPT_DIR    # Directory containing this deploy.sh script
+readonly PROJECT_ROOT  # Root directory of the OpenEMR project
+readonly TERRAFORM_DIR # Terraform directory for state access
 
 # Deployment timeouts - carefully tuned based on OpenEMR's startup characteristics
 # These timeouts account for OpenEMR's complex initialization process which includes
 # database schema creation, configuration setup, and service startup.
-readonly POD_READY_TIMEOUT=1800          # 30 minutes - OpenEMR can take 7-11 minutes normally (can spike to 19 min)
-readonly HEALTH_CHECK_TIMEOUT=600        # 10 minutes - For PVC binding and service readiness
-readonly EFS_CSI_TIMEOUT=300             # 5 minutes - EFS CSI driver operations
-readonly CLEANUP_WAIT_TIME=5             # 5 seconds - Wait after cleanup operations
-readonly PVC_CHECK_INTERVAL=5            # 5 seconds - Interval between PVC status checks
-readonly ESSENTIAL_PVC_COUNT=3           # 3 PVCs required for OpenEMR deployment
+readonly POD_READY_TIMEOUT=1800   # 30 minutes - OpenEMR can take 7-11 minutes normally (can spike to 19 min)
+readonly HEALTH_CHECK_TIMEOUT=600 # 10 minutes - For PVC binding and service readiness
+readonly EFS_CSI_TIMEOUT=300      # 5 minutes - EFS CSI driver operations
+readonly CLEANUP_WAIT_TIME=5      # 5 seconds - Wait after cleanup operations
+readonly PVC_CHECK_INTERVAL=5     # 5 seconds - Interval between PVC status checks
+readonly ESSENTIAL_PVC_COUNT=3    # 3 PVCs required for OpenEMR deployment
 
 # Kubernetes resource names - consistent naming across all manifests
 # These names must match the corresponding Kubernetes manifests in the k8s/ directory.
-readonly DEPLOYMENT_NAME="openemr"           # Name of the OpenEMR deployment
-readonly SERVICE_NAME="openemr-service"      # Name of the OpenEMR service
-readonly NAMESPACE_DEFAULT="openemr"         # Default namespace for OpenEMR resources
-readonly CLUSTER_NAME_DEFAULT="openemr-eks"  # Default EKS cluster name
+readonly DEPLOYMENT_NAME="openemr"          # Name of the OpenEMR deployment
+readonly SERVICE_NAME="openemr-service"     # Name of the OpenEMR service
+readonly NAMESPACE_DEFAULT="openemr"        # Default namespace for OpenEMR resources
+readonly CLUSTER_NAME_DEFAULT="openemr-eks" # Default EKS cluster name
 
 # Storage classes required for OpenEMR deployment
 # These storage classes must be available in the cluster for PVCs to bind properly.
@@ -131,9 +131,9 @@ if [ -z "${CLUSTER_NAME:-}" ]; then
 fi
 
 # Namespace and SSL configuration
-NAMESPACE=${NAMESPACE:-"$NAMESPACE_DEFAULT"}  # Kubernetes namespace for OpenEMR
-SSL_CERT_ARN=${SSL_CERT_ARN:-""}              # Optional: AWS Certificate Manager ARN for SSL
-DOMAIN_NAME=${DOMAIN_NAME:-""}                # Optional: Domain name for SSL certificate
+NAMESPACE=${NAMESPACE:-"$NAMESPACE_DEFAULT"} # Kubernetes namespace for OpenEMR
+SSL_CERT_ARN=${SSL_CERT_ARN:-""}             # Optional: AWS Certificate Manager ARN for SSL
+DOMAIN_NAME=${DOMAIN_NAME:-""}               # Optional: Domain name for SSL certificate
 
 # =============================================================================
 # LOGGING FUNCTIONS
