@@ -15,12 +15,12 @@ private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
 public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 
 # Database Configuration (Aurora Serverless V2)
-aurora_min_capacity = 0.5   # Minimum ACUs (always running cost: ~$43/month)
-aurora_max_capacity = 16    # Maximum ACUs for scaling
+aurora_min_capacity = 0.5 # Minimum ACUs (always running cost: ~$43/month)
+aurora_max_capacity = 16  # Maximum ACUs for scaling
 
 # Cache Configuration (Valkey Serverless)
-redis_max_data_storage     = 20    # GB
-redis_max_ecpu_per_second  = 5000  # ECPUs
+redis_max_data_storage     = 20   # GB
+redis_max_ecpu_per_second  = 5000 # ECPUs
 
 # Security Configuration
 enable_public_access = true   # Set to false for maximum security
@@ -32,17 +32,17 @@ openemr_version = "8.0.0"  # OpenEMR version to deploy (e.g., "8.0.0", "latest")
 
 # OpenEMR Feature Configuration (SECURITY: Disabled by default)
 # Only enable these features if specifically needed for your use case
-enable_openemr_api     = false  # Enable REST API and FHIR endpoints
-enable_patient_portal  = false  # Enable patient portal functionality
+enable_openemr_api     = false # Enable REST API and FHIR endpoints
+enable_patient_portal  = false # Enable patient portal functionality
 
 # Domain Configuration (Optional)
 # domain_name = "openemr.yourdomain.com"  # Leave empty for LoadBalancer access only
 
 # Backup and Retention
-backup_retention_days     = 30   # RDS backup retention
-alb_logs_retention_days   = 90   # ALB access logs in S3
-app_logs_retention_days   = 30   # Application logs in CloudWatch
-audit_logs_retention_days = 365  # Audit logs for compliance
+backup_retention_days     = 30  # RDS backup retention
+alb_logs_retention_days   = 90  # ALB access logs in S3
+app_logs_retention_days   = 30  # Application logs in CloudWatch
+audit_logs_retention_days = 365 # Audit logs for compliance
 
 # EKS Auto Mode Configuration
 # Auto Mode is enabled by default - no additional configuration needed
