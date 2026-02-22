@@ -143,14 +143,12 @@ request_certificate() {
 
     echo -e "${YELLOW}Requesting SSL certificate for domain: $domain${NC}"
 
-    CERT_ARN=$(aws acm request-certificate \
+    if ! CERT_ARN=$(aws acm request-certificate \
         --domain-name "$domain" \
         --validation-method DNS \
         --region "$AWS_REGION" \
         --query 'CertificateArn' \
-        --output text)
-
-    if [ $? -ne 0 ]; then
+        --output text); then
         echo -e "${RED}❌ Failed to request certificate${NC}"
         exit 1
     fi
@@ -201,24 +199,24 @@ get_hosted_zone_id() {
         --query "HostedZones[?Name=='${domain}.'].Id" \
         --output text 2>/dev/null | sed 's|/hostedzone/||')
 
-    if [ ! -z "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
+    if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
         echo "$ZONE_ID"
         return 0
     fi
 
     # Try parent domains (e.g., for subdomain.example.com, try example.com)
-    base_domain=$(echo "$domain" | sed 's/^[^.]*\.//')
+    base_domain="${domain#*.}"
     while [[ "$base_domain" == *.* ]]; do
         ZONE_ID=$(aws route53 list-hosted-zones \
             --query "HostedZones[?Name=='${base_domain}.'].Id" \
             --output text 2>/dev/null | sed 's|/hostedzone/||')
 
-        if [ ! -z "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
+        if [ -n "$ZONE_ID" ] && [ "$ZONE_ID" != "None" ]; then
             echo "$ZONE_ID"
             return 0
         fi
 
-        base_domain=$(echo "$base_domain" | sed 's/^[^.]*\.//')
+        base_domain="${base_domain#*.}"
     done
 
     return 1
@@ -427,14 +425,13 @@ deploy_with_certificate() {
     echo -e "${YELLOW}Certificate ARN:${NC} $cert_arn"
 
     cd "$PROJECT_ROOT/k8s"
-    ./deploy.sh
 
-    if [ $? -eq 0 ]; then
+    if ./deploy.sh; then
         echo -e "${GREEN}✅ Deployment completed successfully with SSL certificate!${NC}"
         echo ""
         echo -e "${YELLOW}Your OpenEMR instance is now accessible with trusted SSL:${NC}"
-        LB_URL=$(kubectl get svc openemr-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-        if [ ! -z "$LB_URL" ]; then
+        LB_URL=$(kubectl get svc openemr-service -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+        if [ -n "$LB_URL" ]; then
             echo "HTTPS URL: https://$LB_URL"
         fi
     else
@@ -448,16 +445,16 @@ show_status() {
     echo ""
 
     # Check if service exists
-    if ! kubectl get service openemr-service -n $NAMESPACE >/dev/null 2>&1; then
+    if ! kubectl get service openemr-service -n "$NAMESPACE" >/dev/null 2>&1; then
         echo -e "${RED}❌ OpenEMR service not found. Deploy the application first.${NC}"
         exit 1
     fi
 
     # Check service annotations for SSL configuration
-    SSL_CERT=$(kubectl get service openemr-service -n $NAMESPACE -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert}' 2>/dev/null)
-    SSL_PORTS=$(kubectl get service openemr-service -n $NAMESPACE -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports}' 2>/dev/null)
+    SSL_CERT=$(kubectl get service openemr-service -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-cert}' 2>/dev/null)
+    SSL_PORTS=$(kubectl get service openemr-service -n "$NAMESPACE" -o jsonpath='{.metadata.annotations.service\.beta\.kubernetes\.io/aws-load-balancer-ssl-ports}' 2>/dev/null)
 
-    if [ ! -z "$SSL_CERT" ] && [ "$SSL_CERT" != "null" ]; then
+    if [ -n "$SSL_CERT" ] && [ "$SSL_CERT" != "null" ]; then
         echo -e "${GREEN}✅ SSL Mode: AWS Certificate Manager${NC}"
         echo -e "${YELLOW}Certificate ARN:${NC} $SSL_CERT"
 
@@ -481,11 +478,11 @@ show_status() {
     # Show service ports
     echo ""
     echo -e "${YELLOW}Available ports:${NC}"
-    kubectl get service openemr-service -n $NAMESPACE -o custom-columns=NAME:.metadata.name,PORTS:.spec.ports[*].port
+    kubectl get service openemr-service -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,PORTS:.spec.ports[*].port
 
     # Show LoadBalancer URL
-    LB_URL=$(kubectl get svc openemr-service -n $NAMESPACE -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
-    if [ ! -z "$LB_URL" ]; then
+    LB_URL=$(kubectl get svc openemr-service -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+    if [ -n "$LB_URL" ]; then
         echo ""
         echo -e "${YELLOW}Access URLs:${NC}"
         echo "HTTPS: https://$LB_URL"

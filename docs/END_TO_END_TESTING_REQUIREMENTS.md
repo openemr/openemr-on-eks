@@ -152,6 +152,7 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 - **Complete infrastructure cycle**: Test must validate full create/destroy/restore cycle
 - **Data integrity verification**: Proof files must be correctly restored
 - **Connectivity validation**: Database and application connectivity must work after restore
+- **Credential rotation readiness**: After restoration, verify rotation prerequisites are intact (`./scripts/verify-credential-rotation.sh`)
 - **Resource cleanup**: All test resources must be properly cleaned up
 
 ### **Performance Requirements**

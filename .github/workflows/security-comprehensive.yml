@@ -49,10 +49,10 @@ permissions:
 
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
-  TRIVY_VERSION: '0.68.2'
-  CHECKOV_VERSION: '3.2.497'
+  TRIVY_VERSION: '0.69.1'
+  CHECKOV_VERSION: '3.2.504'
   KICS_VERSION: 'v2.1.19'
-  GOSEC_VERSION: 'v2.22.11'
+  GOSEC_VERSION: 'v2.23.0'
   PYTHON_VERSION: '3.14'
   GO_VERSION: '1.25'
 
@@ -67,7 +67,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Run Trivy filesystem scan (STRICT)
         uses: aquasecurity/trivy-action@master
@@ -141,7 +141,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -248,7 +248,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Run KICS scan
         uses: Checkmarx/kics-github-action@v2.1.3
@@ -296,7 +296,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Set up Python
         uses: actions/setup-python@v6.2.0
@@ -365,7 +365,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Set up Go
         uses: actions/setup-go@v6.2.0
@@ -422,7 +422,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       - name: Install ShellCheck
         run: |

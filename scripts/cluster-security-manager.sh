@@ -130,7 +130,8 @@ get_current_ip() {
 get_allowed_ips() {
     # Query EKS cluster configuration to get public access CIDRs
     # Handle various response formats (empty arrays, null values, etc.)
-    local cidr=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
+    local cidr
+    cidr=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
       --query 'cluster.resourcesVpcConfig.publicAccessCidrs[0]' --output text 2>/dev/null)
 
     # Validate the CIDR response and handle edge cases
@@ -159,12 +160,10 @@ case "$1" in
 
     # Update EKS cluster configuration to enable public access from current IP
     # This allows kubectl commands to work from the current machine
-    aws eks update-cluster-config \
-      --region $REGION \
-      --name $CLUSTER_NAME \
-      --resources-vpc-config endpointPublicAccess=true,endpointPrivateAccess=true,publicAccessCidrs="$CURRENT_IP/32"
-
-    if [ $? -eq 0 ]; then
+    if aws eks update-cluster-config \
+      --region "$REGION" \
+      --name "$CLUSTER_NAME" \
+      --resources-vpc-config endpointPublicAccess=true,endpointPrivateAccess=true,publicAccessCidrs="$CURRENT_IP/32"; then
         echo "✅ Public access enabled for IP: $CURRENT_IP"
         echo "⚠️  Remember to disable public access when finished!"
         echo "💡 Run: $0 disable"
@@ -195,7 +194,7 @@ case "$1" in
             fi
 
             # Check cluster status
-            CLUSTER_STATUS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
+            CLUSTER_STATUS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
               --query 'cluster.status' --output text 2>/dev/null || echo "UNKNOWN")
 
             if [ "$CLUSTER_STATUS" = "ACTIVE" ]; then
@@ -211,12 +210,12 @@ case "$1" in
                 echo "💡 Waiting for status to stabilize..."
             fi
 
-            sleep $POLLING_INTERVAL
+            sleep "$POLLING_INTERVAL"
         done
 
         # Update kubeconfig
         echo "🔄 Updating kubeconfig..."
-        aws eks update-kubeconfig --region $REGION --name $CLUSTER_NAME
+        aws eks update-kubeconfig --region "$REGION" --name "$CLUSTER_NAME"
 
         # Wait for networking to stabilize with loading bar
         echo "⏳ Waiting for networking to stabilize (5 minutes)..."
@@ -232,7 +231,7 @@ case "$1" in
             printf "\r⏳ ["
             printf "%${filled}s" | tr ' ' '█'
             printf "%${empty}s" | tr ' ' '░'
-            printf "] %d%% (%ds/%ds)" $((elapsed * 100 / total)) $elapsed $total
+            printf "] %d%% (%ds/%ds)" "$((elapsed * 100 / total))" "$elapsed" "$total"
         }
 
         # Show loading bar during networking stabilization
@@ -259,7 +258,7 @@ case "$1" in
         CONNECTION_ATTEMPTS=3
         CONNECTION_SUCCESS=false
 
-        for attempt in $(seq 1 $CONNECTION_ATTEMPTS); do
+        for attempt in $(seq 1 "$CONNECTION_ATTEMPTS"); do
             echo "  Attempt $attempt/$CONNECTION_ATTEMPTS..."
 
             # Try with better error handling
@@ -269,7 +268,7 @@ case "$1" in
                 CONNECTION_SUCCESS=true
                 break
             else
-                if [ $attempt -lt $CONNECTION_ATTEMPTS ]; then
+                if [ "$attempt" -lt "$CONNECTION_ATTEMPTS" ]; then
                     echo "  ⏳ Connection attempt failed, waiting 30 seconds before retry..."
                     echo "  💡 This is normal - cluster networking may still be stabilizing"
                     sleep 30
@@ -297,12 +296,10 @@ case "$1" in
     
     # Update EKS cluster configuration to disable public access
     # This ensures the cluster is only accessible from within the VPC
-    aws eks update-cluster-config \
-      --region $REGION \
-      --name $CLUSTER_NAME \
-      --resources-vpc-config endpointPublicAccess=false,endpointPrivateAccess=true
-
-    if [ $? -eq 0 ]; then
+    if aws eks update-cluster-config \
+      --region "$REGION" \
+      --name "$CLUSTER_NAME" \
+      --resources-vpc-config endpointPublicAccess=false,endpointPrivateAccess=true; then
         echo "✅ Public access disabled - cluster is now private-only"
         echo "🛡️  Cluster is now secure from external access"
 
@@ -330,7 +327,7 @@ case "$1" in
             fi
 
             # Check cluster status
-            CLUSTER_STATUS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
+            CLUSTER_STATUS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
               --query 'cluster.status' --output text 2>/dev/null || echo "UNKNOWN")
 
             if [ "$CLUSTER_STATUS" = "ACTIVE" ]; then
@@ -346,7 +343,7 @@ case "$1" in
                 echo "💡 Waiting for status to stabilize..."
             fi
 
-            sleep $POLLING_INTERVAL
+            sleep "$POLLING_INTERVAL"
         done
 
                 # Wait for networking to stabilize with loading bar
@@ -363,7 +360,7 @@ case "$1" in
             printf "\r⏳ ["
             printf "%${filled}s" | tr ' ' '█'
             printf "%${empty}s" | tr ' ' '░'
-            printf "] %d%% (%ds/%ds)" $((elapsed * 100 / total)) $elapsed $total
+            printf "] %d%% (%ds/%ds)" "$((elapsed * 100 / total))" "$elapsed" "$total"
         }
 
         # Show loading bar during networking stabilization
@@ -400,12 +397,12 @@ case "$1" in
     echo "📊 Current cluster endpoint configuration:"
     
     # Query and display cluster endpoint configuration in table format
-    aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
+    aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
       --query 'cluster.resourcesVpcConfig.{PublicAccess:endpointPublicAccess,PrivateAccess:endpointPrivateAccess,AllowedCIDRs:publicAccessCidrs}' \
       --output table
 
     # Check if public access is enabled
-    PUBLIC_ACCESS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION \
+    PUBLIC_ACCESS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
       --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text)
 
     if [ "$PUBLIC_ACCESS" = "True" ]; then
@@ -436,14 +433,14 @@ case "$1" in
     CURRENT_IP=$(get_current_ip)
 
     # Check if cluster is accessible first
-    if ! aws eks describe-cluster --name $CLUSTER_NAME --region $REGION >/dev/null 2>&1; then
+    if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" >/dev/null 2>&1; then
         echo "❌ Cannot access cluster '$CLUSTER_NAME'"
         echo "💡 Cluster may be updating or not accessible"
         exit 1
     fi
 
     # Check cluster status
-    CLUSTER_STATUS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $REGION --query 'cluster.status' --output text 2>/dev/null)
+    CLUSTER_STATUS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" --query 'cluster.status' --output text 2>/dev/null)
     if [ "$CLUSTER_STATUS" = "UPDATING" ]; then
         echo "⚠️  Cluster is currently updating - please wait for update to complete"
         echo "💡 Check status with: $0 status"
@@ -469,7 +466,7 @@ case "$1" in
                 KUBECTL_SUCCESS=true
                 break
             else
-                if [ $attempt -lt 3 ]; then
+                if [ "$attempt" -lt 3 ]; then
                     echo "   Attempt $attempt/3 failed, retrying in 5 seconds..."
                     sleep 5
                 fi
@@ -510,17 +507,17 @@ case "$1" in
     SECONDS=$((MINUTES * 60))
 
     # Format time for display
-    if [ $MINUTES -eq 1 ]; then
+    if [ "$MINUTES" -eq 1 ]; then
         TIME_DISPLAY="1 minute"
-    elif [ $MINUTES -lt 60 ]; then
+    elif [ "$MINUTES" -lt 60 ]; then
         TIME_DISPLAY="${MINUTES} minutes"
     else
         HOURS=$((MINUTES / 60))
         REMAINING_MINUTES=$((MINUTES % 60))
-        if [ $REMAINING_MINUTES -eq 0 ]; then
-            TIME_DISPLAY="${HOURS} hour$(if [ $HOURS -ne 1 ]; then echo "s"; fi)"
+        if [ "$REMAINING_MINUTES" -eq 0 ]; then
+            TIME_DISPLAY="${HOURS} hour$(if [ "$HOURS" -ne 1 ]; then echo "s"; fi)"
         else
-            TIME_DISPLAY="${HOURS} hour$(if [ $HOURS -ne 1 ]; then echo "s"; fi) and ${REMAINING_MINUTES} minute$(if [ $REMAINING_MINUTES -ne 1 ]; then echo "s"; fi)"
+            TIME_DISPLAY="${HOURS} hour$(if [ "$HOURS" -ne 1 ]; then echo "s"; fi) and ${REMAINING_MINUTES} minute$(if [ "$REMAINING_MINUTES" -ne 1 ]; then echo "s"; fi)"
         fi
     fi
 
@@ -545,16 +542,17 @@ EOF
         echo "📝 Check log: tail -f /tmp/cluster-auto-disable.log"
     else
         # Use 'at' command
-        if [ $MINUTES -lt 60 ]; then
+        schedule_succeeded=true
+        if [ "$MINUTES" -lt 60 ]; then
             # For minutes, use "now + X minutes"
-            echo "$0 disable" | at now + $MINUTES minutes 2>/dev/null
+            echo "$0 disable" | at now + "$MINUTES" minutes 2>/dev/null || schedule_succeeded=false
         else
             # For hours, use "now + X hours"
             HOURS=$((MINUTES / 60))
-            echo "$0 disable" | at now + $HOURS hours 2>/dev/null
+            echo "$0 disable" | at now + "$HOURS" hours 2>/dev/null || schedule_succeeded=false
         fi
 
-        if [ $? -eq 0 ]; then
+        if [ "$schedule_succeeded" = true ]; then
             echo "✅ Auto-disable scheduled for $TIME_DISPLAY from now"
             echo "📅 Check scheduled jobs: atq"
             echo "❌ Cancel if needed: atrm JOB_NUMBER"

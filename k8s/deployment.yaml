@@ -22,8 +22,10 @@ metadata:
     app: openemr # Primary application label for service discovery
     version: v1  # Version tracking for deployment management
 spec:
-  # Replicas are managed by HPA (Horizontal Pod Autoscaler) - see hpa.yaml
-  # HPA will scale between 1-10 replicas based on CPU/memory usage
+  replicas: 1  # Start with 1 replica so the docker-leader can initialize undisturbed.
+               # HPA (hpa.yaml) scales to minReplicas after the leader pod is ready.
+               # Starting >1 risks a deadlock: if the leader pod restarts mid-init,
+               # the lock file persists on EFS and ALL pods wait forever.
   progressDeadlineSeconds: 3600                        # 60 minutes to accommodate long startup times and cluster state variations
   
   # Rolling update strategy for zero-downtime deployments
@@ -95,6 +97,25 @@ spec:
         command: ["/bin/sh", "-c"]
         args:
         - |
+          # ---------------------------------------------------------------------------
+          # Stale docker-leader lock recovery
+          # ---------------------------------------------------------------------------
+          # In SWARM_MODE the first pod creates sites/docker-leader (noclobber) and
+          # becomes the "AUTHORITY" that runs DB setup.  Other pods poll for
+          # sites/docker-completed.  If the leader pod crashes mid-init the lock
+          # file persists on EFS but docker-completed is never written, so every
+          # pod (including the restarted leader) loops forever.
+          #
+          # Because the Deployment starts with replicas=1, if the lock exists but
+          # docker-completed does not, it MUST be stale — only this pod could have
+          # created it.  Safe to remove so openemr.sh can re-elect a leader.
+          # ---------------------------------------------------------------------------
+          SITES_DIR="/var/www/localhost/htdocs/openemr/sites"
+          if [ -e "$SITES_DIR/docker-leader" ] && [ ! -f "$SITES_DIR/docker-completed" ]; then
+              echo "=== Stale docker-leader lock detected (previous init crashed), removing ==="
+              rm -f "$SITES_DIR/docker-leader"
+          fi
+
           # Download AWS root CA certificates for secure connections to AWS services
           echo "=== Downloading SSL certificates ==="
           # Download Redis CA certificate for secure ElastiCache connections
@@ -256,7 +277,7 @@ spec:
 
       # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
-        image: fluent/fluent-bit:4.2.2                                        # Fluent Bit log processor and forwarder
+        image: fluent/fluent-bit:4.2.3                                        # Fluent Bit log processor and forwarder
         
         # Container-level security context for Fluent Bit
         # trivy:ignore:AVD-KSV-0012 Fluent Bit needs root to read log files
@@ -318,7 +339,7 @@ spec:
         # Liveness probe for Fluent Bit sidecar
         livenessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.2)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.3)
             port: 2020            # Fluent Bit HTTP monitoring endpoint
           initialDelaySeconds: 30 # Fluent Bit starts quickly
           periodSeconds: 30       # Check every 30 seconds
@@ -327,7 +348,7 @@ spec:
         # Readiness probe for Fluent Bit sidecar
         readinessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.2)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.3)
             port: 2020            # Fluent Bit HTTP monitoring port
           initialDelaySeconds: 15 # Fluent Bit starts quickly
           periodSeconds: 15       # Check every 15 seconds

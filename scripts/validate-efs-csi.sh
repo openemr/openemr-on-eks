@@ -137,11 +137,11 @@ if kubectl get serviceaccount efs-csi-controller-sa -n kube-system > /dev/null 2
     POD_IDENTITY_CHECK=false
     if command -v aws >/dev/null 2>&1; then
         # Query EKS Pod Identity associations for the EFS CSI service account
-        POD_IDENTITY_ASSOC=$(aws eks list-pod-identity-associations --cluster-name $CLUSTER_NAME --region $AWS_REGION --query "associations[?serviceAccount=='efs-csi-controller-sa'].associationId" --output text 2>/dev/null || echo "")
+        POD_IDENTITY_ASSOC=$(aws eks list-pod-identity-associations --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" --query "associations[?serviceAccount=='efs-csi-controller-sa'].associationId" --output text 2>/dev/null || echo "")
         if [ -n "$POD_IDENTITY_ASSOC" ] && [ "$POD_IDENTITY_ASSOC" != "None" ]; then
             POD_IDENTITY_CHECK=true
             # Get the role ARN associated with the Pod Identity
-            POD_IDENTITY_ROLE=$(aws eks list-pod-identity-associations --cluster-name $CLUSTER_NAME --region $AWS_REGION --query "associations[?serviceAccount=='efs-csi-controller-sa'].roleArn" --output text 2>/dev/null || echo "")
+            POD_IDENTITY_ROLE=$(aws eks list-pod-identity-associations --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" --query "associations[?serviceAccount=='efs-csi-controller-sa'].roleArn" --output text 2>/dev/null || echo "")
         fi
     fi
 
@@ -233,14 +233,15 @@ if kubectl get namespace openemr > /dev/null 2>&1; then
 
         # Count essential PVCs that are bound (required for OpenEMR to start)
         # Essential PVCs: sites (application data), ssl (certificates), letsencrypt (SSL certificates)
-        ESSENTIAL_BOUND=$(kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | grep -c "Bound" || echo "0")
+        ESSENTIAL_BOUND=$(kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | grep -c "Bound" || true)
+        ESSENTIAL_BOUND="${ESSENTIAL_BOUND:-0}"
         # Check backup PVC status (binds only when backup runs)
         BACKUP_STATUS=$(kubectl get pvc openemr-backup-pvc -n openemr --no-headers 2>/dev/null | awk '{print $2}' || echo "Not Found")
         TOTAL_PVCS=$(kubectl get pvc -n openemr --no-headers | wc -l | tr -d ' ')
 
         # Display status of essential PVCs with color-coded feedback
         echo -e "${BLUE}Essential PVCs (required for OpenEMR):${NC}"
-        kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | while read line; do
+        kubectl get pvc -n openemr --no-headers | grep -E "(openemr-sites-pvc|openemr-ssl-pvc|openemr-letsencrypt-pvc)" | while read -r line; do
             PVC_NAME=$(echo "$line" | awk '{print $1}')
             PVC_STATUS=$(echo "$line" | awk '{print $2}')
             if [ "$PVC_STATUS" = "Bound" ]; then
@@ -337,25 +338,25 @@ CHECKS_PASSED=0
 
 # Check 1: EFS CSI controller pods are running
 if kubectl get pods -n kube-system | grep efs-csi-controller | grep Running > /dev/null; then
-    ((CHECKS_PASSED++))
+    ((CHECKS_PASSED += 1))
 fi
 
 # Check 2: IAM configuration is present (either IRSA or Pod Identity)
 IRSA_ANNOTATION=$(kubectl get serviceaccount efs-csi-controller-sa -n kube-system -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}' 2>/dev/null || echo "")
-POD_IDENTITY_ASSOC=$(aws eks list-pod-identity-associations --cluster-name $CLUSTER_NAME --region $AWS_REGION --query "associations[?serviceAccount=='efs-csi-controller-sa'].associationId" --output text 2>/dev/null || echo "")
+POD_IDENTITY_ASSOC=$(aws eks list-pod-identity-associations --cluster-name "$CLUSTER_NAME" --region "$AWS_REGION" --query "associations[?serviceAccount=='efs-csi-controller-sa'].associationId" --output text 2>/dev/null || echo "")
 
-if [ -n "$IRSA_ANNOTATION" ] || ([ -n "$POD_IDENTITY_ASSOC" ] && [ "$POD_IDENTITY_ASSOC" != "None" ]); then
-    ((CHECKS_PASSED++))
+if [ -n "$IRSA_ANNOTATION" ] || { [ -n "$POD_IDENTITY_ASSOC" ] && [ "$POD_IDENTITY_ASSOC" != "None" ]; }; then
+    ((CHECKS_PASSED += 1))
 fi
 
 # Check 3: EFS file system ID is available from Terraform
 if [ "$EFS_ID" != "unknown" ] && [ -n "$EFS_ID" ]; then
-    ((CHECKS_PASSED++))
+    ((CHECKS_PASSED += 1))
 fi
 
 # Check 4: No recent errors in EFS CSI controller logs
 if [ -z "$RECENT_ERRORS" ]; then
-    ((CHECKS_PASSED++))
+    ((CHECKS_PASSED += 1))
 fi
 
 # Display validation results

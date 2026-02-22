@@ -293,6 +293,7 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 
 ### **🔒 Security & Compliance**
 
+- [Credential Rotation (Zero-Downtime)](#credential-rotation-scripts)
 - [Production Best Practice - Jumpbox Architecture](#%E2%80%8D-production-best-practice---jumpbox-architecture)
 - [Operational Scripts](#%EF%B8%8F-operational-scripts)
 
@@ -343,6 +344,7 @@ graph TB
 
             subgraph "Security Layer"
                 KMS[6 KMS Keys<br/>Granular Encryption]
+                SM[Secrets Manager<br/>Dual-Slot Rotation]
                 SG[Security Groups]
                 NP[Network Policies]
                 WAF[WAFv2<br/>DDoS & Bot Protection]
@@ -361,6 +363,7 @@ graph TB
     OP --> EFS
     AM --> BN
     KMS --> OP
+    SM --> OP
     BN --> OP
     WAF --> OP
     SG --> OP
@@ -379,6 +382,9 @@ graph TB
   - **Bottlerocket OS**:
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
     - Rust-based, immutable, security-hardened Linux with SELinux enforcement and no SSH access
+  - **Zero-Downtime Credential Rotation**:
+    - [Credential Rotation Guide](docs/credential-rotation.md)
+    - Dual-slot (A/B) RDS credential rotation via Secrets Manager with automatic rollback
 
 ## Prerequisites
 
@@ -621,12 +627,12 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v81.4.2 (metrics & alerting)
+     - Prometheus v82.2.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.51.0 (log aggregation with S3 storage)
+     - Loki v6.53.0 (log aggregation with S3 storage)
      - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
-     - OTeBPF v0.3.0 (eBPF auto-instrumentation)
+     - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.
@@ -873,11 +879,11 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v81.4.2 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v82.2.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
-- 📝 **Loki**: v6.51.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
+- 📝 **Loki**: v6.53.0 distributed mode (SimpleScalable - log aggregation with S3 storage and 720h retention)
   - **Distributed Architecture**: Uses SimpleScalable deployment mode with separate read, write, and backend components for better scalability and high availability
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
@@ -889,7 +895,7 @@ cd ../scripts
   - **Remote Write**: Prometheus automatically forwards metrics to Mimir for long-term retention
   - **S3 Storage**: All metrics stored in S3 with lifecycle policies
   - **Retention**: 365 days of metrics storage
-- 🎯 **OTeBPF**: v0.3.0 (eBPF auto-instrumentation)
+- 🎯 **OTeBPF**: v0.4.1 (eBPF auto-instrumentation)
   - **Zero-Code Instrumentation**: Automatically instruments OpenEMR pods without code changes
   - **Traces**: Exports traces to Tempo for distributed tracing
   - **Integration**: Exposes metrics in Prometheus format (scraped by Prometheus)
@@ -931,6 +937,7 @@ openemr-on-eks/
 │   ├── cloudwatch.tf                      # CloudWatch log groups
 │   ├── iam.tf                             # IAM roles and policies
 │   ├── cloudtrail.tf                      # CloudTrail logging
+│   ├── credential-rotation.tf             # Secrets Manager secrets, IAM role/policy for credential rotation
 │   ├── terraform.tfvars.example           # Example variable values with autoscaling configs
 │   ├── terraform-testing.tfvars           # Testing configuration (deletion protection disabled)
 │   └── terraform-production.tfvars        # Production configuration reference (deletion protection enabled)
@@ -957,6 +964,10 @@ openemr-on-eks/
 │   ├── ingress.yaml                       # Ingress controller configuration
 │   ├── ssl-renewal.yaml                   # SSL certificate renewal automation
 │   ├── logging.yaml                       # Fluent Bit sidecar configuration for log collection
+│   ├── credential-rotation-sa.yaml        # ServiceAccount for credential rotation (IRSA)
+│   ├── credential-rotation-rbac.yaml      # RBAC Role/Binding for credential rotation Job
+│   ├── credential-rotation-job.yaml       # One-off credential rotation Job manifest
+│   ├── credential-rotation-cronjob.yaml   # Scheduled monthly credential rotation CronJob
 │   └── openemr-credentials.txt            # OpenEMR admin credentials (created during deployment)
 ├── monitoring/                            # Advanced observability stack (optional)
 │   ├── install-monitoring.sh              # Main installation script
@@ -995,6 +1006,8 @@ openemr-on-eks/
 │   ├── test-warp-end-to-end.sh            # Warp end-to-end test with automatic cleanup
 │   ├── deploy-training-openemr-setup.sh   # Training setup deployment with synthetic patient data
 │   ├── quick-deploy.sh                    # Quick deployment with monitoring stack
+│   ├── run-credential-rotation.sh         # Zero-downtime RDS credential rotation runner
+│   ├── verify-credential-rotation.sh      # Pre-flight credential rotation verification
 │   ├── run-test-suite.sh                  # CI/CD test suite runner
 │   └── test-config.yaml                   # Test configuration for CI/CD framework
 ├── docs/                                  # Complete documentation
@@ -1009,6 +1022,7 @@ openemr-on-eks/
 │   ├── LOGGING_GUIDE.md                   # OpenEMR 8.0.0 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
+│   ├── credential-rotation.md             # Zero-downtime RDS credential rotation guide
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
 │   ├── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
 │   └── CONSOLE_GUIDE.md                   # Terminal User Interface (TUI) console guide
@@ -1026,6 +1040,13 @@ openemr-on-eks/
 │       ├── versions_yaml.bats             # versions.yaml structural contract validation
 │       ├── *.bats                         # Per-script BATS test suites (CLI contract + UNIT tests)
 │       └── ...                            # One .bats file per script with function-level unit tests
+├── tools/                                 # Standalone tools and utilities
+│   └── credential-rotation/               # Python-based credential rotation tool
+│       ├── README.md                      # Tool documentation, CLI, rotation algorithm
+│       ├── requirements.txt               # Python dependencies (boto3, pymysql, kubernetes)
+│       ├── rotate_credentials.py          # Core rotation logic (dual-slot A/B strategy)
+│       ├── Dockerfile                     # Container image for K8s Job execution
+│       └── tests/                         # pytest suite for rotation logic
 ├── warp/                                  # Warp - OpenEMR Data Upload Accelerator
 │   ├── README.md                          # Warp project documentation
 │   ├── DEVELOPER.md                       # Warp developer guide and architecture
@@ -1551,6 +1572,30 @@ cd scripts && ./destroy.sh [--force]
 - **Comprehensive**: Removes ALL resources including Terraform state, RDS clusters, snapshots, S3 buckets
 - **Bulletproof**: Handles edge cases like deletion protection, orphaned resources, and AWS API rate limits
 - **Verification**: Confirms complete cleanup before declaring success
+
+### **Credential Rotation Scripts**
+
+#### **`run-credential-rotation.sh`** - Zero-Downtime RDS Credential Rotation
+
+```bash
+cd scripts && ./run-credential-rotation.sh [--dry-run] [--sync-db-users]
+```
+
+**Purpose:** Rotate RDS database credentials with zero application downtime using a dual-slot (A/B) strategy
+**Features:** Secrets Manager integration, EFS sqlconf.php update, K8s Secret patching, rolling restart, validation, automatic rollback
+**When to use:** Routine credential rotation (monthly recommended), security incidents, compliance requirements
+
+#### **`verify-credential-rotation.sh`** - Pre-flight Rotation Verification
+
+```bash
+cd scripts && ./verify-credential-rotation.sh
+```
+
+**Purpose:** Validate all prerequisites for credential rotation before running it
+**Checks:** Secrets Manager access, K8s Secret/Deployment/ServiceAccount existence, EFS PVC status, active slot state
+**When to use:** Before first rotation, after infrastructure changes, troubleshooting rotation failures
+
+> **See also:** [Credential Rotation Guide](docs/credential-rotation.md) for full architecture, operational runbook, and failure scenarios.
 
 ### **Security Management Scripts**
 
@@ -2372,6 +2417,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
 - **[Console Directory](console/README.md)** - Console folder documentation with quick start and development guide
 - **[Tests Directory](tests/README.md)** - BATS test suite documentation, design standards, and coverage summary
+- **[Credential Rotation Tool](tools/credential-rotation/README.md)** - Python-based dual-slot credential rotation tool for RDS
 
 #### **📖 User Documentation**
 
@@ -2387,6 +2433,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
 - [GitHub → AWS Credentials Guide](docs/GITHUB_AWS_CREDENTIALS.md) - GitHub → AWS OIDC setup and credential management
+- [Credential Rotation Guide](docs/credential-rotation.md) - Zero-downtime RDS credential rotation architecture and runbook
 - [Console Guide (TUI)](docs/CONSOLE_GUIDE.md) - Terminal User Interface (TUI) console guide for macOS
 - [Monitoring Setup](monitoring/README.md) - Prometheus, Grafana, and monitoring stack configuration
 

@@ -127,6 +127,7 @@ search_version_in_codebase() {
     
     # Escape special characters in the version string for grep regex
     # This prevents grep from interpreting version numbers as regex patterns
+    # shellcheck disable=SC2016
     local escaped_version=$(printf '%s\n' "$current_version" | sed 's/[[\.*^$()+?{|]/\\&/g')
     
     # Determine search pattern based on component type
@@ -134,6 +135,7 @@ search_version_in_codebase() {
     if [[ "$component" == *"actions/"* ]] || [[ "$component" == *"azure/"* ]] || [[ "$component" == *"hashicorp/"* ]]; then
         # For GitHub Actions, search for the full action name with the version
         # Format: component@version (e.g., actions/checkout@v3)
+        # shellcheck disable=SC2016
         local escaped_component=$(printf '%s\n' "$component" | sed 's/[[\.*^$()+?{|]/\\&/g')
         search_pattern="${escaped_component}@${escaped_version}"
     fi
@@ -143,14 +145,16 @@ search_version_in_codebase() {
         log "INFO" "Found $match_count occurrence(s) of version '$current_version' in codebase"
         
         # Add search results to the report
-        echo "" >> "$update_report"
-        echo "### 📍 Version Locations for $component" >> "$update_report"
-        echo "" >> "$update_report"
-        echo "**Current Version:** \`$current_version\`" >> "$update_report"
-        echo "**Latest Version:** \`$latest_version\`" >> "$update_report"
-        echo "" >> "$update_report"
-        echo "**Files containing current version:**" >> "$update_report"
-        echo "" >> "$update_report"
+        {
+            echo ""
+            echo "### 📍 Version Locations for $component"
+            echo ""
+            echo "**Current Version:** \`$current_version\`"
+            echo "**Latest Version:** \`$latest_version\`"
+            echo ""
+            echo "**Files containing current version:**"
+            echo ""
+        } >> "$update_report"
         
         # Categorize files by type for better organization in the report
         # This helps users understand where versions are referenced across different file types
@@ -196,43 +200,53 @@ search_version_in_codebase() {
         # Display categorized results in the report
         # Each category is displayed only if it contains files
         if [ ${#config_files[@]} -gt 0 ]; then
-            echo "#### 🔧 Configuration Files" >> "$update_report"
-            echo '```' >> "$update_report"
-            printf '%s\n' "${config_files[@]}" >> "$update_report"
-            echo '```' >> "$update_report"
-            echo "" >> "$update_report"
+            {
+                echo "#### 🔧 Configuration Files"
+                echo '```'
+                printf '%s\n' "${config_files[@]}"
+                echo '```'
+                echo ""
+            } >> "$update_report"
         fi
         
         if [ ${#doc_files[@]} -gt 0 ]; then
-            echo "#### 📚 Documentation Files" >> "$update_report"
-            echo '```' >> "$update_report"
-            printf '%s\n' "${doc_files[@]}" >> "$update_report"
-            echo '```' >> "$update_report"
-            echo "" >> "$update_report"
+            {
+                echo "#### 📚 Documentation Files"
+                echo '```'
+                printf '%s\n' "${doc_files[@]}"
+                echo '```'
+                echo ""
+            } >> "$update_report"
         fi
         
         if [ ${#script_files[@]} -gt 0 ]; then
-            echo "#### 🐚 Script Files" >> "$update_report"
-            echo '```' >> "$update_report"
-            printf '%s\n' "${script_files[@]}" >> "$update_report"
-            echo '```' >> "$update_report"
-            echo "" >> "$update_report"
+            {
+                echo "#### 🐚 Script Files"
+                echo '```'
+                printf '%s\n' "${script_files[@]}"
+                echo '```'
+                echo ""
+            } >> "$update_report"
         fi
         
         if [ ${#terraform_files[@]} -gt 0 ]; then
-            echo "#### 🏗️ Terraform Files" >> "$update_report"
-            echo '```' >> "$update_report"
-            printf '%s\n' "${terraform_files[@]}" >> "$update_report"
-            echo '```' >> "$update_report"
-            echo "" >> "$update_report"
+            {
+                echo "#### 🏗️ Terraform Files"
+                echo '```'
+                printf '%s\n' "${terraform_files[@]}"
+                echo '```'
+                echo ""
+            } >> "$update_report"
         fi
         
         if [ ${#other_files[@]} -gt 0 ]; then
-            echo "#### 📄 Other Files" >> "$update_report"
-            echo '```' >> "$update_report"
-            printf '%s\n' "${other_files[@]}" >> "$update_report"
-            echo '```' >> "$update_report"
-            echo "" >> "$update_report"
+            {
+                echo "#### 📄 Other Files"
+                echo '```'
+                printf '%s\n' "${other_files[@]}"
+                echo '```'
+                echo ""
+            } >> "$update_report"
         fi
         
         # Add explanatory note about the search results
@@ -241,14 +255,16 @@ search_version_in_codebase() {
     else
         # Handle case where no version occurrences are found in the codebase
         log "WARN" "No occurrences of version '$current_version' found in codebase for component: $component"
-        echo "" >> "$update_report"
-        echo "### 📍 Version Locations for $component" >> "$update_report"
-        echo "" >> "$update_report"
-        echo "**Current Version:** \`$current_version\`" >> "$update_report"
-        echo "**Latest Version:** \`$latest_version\`" >> "$update_report"
-        echo "" >> "$update_report"
-        echo "**Note:** No occurrences of the current version found in the codebase. This may indicate the version is only tracked in \`versions.yaml\` or uses a different format." >> "$update_report"
-        echo "" >> "$update_report"
+        {
+            echo ""
+            echo "### 📍 Version Locations for $component"
+            echo ""
+            echo "**Current Version:** \`$current_version\`"
+            echo "**Latest Version:** \`$latest_version\`"
+            echo ""
+            echo "**Note:** No occurrences of the current version found in the codebase. This may indicate the version is only tracked in \`versions.yaml\` or uses a different format."
+            echo ""
+        } >> "$update_report"
     fi
     
     # Clean up temporary files
@@ -264,7 +280,7 @@ normalize_version() {
     
     # Remove 'v' prefix and normalize version format
     # This handles versions like "v5.0.0" -> "5.0.0"
-    local normalized=$(echo "$version" | sed 's/^v//')
+    local normalized="${version#v}"
     
     # If it's just a major version (e.g., "5"), treat it as "5.0.0"
     # This ensures consistent comparison between "5" and "5.0.0"
@@ -593,6 +609,7 @@ get_latest_aurora_version() {
     # This provides a fallback method using AWS API
     if command -v aws >/dev/null 2>&1 && aws sts get-caller-identity >/dev/null 2>&1; then
         log "INFO" "Trying AWS CLI to get Aurora MySQL versions..."
+        # shellcheck disable=SC2016
         local aws_versions=$(aws rds describe-db-engine-versions \
             --engine aurora-mysql \
             --query 'DBEngineVersions[?contains(EngineVersion, `8.0.mysql_aurora.3`)].EngineVersion' \
@@ -835,7 +852,7 @@ get_latest_go_package_version() {
     # Normalize repository path - remove github.com/ prefix if present
     local repo_path="$package_repo"
     if [[ "$package_repo" == github.com/* ]]; then
-        repo_path=$(echo "$package_repo" | sed 's|^github.com/||')
+        repo_path="${package_repo#github.com/}"
     fi
 
     log "INFO" "Checking latest version for Go package: $repo_path..."
@@ -1443,7 +1460,7 @@ EOF
         local bubbletea_repo=$(yq eval '.go_packages.bubbletea.repository' "$VERSIONS_FILE" 2>/dev/null || echo "charmbracelet/bubbletea")
         # Normalize repository path - remove github.com/ prefix if present
         if [[ "$bubbletea_repo" == github.com/* ]]; then
-            bubbletea_repo=$(echo "$bubbletea_repo" | sed 's|^github.com/||')
+            bubbletea_repo="${bubbletea_repo#github.com/}"
         fi
         local bubbletea_latest=$(get_latest_go_package_version "$bubbletea_repo")
 
@@ -1459,7 +1476,7 @@ EOF
         local lipgloss_repo=$(yq eval '.go_packages.lipgloss.repository' "$VERSIONS_FILE" 2>/dev/null || echo "charmbracelet/lipgloss")
         # Normalize repository path - remove github.com/ prefix if present
         if [[ "$lipgloss_repo" == github.com/* ]]; then
-            lipgloss_repo=$(echo "$lipgloss_repo" | sed 's|^github.com/||')
+            lipgloss_repo="${lipgloss_repo#github.com/}"
         fi
         local lipgloss_latest=$(get_latest_go_package_version "$lipgloss_repo")
 
@@ -1542,7 +1559,7 @@ EOF
         local trivy_current=$(yq eval '.security_tools.trivy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$trivy_current" ]; then
             local trivy_latest=$(get_latest_go_package_version "aquasecurity/trivy")
-            trivy_latest=$(echo "$trivy_latest" | sed 's/^v//')  # Remove 'v' prefix for comparison
+            trivy_latest="${trivy_latest#v}"  # Remove 'v' prefix for comparison
             if [ "$trivy_latest" != "❌ Error" ] && [ "$trivy_latest" != "❌ Unable to determine" ] && [ "$trivy_latest" != "$trivy_current" ]; then
                 log "INFO" "Trivy update available: $trivy_current -> $trivy_latest"
                 echo "- **Trivy**: $trivy_current → $trivy_latest" >> "$update_report"
@@ -1590,6 +1607,35 @@ EOF
                 updates_found=1
             fi
         fi
+    fi
+
+    # Check Python package versions if requested
+    if [ "$components" = "all" ] || [ "$components" = "python_packages" ]; then
+        log "INFO" "Checking Python package versions..."
+
+        local pypi_packages=("pymysql:PyMySQL" "boto3:boto3" "requests:requests" "kubernetes:kubernetes" "pytest:pytest" "pytest_cov:pytest-cov" "flake8:flake8" "black:black" "mypy:mypy")
+        for entry in "${pypi_packages[@]}"; do
+            local yaml_key="${entry%%:*}"
+            local pypi_name="${entry##*:}"
+            local pkg_current
+            pkg_current=$(yq eval ".python_packages.${yaml_key}.current" "$VERSIONS_FILE" 2>/dev/null || echo "")
+            if [ -z "$pkg_current" ] || [ "$pkg_current" = "null" ]; then
+                continue
+            fi
+            local pypi_url="https://pypi.org/pypi/${pypi_name}/json"
+            local pypi_response
+            pypi_response=$(curl -s "$pypi_url" 2>/dev/null || echo "")
+            if [ -n "$pypi_response" ]; then
+                local pkg_latest
+                pkg_latest=$(echo "$pypi_response" | jq -r '.info.version' 2>/dev/null || echo "")
+                if [ -n "$pkg_latest" ] && [ "$pkg_latest" != "null" ] && [ "$pkg_latest" != "$pkg_current" ]; then
+                    log "INFO" "${pypi_name} update available: $pkg_current -> $pkg_latest"
+                    echo "- **${pypi_name}**: $pkg_current → $pkg_latest" >> "$update_report"
+                    search_version_in_codebase "$pypi_name" "$pkg_current" "$pkg_latest"
+                    updates_found=1
+                fi
+            fi
+        done
     fi
 
     # Check EKS add-ons versions if requested
@@ -1663,7 +1709,7 @@ Commands:
   help                     Show this help message
 
 Options:
-  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, go_packages, monitoring, eks_addons, security_tools)
+  --components TYPE       Check specific component types (all, applications, infrastructure, terraform_modules, github_workflows, pre_commit_hooks, semver_packages, go_packages, python_packages, monitoring, eks_addons, security_tools)
   --create-issue          Create GitHub issue for updates (used by CI/CD)
   --month <month>         Specify month for report title (used by CI/CD)
   --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR)
@@ -1676,6 +1722,7 @@ Component Types:
   pre_commit_hooks        Pre-commit hook versions
   semver_packages         Python, Terraform, kubectl versions
   go_packages             Go version, bubbletea, lipgloss
+  python_packages         pymysql, boto3, requests, kubernetes, pytest, black, flake8, mypy
   monitoring              Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
   eks_addons              EFS CSI Driver, Metrics Server
   security_tools          Trivy, Checkov, KICS, gosec
@@ -1725,6 +1772,27 @@ show_status() {
         fi
     fi
     
+    # Show Python packages if available
+    if yq eval '.python_packages' "$VERSIONS_FILE" >/dev/null 2>&1; then
+        local pymysql_version=$(yq eval '.python_packages.pymysql.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local boto3_version=$(yq eval '.python_packages.boto3.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local requests_version=$(yq eval '.python_packages.requests.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local kubernetes_version=$(yq eval '.python_packages.kubernetes.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local pytest_version=$(yq eval '.python_packages.pytest.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local black_version=$(yq eval '.python_packages.black.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local mypy_version=$(yq eval '.python_packages.mypy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+
+        echo -e "${BLUE}Python Packages:${NC}"
+        [ -n "$pymysql_version" ] && echo -e "  PyMySQL: ${GREEN}$pymysql_version${NC}"
+        [ -n "$boto3_version" ] && echo -e "  boto3: ${GREEN}$boto3_version${NC}"
+        [ -n "$requests_version" ] && echo -e "  requests: ${GREEN}$requests_version${NC}"
+        [ -n "$kubernetes_version" ] && echo -e "  kubernetes: ${GREEN}$kubernetes_version${NC}"
+        [ -n "$pytest_version" ] && echo -e "  pytest: ${GREEN}$pytest_version${NC}"
+        [ -n "$black_version" ] && echo -e "  black: ${GREEN}$black_version${NC}"
+        [ -n "$mypy_version" ] && echo -e "  mypy: ${GREEN}$mypy_version${NC}"
+        echo ""
+    fi
+
     echo -e "${BLUE}Monitoring:${NC}"
     echo -e "  Prometheus Operator: ${GREEN}$PROMETHEUS_CURRENT${NC}"
     echo -e "  Loki: ${GREEN}$LOKI_CURRENT${NC}"
@@ -1790,6 +1858,18 @@ main() {
         esac
     done
 
+    # Handle help and invalid commands before requiring dependencies
+    case "$command" in
+        check|status) ;;
+        help|--help)
+            show_help
+            exit 0
+            ;;
+        *)
+            error_exit "Unknown command: $command. Use 'help' or '--help' for usage information."
+            ;;
+    esac
+
     # Initialize script dependencies and configuration
     check_dependencies # Validate required tools are available
     parse_config       # Load version configuration from YAML file
@@ -1797,19 +1877,10 @@ main() {
     # Execute the specified command
     case "$command" in
         "check")
-            # Check for version updates across specified components
             check_updates "$components" "$create_issue" "$month"
             ;;
         "status")
-            # Display current version status
             show_status
-            ;;
-        "help"|"--help")
-            # Show usage information
-            show_help
-            ;;
-        *)
-            error_exit "Unknown command: $command. Use 'help' or '--help' for usage information."
             ;;
     esac
 }

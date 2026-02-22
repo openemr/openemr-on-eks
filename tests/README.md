@@ -2,6 +2,8 @@
 
 ## Table of Contents
 
+<img src="../images/tests_table_of_contents_section_picture.png" alt="Tests table of contents section picture" width="400">
+
 - [BATS (Bash Automated Testing System)](#bats-bash-automated-testing-system)
   - [Running BATS Tests](#running-bats-tests)
   - [Installing BATS](#installing-bats)
@@ -152,6 +154,10 @@ bats tests/bats/ --filter "UNIT"
 | `assert_output_contains <str>` | Assert `$output` contains a substring |
 | `assert_output_regex <pattern>` | Assert `$output` matches a regex |
 
+## Other Test Suites
+
+The credential rotation tool (`tools/credential-rotation/`) has its own `pytest`-based test suite for Python rotation logic. Run with `cd tools/credential-rotation && pytest tests/`.
+
 ## Adding New BATS Tests
 
 1. Add a new `tests/bats/<script-name>.bats` file.
@@ -212,7 +218,21 @@ SCRIPT="${SCRIPTS_DIR}/example.sh"
 
 ## Test Coverage Summary
 
-**255 UNIT tests** across all 27 test files, covering function-level behavior for every script.
+**849 tests** across all 31 test files, covering function-level behavior, cross-file contracts, and version consistency.
+
+### Contract & Consistency Tests
+
+These test suites catch configuration drift between files — the kind of issue that only surfaces at deploy time:
+
+| Test File | Tests | What It Catches |
+|-----------|-------|-----------------|
+| `contract-tests.bats` | 30 | Terraform output-to-script contracts, K8s manifest consistency, version sync between Dockerfile/requirements.txt/versions.yaml |
+| `run-test-suite.bats` | 21 | CLI flag parsing, logging helpers, record_test_result counters, environment defaults, structural integrity |
+| `versions_yaml.bats` | 29 | YAML structure, version format, cross-file version drift (CI workflows, Dockerfiles, requirements.txt) |
+
+A dedicated CI workflow (`.github/workflows/ci-contract-tests.yml`) runs these on every push/PR alongside Terraform validate, K8s manifest schema validation (kubeconform), and the full BATS suite.
+
+### Per-Script BATS Tests
 
 | Test File | Script | CLI Tests | UNIT Tests | Key Functions Tested |
 |-----------|--------|-----------|------------|---------------------|
@@ -242,4 +262,6 @@ SCRIPT="${SCRIPTS_DIR}/example.sh"
 | `validate-efs-csi.bats` | `validate-efs-csi.sh` | 12 | 5 | `get_aws_region` |
 | `version-manager.bats` | `version-manager.sh` | 12 | 13 | `log`, `normalize_version`, `compare_versions`, `show_help` |
 | `versions_yaml.bats` | `versions.yaml` | 20+ | 5 | YAML structure validation |
+| `run-credential-rotation.bats` | `run-credential-rotation.sh` | 13 | 10 | Terraform output resolution, RBAC, Job lifecycle, health check URL |
+| `verify-credential-rotation.bats` | `verify-credential-rotation.sh` | 12 | 8 | Terraform output resolution, Secrets Manager checks, K8s resource validation |
 | `warp_verify_counts.bats` | `verify-counts.sh` | 13 | 4 | `log` |

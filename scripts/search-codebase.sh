@@ -70,7 +70,7 @@ search_codebase() {
     
     # Search and display results
     local results
-    results=$(cd "$PROJECT_ROOT" && $grep_cmd "$search_term" . 2>/dev/null || true)
+    results=$( (cd "$PROJECT_ROOT" && $grep_cmd "$search_term" . 2>/dev/null) || true)
     
     if [ -z "$results" ]; then
         echo -e "${YELLOW}No matches found for '$search_term'${NC}"

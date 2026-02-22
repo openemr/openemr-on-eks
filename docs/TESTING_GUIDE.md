@@ -254,6 +254,21 @@ cd scripts
 ./test-end-to-end-backup-restore.sh
 ```
 
+### 6. Credential Rotation Tests
+
+The credential rotation tool (`tools/credential-rotation/`) has its own pytest-based test suite validating the core rotation logic, rollback behavior, and Secrets Manager interactions. Shell scripts also have BATS tests.
+
+```bash
+# Python unit tests for rotation logic
+cd tools/credential-rotation
+pip install -r requirements.txt
+pytest tests/
+
+# BATS tests for wrapper scripts
+bats tests/bats/run-credential-rotation.bats
+bats tests/bats/verify-credential-rotation.bats
+```
+
 ## 🚀 Running Tests
 
 ### Local Testing

@@ -203,7 +203,7 @@ confirm_destruction() {
     log_warning "⚠️  Ensure no active GitHub Actions workflows are using the OIDC role!"
     echo ""
 
-    read -p "Are you sure you want to proceed? (type 'yes' to confirm): " confirmation
+    read -r -p "Are you sure you want to proceed? (type 'yes' to confirm): " confirmation
 
     if [ "$confirmation" != "yes" ]; then
         log_info "Destruction cancelled by user"

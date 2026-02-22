@@ -165,7 +165,7 @@ When a security scan fails:
 2. **Assess the severity** and determine the root cause
 3. **Remediate the issue**:
    - Update dependencies for vulnerability findings
-   - Remove or rotate secrets for secret findings
+   - Remove or rotate secrets for secret findings (see [Credential Rotation Guide](credential-rotation.md) for RDS database credentials)
    - Fix misconfigurations for config findings
 4. **Verify the fix** by running the scanner locally
 5. **Push the fix** and verify the pipeline passes

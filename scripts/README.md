@@ -30,6 +30,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - [cluster-security-manager.sh](#cluster-security-managersh)
   - [ssl-cert-manager.sh](#ssl-cert-managersh)
   - [ssl-renewal-manager.sh](#ssl-renewal-managersh)
+  - [run-credential-rotation.sh](#run-credential-rotationsh)
+  - [verify-credential-rotation.sh](#verify-credential-rotationsh)
 - [Feature Management](#4-feature-management)
   - [openemr-feature-manager.sh](#openemr-feature-managersh)
   - [check-openemr-versions.sh](#check-openemr-versionssh)
@@ -88,6 +90,10 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 2. `ssl-cert-manager.sh` (SSL certificates)
 3. `ssl-renewal-manager.sh` (certificate renewal)
 
+#### 🔑 **Credential Rotation**
+1. `verify-credential-rotation.sh` (pre-flight checks)
+2. `run-credential-rotation.sh` (execute rotation)
+
 #### 🧪 **Testing**
 1. `run-test-suite.sh` (comprehensive tests)
 2. `test-end-to-end-backup-restore.sh` (backup/restore validation)
@@ -114,6 +120,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **`cluster-security-manager.sh`** - EKS cluster security management (IP whitelisting, access control)
 - **`ssl-cert-manager.sh`** - SSL certificate management and renewal
 - **`ssl-renewal-manager.sh`** - Automated SSL certificate renewal system for self-signed certificates used by OpenEMR for encryption between the load balancer and the OpenEMR pods.
+- **`run-credential-rotation.sh`** - Zero-downtime RDS credential rotation using dual-slot (A/B) strategy
+- **`verify-credential-rotation.sh`** - Pre-flight verification for credential rotation prerequisites
 
 ### Feature Management
 
@@ -316,6 +324,54 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Modify certificate validation criteria as needed
   - Adjust renewal thresholds based on operational requirements
   - Test certificate rotation process after infrastructure changes
+
+#### `run-credential-rotation.sh`
+
+- **Purpose**: Zero-downtime RDS credential rotation using dual-slot (A/B) strategy
+- **Dependencies**: kubectl, aws, terraform, docker/ECR
+- **Key Features**:
+  - Resolves Secrets Manager ARNs from Terraform outputs
+  - Applies RBAC and ServiceAccount manifests for the rotation Job
+  - Builds or pulls the credential rotation container image
+  - Creates and monitors a Kubernetes Job that performs the rotation
+  - Forwards CLI arguments (e.g., `--dry-run`, `--sync-db-users`) to the rotation tool
+  - Streams Job logs and reports success/failure
+- **Usage Examples**:
+  ```bash
+  # Run credential rotation
+  ./run-credential-rotation.sh
+
+  # Dry-run mode (no changes made)
+  ./run-credential-rotation.sh --dry-run
+
+  # Sync database users without full rotation
+  ./run-credential-rotation.sh --sync-db-users
+  ```
+- **Maintenance Notes**:
+  - Update ECR repository URI if account or region changes
+  - Ensure RBAC manifests stay in sync with `k8s/credential-rotation-rbac.yaml`
+
+#### `verify-credential-rotation.sh`
+
+- **Purpose**: Pre-flight verification of all credential rotation prerequisites
+- **Dependencies**: kubectl, aws, terraform
+- **Key Features**:
+  - Resolves Terraform outputs for Secrets Manager ARNs and cluster info
+  - Verifies RDS slot secret and admin secret exist in Secrets Manager
+  - Checks active_slot field and parses slot configuration
+  - Validates Kubernetes Secret, Deployment, and ServiceAccount existence
+  - Confirms EFS PVC is bound and storage is available
+  - Displays formatted summary of rotation readiness
+- **Usage Examples**:
+  ```bash
+  # Verify rotation prerequisites
+  ./verify-credential-rotation.sh
+  ```
+- **Maintenance Notes**:
+  - Update Terraform output names if infrastructure changes
+  - Add new prerequisite checks as rotation tool evolves
+
+> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for full architecture and operational runbook.
 
 ### 4. Feature Management
 
@@ -764,6 +820,8 @@ Some scripts are designed to call other scripts as part of their operations. Bel
 | `backup.sh` | `test-end-to-end-backup-restore.sh`                                     |
 | `restore.sh` | `test-end-to-end-backup-restore.sh`                                     |
 | `clean-deployment.sh` | `restore.sh`, `destroy.sh`                                              |
+| `run-credential-rotation.sh` | (standalone - applies k8s/ RBAC manifests and creates rotation Job) |
+| `verify-credential-rotation.sh` | (standalone - read-only verification)                           |
 
 ## Support
 

@@ -305,7 +305,7 @@ aws_with_retry() {
             if [ $attempt -lt $max_attempts ]; then
                 log_warning "AWS command failed (attempt $attempt/$max_attempts), retrying in ${delay}s..."
                 sleep $delay
-                ((attempt++))
+                ((attempt += 1))
             else
                 log_error "AWS command failed after $max_attempts attempts"
                 return 1
@@ -434,7 +434,7 @@ verify_deletion_protection_disabled() {
         else
             log_info "Deletion protection status: $protection_status (attempt $attempt/$max_attempts)"
             sleep 10
-            ((attempt++))
+            ((attempt += 1))
         fi
     done
     
@@ -499,7 +499,7 @@ disable_rds_deletion_protection() {
                     else
                         log_warning "Modification command succeeded but verification failed, retrying..."
                         sleep 15
-                        ((modify_attempt++))
+                        ((modify_attempt += 1))
                     fi
                 else
                     local error_output
@@ -511,11 +511,11 @@ disable_rds_deletion_protection() {
                         if ! wait_for_rds_available "$cluster_id"; then
                             log_warning "Still not available, but continuing..."
                         fi
-                        ((modify_attempt++))
+                        ((modify_attempt += 1))
                     else
                         log_warning "Modification failed: $error_output"
                         sleep 10
-                        ((modify_attempt++))
+                        ((modify_attempt += 1))
                     fi
                 fi
             done
@@ -926,7 +926,7 @@ cleanup_aws_backup_resources() {
            [[ ! "$plan_id" == *"Warning"* ]] && \
            [[ ! "$plan_id" == *"No outputs found"* ]] && \
            [[ ! "$plan_id" == *"╷"* ]]; then
-            ((valid_plans++))
+            ((valid_plans += 1))
         fi
     done
     
@@ -1623,7 +1623,7 @@ terraform_destroy() {
                 log_warning "Waiting 30 seconds before retry (allows AWS API propagation)..."
                 log_warning "This delay helps resolve eventual consistency issues with RDS deletion protection"
                 sleep 30
-                ((attempt++))
+                ((attempt += 1))
             else
                 log_error "Terraform destroy failed after $max_attempts attempts"
                 log_warning "Preserving Terraform state files for debugging and potential manual retry"

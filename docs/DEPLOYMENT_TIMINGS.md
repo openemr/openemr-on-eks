@@ -321,6 +321,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 | Operation | Duration |
 |-----------|----------|
 | Pod restart | 1-3 min |
+| Credential rotation (end-to-end) | 3-8 min |
 | Service endpoint update | 2-4 min |
 | Security group rule update | 1-2 min |
 | IAM role/policy creation | 1-2 min |
@@ -382,6 +383,7 @@ These operations can vary significantly:
 **Minimum Time Windows:**
 - **Initial deployment:** 60 minutes (includes buffer)
 - **Application update:** 20 minutes (includes rollback time)
+- **Credential rotation:** 10 minutes (includes validation and rolling restart)
 - **Backup operation:** 2 minutes (includes verification)
 - **Restore operation:** 45 minutes (full restore with verification)
 - **Infrastructure teardown:** 25 minutes (includes verification)

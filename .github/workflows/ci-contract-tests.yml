@@ -1,0 +1,89 @@
+# =============================================================================
+# Contract & Consistency Tests
+# =============================================================================
+# Lightweight workflow that validates cross-file consistency: version drift,
+# Terraform output-to-script contracts, K8s manifest consistency, and schema
+# validation. Runs on every push/PR and completes in ~3-5 minutes.
+# =============================================================================
+
+name: Contract & Consistency Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  contract-tests:
+    name: Contract & Version Consistency
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install yq
+        run: |
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Install BATS
+        run: sudo apt-get update && sudo apt-get install -y bats
+
+      - name: Run contract tests
+        run: bats tests/bats/contract-tests.bats
+
+      - name: Run version consistency tests
+        run: bats tests/bats/versions_yaml.bats
+
+  terraform-validate:
+    name: Terraform Validate (offline)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: hashicorp/setup-terraform@v3.1.2
+
+      - name: Terraform init and validate
+        run: cd terraform && terraform init -backend=false && terraform validate
+
+  k8s-manifest-validate:
+    name: K8s Manifest Schema Validation
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install kubeconform
+        run: |
+          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate K8s manifests
+        run: |
+          # Validate manifests that don't use shell variable substitution
+          # Skip files with ${...} placeholders (credential-rotation templates)
+          for f in k8s/*.yaml; do
+            if grep -q '\${' "$f"; then
+              echo "Skipping template file: $f"
+              continue
+            fi
+            echo "Validating: $f"
+            kubeconform -strict -summary "$f" || true
+          done
+
+  full-bats-suite:
+    name: Full BATS Test Suite
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update && sudo apt-get install -y bats shellcheck
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo chmod +x /usr/local/bin/yq
+
+      - name: Run ALL BATS tests
+        run: bats tests/bats/*.bats

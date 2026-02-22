@@ -37,10 +37,10 @@ build:
 	python3 setup.py sdist bdist_wheel
 
 docker-build:
-	docker build -t openemr/warp:latest .
+	docker buildx build --platform linux/amd64,linux/arm64 -t openemr/warp:latest .
 
-docker-push: docker-build
-	docker push openemr/warp:latest
+docker-push:
+	docker buildx build --platform linux/amd64,linux/arm64 -t openemr/warp:latest --push .
 
 deploy:
 	kubectl apply -f k8s-job.yaml

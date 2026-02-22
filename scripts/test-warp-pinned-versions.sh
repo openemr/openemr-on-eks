@@ -155,6 +155,7 @@ echo "Creating virtual environment with $PYTHON_CMD..."
 $PYTHON_CMD -m venv "$VENV_DIR"
 
 # Activate virtual environment
+# shellcheck disable=SC1091
 source "$VENV_DIR/bin/activate"
 
 # Step 1: Check Python version

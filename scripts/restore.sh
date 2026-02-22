@@ -1669,6 +1669,7 @@ restore_application_data() {
     # Snapshot ID format: openemr-eks-aurora-61a909e9-backup-20251019-131840
     # Backup file format: app-data-backup-20251019-131840.tar.gz
     local timestamp
+    # shellcheck disable=SC2001
     timestamp=$(echo "$SNAPSHOT_ID" | sed 's/.*backup-\([0-9]\{8\}-[0-9]\{6\}\).*/\1/')
     
     if [ -z "$timestamp" ] || [ "$timestamp" = "$SNAPSHOT_ID" ]; then

@@ -98,6 +98,14 @@ AVD-KSV-0125
 # Kubernetes RBAC Exceptions
 # -----------------------------------------------------------------------------
 
+# AVD-KSV-0048: Workload management resources (deployments, pods) with write verbs
+# Reason: Credential rotation job must patch the openemr Deployment to trigger
+# a rollout restart after rotating database credentials. The Role is tightly
+# scoped: specific resourceNames only ("openemr"), single namespace, minimal
+# verbs (get, patch). No wildcard access or deletecollection.
+# Compensating control: Role bound to dedicated SA; namespace-scoped; resourceNames pinned
+AVD-KSV-0048
+
 # AVD-KSV-0113: Role has secrets access
 # Reason: OpenEMR service account needs to read database credentials from secrets
 # Compensating control: Role scoped to openemr namespace only; minimal permissions

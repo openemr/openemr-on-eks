@@ -32,6 +32,7 @@ This directory contains the complete infrastructure-as-code (IaC) configuration 
   - [cloudwatch.tf](#cloudwatchtf)
   - [waf.tf](#waftf)
   - [cloudtrail.tf](#cloudtrailtf)
+  - [credential-rotation.tf](#credential-rotationtf)
 
 ### **🚀 Deployment & Operations**
 - [Maintenance Guidelines](#maintenance-guidelines)
@@ -66,6 +67,7 @@ This directory contains the complete infrastructure-as-code (IaC) configuration 
 - **`cloudwatch.tf`** - CloudWatch log groups for application logging
 - **`waf.tf`** - AWS WAF configuration for security
 - **`cloudtrail.tf`** - CloudTrail for audit logging
+- **`credential-rotation.tf`** - Secrets Manager secrets and IRSA role/policy for credential rotation
 
 ## Infrastructure Dependency Graph
 
@@ -156,6 +158,7 @@ graph TD
   - Cache endpoints and credentials
   - Security group IDs and ARNs
   - Log group names and ARNs
+  - Credential rotation ARNs (`rds_slot_secret_arn`, `rds_admin_secret_arn`)
 - **Dependencies**: All resource files
 - **Maintenance Notes**:
   - Add new outputs as needed
@@ -206,6 +209,7 @@ graph TD
   - Update policies for new AWS services
   - Modify permissions based on security requirements
   - Add new roles for additional services
+  - Coordinate with `credential-rotation.tf` for rotation-specific IRSA policies
 
 #### `kms.tf`
 
@@ -235,6 +239,7 @@ graph TD
   - Update MySQL version regularly
   - Adjust scaling configuration as needed
   - Modify backup retention policies as needed
+  - RDS admin credentials stored in Secrets Manager are consumed by `credential-rotation.tf`
 
 #### `efs.tf`
 
@@ -320,6 +325,23 @@ graph TD
   - Update log retention policies
   - Modify event selectors
   - Add additional data resources
+
+#### `credential-rotation.tf`
+
+- **Purpose**: Secrets Manager secrets and IAM for zero-downtime credential rotation
+- **Key Components**:
+  - RDS slot secret (dual-slot A/B credentials with active_slot indicator)
+  - RDS admin secret (admin credentials for user management)
+  - IRSA role and policy for the rotation Kubernetes Job
+  - Secrets Manager read/write and RDS connect permissions
+  - KMS decrypt permissions for secrets encryption
+- **Dependencies**: `eks.tf`, `rds.tf`, `kms.tf`
+- **Maintenance Notes**:
+  - Keep IRSA trust policy in sync with the K8s ServiceAccount namespace
+  - Update Secrets Manager permissions if new secret fields are added
+  - Coordinate with `k8s/credential-rotation-sa.yaml` for the ServiceAccount annotation
+
+> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for the full architecture.
 
 ## Configuration Files
 

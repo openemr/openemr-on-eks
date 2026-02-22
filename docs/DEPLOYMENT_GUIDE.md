@@ -29,6 +29,7 @@ This comprehensive guide provides step-by-step instructions for deploying a prod
 ### **Phase 4: Post-Deployment**
 
 - [Security Hardening](#security-hardening)
+- [Credential Rotation Setup](#credential-rotation-setup)
 - [Monitoring Setup](#monitoring-setup)
 - [Backup Configuration](#backup-configuration)
 - [Operational Scripts Reference](#operational-scripts-reference)
@@ -721,6 +722,25 @@ cd ../scripts
 ./cluster-security-manager.sh disable
 ```
 
+### Credential Rotation Setup
+
+After initial deployment, verify that the credential rotation infrastructure is ready and optionally run an initial rotation:
+
+```bash
+cd ../scripts
+
+# 1. Verify all prerequisites are in place
+./verify-credential-rotation.sh
+
+# 2. (Optional) Run initial rotation to establish dual-slot state
+./run-credential-rotation.sh
+
+# 3. (Optional) Enable automated monthly rotation via CronJob
+kubectl apply -f ../k8s/credential-rotation-cronjob.yaml
+```
+
+> **Full details:** See [Credential Rotation Guide](credential-rotation.md) for architecture, failure scenarios, and operational runbook.
+
 ### Monitoring Setup
 
 #### Basic Monitoring (Included)
@@ -932,12 +952,12 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v81.4.2 (metrics & alerting)
+     - Prometheus v82.2.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
-     - Loki v6.51.0 (log aggregation with S3 storage)
+     - Loki v6.53.0 (log aggregation with S3 storage)
      - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
-     - OTeBPF v0.3.0 (eBPF auto-instrumentation)
+     - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.
@@ -1602,6 +1622,7 @@ cat k8s/openemr-credentials.txt
 - Update documentation
 - Security audit
 - Performance optimization
+- Run or verify credential rotation (`./scripts/run-credential-rotation.sh`)
 
 ## Rollback Procedures
 

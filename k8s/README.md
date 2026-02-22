@@ -25,6 +25,7 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
   - [network-policies.yaml](#network-policiesyaml)
   - [logging.yaml](#loggingyaml)
   - [ssl-renewal.yaml](#ssl-renewalyaml)
+  - [credential-rotation-*.yaml](#credential-rotation-manifests)
 
 ### **🚀 Deployment & Operations**
 - [Deployment Workflow](#deployment-workflow)
@@ -54,6 +55,10 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
 - **`network-policies.yaml`** - Network security policies
 - **`logging.yaml`** - Fluent Bit sidecar configuration for log aggregation
 - **`ssl-renewal.yaml`** - Automated SSL certificate renewal CronJob
+- **`credential-rotation-sa.yaml`** - ServiceAccount for credential rotation (IRSA-annotated)
+- **`credential-rotation-rbac.yaml`** - RBAC Role/RoleBinding for credential rotation Job
+- **`credential-rotation-job.yaml`** - One-off credential rotation Job manifest
+- **`credential-rotation-cronjob.yaml`** - Scheduled monthly credential rotation CronJob
 
 ## Kubernetes Manifest Dependency Graph
 
@@ -239,7 +244,7 @@ graph TD
 
 - **Purpose**: Secret templates for sensitive data
 - **Key Components**:
-  - Database credentials
+  - Database credentials (also managed by credential rotation -- see below)
   - Redis credentials
   - Application credentials
   - TLS certificates
@@ -248,6 +253,7 @@ graph TD
   - Update secret names for new services
   - Add new secret types as needed
   - Modify base64 encoding as required
+  - The `openemr-db-credentials` Secret is patched by the credential rotation Job during rotations
 
 #### `security.yaml`
 
@@ -311,6 +317,20 @@ graph TD
   - Add new certificate types as needed
   - Update cleanup policies as needed
 
+#### Credential Rotation Manifests
+
+- **`credential-rotation-sa.yaml`** - ServiceAccount annotated with the IRSA role ARN from Terraform, granting the rotation Job AWS permissions for Secrets Manager and RDS
+- **`credential-rotation-rbac.yaml`** - Role and RoleBinding granting the rotation Job permission to read/patch Secrets and trigger Deployment rollout restarts in the `openemr` namespace
+- **`credential-rotation-job.yaml`** - One-off Kubernetes Job that runs the Python-based credential rotation tool from the ECR container image
+- **`credential-rotation-cronjob.yaml`** - CronJob (default: monthly) that schedules automated credential rotations
+- **Dependencies**: `security.yaml` (namespace), `secrets.yaml` (target Secret), Terraform IRSA role
+- **Maintenance Notes**:
+  - Keep the IRSA role ARN annotation in sync with `terraform/credential-rotation.tf`
+  - Update the container image URI when the rotation tool is rebuilt
+  - Adjust CronJob schedule for organization-specific rotation frequency
+
+> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for the full architecture and runbook.
+
 ## Deployment Workflow
 
 ### 1. Prerequisites
@@ -329,6 +349,7 @@ graph TD
 5. **External Access**: `ingress.yaml`
 6. **Scaling Configuration**: `hpa.yaml`
 7. **Maintenance Automation**: `ssl-renewal.yaml`
+8. **Credential Rotation** (optional): `credential-rotation-sa.yaml` → `credential-rotation-rbac.yaml` → `credential-rotation-cronjob.yaml`
 
 ### 3. Configuration Management
 

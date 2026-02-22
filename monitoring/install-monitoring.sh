@@ -67,11 +67,11 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 81.4.2)
-#   CHART_LOKI_VERSION         Loki chart version (default: 6.51.0)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 82.2.0)
+#   CHART_LOKI_VERSION         Loki chart version (default: 6.53.0)
 #   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 1.61.3)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
-#   OTEBPF_VERSION             OTeBPF version (default: v0.3.0)
+#   OTEBPF_VERSION             OTeBPF version (default: v0.4.1)
 #   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
@@ -229,15 +229,15 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-81.4.2}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.51.0}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-82.2.0}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.53.0}"
 readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-1.61.3}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"
 # OpenTelemetry eBPF Instrumentation version (OTeBPF)
 # Using Docker Hub image: otel/ebpf-instrument
 # Official image repository: https://hub.docker.com/r/otel/ebpf-instrument
 # GitHub: https://github.com/open-telemetry/opentelemetry-network
-readonly OTEBPF_VERSION="${OTEBPF_VERSION:-v0.3.0}"
+readonly OTEBPF_VERSION="${OTEBPF_VERSION:-v0.4.1}"
 readonly OTEBPF_IMAGE="${OTEBPF_IMAGE:-otel/ebpf-instrument}"
 
 # Timeouts / retries
@@ -525,11 +525,11 @@ readonly NC='\033[0m'
 # ------------------------------
 # Enhanced Logging
 # ------------------------------
-log_with_timestamp() { local level="$1"; shift; local t; t="$(date '+%Y-%m-%d %H:%M:%S')"; echo -e "${level} [$t] $*"; [[ "${ENABLE_LOG_FILE:-1}" == "1" ]] && echo -e "${level} [$t] $*" >> "$LOG_FILE" 2>/dev/null || true; }
+log_with_timestamp() { local level="$1"; shift; local t; t="$(date '+%Y-%m-%d %H:%M:%S')"; echo -e "${level} [$t] $*"; if [[ "${ENABLE_LOG_FILE:-1}" == "1" ]]; then echo -e "${level} [$t] $*" >> "$LOG_FILE" 2>/dev/null || true; fi; }
 log_info()    { log_with_timestamp "${GREEN}[INFO]${NC}" "$@"; }
 log_warn()    { log_with_timestamp "${YELLOW}[WARN]${NC}" "$@" >&2; }
 log_error()   { log_with_timestamp "${RED}[ERROR]${NC}" "$@" >&2; }
-log_debug()   { [[ "${DEBUG:-0}" == "1" ]] && log_with_timestamp "${BLUE}[DEBUG]${NC}" "$@" || true; }
+log_debug()   { if [[ "${DEBUG:-0}" == "1" ]]; then log_with_timestamp "${BLUE}[DEBUG]${NC}" "$@"; fi; }
 log_success() { log_with_timestamp "${GREEN}[SUCCESS]${NC}" "$@"; }
 log_step()    { log_with_timestamp "${CYAN}[STEP]${NC}" "$@"; }
 
@@ -550,7 +550,7 @@ capture_debug_info() {
     echo ""; echo "Helm releases:"; helm list --all-namespaces 2>/dev/null || echo "Failed to list helm releases"
   } > "$f"; log_info "Debug information captured: $f"
 }
-cleanup_on_error(){ log_info "Performing error cleanup..."; [[ -f "${VALUES_FILE}.bak" ]] && mv "${VALUES_FILE}.bak" "${VALUES_FILE}" 2>/dev/null || true; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
+cleanup_on_error(){ log_info "Performing error cleanup..."; if [[ -f "${VALUES_FILE}.bak" ]]; then mv "${VALUES_FILE}.bak" "${VALUES_FILE}" 2>/dev/null || true; fi; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
 cleanup(){ log_debug "Performing normal cleanup..."; rm -f "${VALUES_FILE}.bak" 2>/dev/null || true; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
 handle_error(){ local c="$1" l="$2" cmd="$3"; log_error "Command failed with exit code $c at line $l: $cmd"; log_error "Function stack: ${FUNCNAME[*]}"; log_audit "ERROR" "script_execution" "FAILED"; capture_debug_info; cleanup_on_error; exit "$c"; }
 trap 'handle_error $? $LINENO "$BASH_COMMAND"' ERR
@@ -712,10 +712,10 @@ cleanup_duplicate_pods(){
   if [[ "$grafana_pods" -gt 1 ]]; then
     log_info "Found $grafana_pods Grafana pods, cleaning up duplicates..."
     kubectl get pods -n "$MONITORING_NAMESPACE" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Pending --no-headers 2>/dev/null | \
-    while read -r pod_name _; do if [[ -n "$pod_name" ]]; then log_info "Deleting pending Grafana pod: $pod_name"; kubectl delete pod "$pod_name" -n "$MONITORING_NAMESPACE" --ignore-not-found; ((cleaned++)); fi; done
+    while read -r pod_name _; do if [[ -n "$pod_name" ]]; then log_info "Deleting pending Grafana pod: $pod_name"; kubectl delete pod "$pod_name" -n "$MONITORING_NAMESPACE" --ignore-not-found; ((cleaned += 1)); fi; done
   fi
   kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | \
-  while read -r pod_name _ _ _ age _; do if [[ -n "$pod_name" && "$age" =~ ^[0-9]+[mh]$ ]]; then log_info "Deleting failed pod: $pod_name (age: $age)"; kubectl delete pod "$pod_name" -n "$MONITORING_NAMESPACE" --ignore-not-found; ((cleaned++)); fi; done
+  while read -r pod_name _ _ _ age _; do if [[ -n "$pod_name" && "$age" =~ ^[0-9]+[mh]$ ]]; then log_info "Deleting failed pod: $pod_name (age: $age)"; kubectl delete pod "$pod_name" -n "$MONITORING_NAMESPACE" --ignore-not-found; ((cleaned += 1)); fi; done
   if [[ "$cleaned" -gt 0 ]]; then log_success "Cleaned up $cleaned problematic pods"; log_audit "CLEANUP" "duplicate_pods" "SUCCESS"; else log_info "No duplicate or failed pods found"; fi
 }
 create_monitoring_rbac(){
@@ -784,7 +784,7 @@ check_storage_class(){
 # ------------------------------
 # Retry Helper
 # ------------------------------
-retry_with_backoff(){ local max="$1" base="$2" maxd="$3"; shift 3; local attempt=1 delay="$base"; while [[ $attempt -le $max ]]; do log_debug "Attempt $attempt/$max: $*"; if "$@"; then return 0; fi; if [[ $attempt -lt $max ]]; then log_warn "Attempt $attempt failed, retrying in ${delay}s..."; sleep "$delay"; delay=$((delay * 2)); [[ $delay -gt $maxd ]] && delay="$maxd"; fi; ((attempt++)); done; log_error "Command failed after $max attempts: $*"; return 1; }
+retry_with_backoff(){ local max="$1" base="$2" maxd="$3"; shift 3; local attempt=1 delay="$base"; while [[ $attempt -le $max ]]; do log_debug "Attempt $attempt/$max: $*"; if "$@"; then return 0; fi; if [[ $attempt -lt $max ]]; then log_warn "Attempt $attempt failed, retrying in ${delay}s..."; sleep "$delay"; delay=$((delay * 2)); [[ $delay -gt $maxd ]] && delay="$maxd"; fi; ((attempt += 1)); done; log_error "Command failed after $max attempts: $*"; return 1; }
 
 # ------------------------------
 # Helm Repo Setup
@@ -986,7 +986,7 @@ PY
 
 create_values_file(){
   log_step "Creating Helm values file..."
-  [[ -f "$VALUES_FILE" ]] && cp "$VALUES_FILE" "${VALUES_FILE}.bak" || true
+  if [[ -f "$VALUES_FILE" ]]; then cp "$VALUES_FILE" "${VALUES_FILE}.bak"; fi
   resolve_access_modes
   local sc_prom="$STORAGE_CLASS_RWO" am_prom="$ACCESS_MODE_RWO"
   local sc_am="$STORAGE_CLASS_RWO"   am_am="$ACCESS_MODE_RWO"
@@ -1256,6 +1256,19 @@ wait_for_prom_operator_crds(){
   log_success "All required CRDs present"
 }
 
+wait_for_prom_operator_webhook(){
+  log_step "Waiting for Prometheus Operator admission webhook to be ready..."
+  kubectl -n "$MONITORING_NAMESPACE" wait deploy/prometheus-stack-kube-prom-operator \
+    --for=condition=Available --timeout="${TIMEOUT_KUBECTL}" >/dev/null 2>&1 || {
+    log_error "Prometheus Operator deployment not available"; return 1
+  }
+  retry_with_backoff 12 5 60 bash -c \
+    "kubectl get endpoints prometheus-stack-kube-prom-operator -n \"$MONITORING_NAMESPACE\" -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null | grep -q ." || {
+    log_error "Prometheus Operator webhook endpoints not ready"; return 1
+  }
+  log_success "Prometheus Operator webhook ready"
+}
+
 # ------------------------------
 # AlertManager Config (optional)
 # ------------------------------
@@ -1339,7 +1352,7 @@ install_prometheus_stack(){
     if ! kubectl cluster-info >/dev/null 2>&1; then
       log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
       sleep "$retry_delay"
-      ((attempt++))
+      ((attempt += 1))
       continue
     fi
     
@@ -1369,7 +1382,7 @@ install_prometheus_stack(){
       fi
     fi
     
-    ((attempt++))
+    ((attempt += 1))
   done
   
   if [ $attempt -gt "$max_retries" ]; then
@@ -1453,7 +1466,7 @@ EOF
     if ! kubectl cluster-info >/dev/null 2>&1; then
       log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
       sleep "$retry_delay"
-      ((attempt++))
+      ((attempt += 1))
       continue
     fi
     
@@ -1537,7 +1550,7 @@ EOF
       fi
     fi
     
-    ((attempt++))
+    ((attempt += 1))
   done
   
   if [ $attempt -gt "$max_retries" ]; then
@@ -1974,7 +1987,7 @@ EOF
         log_warn "Failed to patch query-frontend readiness probe after $patch_retries attempts (deployment may not exist yet)"
       fi
     fi
-    ((patch_attempt++))
+    ((patch_attempt += 1))
   done
 
   log_info "Waiting for Tempo pods to be ready..."
@@ -2511,15 +2524,15 @@ verify_installation(){
             log_info "ℹ️ $name service exists, endpoints may be initializing (pods running: $running_pods)"
           else
             log_warn "⚠️ $name service exists but has no endpoints and no running pods"
-            ((failed++))
+            ((failed += 1))
           fi
         else
           log_warn "⚠️ $name service exists but has no endpoints"
-          ((failed++))
+          ((failed += 1))
         fi
       fi
     else
-      if [[ "$name" == "tempo" || "$name" == "mimir" ]]; then log_info "ℹ️ $name service not found (optional component)"; else log_warn "❌ $name service not found"; ((failed++)); fi
+      if [[ "$name" == "tempo" || "$name" == "mimir" ]]; then log_info "ℹ️ $name service not found (optional component)"; else log_warn "❌ $name service not found"; ((failed += 1)); fi
     fi
   done
   log_info "Pod status in ${MONITORING_NAMESPACE} ..."; local pending running failed_p
@@ -2564,7 +2577,7 @@ verify_installation(){
     non_otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -cv "otebpf" || echo 0)
     if [[ "$non_otebpf_failed" -gt 0 ]]; then
       kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -v "otebpf" || true
-      ((failed++))
+      ((failed += 1))
     fi
   fi
   
@@ -2572,7 +2585,7 @@ verify_installation(){
   if [[ "$otebpf_failed" -gt 0 ]]; then 
     log_warn "⚠️ OTeBPF has $otebpf_failed failed pod(s) - this is concerning"
     kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Failed || true
-    ((failed++))
+    ((failed += 1))
   fi
   
   # Only fail if there are non-HPA pending pods (HPA pending pods are expected during scale-up)
@@ -2872,6 +2885,7 @@ EOF
 create_openemr_monitoring(){
   log_step "Creating comprehensive OpenEMR monitoring configuration..."
   wait_for_prom_operator_crds
+  wait_for_prom_operator_webhook
   ensure_namespace "$OPENEMR_NAMESPACE"
 
   kubectl apply -f - <<EOF
@@ -2899,7 +2913,7 @@ spec:
     matchNames: [ ${OPENEMR_NAMESPACE} ]
 EOF
 
-  kubectl apply -f - <<EOF
+  retry_with_backoff 5 10 60 kubectl apply -f - <<EOF
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:

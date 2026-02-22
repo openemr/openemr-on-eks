@@ -62,7 +62,7 @@ NC='\033[0m'        # Reset color to default
 
 # Configuration variables - can be overridden by environment variables
 CLUSTER_NAME=${CLUSTER_NAME:-"openemr-eks"} # EKS cluster name to validate
-AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where resources are located
+export AWS_REGION=${AWS_REGION:-"us-west-2"}       # AWS region where resources are located
 NAMESPACE=${NAMESPACE:-"openemr"}           # Kubernetes namespace for OpenEMR
 
 # Get AWS region from environment or Terraform state
@@ -165,7 +165,7 @@ detect_credential_source() {
 
     # Check environment variables (highest precedence)
     # AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY take precedence over all other sources
-    if [ ! -z "$AWS_ACCESS_KEY_ID" ] && [ ! -z "$AWS_SECRET_ACCESS_KEY" ]; then
+    if [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
         cred_sources+=("Environment variables (AWS_ACCESS_KEY_ID)")
         echo -e "${BLUE}   📍 Source: Environment variables${NC}"
     fi
@@ -181,7 +181,7 @@ detect_credential_source() {
         # Profiles are defined in [profile-name] sections
         if command -v grep >/dev/null 2>&1; then
             PROFILES=$(grep -E '^\[.*\]' "$AWS_CREDS_FILE" | sed 's/\[//g' | sed 's/\]//g' | tr '\n' ', ' | sed 's/, $//')
-            if [ ! -z "$PROFILES" ]; then
+            if [ -n "$PROFILES" ]; then
                 echo -e "${BLUE}   📋 Available profiles: $PROFILES${NC}"
             fi
         fi
@@ -222,7 +222,7 @@ detect_credential_source() {
 
     # Check for ECS task role (if running in ECS)
     # ECS task roles provide credentials to containers running in ECS tasks
-    if [ ! -z "$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI" ]; then
+    if [ -n "$AWS_CONTAINER_CREDENTIALS_RELATIVE_URI" ]; then
         cred_sources+=("ECS task role")
         echo -e "${BLUE}   📦 ECS task role detected${NC}"
     fi
@@ -254,7 +254,7 @@ detect_credential_source() {
 # It handles both existing clusters and first-time deployment scenarios
 check_cluster_access() {
     # Check if the EKS cluster exists and is accessible via AWS API
-    if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
+    if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ EKS cluster '$CLUSTER_NAME' is accessible${NC}"
 
         # Test kubectl connectivity to the cluster
@@ -340,7 +340,7 @@ check_required_resources() {
     VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=${CLUSTER_NAME}-vpc" --query 'Vpcs[0].VpcId' --output text 2>/dev/null)
     if [ "$VPC_ID" != "None" ] && [ "$VPC_ID" != "" ]; then
         echo -e "${GREEN}✅ VPC exists: $VPC_ID${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${BLUE}ℹ️  VPC not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
@@ -351,7 +351,7 @@ check_required_resources() {
     RDS_CLUSTER=$(aws rds describe-db-clusters --query "DBClusters[?contains(DBClusterIdentifier, '${CLUSTER_NAME}')].DBClusterIdentifier" --output text 2>/dev/null)
     if [ "$RDS_CLUSTER" != "" ]; then
         echo -e "${GREEN}✅ RDS Aurora cluster exists: $RDS_CLUSTER${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${BLUE}ℹ️  RDS Aurora cluster not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
@@ -362,7 +362,7 @@ check_required_resources() {
     REDIS_CLUSTER=$(aws elasticache describe-serverless-caches --query "ServerlessCaches[?contains(ServerlessCacheName, '${CLUSTER_NAME}')].ServerlessCacheName" --output text 2>/dev/null)
     if [ "$REDIS_CLUSTER" != "" ]; then
         echo -e "${GREEN}✅ ElastiCache Valkey cluster exists: $REDIS_CLUSTER${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${BLUE}ℹ️  ElastiCache Valkey cluster not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
@@ -373,7 +373,7 @@ check_required_resources() {
     EFS_ID=$(aws efs describe-file-systems --query "FileSystems[?contains(Name, '${CLUSTER_NAME}')].FileSystemId" --output text 2>/dev/null)
     if [ "$EFS_ID" != "" ]; then
         echo -e "${GREEN}✅ EFS file system exists: $EFS_ID${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${BLUE}ℹ️  EFS file system not found${NC}"
         echo -e "${BLUE}💡 This is expected for first-time deployments${NC}"
@@ -400,9 +400,9 @@ check_k8s_resources() {
 
     # Check if the OpenEMR namespace exists
     # Namespaces provide logical separation and resource isolation
-    if kubectl get namespace $NAMESPACE >/dev/null 2>&1; then
+    if kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Namespace '$NAMESPACE' exists${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${YELLOW}⚠️  Namespace '$NAMESPACE' not found${NC}"
         echo -e "${YELLOW}💡 Will be created during deployment${NC}"
@@ -410,12 +410,12 @@ check_k8s_resources() {
 
     # Check if OpenEMR deployment already exists
     # This helps determine if this is an update or fresh deployment
-    if kubectl get deployment openemr -n $NAMESPACE >/dev/null 2>&1; then
+    if kubectl get deployment openemr -n "$NAMESPACE" >/dev/null 2>&1; then
         # Get the number of ready replicas to show current deployment status
-        REPLICAS=$(kubectl get deployment openemr -n $NAMESPACE -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+        REPLICAS=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
         echo -e "${YELLOW}⚠️  OpenEMR deployment already exists ($REPLICAS ready replicas)${NC}"
         echo -e "${YELLOW}💡 Deployment will update existing resources${NC}"
-        ((resources_found++))
+        ((resources_found += 1))
     else
         echo -e "${GREEN}✅ OpenEMR not yet deployed (clean deployment)${NC}"
     fi
@@ -442,7 +442,7 @@ check_security_config() {
     echo -e "${BLUE}Checking security configuration...${NC}"
 
     # Check if cluster exists first - if not, show planned security features
-    if ! aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
+    if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
         echo -e "${BLUE}ℹ️  EKS cluster not found - security configuration will be applied during deployment${NC}"
         echo -e "${BLUE}📋 Planned deployment features:${NC}"
         echo -e "${BLUE}   • OpenEMR 8.0.0 with HTTPS-only access (port 443)${NC}"
@@ -459,13 +459,13 @@ check_security_config() {
     # Check cluster endpoint access configuration
     # Public access allows kubectl from the internet (with IP restrictions)
     # Private access allows kubectl only from within the VPC
-    PUBLIC_ACCESS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text 2>/dev/null)
-    PRIVATE_ACCESS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.endpointPrivateAccess' --output text 2>/dev/null)
+    PUBLIC_ACCESS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.endpointPublicAccess' --output text 2>/dev/null)
+    PRIVATE_ACCESS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.endpointPrivateAccess' --output text 2>/dev/null)
 
     # Validate public access configuration
     if [ "$PUBLIC_ACCESS" = "True" ]; then
         # Get the list of allowed CIDR blocks for public access
-        ALLOWED_CIDRS=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.publicAccessCidrs' --output text 2>/dev/null)
+        ALLOWED_CIDRS=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.publicAccessCidrs' --output text 2>/dev/null)
         echo -e "${YELLOW}⚠️  Public access enabled for: $ALLOWED_CIDRS${NC}"
         echo -e "${YELLOW}💡 Consider disabling after deployment: $SCRIPT_DIR/cluster-security-manager.sh disable${NC}"
     else
@@ -481,7 +481,7 @@ check_security_config() {
 
     # Check EKS secrets encryption configuration
     # Encryption at rest protects sensitive data stored in etcd
-    ENCRYPTION_CONFIG=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.encryptionConfig' --output text 2>/dev/null)
+    ENCRYPTION_CONFIG=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.encryptionConfig' --output text 2>/dev/null)
     if [ "$ENCRYPTION_CONFIG" != "None" ] && [ "$ENCRYPTION_CONFIG" != "" ]; then
         echo -e "${GREEN}✅ EKS secrets encryption enabled${NC}"
     else
@@ -500,11 +500,11 @@ provide_recommendations() {
 
     # Check for IP changes if cluster exists
     # This helps users understand if they need to update cluster access
-    if aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION >/dev/null 2>&1; then
+    if aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
         # Get current public IP address
         CURRENT_IP=$(curl -s https://checkip.amazonaws.com 2>/dev/null || echo "unknown")
         # Get the first allowed IP from the cluster configuration
-        ALLOWED_IP=$(aws eks describe-cluster --name $CLUSTER_NAME --region $AWS_REGION --query 'cluster.resourcesVpcConfig.publicAccessCidrs[0]' --output text 2>/dev/null | cut -d'/' -f1)
+        ALLOWED_IP=$(aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" --query 'cluster.resourcesVpcConfig.publicAccessCidrs[0]' --output text 2>/dev/null | cut -d'/' -f1)
 
         # Compare current IP with allowed IP to detect changes
         if [ "$CURRENT_IP" != "$ALLOWED_IP" ] && [ "$CURRENT_IP" != "unknown" ] && [ "$ALLOWED_IP" != "None" ] && [ "$ALLOWED_IP" != "" ]; then
@@ -544,12 +544,12 @@ provide_recommendations() {
     echo -e "   • Basic deployment: CloudWatch logs only"
     echo -e "   • Optional: Enhanced monitoring stack: cd $PROJECT_ROOT/monitoring && ./install-monitoring.sh"
     echo -e "   • Enhanced stack includes:"
-    echo -e "     - Prometheus v81.4.2 (metrics & alerting)"
+    echo -e "     - Prometheus v82.2.0 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
-    echo -e "     - Loki v6.51.0 (log aggregation)"
+    echo -e "     - Loki v6.53.0 (log aggregation)"
     echo -e "     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)"
     echo -e "     - Mimir v6.0.5 (long-term metrics storage)"
-    echo -e "     - OTeBPF v0.3.0 (eBPF auto-instrumentation)"
+    echo -e "     - OTeBPF v0.4.1 (eBPF auto-instrumentation)"
     echo -e "     - AlertManager (Slack integration support)"
     echo -e "     - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)"
     echo -e "   • Configure alerting for critical issues"
@@ -566,15 +566,15 @@ main() {
 
     # Step 1: Validate required command-line tools
     echo -e "${BLUE}1. Checking prerequisites...${NC}"
-    check_command "kubectl" || ((errors++))                                                       # Kubernetes command-line tool
-    check_command "aws" || ((errors++))                                                           # AWS CLI tool
-    check_command "helm" || ((errors++))                                                          # Helm package manager
+    check_command "kubectl" || ((errors += 1))                                                       # Kubernetes command-line tool
+    check_command "aws" || ((errors += 1))                                                           # AWS CLI tool
+    check_command "helm" || ((errors += 1))                                                          # Helm package manager
     check_command "jq" || echo -e "${YELLOW}⚠️  jq not installed (optional but recommended)${NC}" # JSON processor (optional)
     echo ""
 
     # Step 2: Validate AWS credentials and authentication
     echo -e "${BLUE}2. Checking AWS credentials...${NC}"
-    check_aws_credentials || ((errors++))
+    check_aws_credentials || ((errors += 1))
     echo ""
 
     # Step 3: Validate Terraform state and infrastructure
@@ -585,7 +585,7 @@ main() {
         first_time_deployment=true
         echo -e "${BLUE}💡 This is normal for first-time deployments${NC}"
     elif [ "$terraform_check_result" -eq 1 ]; then
-        ((errors++))
+        ((errors += 1))
     fi
     echo ""
 
@@ -597,7 +597,7 @@ main() {
         first_time_deployment=true
         echo -e "${BLUE}💡 This is normal for first-time deployments${NC}"
     elif [ "$cluster_access_check_result" -eq 1 ]; then
-        ((errors++))
+        ((errors += 1))
     fi
     echo ""
 
@@ -609,7 +609,7 @@ main() {
         first_time_deployment=true
         echo -e "${BLUE}💡 This is normal for first-time deployments${NC}"
     elif [ "$aws_resources_check_result" -eq 1 ]; then
-        ((errors++))
+        ((errors += 1))
     fi
     echo ""
 
@@ -621,7 +621,7 @@ main() {
         first_time_deployment=true
         echo -e "${BLUE}💡 This is normal for first-time deployments${NC}"
     elif [ "$k8s_resources_check_result" -eq 1 ]; then
-        ((errors++))
+        ((errors += 1))
     fi
     echo ""
 

@@ -17,6 +17,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Autoscaling Guide](#autoscaling_guidemd)
 - [Logging Guide](#logging_guidemd)
 - [Security Scanning Guide](#security_scanningmd)
+- [Credential Rotation Guide](#credential-rotationmd)
 - [Testing Guide](#testing_guidemd)
 - [End-to-End Testing Requirements](#end_to_end_testing_requirementsmd)
 - [Manual Releases](#manual_releasesmd)
@@ -31,6 +32,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Scripts Documentation](../scripts/README.md)
 - [Monitoring Documentation](../monitoring/README.md)
 - [Warp Project Documentation](../warp/README.md)
+- [Credential Rotation Tool](../tools/credential-rotation/README.md)
 
 ### **📖 Documentation Maintenance**
 - [Maintenance Guidelines](#maintenance-guidelines)
@@ -46,6 +48,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`AUTOSCALING_GUIDE.md`** - Autoscaling configuration and optimization guide
 - **`LOGGING_GUIDE.md`** - Logging configuration with CloudWatch and Loki integration
 - **`SECURITY_SCANNING.md`** - Comprehensive security scanning with zero-tolerance policy
+- **`credential-rotation.md`** - Zero-downtime RDS credential rotation architecture and runbook
 - **`TESTING_GUIDE.md`** - Testing framework and CI/CD procedures
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
@@ -61,6 +64,8 @@ graph TD
     A --> C[AUTOSCALING_GUIDE.md]
     A --> D[LOGGING_GUIDE.md]
     A --> E[TROUBLESHOOTING.md]
+    A --> CR[credential-rotation.md]
+    CR --> E
 
     A1 --> F[END_TO_END_TESTING_REQUIREMENTS.md]
     B --> F
@@ -97,6 +102,7 @@ graph TD
     style H fill:#e1f5fe
     style M fill:#e1f5fe
     style S fill:#e1f5fe
+    style CR fill:#ffebee
 ```
 
 ## File Descriptions
@@ -210,6 +216,21 @@ graph TD
   - Review and update ignore files only with security team approval
   - Add new scanners as security requirements evolve
   - Update remediation procedures as new finding types are identified
+
+#### `credential-rotation.md`
+
+- **Purpose**: Zero-downtime RDS credential rotation architecture, operational runbook, and failure recovery
+- **Key Features**:
+  - Dual-slot (A/B) credential rotation strategy with Secrets Manager
+  - Step-by-step rotation flow with automatic rollback
+  - Kubernetes Job/CronJob orchestration via IRSA
+  - EFS sqlconf.php and K8s Secret patching
+  - Failure scenarios, idempotency guarantees, and troubleshooting
+- **Dependencies**: `terraform/credential-rotation.tf`, `scripts/run-credential-rotation.sh`, `scripts/verify-credential-rotation.sh`, `tools/credential-rotation/`
+- **Maintenance Notes**:
+  - Update when rotation tool flags or environment variables change
+  - Revise failure scenarios as new edge cases are discovered
+  - Keep IAM/RBAC permission references in sync with Terraform
 
 ### Testing and Quality Assurance
 

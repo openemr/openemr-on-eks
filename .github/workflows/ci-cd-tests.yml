@@ -45,6 +45,7 @@ on:
         - script_validation
         - documentation
         - warp
+        - credential_rotation
 
 # Required permissions for the workflow
 permissions:
@@ -54,9 +55,9 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.2'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.14.3' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.35.0'  # kubectl version for Kubernetes manifest validation
+  PYTHON_VERSION: '3.14.3'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.14.5' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.35.1'  # kubectl version for Kubernetes manifest validation
 
 jobs:
   # Primary test job - runs test suites in parallel using matrix strategy
@@ -85,7 +86,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for testing
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
@@ -185,7 +186,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for validation
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
@@ -228,40 +229,24 @@ jobs:
             echo "✓ $file YAML syntax is valid"
           done
 
-      # Step 8: Validate shell script syntax with shellcheck
-      # This step performs static analysis of shell scripts for common issues and best practices
-      - name: Check shell script syntax
+      # Step 8: Strict shellcheck validation — all findings (error, warning, info, style) fail the build
+      - name: Strict shellcheck on all shell scripts
         run: |
-          echo "Running shellcheck on all shell scripts..."
-          echo "Note: Warnings and info messages are shown but won't fail the build"
-
-          # Run shellcheck with exit code 0 even on warnings/info
-          # Only fail on actual errors (severity 1)
-          for file in scripts/*.sh; do
+          echo "Running strict shellcheck on all shell scripts..."
+          failed=0
+          for file in scripts/*.sh monitoring/*.sh k8s/*.sh oidc_provider/scripts/*.sh warp/benchmark-data/*.sh; do
             if [ -f "$file" ]; then
               echo "Checking $file..."
-              # Use --severity=error to only fail on actual errors, not warnings
-              shellcheck --severity=error "$file" || echo "✓ $file passed error checks (warnings ignored)"
+              if ! shellcheck "$file"; then
+                failed=1
+              fi
             fi
           done
-
-          echo "Shell script syntax check completed"
-
-      # Step 9: Display shellcheck warnings for reference and improvement
-      # This step shows all shellcheck findings (warnings, info) for code quality improvement
-      - name: Show shellcheck warnings (for reference)
-        run: |
-          echo "=== Shellcheck Warnings/Info (for reference) ==="
-          echo "The following are suggestions for improvement, not errors:"
-
-          for file in scripts/*.sh; do
-            if [ -f "$file" ]; then
-              echo ""
-              echo "--- $file ---"
-              # Show all issues but don't fail the build
-              shellcheck "$file" || echo "✓ $file has no issues"
-            fi
-          done
+          if [ "$failed" -ne 0 ]; then
+            echo "::error::shellcheck found issues — all warnings must be resolved"
+            exit 1
+          fi
+          echo "All shell scripts pass strict shellcheck"
 
       # Step 10: Validate YAML files across multiple directories
       # This step validates YAML syntax for Kubernetes and monitoring configurations
@@ -286,7 +271,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for security scanning
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Run Trivy vulnerability scanner in table format (STRICT MODE)
       # This scan produces human-readable output and FAILS on ANY finding
@@ -375,7 +360,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Set up Python environment for quality checks
       - name: Set up Python
@@ -427,7 +412,7 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Set up Python environment
       - name: Set up Python
@@ -454,7 +439,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
           # Install test dependencies (versions pinned to match versions.yaml)
-          pip install pytest==9.0.1 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.0
+          pip install pytest==9.0.2 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.1
 
       # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
@@ -515,20 +500,98 @@ jobs:
           fi
           echo "=========================================================="
 
+  # Credential Rotation CI job - Python package testing and validation
+  # This job runs comprehensive testing for the credential rotation tool
+  # It validates the dual-slot rotation logic, EFS atomic writes, and K8s integration
+  credential-rotation-ci:
+    name: Credential Rotation CI
+    runs-on: ubuntu-24.04
+    if: |
+      (github.event_name == 'workflow_dispatch' && 
+       (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'credential_rotation')) ||
+      github.event_name != 'workflow_dispatch'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          cd tools/credential-rotation
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest==9.0.2 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.1
+
+      - name: Run pytest with coverage
+        run: |
+          cd tools/credential-rotation
+          PYTHONPATH=src pytest tests/ -v --cov=credential_rotation --cov-report=term-missing --cov-report=html
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v6
+        if: always()
+        with:
+          name: credential-rotation-coverage-report
+          path: tools/credential-rotation/htmlcov/
+          retention-days: 7
+
+      - name: Format check with black
+        run: |
+          cd tools/credential-rotation
+          black src/ tests/ --line-length 127 --check --diff
+
+      - name: Run flake8
+        run: |
+          cd tools/credential-rotation
+          flake8 src/ tests/ --max-line-length=127 --extend-ignore=E203 --count --statistics
+
+      - name: Run type checking with mypy
+        run: |
+          cd tools/credential-rotation
+          mypy src/credential_rotation/ --ignore-missing-imports || echo "Type checking completed with warnings"
+
+      - name: Run Trivy security scan (Zero-Tolerance)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: 'tools/credential-rotation'
+          format: 'table'
+          output: 'trivy-credential-rotation-results.txt'
+          severity: 'CRITICAL,HIGH,MEDIUM,LOW'
+          scanners: 'vuln,secret,misconfig'
+          exit-code: '1'
+          trivyignores: '.trivyignore'
+
+      - name: Display Trivy results
+        if: always()
+        run: |
+          echo "Trivy Security Scan Results for Credential Rotation (ZERO-TOLERANCE):"
+          echo "====================================================================="
+          if [ -f "trivy-credential-rotation-results.txt" ]; then
+            cat trivy-credential-rotation-results.txt
+          else
+            echo "No vulnerabilities found - scan passed"
+          fi
+          echo "====================================================================="
+
   # Summary job - generates comprehensive test results summary
   # This job collects results from all previous jobs and provides a unified
   # overview of the entire CI/CD pipeline execution
   summary:
     name: Test Summary
     runs-on: ubuntu-24.04
-    # Include all jobs - warp-ci may be skipped but will be handled gracefully
-    needs: [test, lint-and-validate, security-scan, code-quality, warp-ci]
+    needs: [test, lint-and-validate, security-scan, code-quality, warp-ci, credential-rotation-ci]
     if: always()  # Run summary regardless of job outcomes
 
     steps:
       # Step 1: Checkout repository code for summary generation
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
 
       # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results
@@ -570,6 +633,16 @@ jobs:
             echo "⏭️ **Warp tests not run** (workflow paths filter)"
           else
             echo "❌ **Warp tests failed or had issues** - Check the warp-ci job logs"
+          fi
+          echo ""
+
+          echo "## 🔐 Credential Rotation CI Status"
+          if [ "${{ needs.credential-rotation-ci.result }}" == "success" ]; then
+            echo "✅ **Credential rotation tests passed successfully!**"
+          elif [ "${{ needs.credential-rotation-ci.result }}" == "skipped" ]; then
+            echo "⏭️ **Credential rotation tests skipped**"
+          else
+            echo "❌ **Credential rotation tests failed** - Check the credential-rotation-ci job logs"
           fi
           echo ""
 

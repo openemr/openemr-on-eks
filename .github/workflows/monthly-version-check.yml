@@ -61,8 +61,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.14.3"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.35.0"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.14.5"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.35.1"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -87,7 +87,7 @@ jobs:
     steps:
       # Step 1: Checkout repository with full history for version analysis
       - name: Checkout Repository
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0  # Fetch complete git history for comprehensive analysis
 

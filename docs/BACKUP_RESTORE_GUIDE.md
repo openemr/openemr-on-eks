@@ -519,7 +519,12 @@ The script automatically adjusts the restore order based on database state:
    - Update Redis credentials secret in Kubernetes
    - Ensure OpenEMR can connect to Redis/Valkey
 
-8. **Completion**
+8. **Credential Rotation Re-sync** (if using dual-slot rotation)
+   - After restoring from backup, database credentials may differ from the pre-backup state
+   - Run `./scripts/run-credential-rotation.sh --sync-db-users` to re-establish dual-slot credentials
+   - See [Credential Rotation Guide](credential-rotation.md) for details
+
+9. **Completion**
    - Provide restore status and next steps
    - All operations use existing infrastructure (no temporary resources)
 
@@ -925,6 +930,18 @@ Monitor backup success through:
 ## Troubleshooting
 
 ### Common Issues
+
+#### Database Access Denied After Restore
+
+**Issue**: After restoring from backup, OpenEMR pods show `Access denied` errors because the restored database has different credentials than the current Secrets Manager state.
+
+```bash
+# Re-sync dual-slot credentials after restore
+./scripts/run-credential-rotation.sh --sync-db-users
+
+# Or verify rotation prerequisites first
+./scripts/verify-credential-rotation.sh
+```
 
 #### Backup Script Fails
 

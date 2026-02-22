@@ -18,6 +18,7 @@ This comprehensive guide helps diagnose and resolve issues with OpenEMR on EKS A
 - [Terraform Deployment Failures](#3-terraform-deployment-failures)
 - [Pods Not Starting](#4-pods-not-starting)
 - [Database Connection Issues](#5-database-connection-issues)
+- [Credential Rotation Issues](#credential-rotation-issues)
 - [EKS Auto Mode Specific Issues](#6-eks-auto-mode-specific-issues)
 - [HPA Metrics Server Issues](#7-hpa-metrics-server-issues)
 - [Logging and Monitoring Issues](#8-logging-and-monitoring-issues)
@@ -471,6 +472,78 @@ kubectl create secret generic openemr-db-credentials \
 kubectl rollout restart deployment openemr -n openemr
 ```
 
+### Credential Rotation Issues
+
+If you are experiencing database access failures after or during credential rotation, start with the verification script:
+
+```bash
+./scripts/verify-credential-rotation.sh
+```
+
+#### Issue: Access Denied After Credential Rotation
+
+**Symptoms:**
+
+```
+ERROR 1045 (28000): Access denied for user 'openemr_a'@'...'
+Pods in CrashLoopBackOff after rotation
+```
+
+**Diagnosis:**
+
+```bash
+# Check which slot is active in Secrets Manager
+aws secretsmanager get-secret-value \
+  --secret-id "$(terraform -chdir=terraform output -raw rds_slot_secret_arn)" \
+  --query 'SecretString' | jq -r '.active_slot'
+
+# Check what the K8s Secret contains
+kubectl get secret openemr-db-credentials -n openemr -o jsonpath='{.data.mysql-user}' | base64 -d
+
+# Check sqlconf.php on EFS
+kubectl exec deployment/openemr -n openemr -- cat /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php | grep login
+```
+
+**Solutions:**
+
+1. **Slot mismatch between K8s Secret and Secrets Manager** -- Re-run rotation to re-sync:
+   ```bash
+   ./scripts/run-credential-rotation.sh --sync-db-users
+   ```
+
+2. **Rotation Job failed mid-way** -- The rotation tool is idempotent; re-run it:
+   ```bash
+   ./scripts/run-credential-rotation.sh
+   ```
+
+3. **Rollback needed** -- If the newly rotated credential is invalid, the rotation tool automatically rolls back. Check Job logs:
+   ```bash
+   kubectl logs job/credential-rotation -n openemr
+   ```
+
+#### Issue: Credential Rotation Job Not Starting
+
+**Symptoms:**
+
+```
+Job pod stuck in Pending or ImagePullBackOff
+```
+
+**Diagnosis:**
+
+```bash
+kubectl describe job credential-rotation -n openemr
+kubectl get events -n openemr --field-selector reason=FailedCreate
+```
+
+**Solutions:**
+
+- **ImagePullBackOff**: Verify ECR image URI and IRSA permissions for ECR pull
+- **RBAC errors**: Re-apply RBAC manifests: `kubectl apply -f k8s/credential-rotation-rbac.yaml`
+- **ServiceAccount missing**: `kubectl apply -f k8s/credential-rotation-sa.yaml`
+
+> **Full guide:** See [Credential Rotation Guide](credential-rotation.md) for the complete operational runbook and failure scenarios.
+
 ### 6. EKS Auto Mode Specific Issues
 
 #### Issue: Nodes Not Provisioning
@@ -620,7 +693,7 @@ helm get values loki -n monitoring
 # Upgrade Loki to enable volume
 helm upgrade loki grafana/loki \
   --namespace monitoring \
-  --version 6.51.0 \
+  --version 6.53.0 \
   --reuse-values \
   --set loki.limits_config.volume_enabled=true
 
@@ -1215,6 +1288,9 @@ aws ec2 revoke-security-group-egress \
     --query 'SecurityGroups[0].IpPermissionsEgress' --output json)"
 
 # 5. Rotate all credentials
+# Rotate RDS database credentials immediately
+./scripts/run-credential-rotation.sh
+# See docs/credential-rotation.md for full details
 
 # 6. Notify compliance officer
 ```

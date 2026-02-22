@@ -139,10 +139,8 @@ get_docker_tags() {
     echo -e "${YELLOW}Fetching tags from Docker Hub...${NC}"
 
     # Make API request to Docker Hub - using curl with silent mode (-s) to suppress progress
-    local response=$(curl -s "$url")
-
-    # Check if curl command succeeded (exit code 0)
-    if [ $? -ne 0 ]; then
+    local response
+    if ! response=$(curl -s "$url"); then
         echo -e "${RED}Error: Failed to fetch tags from Docker Hub${NC}" >&2
         exit 1
     fi

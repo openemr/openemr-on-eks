@@ -300,7 +300,7 @@ cleanup_jobs() {
     # Keep only the last 3 successful and 3 failed jobs (as configured in CronJob)
     # Delete jobs older than 7 days
     kubectl get jobs -n "$NAMESPACE" -l app=ssl-cert-renewal -o jsonpath='{range .items[*]}{.metadata.name}{" "}{.metadata.creationTimestamp}{"\n"}{end}' | \
-    while read job_name creation_time; do
+    while read -r job_name creation_time; do
         if [ -n "$job_name" ] && [ -n "$creation_time" ]; then
             # Convert creation time to epoch
             creation_epoch=$(date -d "$creation_time" +%s 2>/dev/null || date -j -f "%Y-%m-%dT%H:%M:%SZ" "$creation_time" +%s 2>/dev/null || echo 0)

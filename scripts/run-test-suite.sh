@@ -134,17 +134,17 @@ record_test_result() {
     case $status in
         "PASS")
             TEST_RESULTS+=("PASS|$test_name|$message|$duration")
-            ((PASSED_TESTS++))
+            ((PASSED_TESTS += 1))
             log_success "$test_name: $message"
             ;;
         "FAIL")
             TEST_RESULTS+=("FAIL|$test_name|$message|$duration")
-            ((FAILED_TESTS++))
+            ((FAILED_TESTS += 1))
             log_error "$test_name: $message"
             ;;
         "SKIP")
             TEST_RESULTS+=("SKIP|$test_name|$message|$duration")
-            ((SKIPPED_TESTS++))
+            ((SKIPPED_TESTS += 1))
             log_warning "$test_name: $message"
             ;;
     esac

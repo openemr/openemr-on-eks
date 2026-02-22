@@ -19,6 +19,11 @@ ENV/
 .test-venv/
 *.venv/
 
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
 # Security tool caches and outputs
 .trivycache/
 results.sarif
@@ -31,3 +36,8 @@ console/console
 version-update*.log
 version-update-report-*.md
 console/openemr-eks-console
+
+# Source code
+openemr-on-ecs-main
+openemr-devops-master
+openemr-master

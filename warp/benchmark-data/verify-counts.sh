@@ -40,7 +40,7 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Function to log messages
+# shellcheck disable=SC2329,SC2317
 log() {
     local level="$1"
     local message="$2"
@@ -289,8 +289,7 @@ if [ "$PERSON_COUNT" -eq "$EXPECTED_PERSON" ] && \
     # Clean up data files unless --keep-downloaded-data flag is set
     if [ "$KEEP_DATA" = false ]; then
         echo "Cleaning up downloaded data files..."
-        rm -f "$PERSON_FILE" "$CONDITION_FILE" "$MEDICATION_FILE" "$OBSERVATION_FILE"
-        if [ $? -eq 0 ]; then
+        if rm -f "$PERSON_FILE" "$CONDITION_FILE" "$MEDICATION_FILE" "$OBSERVATION_FILE"; then
             echo -e "${GREEN}✓ Data files removed${NC}"
         else
             echo -e "${YELLOW}⚠ Warning: Some files could not be removed${NC}"

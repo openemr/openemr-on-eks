@@ -87,7 +87,7 @@ AWS_REGION=${AWS_REGION:-$(aws configure get region 2>/dev/null || echo "us-west
 if [ -z "${CLUSTER_NAME:-}" ]; then
     # Validate terraform directory exists before attempting to read output
     if [ -d "$TERRAFORM_DIR" ]; then
-        TERRAFORM_CLUSTER_NAME=$(cd "$TERRAFORM_DIR" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1 || true)
+        TERRAFORM_CLUSTER_NAME=$( (cd "$TERRAFORM_DIR" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1) || true)
         if [ -n "$TERRAFORM_CLUSTER_NAME" ]; then
             CLUSTER_NAME="$TERRAFORM_CLUSTER_NAME"
         else
@@ -434,7 +434,7 @@ kubectl_exec_with_retry() {
             sleep $final_delay
         fi
 
-        ((attempt++))
+        ((attempt += 1))
     done
 
     log_error "kubectl exec failed after $max_attempts attempts"
@@ -635,7 +635,7 @@ validate_configuration() {
     log_info "Validating test configuration..."
 
     # Validate AWS region
-    if ! aws ec2 describe-regions --region-names "$AWS_REGION" >/dev/null 2>&1; then
+    if ! aws ec2 describe-regions --region "$AWS_REGION" --region-names "$AWS_REGION" >/dev/null 2>&1; then
         log_error "Invalid AWS region: $AWS_REGION"
         exit 1
     fi
@@ -1029,9 +1029,24 @@ deploy_openemr() {
         if [ $((ready_attempt % 3)) -eq 0 ]; then
             log_info "Still waiting for all replicas to be ready... (${ready_replicas}/${desired_replicas} ready)"
         fi
-        
+
+        # Stuck docker-leader recovery: if the pod is looping on "Waiting for
+        # the docker-leader" for >2 minutes, delete it so the container restarts
+        # and our pre-init stale-lock cleanup in deployment.yaml kicks in.
+        if [ $((ready_attempt % 12)) -eq 11 ]; then
+            local leader_stuck
+            leader_stuck=$(kubectl logs -n "$NAMESPACE" -l app=openemr -c openemr --tail=5 2>/dev/null \
+                | grep -c "Waiting for the docker-leader" 2>/dev/null || true)
+            leader_stuck="${leader_stuck:-0}"
+            if [ "$leader_stuck" -ge 3 ]; then
+                log_warning "Detected docker-leader deadlock — deleting stuck pod to trigger recovery"
+                kubectl delete pods -n "$NAMESPACE" -l app=openemr --force --grace-period=0 2>/dev/null || true
+                sleep 15
+            fi
+        fi
+
         sleep 10
-        ((ready_attempt++))
+        ((ready_attempt += 1))
     done
     
     if [ "$all_ready" = false ]; then
@@ -1096,7 +1111,7 @@ deploy_openemr() {
             if ! kubectl get pod "$pod_name" -n "$NAMESPACE" >/dev/null 2>&1; then
                 log_warning "Pod $pod_name no longer exists, continuing search..."
                 sleep 5
-                ((container_wait_attempts++))
+                ((container_wait_attempts += 1))
                 continue
             fi
             
@@ -1143,7 +1158,7 @@ deploy_openemr() {
         fi
 
         sleep 10
-        ((container_wait_attempts++))
+        ((container_wait_attempts += 1))
     done
 
     if [ $container_wait_attempts -ge $max_container_wait ]; then
@@ -1196,7 +1211,7 @@ deploy_test_data() {
         fi
 
         sleep 5
-        ((pod_attempt++))
+        ((pod_attempt += 1))
     done
 
     if [ -z "$pod_name" ] || [ "$pod_phase" != "Running" ]; then
@@ -1332,7 +1347,7 @@ deploy_test_data() {
             log_info "Container ready status: $container_ready"
 
             sleep 10
-            ((attempt++))
+            ((attempt += 1))
         fi
     done
 
@@ -1737,7 +1752,7 @@ empty_s3_bucket() {
         else
             log_info "Attempt $wait_attempt/$max_wait_attempts: Bucket still contains $remaining_objects items (objects: $current_objects, versions: $current_versions, delete markers: $current_delete_markers), waiting 5 seconds..."
             sleep 5
-            ((wait_attempt++))
+            ((wait_attempt += 1))
         fi
     done
 
@@ -1997,7 +2012,7 @@ restore_from_backup() {
         else
             log_info "Attempt $attempt/$max_attempts: Cluster not yet accessible, waiting 10 seconds..."
             sleep 10
-            ((attempt++))
+            ((attempt += 1))
         fi
     done
 
@@ -2279,7 +2294,7 @@ verify_restoration() {
         fi
 
         sleep 5
-        ((pod_attempt++))
+        ((pod_attempt += 1))
     done
 
     if [ -z "$pod_name" ] || [ "$pod_phase" != "Running" ]; then
@@ -2327,7 +2342,7 @@ verify_restoration() {
             log_info "Container ready status: $container_ready"
 
             sleep 10
-            ((attempt++))
+            ((attempt += 1))
         fi
     done
 
@@ -2473,11 +2488,25 @@ verify_restoration() {
     # Database connectivity is already tested by the restore script
     log_success "Database connectivity verified"
 
+    # Verify credential rotation prerequisites are intact after restoration
+    log_info "Verifying credential rotation readiness after restoration..."
+    local rotation_script="$SCRIPT_DIR/verify-credential-rotation.sh"
+    if [ -f "$rotation_script" ]; then
+        if "$rotation_script" 2>/dev/null; then
+            log_success "Credential rotation prerequisites verified after restoration"
+        else
+            log_warning "Credential rotation verification reported issues (non-fatal)"
+            log_info "Run ./scripts/verify-credential-rotation.sh manually and ./scripts/run-credential-rotation.sh --sync-db-users if needed"
+        fi
+    else
+        log_info "Credential rotation verification script not found, skipping"
+    fi
+
     log_success "Restoration verification completed successfully"
 
     local step_duration
     step_duration=$(get_duration "$step_start")
-    add_test_result "Restoration Verification" "SUCCESS" "Proof file verified (database connectivity tested by restore script)" "$step_duration"
+    add_test_result "Restoration Verification" "SUCCESS" "Proof file verified, credential rotation readiness checked (database connectivity tested by restore script)" "$step_duration"
 }
 
 # Step 10: Clean up infrastructure and backups
@@ -2588,8 +2617,8 @@ print_test_results() {
         for result in "${TEST_RESULTS[@]}"; do
         IFS='|' read -r step status details duration <<< "$result"
         case "$status" in
-            "SUCCESS") ((success_count++)) ;;
-            "FAILED") ((failed_count++)) ;;
+            "SUCCESS") ((success_count += 1)) ;;
+            "FAILED") ((failed_count += 1)) ;;
         esac
         done
     fi

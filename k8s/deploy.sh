@@ -122,7 +122,7 @@ if [ -z "${CLUSTER_NAME:-}" ]; then
     # - Removes terraform warnings
     # - Validates format with regex
     # - Takes the first valid result
-    TERRAFORM_CLUSTER_NAME=$(cd "$PROJECT_ROOT/terraform" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1 || true)
+    TERRAFORM_CLUSTER_NAME=$( (cd "$PROJECT_ROOT/terraform" 2>/dev/null && terraform output -raw cluster_name 2>/dev/null | grep -v "Warning:" | grep -E "^[a-zA-Z0-9-]+$" | head -1) || true)
     if [ -n "$TERRAFORM_CLUSTER_NAME" ]; then
         CLUSTER_NAME="$TERRAFORM_CLUSTER_NAME"
     else
@@ -225,8 +225,10 @@ show_deployment_status() {
     ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
     desired_replicas=$(printf '%s' "$desired_replicas" | tr -d '[:space:]')
     available_replicas=$(printf '%s' "$available_replicas" | tr -d '[:space:]')
-    pod_count=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c . 2>/dev/null || echo "0")
-    running_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . 2>/dev/null || echo "0")
+    pod_count=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c . 2>/dev/null || true)
+    pod_count="${pod_count:-0}"
+    running_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . 2>/dev/null || true)
+    running_pods="${running_pods:-0}"
     
     # Ensure all variables are clean integers
     ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
@@ -456,7 +458,8 @@ spec:
       
       # Check if openemr database exists
       echo "Checking if 'openemr' database exists..."
-      DB_EXISTS=\$(mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SHOW DATABASES LIKE 'openemr';" 2>/dev/null | grep -c "openemr" || echo "0")
+      DB_EXISTS=\$(mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SHOW DATABASES LIKE 'openemr';" 2>/dev/null | grep -c "openemr" || true)
+      DB_EXISTS=\${DB_EXISTS:-0}
       
       if [ "\$DB_EXISTS" = "0" ]; then
         echo "⚠️  'openemr' database does not exist, creating empty database..."
@@ -610,9 +613,8 @@ analyze_cluster_state() {
     # Count pods in the Failed phase - these are completely dead and need removal
     local failed_pods
     # Count failed pods with robust error handling
-    failed_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -c . || echo "0")
-    # Clean the output: remove all whitespace and ensure it's a clean integer
-    failed_pods=$(printf '%s' "$failed_pods" | tr -d '[:space:]')
+    failed_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -c . || true)
+    failed_pods="${failed_pods:-0}"
     # Ensure we have a valid integer (fallback to 0 if empty or invalid)
     if [ -z "$failed_pods" ] || ! [[ "$failed_pods" =~ ^[0-9]+$ ]]; then
         failed_pods=0
@@ -630,9 +632,8 @@ analyze_cluster_state() {
     # - ErrImagePull: Error occurred while pulling the image
     local problematic_pods
     # Count problematic pods with robust error handling
-    problematic_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c -E "(CrashLoopBackOff|ImagePullBackOff|ErrImagePull)" || echo "0")
-    # Clean the output: remove all whitespace, newlines, and ensure it's a clean integer
-    problematic_pods=$(printf '%s' "$problematic_pods" | tr -d '[:space:]' | grep -E '^[0-9]+$' || echo "0")
+    problematic_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c -E "(CrashLoopBackOff|ImagePullBackOff|ErrImagePull)" || true)
+    problematic_pods="${problematic_pods:-0}"
     
     if [ "$problematic_pods" -gt 0 ]; then
         log_warning "Found $problematic_pods pods in problematic states - cleanup needed"
@@ -709,7 +710,7 @@ validate_prerequisites() {
     if [ "$REDIS_ENDPOINT" = "redis-not-available" ]; then
         log_error "Redis endpoint not available - CRITICAL FAILURE"
         log_error "ElastiCache serverless cache is required for OpenEMR deployment"
-        ((errors++))
+        ((errors += 1))
     else
         log_success "Redis endpoint validated: $REDIS_ENDPOINT"
     fi
@@ -718,7 +719,7 @@ validate_prerequisites() {
     if [ -z "$AURORA_ENDPOINT" ] || [ "$AURORA_ENDPOINT" = "aurora-not-available" ]; then
         log_error "Aurora endpoint not available - CRITICAL FAILURE"
         log_error "Database is required for OpenEMR deployment"
-        ((errors++))
+        ((errors += 1))
     else
         log_success "Aurora endpoint validated: $AURORA_ENDPOINT"
     fi
@@ -728,7 +729,7 @@ validate_prerequisites() {
     if ! kubectl get storageclass efs-sc >/dev/null 2>&1; then
         log_error "EFS storage class not found - CRITICAL FAILURE"
         log_error "EFS CSI driver must be installed for persistent storage"
-        ((errors++))
+        ((errors += 1))
     else
         log_success "EFS storage class validated"
     fi
@@ -737,7 +738,7 @@ validate_prerequisites() {
     if ! kubectl cluster-info >/dev/null 2>&1; then
         log_error "Cannot connect to Kubernetes cluster - CRITICAL FAILURE"
         log_error "Please ensure kubeconfig is properly configured"
-        ((errors++))
+        ((errors += 1))
     else
         log_success "Kubernetes cluster connectivity validated"
     fi
@@ -762,7 +763,8 @@ validate_deployment_success() {
     local ready_pods=0
     
     while [ $wait_time -lt $max_wait ]; do
-        ready_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . || echo "0")
+        ready_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . || true)
+        ready_pods="${ready_pods:-0}"
         
         if [ "$ready_pods" -ge 1 ]; then
             log_success "Found $ready_pods running OpenEMR pods"
@@ -911,7 +913,7 @@ validate_deployment_health() {
             log_info "Waiting 10 seconds before next check..."
             sleep 10
         fi
-        ((attempt++))
+        ((attempt += 1))
     done
 
     echo ""
@@ -1127,6 +1129,11 @@ REDIS_ENDPOINT=$(terraform output -raw redis_endpoint 2>/dev/null || echo "redis
 REDIS_PORT=$(terraform output -raw redis_port 2>/dev/null || echo "6379")
 REDIS_PASSWORD=$(terraform output -raw redis_password 2>/dev/null || echo "fallback-password")
 ALB_LOGS_BUCKET=$(terraform output -raw alb_logs_bucket_name)
+
+# Credential rotation infrastructure outputs
+RDS_SLOT_SECRET_ARN=$(terraform output -raw rds_slot_secret_arn 2>/dev/null || echo "")
+RDS_ADMIN_SECRET_ARN=$(terraform output -raw rds_admin_secret_arn 2>/dev/null || echo "")
+CREDENTIAL_ROTATION_ROLE_ARN=$(terraform output -raw credential_rotation_role_arn 2>/dev/null || echo "")
 
 # Validate critical infrastructure components
 log_step "Validating infrastructure components..."
@@ -1376,6 +1383,38 @@ kubectl create secret generic openemr-db-credentials \
   --dry-run=client -o yaml | kubectl apply -f -
 log_info "Database credentials secret created/updated."
 
+# Seed Secrets Manager for credential rotation (idempotent — only updates if placeholders present)
+if [[ -n "$RDS_SLOT_SECRET_ARN" && -n "$RDS_ADMIN_SECRET_ARN" ]]; then
+  log_step "Seeding credential rotation secrets..."
+  CURRENT_SLOT_SECRET=$(aws secretsmanager get-secret-value --secret-id "$RDS_SLOT_SECRET_ARN" --region "$AWS_REGION" --query SecretString --output text 2>/dev/null || echo "")
+  if echo "$CURRENT_SLOT_SECRET" | grep -q "PLACEHOLDER_SEEDED_BY_DEPLOY_SCRIPT"; then
+    log_info "Initialising RDS slot secret with real credentials..."
+    SLOT_A_PASS=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(30)))")
+    SLOT_B_PASS=$(python3 -c "import secrets,string; print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(30)))")
+    aws secretsmanager put-secret-value \
+      --secret-id "$RDS_SLOT_SECRET_ARN" \
+      --region "$AWS_REGION" \
+      --secret-string "{\"active_slot\":\"A\",\"A\":{\"username\":\"openemr_a\",\"password\":\"$SLOT_A_PASS\",\"host\":\"$AURORA_ENDPOINT\",\"port\":\"3306\",\"dbname\":\"openemr\"},\"B\":{\"username\":\"openemr_b\",\"password\":\"$SLOT_B_PASS\",\"host\":\"$AURORA_ENDPOINT\",\"port\":\"3306\",\"dbname\":\"openemr\"}}" > /dev/null
+    log_success "RDS slot secret seeded."
+  else
+    log_info "RDS slot secret already initialised, skipping seed."
+  fi
+
+  CURRENT_ADMIN_SECRET=$(aws secretsmanager get-secret-value --secret-id "$RDS_ADMIN_SECRET_ARN" --region "$AWS_REGION" --query SecretString --output text 2>/dev/null || echo "")
+  if echo "$CURRENT_ADMIN_SECRET" | grep -q "PLACEHOLDER" || [[ -z "$CURRENT_ADMIN_SECRET" ]]; then
+    log_info "Initialising RDS admin secret with master credentials..."
+    aws secretsmanager put-secret-value \
+      --secret-id "$RDS_ADMIN_SECRET_ARN" \
+      --region "$AWS_REGION" \
+      --secret-string "{\"username\":\"openemr\",\"password\":\"$AURORA_PASSWORD\",\"host\":\"$AURORA_ENDPOINT\",\"port\":\"3306\",\"dbname\":\"openemr\"}" > /dev/null
+    log_success "RDS admin secret seeded."
+  else
+    log_info "RDS admin secret already initialised, skipping seed."
+  fi
+else
+  log_info "Credential rotation secrets not found (Terraform outputs missing). Skipping seed."
+fi
+
 kubectl create secret generic openemr-redis-credentials \
   --namespace="$NAMESPACE" \
   --from-literal=redis-host="$REDIS_ENDPOINT" \
@@ -1496,10 +1535,44 @@ log_step "Applying network policies..."
 kubectl apply -f network-policies.yaml 2>/dev/null || log_info "Network policies not found or already applied"
 log_success "Network policies applied."
 
+# Apply credential rotation RBAC and ServiceAccount (if rotation infrastructure exists)
+if [[ -n "$CREDENTIAL_ROTATION_ROLE_ARN" ]]; then
+  log_step "Applying credential rotation RBAC..."
+  export CREDENTIAL_ROTATION_ROLE_ARN
+  envsubst < credential-rotation-sa.yaml | kubectl apply -f -
+  kubectl apply -f credential-rotation-rbac.yaml
+  log_success "Credential rotation RBAC applied."
+else
+  log_info "Credential rotation role not found, skipping RBAC setup."
+fi
+
 # Apply service configuration
 log_step "Applying service configuration..."
 kubectl apply -f service.yaml
 log_success "Service configuration applied."
+
+# ---------------------------------------------------------------------------
+# Ensure single-replica leader initialization
+# ---------------------------------------------------------------------------
+# OpenEMR uses a docker-leader election via a lock file on shared EFS.
+# If multiple pods start simultaneously and the leader crashes mid-init,
+# ALL pods deadlock waiting for docker-completed that will never appear.
+#
+# To prevent this:
+#   1. Remove any existing HPA so it can't auto-scale during init
+#   2. Apply deployment.yaml (replicas: 1) — only one pod starts
+#   3. Wait for the leader pod to become fully ready
+#   4. THEN apply the HPA (post-deployment, already handled below)
+# ---------------------------------------------------------------------------
+if kubectl get hpa openemr -n "$NAMESPACE" >/dev/null 2>&1; then
+    log_info "Removing existing HPA to ensure single-replica leader initialization..."
+    kubectl delete hpa openemr -n "$NAMESPACE" --ignore-not-found
+fi
+if kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
+    log_info "Scaling existing deployment to 1 replica for leader initialization..."
+    kubectl scale deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" --replicas=1
+    sleep 5
+fi
 
 # Apply deployment configuration
 log_step "Applying deployment configuration..."
@@ -1519,8 +1592,8 @@ essential_pvcs_bound=0
 
 while [ $pvc_wait_time -lt $pvc_wait_max ]; do
     # Count bound PVCs with robust error handling
-    essential_pvcs_bound=$(kubectl get pvc -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c "Bound" 2>/dev/null || echo "0")
-    # Ensure we have a valid integer (fallback to 0 if empty or invalid)
+    essential_pvcs_bound=$(kubectl get pvc -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c "Bound" 2>/dev/null || true)
+    essential_pvcs_bound="${essential_pvcs_bound:-0}"
     if ! [[ "$essential_pvcs_bound" =~ ^[0-9]+$ ]]; then
         essential_pvcs_bound=0
     fi
@@ -1551,16 +1624,17 @@ log_info "⏳ Leader pod: ~9-11 minutes (database setup) | Follower pods: ~7-9 m
 log_info "💡 Startup phases: OpenEMR init → Database setup → Apache start → Ready"
 echo ""
 
-# Monitor with periodic status updates and startup logs
+# Monitor with periodic status updates, startup logs, and stuck-leader recovery
 {
     attempt=0
     max_attempts=60  # 30 minutes at 30-second intervals (accommodates 10min leader + buffer)
+    leader_wait_count=0
 
     while [ $attempt -lt $max_attempts ]; do
         sleep 30
         echo ""
         show_deployment_status && break
-        ((attempt++))
+        ((attempt += 1))
 
         # Show progress indicator
         progress=$((attempt * 100 / max_attempts))
@@ -1568,6 +1642,29 @@ echo ""
         
         # Show startup logs for user visibility
         show_startup_logs
+
+        # ---------------------------------------------------------------
+        # Stuck docker-leader recovery
+        # ---------------------------------------------------------------
+        # If pod logs show repeated "Waiting for the docker-leader" messages,
+        # the leader lock is stale.  Delete the pod so the container restarts
+        # and our pre-init cleanup (in deployment.yaml) removes the lock.
+        if [ $attempt -ge 6 ]; then  # only check after 3 minutes
+            leader_stuck=$(kubectl logs -n "$NAMESPACE" -l app=openemr -c openemr --tail=5 2>/dev/null \
+                | grep -c "Waiting for the docker-leader" 2>/dev/null || true)
+            leader_stuck="${leader_stuck:-0}"
+            if [ "$leader_stuck" -ge 3 ]; then
+                ((leader_wait_count += 1))
+            else
+                leader_wait_count=0
+            fi
+            if [ "$leader_wait_count" -ge 3 ]; then
+                echo -e "${YELLOW}⚠️  Detected docker-leader deadlock — deleting stuck pod to trigger recovery${NC}"
+                kubectl delete pods -n "$NAMESPACE" -l app=openemr --force --grace-period=0 2>/dev/null || true
+                leader_wait_count=0
+                sleep 15
+            fi
+        fi
     done
 } &
 MONITOR_PID=$!
@@ -1600,7 +1697,7 @@ else
     log_warning "Checking pod descriptions for issues..."
     for pod in $(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[*].metadata.name}'); do
         log_info "Pod: $pod"
-        kubectl describe pod "$pod" -n "$NAMESPACE" | grep -A 10 -B 5 -E "(Events:|Conditions:|Warning:|Error:)"
+        kubectl describe pod "$pod" -n "$NAMESPACE" 2>/dev/null | grep -A 10 -B 5 -E 'Events:|Conditions:|Warning:|Error:' || true
     done
     exit 1
 fi
@@ -1610,6 +1707,8 @@ if [ $cluster_state_result -ne 2 ]; then
     log_info "Ensuring deployment uses latest configuration..."
     # Use rollout restart only if needed, not every time
     kubectl rollout restart deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE"
+    log_info "Waiting for rollout restart to complete (single replica)..."
+    kubectl rollout status deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" --timeout=${POD_READY_TIMEOUT}s >/dev/null 2>&1 || true
 else
     log_success "Deployment already using latest configuration"
 fi

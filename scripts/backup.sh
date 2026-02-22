@@ -231,10 +231,7 @@ log_warning() {
 }
 
 log_error() {
-    # Display error messages in red with X emoji and exit the script
-    # Used for critical failures that prevent backup completion
     echo -e "${RED}[$(date '+%H:%M:%S')] ❌ $1${NC}"
-    exit 1
 }
 
 # Get AWS region from environment or Terraform state
@@ -456,6 +453,7 @@ create_s3_bucket_with_retry() {
         log_info "Bucket is currently being deleted, waiting for deletion to complete..."
         if ! wait_for_bucket_deletion "$bucket_name" "$region"; then
             log_error "Failed to wait for bucket deletion - cannot proceed with bucket creation"
+            return 1
         fi
     elif [ "$bucket_state" = "exists" ]; then
         log_info "Bucket already exists"
@@ -495,6 +493,7 @@ create_s3_bucket_with_retry() {
             return 0
         else
             log_error "Failed to create bucket: $create_output"
+            return 1
         fi
 
         attempt=$((attempt + 1))
@@ -619,7 +618,7 @@ fi
 
 # Check regions
 for region in "$AWS_REGION" "$BACKUP_REGION"; do
-    if ! aws ec2 describe-regions --region-names "$region" >/dev/null 2>&1; then
+    if ! aws ec2 describe-regions --region "$region" --region-names "$region" >/dev/null 2>&1; then
         log_error "Cannot access region: $region"
         exit 1
     fi
@@ -667,6 +666,7 @@ if create_s3_bucket_with_retry "$BACKUP_BUCKET" "$BACKUP_REGION" 5; then
     log_success "Backup bucket created and configured"
 else
     log_error "Failed to create backup bucket after retries"
+    exit 1
 fi
 
 # Initialize backup results
@@ -951,7 +951,7 @@ wait_for_ready_pod_with_efs() {
         
         log_info "Waiting for Ready pod with swarm mode complete (attempt $attempt/$max_attempts)..." >&2
         sleep 10
-        ((attempt++))
+        ((attempt += 1))
     done
     
     log_error "No Ready pod with EFS mounted and swarm mode complete found within 5 minutes" >&2

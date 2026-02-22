@@ -167,3 +167,69 @@ setup() {
   "
   [[ "$output" =~ "VALID" ]]
 }
+
+# ── Cross-file version consistency checks ─────────────────────────────────
+
+@test "CROSS-FILE: credential rotation Dockerfile PYTHON_VERSION matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver docker_ver
+  yaml_ver=$(yq eval '.applications.python.current' "$VERSIONS_FILE")
+  docker_ver=$(grep '^ARG PYTHON_VERSION=' "${PROJECT_ROOT}/tools/credential-rotation/Dockerfile" | sed 's/ARG PYTHON_VERSION=//')
+  [ "$docker_ver" = "$yaml_ver" ]
+}
+
+@test "CROSS-FILE: CI workflow PYTHON_VERSION matches versions.yaml semver_packages" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.semver_packages.python_version.current' "$VERSIONS_FILE")
+  run grep "PYTHON_VERSION:" "${PROJECT_ROOT}/.github/workflows/ci-cd-tests.yml"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: CI workflow TERRAFORM_VERSION matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.semver_packages.terraform_version.current' "$VERSIONS_FILE")
+  run grep "TERRAFORM_VERSION:" "${PROJECT_ROOT}/.github/workflows/ci-cd-tests.yml"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: CI workflow KUBECTL_VERSION matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.semver_packages.kubectl_version.current' "$VERSIONS_FILE")
+  run grep "KUBECTL_VERSION:" "${PROJECT_ROOT}/.github/workflows/ci-cd-tests.yml"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: warp requirements.txt boto3 matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.boto3.current' "$VERSIONS_FILE")
+  run grep '^boto3' "${PROJECT_ROOT}/warp/requirements.txt"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: warp requirements.txt pymysql matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.pymysql.current' "$VERSIONS_FILE")
+  run grep '^pymysql' "${PROJECT_ROOT}/warp/requirements.txt"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: credential rotation requirements.txt boto3 matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.boto3.current' "$VERSIONS_FILE")
+  run grep '^boto3' "${PROJECT_ROOT}/tools/credential-rotation/requirements.txt"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CROSS-FILE: credential rotation requirements.txt pymysql matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.pymysql.current' "$VERSIONS_FILE")
+  run grep '^pymysql' "${PROJECT_ROOT}/tools/credential-rotation/requirements.txt"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
