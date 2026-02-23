@@ -739,7 +739,7 @@ cd ../scripts
 kubectl apply -f ../k8s/credential-rotation-cronjob.yaml
 ```
 
-> **Full details:** See [Credential Rotation Guide](credential-rotation.md) for architecture, failure scenarios, and operational runbook.
+> **Full details:** See [Credential Rotation Guide](CREDENTIAL_ROTATION_GUIDE.md) for architecture, failure scenarios, and operational runbook.
 
 ### Monitoring Setup
 

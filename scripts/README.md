@@ -371,7 +371,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - Update Terraform output names if infrastructure changes
   - Add new prerequisite checks as rotation tool evolves
 
-> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for full architecture and operational runbook.
+> **See also:** [Credential Rotation Guide](../docs/CREDENTIAL_ROTATION_GUIDE.md) for full architecture and operational runbook.
 
 ### 4. Feature Management
 

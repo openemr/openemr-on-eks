@@ -185,7 +185,7 @@ pre_commit_hooks:
     description: "https://github.com/psf/black"
 
   isort:
-    current: "7.0.0"
+    current: "8.0.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/pycqa/isort"
@@ -379,7 +379,7 @@ monitoring:
 
   tempo:
     current: "1.61.3"
-    chart: "tempo-distributed"
+    chart: "tempo"
     repository: "grafana"
     notify_on_update: true
     requires_aws_cli: false

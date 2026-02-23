@@ -383,7 +383,7 @@ graph TB
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
     - Rust-based, immutable, security-hardened Linux with SELinux enforcement and no SSH access
   - **Zero-Downtime Credential Rotation**:
-    - [Credential Rotation Guide](docs/credential-rotation.md)
+    - [Credential Rotation Guide](docs/CREDENTIAL_ROTATION_GUIDE.md)
     - Dual-slot (A/B) RDS credential rotation via Secrets Manager with automatic rollback
 
 ## Prerequisites
@@ -1022,7 +1022,7 @@ openemr-on-eks/
 │   ├── LOGGING_GUIDE.md                   # OpenEMR 8.0.0 Enhanced Logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
-│   ├── credential-rotation.md             # Zero-downtime RDS credential rotation guide
+│   ├── CREDENTIAL_ROTATION_GUIDE.md       # Zero-downtime RDS credential rotation guide
 │   ├── END_TO_END_TESTING_REQUIREMENTS.md # Mandatory testing procedure
 │   ├── GITHUB_AWS_CREDENTIALS.md          # GitHub → AWS OIDC setup and credential management
 │   └── CONSOLE_GUIDE.md                   # Terminal User Interface (TUI) console guide
@@ -1595,7 +1595,7 @@ cd scripts && ./verify-credential-rotation.sh
 **Checks:** Secrets Manager access, K8s Secret/Deployment/ServiceAccount existence, EFS PVC status, active slot state
 **When to use:** Before first rotation, after infrastructure changes, troubleshooting rotation failures
 
-> **See also:** [Credential Rotation Guide](docs/credential-rotation.md) for full architecture, operational runbook, and failure scenarios.
+> **See also:** [Credential Rotation Guide](docs/CREDENTIAL_ROTATION_GUIDE.md) for full architecture, operational runbook, and failure scenarios.
 
 ### **Security Management Scripts**
 
@@ -2433,7 +2433,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures
 - [GitHub → AWS Credentials Guide](docs/GITHUB_AWS_CREDENTIALS.md) - GitHub → AWS OIDC setup and credential management
-- [Credential Rotation Guide](docs/credential-rotation.md) - Zero-downtime RDS credential rotation architecture and runbook
+- [Credential Rotation Guide](docs/CREDENTIAL_ROTATION_GUIDE.md) - Zero-downtime RDS credential rotation architecture and runbook
 - [Console Guide (TUI)](docs/CONSOLE_GUIDE.md) - Terminal User Interface (TUI) console guide for macOS
 - [Monitoring Setup](monitoring/README.md) - Prometheus, Grafana, and monitoring stack configuration
 

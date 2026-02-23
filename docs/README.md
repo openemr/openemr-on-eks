@@ -17,7 +17,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Autoscaling Guide](#autoscaling_guidemd)
 - [Logging Guide](#logging_guidemd)
 - [Security Scanning Guide](#security_scanningmd)
-- [Credential Rotation Guide](#credential-rotationmd)
+- [Credential Rotation Guide](#credential_rotation_guidemd)
 - [Testing Guide](#testing_guidemd)
 - [End-to-End Testing Requirements](#end_to_end_testing_requirementsmd)
 - [Manual Releases](#manual_releasesmd)
@@ -48,7 +48,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`AUTOSCALING_GUIDE.md`** - Autoscaling configuration and optimization guide
 - **`LOGGING_GUIDE.md`** - Logging configuration with CloudWatch and Loki integration
 - **`SECURITY_SCANNING.md`** - Comprehensive security scanning with zero-tolerance policy
-- **`credential-rotation.md`** - Zero-downtime RDS credential rotation architecture and runbook
+- **`CREDENTIAL_ROTATION_GUIDE.md`** - Zero-downtime RDS credential rotation architecture and runbook
 - **`TESTING_GUIDE.md`** - Testing framework and CI/CD procedures
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
@@ -64,7 +64,7 @@ graph TD
     A --> C[AUTOSCALING_GUIDE.md]
     A --> D[LOGGING_GUIDE.md]
     A --> E[TROUBLESHOOTING.md]
-    A --> CR[credential-rotation.md]
+    A --> CR[CREDENTIAL_ROTATION_GUIDE.md]
     CR --> E
 
     A1 --> F[END_TO_END_TESTING_REQUIREMENTS.md]
@@ -217,7 +217,7 @@ graph TD
   - Add new scanners as security requirements evolve
   - Update remediation procedures as new finding types are identified
 
-#### `credential-rotation.md`
+#### `CREDENTIAL_ROTATION_GUIDE.md`
 
 - **Purpose**: Zero-downtime RDS credential rotation architecture, operational runbook, and failure recovery
 - **Key Features**:

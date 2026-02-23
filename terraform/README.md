@@ -341,7 +341,7 @@ graph TD
   - Update Secrets Manager permissions if new secret fields are added
   - Coordinate with `k8s/credential-rotation-sa.yaml` for the ServiceAccount annotation
 
-> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for the full architecture.
+> **See also:** [Credential Rotation Guide](../docs/CREDENTIAL_ROTATION_GUIDE.md) for the full architecture.
 
 ## Configuration Files
 

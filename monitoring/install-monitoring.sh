@@ -1763,7 +1763,7 @@ EOF
   log_info "Installing Tempo using Helm chart (version: ${CHART_TEMPO_VERSION})..."
   
   # Create Tempo configuration for distributed mode
-  # The tempo-distributed chart uses external configuration
+  # The tempo chart uses external configuration
   local TEMPO_CONFIG_FILE="${SCRIPT_DIR}/tempo-config.yaml"
   cat > "$TEMPO_CONFIG_FILE" <<EOF
 server:
@@ -1833,7 +1833,7 @@ overrides:
       processors: [service-graphs, span-metrics, local-blocks]
 EOF
 
-  # Create Tempo values for Helm installation (tempo-distributed chart)
+  # Create Tempo values for Helm installation (tempo chart)
   local TEMPO_VALUES_FILE="${SCRIPT_DIR}/tempo-values.yaml"
   cat > "$TEMPO_VALUES_FILE" <<EOF
 # Tempo Distributed Configuration
@@ -1935,7 +1935,7 @@ EOF
   
   log_success "Tempo configuration ConfigMap created"
   
-  # Create tempo-runtime ConfigMap (required by tempo-distributed chart)
+  # Create tempo-runtime ConfigMap (required by tempo chart)
   log_info "Creating Tempo runtime ConfigMap..."
   kubectl create configmap tempo-runtime \
     --from-literal=overrides.yaml="" \
@@ -1957,8 +1957,8 @@ autoscaling:
 EOF
   fi
 
-  # Install Tempo using Helm (using tempo-distributed chart for distributed mode)
-  if ! helm upgrade --install tempo grafana/tempo-distributed \
+  # Install Tempo using Helm (using tempo chart for distributed mode)
+  if ! helm upgrade --install tempo grafana/tempo \
     --namespace "$MONITORING_NAMESPACE" \
     --version "$CHART_TEMPO_VERSION" \
     --values "$TEMPO_VALUES_FILE" \

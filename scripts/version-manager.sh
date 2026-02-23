@@ -437,9 +437,6 @@ get_latest_helm_version() {
         "tempo")
             repo_url="https://grafana.github.io/helm-charts/index.yaml"
             ;;
-        "tempo-distributed")
-            repo_url="https://grafana.github.io/helm-charts/index.yaml"
-            ;;
         "mimir-distributed")
             repo_url="https://grafana.github.io/helm-charts/index.yaml"
             ;;
@@ -1510,8 +1507,8 @@ EOF
             updates_found=1
         fi
 
-        # Tempo (using tempo-distributed chart)
-        local tempo_latest=$(get_latest_helm_version "tempo-distributed")
+        # Tempo (using tempo chart)
+        local tempo_latest=$(get_latest_helm_version "tempo")
         if [ "$tempo_latest" != "$TEMPO_CURRENT" ]; then
             log "INFO" "Tempo update available: $TEMPO_CURRENT -> $tempo_latest"
             echo "- **Tempo**: $TEMPO_CURRENT → $tempo_latest" >> "$update_report"

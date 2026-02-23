@@ -522,7 +522,7 @@ The script automatically adjusts the restore order based on database state:
 8. **Credential Rotation Re-sync** (if using dual-slot rotation)
    - After restoring from backup, database credentials may differ from the pre-backup state
    - Run `./scripts/run-credential-rotation.sh --sync-db-users` to re-establish dual-slot credentials
-   - See [Credential Rotation Guide](credential-rotation.md) for details
+   - See [Credential Rotation Guide](CREDENTIAL_ROTATION_GUIDE.md) for details
 
 9. **Completion**
    - Provide restore status and next steps

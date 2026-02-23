@@ -542,7 +542,7 @@ kubectl get events -n openemr --field-selector reason=FailedCreate
 - **RBAC errors**: Re-apply RBAC manifests: `kubectl apply -f k8s/credential-rotation-rbac.yaml`
 - **ServiceAccount missing**: `kubectl apply -f k8s/credential-rotation-sa.yaml`
 
-> **Full guide:** See [Credential Rotation Guide](credential-rotation.md) for the complete operational runbook and failure scenarios.
+> **Full guide:** See [Credential Rotation Guide](CREDENTIAL_ROTATION_GUIDE.md) for the complete operational runbook and failure scenarios.
 
 ### 6. EKS Auto Mode Specific Issues
 
@@ -1290,7 +1290,7 @@ aws ec2 revoke-security-group-egress \
 # 5. Rotate all credentials
 # Rotate RDS database credentials immediately
 ./scripts/run-credential-rotation.sh
-# See docs/credential-rotation.md for full details
+# See docs/CREDENTIAL_ROTATION_GUIDE.md for full details
 
 # 6. Notify compliance officer
 ```

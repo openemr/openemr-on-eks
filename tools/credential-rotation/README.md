@@ -2,7 +2,7 @@
 
 Dual-slot credential rotation for OpenEMR on EKS + EFS.
 
-> **Full operational guide:** See [docs/credential-rotation.md](../../docs/credential-rotation.md) for architecture diagrams, the operational runbook, failure scenarios, and infrastructure setup (Terraform, IAM, RBAC).
+> **Full operational guide:** See [docs/CREDENTIAL_ROTATION_GUIDE.md](../../docs/CREDENTIAL_ROTATION_GUIDE.md) for architecture diagrams, the operational runbook, failure scenarios, and infrastructure setup (Terraform, IAM, RBAC).
 
 ## Table of Contents
 

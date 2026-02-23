@@ -285,7 +285,7 @@ The console provides access to 10 essential operations:
 
 **When to use**: For training, testing, or demonstration purposes when you need sample patient data
 
-> **Credential Rotation**: Credential rotation scripts (`run-credential-rotation.sh`, `verify-credential-rotation.sh`) are currently run directly from the command line. See [Credential Rotation Guide](credential-rotation.md) for usage instructions.
+> **Credential Rotation**: Credential rotation scripts (`run-credential-rotation.sh`, `verify-credential-rotation.sh`) are currently run directly from the command line. See [Credential Rotation Guide](CREDENTIAL_ROTATION_GUIDE.md) for usage instructions.
 
 ## Command Execution
 

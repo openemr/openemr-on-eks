@@ -329,7 +329,7 @@ graph TD
   - Update the container image URI when the rotation tool is rebuilt
   - Adjust CronJob schedule for organization-specific rotation frequency
 
-> **See also:** [Credential Rotation Guide](../docs/credential-rotation.md) for the full architecture and runbook.
+> **See also:** [Credential Rotation Guide](../docs/CREDENTIAL_ROTATION_GUIDE.md) for the full architecture and runbook.
 
 ## Deployment Workflow
 
