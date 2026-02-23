@@ -18,7 +18,7 @@
 #   - Validates IAM role trust policy
 #
 # Prerequisites:
-#   - Terraform 1.14.0+ installed and in PATH
+#   - Terraform 1.14.5+ installed and in PATH
 #   - AWS CLI 2.15+ installed and configured
 #   - AWS credentials with permissions to read IAM resources
 #

@@ -51,7 +51,7 @@ This comprehensive guide provides step-by-step instructions for deploying a prod
 ```bash
 # Required tools and minimum versions
 aws-cli >= 2.15.0
-terraform >= 1.5.0
+terraform >= 1.14.5
 kubectl >= 1.29.0
 helm >= 3.12.0
 jq >= 1.6

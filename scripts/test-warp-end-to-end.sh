@@ -26,7 +26,7 @@
 #
 # Prerequisites:
 #   - AWS CLI configured with appropriate permissions
-#   - Terraform >= 1.14.0
+#   - Terraform >= 1.14.5
 #   - kubectl >= 1.35.0
 #   - jq, tar, gzip
 #
@@ -580,7 +580,7 @@ EXAMPLES:
 
 PREREQUISITES:
     - AWS CLI configured with appropriate permissions
-    - Terraform >= 1.5.0
+    - Terraform >= 1.14.5
     - kubectl >= 1.29.0
     - jq >= 1.6
     - tar, gzip

@@ -390,7 +390,7 @@ graph TB
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.14.0)**
+#### **Terraform Installation (Required: v1.14.5)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -398,17 +398,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.14.0/
+# Visit: https://releases.hashicorp.com/terraform/1.14.5/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.14.0
-tfenv use 1.14.0
+tfenv install 1.14.5
+tfenv use 1.14.5
 
 # Verify installation
-terraform --version  # Should show v1.14.0
+terraform --version  # Should show v1.14.5
 ```
 
 #### **Other Required Tools**
@@ -503,11 +503,11 @@ brew install awscli helm jq kubectl terraform
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.14.0/
+# Download from: https://releases.hashicorp.com/terraform/1.14.5/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.14.0
-# tfenv use 1.14.0
+# tfenv install 1.14.5
+# tfenv use 1.14.5
 
 # Configure AWS credentials
 aws configure
