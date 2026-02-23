@@ -69,7 +69,7 @@
 # └─────────────────────────────────────────────────────────────────────────┘
 #   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 82.2.0)
 #   CHART_LOKI_VERSION         Loki chart version (default: 6.53.0)
-#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 1.61.3)
+#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.4.2)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
 #   OTEBPF_VERSION             OTeBPF version (default: v0.4.1)
 #   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
@@ -231,7 +231,7 @@ readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 # Chart versions (pin to known-good)
 readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-82.2.0}"
 readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.53.0}"
-readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-1.61.3}"
+readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.4.2}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"
 # OpenTelemetry eBPF Instrumentation version (OTeBPF)
 # Using Docker Hub image: otel/ebpf-instrument
@@ -791,7 +791,7 @@ retry_with_backoff(){ local max="$1" base="$2" maxd="$3"; shift 3; local attempt
 # ------------------------------
 setup_helm_repos(){
   log_step "Setting up Helm repositories..."
-  local repos=("prometheus-community|https://prometheus-community.github.io/helm-charts" "grafana|https://grafana.github.io/helm-charts")
+  local repos=("prometheus-community|https://prometheus-community.github.io/helm-charts" "grafana|https://grafana.github.io/helm-charts" "grafana-community|https://grafana-community.github.io/helm-charts")
   for r in "${repos[@]}"; do IFS='|' read -r name url <<<"$r"; log_info "Adding repository: $name"; retry_with_backoff 3 5 15 helm repo add "$name" "$url" || log_warn "Repo $name add failed (may already exist)"; done
   log_info "Updating Helm repositories..."; retry_with_backoff 3 10 30 helm repo update
   log_success "Helm repositories configured"; log_audit "CONFIGURE" "helm_repositories" "SUCCESS"
@@ -1763,7 +1763,7 @@ EOF
   log_info "Installing Tempo using Helm chart (version: ${CHART_TEMPO_VERSION})..."
   
   # Create Tempo configuration for distributed mode
-  # The tempo chart uses external configuration
+  # The tempo-distributed chart uses external configuration
   local TEMPO_CONFIG_FILE="${SCRIPT_DIR}/tempo-config.yaml"
   cat > "$TEMPO_CONFIG_FILE" <<EOF
 server:
@@ -1833,7 +1833,7 @@ overrides:
       processors: [service-graphs, span-metrics, local-blocks]
 EOF
 
-  # Create Tempo values for Helm installation (tempo chart)
+  # Create Tempo values for Helm installation (tempo-distributed chart)
   local TEMPO_VALUES_FILE="${SCRIPT_DIR}/tempo-values.yaml"
   cat > "$TEMPO_VALUES_FILE" <<EOF
 # Tempo Distributed Configuration
@@ -1935,7 +1935,7 @@ EOF
   
   log_success "Tempo configuration ConfigMap created"
   
-  # Create tempo-runtime ConfigMap (required by tempo chart)
+  # Create tempo-runtime ConfigMap (required by tempo-distributed chart)
   log_info "Creating Tempo runtime ConfigMap..."
   kubectl create configmap tempo-runtime \
     --from-literal=overrides.yaml="" \
@@ -1957,8 +1957,8 @@ autoscaling:
 EOF
   fi
 
-  # Install Tempo using Helm (using tempo chart for distributed mode)
-  if ! helm upgrade --install tempo grafana/tempo \
+  # Install Tempo using Helm (using tempo-distributed chart for distributed mode)
+  if ! helm upgrade --install tempo grafana-community/tempo-distributed \
     --namespace "$MONITORING_NAMESPACE" \
     --version "$CHART_TEMPO_VERSION" \
     --values "$TEMPO_VALUES_FILE" \

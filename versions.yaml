@@ -378,9 +378,9 @@ monitoring:
     description: "Loki for log aggregation."
 
   tempo:
-    current: "1.61.3"
-    chart: "tempo"
-    repository: "grafana"
+    current: "2.4.2"
+    chart: "tempo-distributed"
+    repository: "grafana-community"
     notify_on_update: true
     requires_aws_cli: false
     description: "Tempo for distributed tracing with S3 storage in microservice mode (replaces Jaeger)."

@@ -547,7 +547,7 @@ provide_recommendations() {
     echo -e "     - Prometheus v82.2.0 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
     echo -e "     - Loki v6.53.0 (log aggregation)"
-    echo -e "     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)"
+    echo -e "     - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)"
     echo -e "     - Mimir v6.0.5 (long-term metrics storage)"
     echo -e "     - OTeBPF v0.4.1 (eBPF auto-instrumentation)"
     echo -e "     - AlertManager (Slack integration support)"

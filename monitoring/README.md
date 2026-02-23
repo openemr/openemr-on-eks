@@ -688,7 +688,7 @@ helm upgrade loki grafana/loki \
   --timeout 35m --atomic
 
 # Upgrade Tempo
-helm upgrade tempo grafana/tempo \
+helm upgrade tempo grafana-community/tempo-distributed \
   --namespace monitoring \
   --version <new-version> \
   --timeout 35m --atomic

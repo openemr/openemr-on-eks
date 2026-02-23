@@ -630,7 +630,7 @@ Next steps for first-time deployment:
      - Prometheus v82.2.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.53.0 (log aggregation with S3 storage)
-     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
+     - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
@@ -888,7 +888,7 @@ cd ../scripts
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Tempo**: v1.61.3 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+- 🔍 **Tempo**: v2.4.2 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
 - 📈 **Mimir**: v6.0.5 (long-term metrics storage with S3 backend)

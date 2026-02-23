@@ -955,7 +955,7 @@ Next steps:
      - Prometheus v82.2.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.53.0 (log aggregation with S3 storage)
-     - Tempo v1.61.3 (distributed tracing with S3 storage, microservice mode)
+     - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.5 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
