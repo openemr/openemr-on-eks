@@ -47,6 +47,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [OIDC Provider Table of Contents Section Picture (`oidc_provider_table_of_contents_section_picture.png`)](#oidc-provider-table-of-contents-section-picture-oidc_provider_table_of_contents_section_picturepng)
   - [Tests Table of Contents Section Picture (`tests_table_of_contents_section_picture.png`)](#tests-table-of-contents-section-picture-tests_table_of_contents_section_picturepng)
   - [Warp Table of Contents Section Picture (`warp_table_of_contents_section_picture.png`)](#warp-table-of-contents-section-picture-warp_table_of_contents_section_picturepng)
+  - [Diagrams Table of Contents Section Picture (`diagrams_table_of_contents_section_picture.png`)](#diagrams-table-of-contents-section-picture-diagrams_table_of_contents_section_picturepng)
 - [Setting GitHub Social Banner](#setting-github-social-banner)
   - [What is a GitHub Social Banner?](#what-is-a-github-social-banner)
   - [Why Set a Social Banner?](#why-set-a-social-banner)
@@ -392,6 +393,14 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Usage**: Displayed just under the table of contents header in the warp README (`warp/README.md`) to add personality and visual appeal
 - **Context**: Provides a friendly, approachable visual element that makes the warp documentation's table of contents section more engaging and memorable
 - **Placement**: Positioned just under the "## Table of Contents" header in the warp README
+
+### **Diagrams Table of Contents Section Picture (`diagrams_table_of_contents_section_picture.png`)**
+
+- **Purpose**: Visual branding element featuring the project mascot used in the table of contents section of the diagrams README
+- **Format**: PNG image
+- **Usage**: Displayed just under the table of contents header in the diagrams README (`diagrams/README.md`) to add personality and visual appeal
+- **Context**: Provides a friendly, approachable visual element that makes the diagrams documentation's table of contents section more engaging and memorable
+- **Placement**: Positioned just under the "## Table of Contents" header in the diagrams README
 
 ## Setting GitHub Social Banner
 

@@ -46,6 +46,9 @@ jobs:
 
       - uses: hashicorp/setup-terraform@v3.1.2
 
+      - name: Terraform fmt check
+        run: terraform fmt -check -recursive terraform/
+
       - name: Terraform init and validate
         run: cd terraform && terraform init -backend=false && terraform validate
 
@@ -72,6 +75,29 @@ jobs:
             echo "Validating: $f"
             kubeconform -strict -summary "$f" || true
           done
+
+  tflint:
+    name: TFLint
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: terraform-linters/setup-tflint@v4
+
+      - name: Run TFLint
+        run: |
+          cd terraform
+          tflint --init
+          tflint --only=terraform_deprecated_interpolation \
+                 --only=terraform_deprecated_index \
+                 --only=terraform_unused_declarations \
+                 --only=terraform_comment_syntax \
+                 --only=terraform_documented_outputs \
+                 --only=terraform_documented_variables \
+                 --only=terraform_typed_variables \
+                 --only=terraform_naming_convention \
+                 --only=terraform_required_version \
+                 --only=terraform_required_providers
 
   full-bats-suite:
     name: Full BATS Test Suite
