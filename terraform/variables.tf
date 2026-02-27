@@ -123,20 +123,6 @@ variable "redis_max_ecpu_per_second" {
 # =============================================================================
 # These variables control security settings, access permissions, and domain configuration
 
-# Domain name for OpenEMR application
-# Leave empty to use only LoadBalancer DNS name (no custom domain)
-# If provided, must be a valid fully qualified domain name (FQDN)
-variable "domain_name" {
-  description = "Custom domain name for OpenEMR (leave empty for LoadBalancer access only)"
-  type        = string
-  default     = "" # No custom domain by default
-
-  # Validation ensures the domain name is either empty or a valid FQDN
-  validation {
-    condition     = can(regex("^$|^[a-zA-Z0-9][a-zA-Z0-9-]{1,61}[a-zA-Z0-9]\\.[a-zA-Z]{2,}$", var.domain_name))
-    error_message = "Domain name must be a valid FQDN (e.g., 'example.com') or empty string."
-  }
-}
 
 # Enable AWS WAF (Web Application Firewall) for additional security
 # WAF provides protection against common web exploits and DDoS attacks
@@ -170,14 +156,6 @@ variable "allowed_cidr_blocks" {
 # =============================================================================
 # These variables control backup retention policies and data lifecycle management
 
-# Number of days to retain automated backups for RDS Aurora
-# Longer retention provides better recovery options but increases storage costs
-# 30 days provides good balance between recovery options and cost
-variable "backup_retention_days" {
-  description = "Number of days to retain automated RDS Aurora backups"
-  type        = number
-  default     = 30 # 30 days retention for good recovery options
-}
 
 # Enable deletion protection for RDS cluster
 # Prevents accidental deletion of the database cluster

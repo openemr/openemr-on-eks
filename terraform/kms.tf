@@ -213,7 +213,7 @@ resource "aws_kms_key" "s3" {
         Condition = {
           StringEquals = {
             "kms:ViaService"    = "s3.${var.aws_region}.amazonaws.com"
-            "aws:SourceAccount" = "${data.aws_caller_identity.current.account_id}"
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
         }
       },
@@ -285,7 +285,7 @@ resource "aws_kms_key" "backup" {
         # Condition restricts access to current account and region
         Condition = {
           StringEquals = {
-            "aws:SourceAccount" = "${data.aws_caller_identity.current.account_id}"
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
           ArnLike = {
             "aws:SourceArn" = "arn:aws:backup:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"

@@ -275,7 +275,7 @@ resource "aws_iam_role" "backup" {
         # Condition restricts access to current account
         Condition = {
           StringEquals = {
-            "aws:SourceAccount" = "${data.aws_caller_identity.current.account_id}"
+            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
           }
         }
       }

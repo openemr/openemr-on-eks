@@ -23,6 +23,18 @@ terraform {
       source  = "hashicorp/kubernetes"
       version = "3.0.1"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = ">= 3.0"
+    }
+    time = {
+      source  = "hashicorp/time"
+      version = ">= 0.9"
+    }
+    http = {
+      source  = "hashicorp/http"
+      version = ">= 3.0"
+    }
   }
 }
 

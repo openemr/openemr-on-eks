@@ -77,7 +77,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
         Principal : "*",
         Action : "s3:*",
         Resource : [
-          "${aws_s3_bucket.cloudtrail.arn}",
+          aws_s3_bucket.cloudtrail.arn,
           "${aws_s3_bucket.cloudtrail.arn}/*"
         ],
         Condition : {
@@ -93,7 +93,7 @@ resource "aws_s3_bucket_policy" "cloudtrail" {
           Service : "cloudtrail.amazonaws.com"
         },
         Action : "s3:GetBucketAcl",
-        Resource : "${aws_s3_bucket.cloudtrail.arn}"
+        Resource : aws_s3_bucket.cloudtrail.arn
       }
     ]
   })
