@@ -38,7 +38,7 @@ spec:
       port: 80   # HTTP port for health checks
     - protocol: TCP
       port: 443  # HTTPS port for secure communication
-      
+
   # Allow access from system namespaces for monitoring
   - from:
     - namespaceSelector:
@@ -95,7 +95,7 @@ spec:
   policyTypes:
   - Ingress # Ingress rules for incoming traffic
   - Egress  # Egress rules for outgoing traffic
-  
+
   # Ingress Rules (Incoming Traffic)
   ingress:
   # Allow external access from load balancers and ingress controllers
@@ -107,7 +107,7 @@ spec:
       port: 80   # HTTP port for user access
     - protocol: TCP
       port: 443  # HTTPS port for secure user access
-      
+
   # Egress Rules (Outgoing Traffic)
   egress:
   # Database Access
@@ -116,14 +116,14 @@ spec:
     ports:
     - protocol: TCP
       port: 3306  # MySQL port
-      
+
   # Redis Access
   # Allow connections to ElastiCache Redis cluster
   - to: []  # Allow to any destination (Redis is external to cluster)
     ports:
     - protocol: TCP
       port: 6379  # Redis port
-      
+
   # Monitoring Namespace Access
   # Allow Fluent Bit to send logs to Loki and traces to Tempo
   - to:
@@ -137,14 +137,14 @@ spec:
       port: 4318  # Tempo OTLP HTTP port
     - protocol: TCP
       port: 4317  # Tempo OTLP gRPC port (if needed)
-      
+
   # DNS Resolution
   # Allow DNS queries for service discovery and external lookups
   - to: []  # Allow to any destination (DNS servers)
     ports:
     - protocol: UDP
       port: 53    # DNS port
-      
+
   # External HTTPS Access
   # Allow HTTPS connections for certificate downloads, updates, etc.
   - to: []  # Allow to any destination (external HTTPS services)

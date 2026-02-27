@@ -432,7 +432,7 @@ jobs:
       - name: Run ShellCheck on all shell scripts
         run: |
           echo "🔍 Running ShellCheck Shell Script Analysis..."
-          
+
           # Find all shell scripts and run shellcheck
           # -S warning: Include warnings and above (warning, error)
           # -f gcc: Output in GCC format for easy parsing
@@ -441,7 +441,7 @@ jobs:
             ! -path "./node_modules/*" \
             ! -path "./.terraform/*" \
             -print0 | xargs -0 shellcheck -S warning -f gcc 2>&1 | tee shellcheck-results.txt
-          
+
           # Check if any issues were found
           if [ -s shellcheck-results.txt ]; then
             echo ""

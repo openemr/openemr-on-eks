@@ -24,12 +24,12 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: openemr  # Scale the OpenEMR deployment
-    
+
   # Scaling Boundaries
   # Configured via Terraform variables for flexibility
   minReplicas: ${OPENEMR_MIN_REPLICAS} # Minimum pods (typically 2)
   maxReplicas: ${OPENEMR_MAX_REPLICAS} # Maximum pods (typically 10)
-  
+
   # Scaling Metrics
   metrics:
   # CPU-based scaling
@@ -39,7 +39,7 @@ spec:
       target:
         type: Utilization
         averageUtilization: ${OPENEMR_CPU_THRESHOLD}  # Scale when CPU exceeds threshold (typically 70%)
-        
+
   # Memory-based scaling
   - type: Resource
     resource:
@@ -47,7 +47,7 @@ spec:
       target:
         type: Utilization
         averageUtilization: ${OPENEMR_MEMORY_THRESHOLD}  # Scale when memory exceeds threshold (typically 80%)
-  
+
   # Scaling Behavior Configuration
   behavior:
     # Scale Down Behavior (Conservative)
@@ -61,7 +61,7 @@ spec:
         value: 2   # Scale down by maximum 2 pods at a time
         periodSeconds: 60
       selectPolicy: Min  # Use the most conservative policy to prevent rapid scale-down
-      
+
     # Scale Up Behavior (Aggressive)
     scaleUp:
       stabilizationWindowSeconds: ${OPENEMR_SCALE_UP_STABILIZATION}  # Wait before scaling up (typically 60s)

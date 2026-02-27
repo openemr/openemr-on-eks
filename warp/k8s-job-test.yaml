@@ -10,7 +10,7 @@ spec:
   # Retry policy
   backoffLimit: 1
   ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
-  
+
   template:
     metadata:
       labels:
@@ -19,7 +19,7 @@ spec:
     spec:
       serviceAccountName: openemr-sa  # Use OpenEMR service account for IRSA
       restartPolicy: Never
-      
+
       containers:
       - name: warp
         # Python image version: Uses latest 3.xx-slim tag automatically
@@ -27,7 +27,7 @@ spec:
         # To use a specific version, replace with: python:3.14-slim
         image: python:3.14-slim
         workingDir: /app
-        
+
         env:
         # Database connection (from Kubernetes secrets)
         - name: DB_HOST
@@ -50,24 +50,24 @@ spec:
             secretKeyRef:
               name: openemr-db-credentials
               key: mysql-database
-        
+
         # Data source configuration
         - name: DATA_SOURCE
           value: "s3://synpuf-omop/cmsdesynpuf1k/"
         - name: AWS_REGION
           value: "us-west-2"
-        
+
         # Processing options - benchmark test (full dataset, single worker for stability)
         - name: BATCH_SIZE
           value: "100"  # Larger batch for better performance
         - name: WORKERS
           value: "1"  # Single worker to avoid DB connection issues
         # Note: MAX_RECORDS not set - imports entire dataset
-        
+
         # Logging
         - name: LOG_LEVEL
           value: "INFO"
-        
+
         command: ["/bin/bash"]
         args:
         - -c
@@ -75,23 +75,23 @@ spec:
           set -e
           echo "Installing system dependencies..."
           apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
-          
+
           echo "Installing Python dependencies..."
           # Versions pinned to match versions.yaml
           pip install --no-cache-dir pymysql==1.1.0 boto3==1.28.0
-          
+
           echo "Extracting warp code from ConfigMap..."
           cd /app
           tar xzf /warp-code/warp-code.tar.gz
-          
+
           echo "Checking extracted structure..."
           ls -la /app/ | head -15
-          
+
           echo "Installing warp..."
           # The tarball extracts to /app/ with setup.py at root and warp/ subdirectory
           cd /app
           pip install --no-cache-dir -e .
-          
+
           echo "Running warp..."
           WARP_CMD="warp ccda_data_upload \
             --db-host \"$DB_HOST\" \
@@ -102,14 +102,14 @@ spec:
             --batch-size \"$BATCH_SIZE\" \
             --workers \"$WORKERS\" \
             --aws-region \"$AWS_REGION\""
-          
+
           # Add --max-records only if MAX_RECORDS is set and not empty
           if [ -n "${MAX_RECORDS:-}" ]; then
             WARP_CMD="$WARP_CMD --max-records \"$MAX_RECORDS\""
           fi
-          
+
           eval $WARP_CMD
-        
+
         # Resources
         resources:
           requests:
@@ -118,7 +118,7 @@ spec:
           limits:
             memory: "4Gi"
             cpu: "2"
-        
+
         # Volume mounts
         volumeMounts:
         - name: tmp
@@ -126,14 +126,14 @@ spec:
         - name: warp-code
           mountPath: /warp-code
           readOnly: true
-        
+
       volumes:
       - name: tmp
         emptyDir: {}
       - name: warp-code
         configMap:
           name: warp-code
-      
+
       # Use IRSA for S3 access (if configured)
       # The service account should have S3 read permissions
 

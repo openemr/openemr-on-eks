@@ -42,7 +42,7 @@ rules:
 - apiGroups: [""]
   resources: ["configmaps", "secrets"]
   verbs: ["get", "list"]  # Read-only access for security
-  
+
 # Access to Pod information
 # Required for health checks and monitoring
 - apiGroups: [""]

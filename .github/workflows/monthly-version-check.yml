@@ -150,14 +150,14 @@ jobs:
         run: |
           # Initialize log file for detailed tracking
           touch scripts/version-check.log
-          
+
           # Validate version-manager.sh script exists and is executable
           if [ ! -f "scripts/version-manager.sh" ]; then
             echo "ERROR: version-manager.sh not found" | tee scripts/version-check.log
             echo "updates_found=false" >> $GITHUB_OUTPUT
             exit 1
           fi
-          
+
           chmod +x scripts/version-manager.sh
 
           # Test script execution and validate dependencies
@@ -165,7 +165,7 @@ jobs:
           echo "yq version: $(yq --version)" >> scripts/version-check.log
           echo "jq version: $(jq --version)" >> scripts/version-check.log
           echo "versions.yaml exists: $(test -f versions.yaml && echo 'yes' || echo 'no')" >> scripts/version-check.log
-          
+
           # Test basic script functionality before full execution
           ./scripts/version-manager.sh status >> scripts/version-check.log 2>&1 || echo "Script status check failed" >> scripts/version-check.log
 
@@ -189,7 +189,7 @@ jobs:
           # Execute version check based on input parameters
           echo "Running version check for: ${{ github.event.inputs.check_type || 'all' }}" >> scripts/version-check.log
           echo "Report title: $REPORT_TITLE" >> scripts/version-check.log
-          
+
           # Run version-manager.sh with appropriate component type
           case "${{ github.event.inputs.check_type || 'all' }}" in
             "applications")
@@ -220,12 +220,12 @@ jobs:
           if [ -f "version-updates.log" ]; then
             cp version-updates.log scripts/version-updates.log
           fi
-          
+
           # Copy version-check.log to root directory for report generation
           if [ -f "scripts/version-check.log" ]; then
             cp scripts/version-check.log version-check.log
           fi
-          
+
           # Analyze log files to determine if updates were found
           if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log; then
             echo "updates_found=true" >> $GITHUB_OUTPUT
@@ -234,7 +234,7 @@ jobs:
             echo "updates_found=false" >> $GITHUB_OUTPUT
             echo "No updates found in log" | tee -a scripts/version-check.log
           fi
-          
+
           # Ensure updates_found status is set for downstream jobs
           echo "Final updates_found status: $(grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log && echo 'true' || echo 'false')" | tee -a scripts/version-check.log
 
@@ -291,11 +291,11 @@ jobs:
             if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
               echo "### ✅ Updates Available" >> update-report.md
               echo "" >> update-report.md
-              
+
               # Create a properly formatted table
               echo "| Component | Current → Latest | Priority |" >> update-report.md
               echo "|-----------|------------------|----------|" >> update-report.md
-              
+
               # Extract updates and categorize by priority
               (grep -E "→ [^❌]" scripts/version-check.log 2>/dev/null || grep -E "→ [^❌]" scripts/version-updates.log 2>/dev/null) | sed 's/.*INFO\] //' | sed 's/ update available: /: /' | sed 's/ → / → /' | grep -v "→ null" | grep -v "→ ❌" | grep -v "→ Unable to determine" | while IFS=':' read -r component versions; do
                 # Determine priority based on component type
@@ -309,12 +309,12 @@ jobs:
                 fi
                 echo "| **$component** | \`$versions\` | $priority |" >> update-report.md
               done
-              
+
               echo "" >> update-report.md
               echo "### 📍 Quick File Reference" >> update-report.md
               echo "" >> update-report.md
               echo "> 💡 **Detailed file locations with line numbers** are available in the workflow artifacts below" >> update-report.md
-              
+
               # Add note about failed checks if any
               if grep -q "Unable to determine" scripts/version-check.log 2>/dev/null || grep -q "Unable to determine" scripts/version-updates.log 2>/dev/null; then
                 echo "" >> update-report.md
@@ -428,7 +428,7 @@ jobs:
                 grep -A 15 "### 📍 Version Locations for" scripts/version-check.log 2>/dev/null || true
                 grep -A 15 "### 📍 Version Locations for" scripts/version-updates.log 2>/dev/null || true
               } | grep -v "→ null" | grep -v "→ ❌" | grep -v "→ Unable to determine" >> detailed-report.md || true
-              
+
               # Add note about failed checks if any
               if grep -q "Unable to determine" scripts/version-check.log 2>/dev/null || grep -q "Unable to determine" scripts/version-updates.log 2>/dev/null; then
                 echo "" >> detailed-report.md
@@ -464,7 +464,7 @@ jobs:
             echo "" >> detailed-report.md
             echo "*This detailed report was generated automatically by the OpenEMR EKS Version Awareness system.*" >> detailed-report.md
           fi
-          
+
           # Re-enable exit on error for the rest of the workflow
           set -e
 

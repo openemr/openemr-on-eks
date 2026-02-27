@@ -26,7 +26,7 @@ metadata:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"                             # Network Load Balancer for Layer 4 routing
     service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"               # Public internet access
     service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "${BACKEND_PROTOCOL}" # TCP or SSL based on SSL mode
-    
+
     # SSL Configuration (conditionally enabled by deploy script)
     # These annotations are uncommented when SSL_CERT_ARN is provided
     # ACM SSL Mode: SSL termination at NLB with re-encryption to pods
@@ -42,7 +42,7 @@ spec:
     port: 80
     targetPort: 80
     protocol: TCP
-    
+
   # HTTPS Port 443
   # SSL configuration depends on deployment mode:
   # - ACM Mode: SSL re-encryption (NLB terminates SSL, re-encrypts to pod)
@@ -51,10 +51,10 @@ spec:
     port: 443
     targetPort: 443
     protocol: TCP
-    
+
   selector:
     app: openemr  # Route traffic to OpenEMR pods
-    
+
   # Session Affinity Configuration
   # Ensures users stick to the same pod for consistent session management
   # Important for OpenEMR's session-based authentication and file uploads

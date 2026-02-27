@@ -22,14 +22,14 @@ data:
         HTTP_Port     2020
         HTTP_Allow    *
         Health_Check  On
-        HC_Errors_Count 50              
-        HC_Retry_Failure_Count 10              
+        HC_Errors_Count 50
+        HC_Retry_Failure_Count 10
         HC_Period     60
-        storage.type  filesystem              
+        storage.type  filesystem
         storage.path  /tmp/fluent-bit-buffer
         storage.backlog.mem_limit 50M
         storage.pause_on_chunks_overlimit On
-        storage.max_chunks_up 256              
+        storage.max_chunks_up 256
 
     # Test log input to verify functionality
     # Generates test logs to verify Fluent Bit is working correctly
@@ -48,7 +48,7 @@ data:
         Path              /var/log/apache2/access.log
         Tag               apache.access
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
 
     # Collect Apache error logs
@@ -58,7 +58,7 @@ data:
         Path              /var/log/apache2/error.log
         Tag               apache.error
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
 
     # Collect OpenEMR application logs
@@ -68,12 +68,12 @@ data:
         Path              /var/log/openemr/*.log
         Tag               openemr.application
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
-        Skip_Long_Lines   On          
-        Ignore_Older      24h          
-        Path_Key          filename     
-        exit_on_eof       false        
+        Skip_Long_Lines   On
+        Ignore_Older      24h
+        Path_Key          filename
+        exit_on_eof       false
 
     # Collect OpenEMR system logs
     # Monitors OpenEMR system logs from the sites directory
@@ -82,12 +82,12 @@ data:
         Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/system_logs/*.log
         Tag               openemr.system
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
-        Skip_Long_Lines   On          
-        Ignore_Older      24h          
-        Path_Key          filename     
-        exit_on_eof       false        
+        Skip_Long_Lines   On
+        Ignore_Older      24h
+        Path_Key          filename
+        exit_on_eof       false
 
     # Collect OpenEMR audit logs
     # Monitors OpenEMR audit logs for compliance and security
@@ -96,12 +96,12 @@ data:
         Path              /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/audit_logs/*.log
         Tag               openemr.audit
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
-        Skip_Long_Lines   On          
-        Ignore_Older      24h          
-        Path_Key          filename     
-        exit_on_eof       false        
+        Skip_Long_Lines   On
+        Ignore_Older      24h
+        Path_Key          filename
+        exit_on_eof       false
 
     # Collect PHP error logs
     # Monitors PHP error logs for application debugging
@@ -110,7 +110,7 @@ data:
         Path              /var/log/php_errors.log
         Tag               openemr.php_error
         Refresh_Interval  5
-        Buffer_Max_Size   5MB         
+        Buffer_Max_Size   5MB
         Skip_Empty_Lines  On
 
     # Forward protocol for external log sources
@@ -235,7 +235,7 @@ data:
     # - Retry_Limit False: Retry indefinitely without crashing (buffered to disk)
     # - net.connect_timeout: 5 second connection timeout
     # - net.keepalive: off to avoid connection persistence issues
-    
+
     # Test logs to Loki
     [OUTPUT]
         Name                loki
@@ -246,9 +246,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=test, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # Apache logs to Loki
     [OUTPUT]
@@ -261,9 +261,9 @@ data:
         label_keys          $tag
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # Forward logs to Loki
     [OUTPUT]
@@ -275,9 +275,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=forward, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # OpenEMR Application logs to Loki
     [OUTPUT]
@@ -289,9 +289,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=application, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # OpenEMR System logs to Loki
     [OUTPUT]
@@ -303,9 +303,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=system, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # OpenEMR Audit logs to Loki
     [OUTPUT]
@@ -317,9 +317,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=audit, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # PHP Error logs to Loki
     [OUTPUT]
@@ -331,9 +331,9 @@ data:
         labels              job=openemr, namespace=openemr, log_type=php_error, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off
 
     # Fluent Bit Metrics to Loki
     [OUTPUT]
@@ -345,6 +345,6 @@ data:
         labels              job=fluent-bit, namespace=openemr, log_type=metrics, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
-        Retry_Limit         False           
-        net.connect_timeout 5               
-        net.keepalive       off             
+        Retry_Limit         False
+        net.connect_timeout 5
+        net.keepalive       off

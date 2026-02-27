@@ -2,7 +2,7 @@
 # OpenEMR Namespace Configuration
 # =============================================================================
 # This file defines the Kubernetes namespaces used by the OpenEMR deployment.
-# 
+#
 # Namespaces provide:
 # - Resource isolation and organization
 # - Security boundaries with Pod Security Standards

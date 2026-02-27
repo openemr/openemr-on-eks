@@ -27,7 +27,7 @@ spec:
                # Starting >1 risks a deadlock: if the leader pod restarts mid-init,
                # the lock file persists on EFS and ALL pods wait forever.
   progressDeadlineSeconds: 3600                        # 60 minutes to accommodate long startup times and cluster state variations
-  
+
   # Rolling update strategy for zero-downtime deployments
   strategy:
     type: RollingUpdate
@@ -38,7 +38,7 @@ spec:
   selector:
     matchLabels:
       app: openemr                                     # Match pods with this label
-      
+
   # Pod template specification
   template:
     metadata:
@@ -66,7 +66,7 @@ spec:
       - name: openemr
         image: openemr/openemr:${OPENEMR_VERSION} # OpenEMR Docker image with version from environment
         imagePullPolicy: IfNotPresent             # Only pull if image not present locally
-        
+
         # Container-level security context
         securityContext:
           allowPrivilegeEscalation: true # Allow privilege escalation for OpenEMR setup
@@ -91,7 +91,7 @@ spec:
         - containerPort: 443
           name: https                                  # HTTPS port for SSL/TLS encrypted traffic
           protocol: TCP
-          
+
         workingDir: /var/www/localhost/htdocs/openemr  # OpenEMR web root directory
         # Custom startup command to handle initialization
         command: ["/bin/sh", "-c"]
@@ -172,7 +172,7 @@ spec:
               key: mysql-database           # Database name for OpenEMR
         - name: MYSQL_PORT
           value: "3306"                     # Standard MySQL port
-          
+
         # Redis/ElastiCache connection settings (from Kubernetes secrets)
         - name: REDIS_SERVER
           valueFrom:
@@ -193,7 +193,7 @@ spec:
               key: redis-password           # Redis password for authentication
         - name: REDIS_TLS
           value: "yes"                      # Enable TLS for secure Redis connections
-          
+
         # OpenEMR application settings
         - name: OE_USER
           valueFrom:
@@ -265,7 +265,7 @@ spec:
           timeoutSeconds: 15                       # 15 second timeout per check
           failureThreshold: 6                      # Allow 6 failures (6*30s = 3min) before restarting pod
           successThreshold: 1                      # Single success marks pod as alive
-          
+
         # Volume mounts for persistent data and SSL certificates
         volumeMounts:
         - name: openemr-sites
@@ -278,7 +278,7 @@ spec:
       # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
         image: fluent/fluent-bit:4.2.3                                        # Fluent Bit log processor and forwarder
-        
+
         # Container-level security context for Fluent Bit
         # trivy:ignore:AVD-KSV-0012 Fluent Bit needs root to read log files
         # trivy:ignore:AVD-KSV-0014 Fluent Bit needs write access for buffers
@@ -292,7 +292,7 @@ spec:
             - ALL                                                             # Drop all capabilities first
             add:
             - DAC_READ_SEARCH                                                 # Required for reading log files
-            
+
         ports:
         - containerPort: 2020
           name: fluent-bit-http                                               # HTTP monitoring endpoint
@@ -319,7 +319,7 @@ spec:
           requests:
             cpu: "50m"     # Minimum CPU for basic log forwarding
             memory: "64Mi" # Minimum memory for log processing
-            
+
         # Volume mounts for Fluent Bit configuration and system access
         volumeMounts:
         - name: fluent-bit-config
@@ -399,7 +399,7 @@ spec:
 
       # Node placement configuration for EKS Auto Mode
       # EKS Auto Mode handles node selection, scheduling, and optimal placement automatically
-      
+
       # Tolerations for EKS Auto Mode nodes
       tolerations:
       - key: "CriticalAddonsOnly"              # Allow scheduling on critical addons nodes

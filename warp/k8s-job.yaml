@@ -10,7 +10,7 @@ spec:
   # Retry policy
   backoffLimit: 2
   ttlSecondsAfterFinished: 3600  # Clean up after 1 hour
-  
+
   template:
     metadata:
       labels:
@@ -19,12 +19,12 @@ spec:
     spec:
       serviceAccountName: openemr-sa  # Use OpenEMR service account for IRSA
       restartPolicy: Never
-      
+
       containers:
       - name: warp-ccda-upload
         image: openemr/warp:latest  # Update with your image
         imagePullPolicy: Always
-        
+
         # Security context for container hardening
         securityContext:
           allowPrivilegeEscalation: false
@@ -34,7 +34,7 @@ spec:
           capabilities:
             drop:
             - ALL
-        
+
         env:
         # Database connection (from Kubernetes secrets)
         - name: DB_HOST
@@ -57,13 +57,13 @@ spec:
             secretKeyRef:
               name: openemr-db-credentials
               key: mysql-database
-        
+
         # Data source configuration
         - name: DATA_SOURCE
           value: "s3://synpuf-omop/cmsdesynpuf1k/"  # S3 path to OMOP data
         - name: AWS_REGION
           value: "us-west-2"
-        
+
         # Processing options - optimized for performance
         - name: BATCH_SIZE
           value: "500"  # Larger batches for Kubernetes
@@ -71,11 +71,11 @@ spec:
           value: "8"  # Multiple workers for parallel processing
         - name: MAX_RECORDS
           value: ""  # Empty = process all records
-        
+
         # Logging
         - name: LOG_LEVEL
           value: "INFO"
-        
+
         command: ["warp"]
         args:
         - "ccda_data_upload"
@@ -95,7 +95,7 @@ spec:
         - "$(WORKERS)"
         - "--aws-region"
         - "$(AWS_REGION)"
-        
+
         # Generous resources for high performance
         resources:
           requests:
@@ -104,16 +104,16 @@ spec:
           limits:
             memory: "16Gi"
             cpu: "8"
-        
+
         # Volume mounts for temporary data
         volumeMounts:
         - name: tmp
           mountPath: /tmp
-        
+
       volumes:
       - name: tmp
         emptyDir: {}
-      
+
       # Use IRSA for S3 access (if configured)
       # The service account should have S3 read permissions
 

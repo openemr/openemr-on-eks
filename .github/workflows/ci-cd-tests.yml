@@ -422,7 +422,7 @@ jobs:
     runs-on: ubuntu-24.04
     # Run if manually triggered with 'all' or 'warp', or on push/PR (workflow paths filter handles file detection)
     if: |
-      (github.event_name == 'workflow_dispatch' && 
+      (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'warp')) ||
       github.event_name != 'workflow_dispatch'
 
@@ -524,7 +524,7 @@ jobs:
     name: Credential Rotation CI
     runs-on: ubuntu-24.04
     if: |
-      (github.event_name == 'workflow_dispatch' && 
+      (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'credential_rotation')) ||
       github.event_name != 'workflow_dispatch'
 
