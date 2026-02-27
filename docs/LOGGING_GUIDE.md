@@ -672,7 +672,7 @@ kubectl exec <pod-name> -c openemr -n openemr -- touch /var/log/openemr/placehol
 
 **Cause**: Loki service may be unavailable or unreachable
 
-**Solution**: 
+**Solution**:
 - This is expected behavior when Loki is not installed. The graceful failure handling (`Retry_Limit False`) ensures logs are buffered to disk and will be retried when Loki becomes available
 - Verify Loki is installed: `kubectl get pods -n monitoring | grep loki`
 - Check Loki gateway service: `kubectl get svc -n monitoring | grep loki`

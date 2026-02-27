@@ -277,7 +277,7 @@ chmod +x ../scripts/*.sh
 
 **Issue**: Go build fails
 
-**Solution**: 
+**Solution**:
 1. Ensure Go 1.25+ is installed: `go version`
 2. Clean and rebuild: `cd console && go clean && go mod tidy && go build`
 3. Check for network issues when downloading dependencies

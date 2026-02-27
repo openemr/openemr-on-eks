@@ -100,7 +100,7 @@ arn:aws:iam::123456789012:role/GitHubActionsOpenEMROIDCRole
 4. Value: Paste the ARN from Step 2
 5. Click **Add secret**
 
-### Step 4: Enjoy Using the [Version Management GitHub Workflow](../.github/workflows/monthly-version-check.yml) 🎉! 
+### Step 4: Enjoy Using the [Version Management GitHub Workflow](../.github/workflows/monthly-version-check.yml) 🎉!
 
 **Key Points:**
 - `permissions: id-token: write` is required for OIDC to work

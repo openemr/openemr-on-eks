@@ -250,7 +250,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 | **10. Verification** | 43 sec | Verify restored data |
 | **11. Final Cleanup** | 18-18.5 min | Clean up all resources |
 
-**Total Measured Duration:** 
+**Total Measured Duration:**
 - **Test Run 1 (Dec 10, 2025):** 13,025 seconds (217.1 minutes / 3.62 hours)
 - **Test Run 2 (Dec 10, 2025):** 12,673 seconds (211.2 minutes / 3.52 hours)
 - **Average:** 211-217 minutes (3.5-3.6 hours)

@@ -83,7 +83,7 @@
 
 *Deploy OpenEMR on EKS in minutes*
 
-</div> 
+</div>
 
 ## 📊 Deploy OpenEMR with monitoring (~45-60 min.)
 
@@ -1604,7 +1604,7 @@ cd scripts && ./destroy.sh [--force]
 ```
 
 **Purpose:** Complete and bulletproof destruction of all OpenEMR infrastructure
-**Features:** 
+**Features:**
 - Disables RDS deletion protection automatically
 - Deletes all snapshots to prevent automatic restoration
 - Cleans up orphaned resources (security groups, load balancers, WAF)
@@ -1612,7 +1612,7 @@ cd scripts && ./destroy.sh [--force]
 - Terraform destroy with retry logic
 - Verification of complete cleanup
 
-**When to use:** 
+**When to use:**
 - Complete infrastructure teardown
 - Development environment cleanup
 - End-to-end testing preparation

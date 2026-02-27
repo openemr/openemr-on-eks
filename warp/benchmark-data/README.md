@@ -77,7 +77,7 @@ The script will:
 6. Report success or failure with color-coded output
 7. **Delete data files after successful verification** (unless `--keep-downloaded-data` flag is used)
 
-**Note**: 
+**Note**:
 - The script automatically downloads fresh data files at the start of each run, ensuring you're always working with the latest dataset.
 - Data files are automatically deleted after successful verification to save disk space. Use the `--keep-downloaded-data` flag if you want to preserve the files for further analysis.
 - Files are preserved if verification fails.

@@ -329,7 +329,7 @@ chmod +x scripts/*.sh
 
 **Issue**: Go build fails
 
-**Solution**: 
+**Solution**:
 1. Ensure Go 1.25 or later is installed: `go version`
 2. Clean and rebuild: `cd console && go clean && go mod tidy && go build`
 3. Check for network issues when downloading dependencies
@@ -339,7 +339,7 @@ chmod +x scripts/*.sh
 
 **Issue**: Commands execute but fail with errors
 
-**Solution**: 
+**Solution**:
 - Check the error message displayed in the console
 - Verify prerequisites are met (AWS credentials, tools installed, etc.)
 - Review the script documentation in `scripts/README.md`
@@ -411,7 +411,7 @@ For issues or questions:
 
 - **Framework**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (Go TUI framework)
 - **Language**: Go 1.25+
-- **Dependencies**: 
+- **Dependencies**:
   - [`github.com/charmbracelet/bubbletea v1.3.10`](https://github.com/charmbracelet/bubbletea) - TUI framework
   - [`github.com/charmbracelet/lipgloss v1.1.0`](https://github.com/charmbracelet/lipgloss) - Styling
 

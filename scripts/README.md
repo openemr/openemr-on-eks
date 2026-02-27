@@ -547,7 +547,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - `--max-records COUNT` - Number of records to import (default: 1000)
   - `--skip-terraform` - Skip Terraform deployment (use existing infrastructure)
   - `--skip-openemr` - Skip OpenEMR deployment (use existing deployment)
-- **Output**: 
+- **Output**:
   - Prints OpenEMR login URL and admin credentials
   - Waits 5 minutes for verification
   - Automatically cleans up infrastructure
