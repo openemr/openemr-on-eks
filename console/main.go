@@ -990,7 +990,8 @@ func (m model) View() tea.View {
 		content = s.String()
 	} else {
 		var s strings.Builder
-		s.WriteString(titleStyle.Render(fmt.Sprintf("OpenEMR on EKS Console  v%s", version)))
+		s.WriteString(titleStyle.Render("OpenEMR on EKS Console"))
+		s.WriteString("  " + helpStyle.Render(fmt.Sprintf("v%s", version)))
 		s.WriteString("\n")
 
 		for _, entry := range m.flatIndex {
