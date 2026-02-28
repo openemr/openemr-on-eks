@@ -952,7 +952,7 @@ func (m model) View() tea.View {
 		entry := m.flatIndex[m.cursor]
 		cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
 		s.WriteString(confirmBoxStyle.Render(
-			fmt.Sprintf("⚠️  DESTRUCTIVE ACTION: %s\n\nThis will permanently destroy all infrastructure resources.\nThis action is irreversible.\n\nPress Y to confirm, any other key to cancel.", cmd.title),
+			fmt.Sprintf("!! DESTRUCTIVE ACTION: %s\n\nThis will permanently destroy all infrastructure resources.\nThis action is irreversible.\n\nPress Y to confirm, any other key to cancel.", cmd.title),
 		))
 		s.WriteString("\n")
 		content = s.String()
