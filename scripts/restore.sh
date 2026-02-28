@@ -440,7 +440,11 @@ validate_arguments() {
     if [ -z "$SNAPSHOT_ID" ]; then
         if [ "$USE_LATEST_SNAPSHOT" = "true" ]; then
             echo -e "${YELLOW}🔍 Auto-detecting latest snapshot...${NC}"
-            auto_detect_latest_snapshot
+            if ! auto_detect_latest_snapshot; then
+                echo -e "${RED}❌ Failed to auto-detect latest snapshot. Please provide a snapshot ID explicitly.${NC}" >&2
+                echo -e "${YELLOW}💡 This can also occur if AWS credentials are missing, expired, or lack the required permissions.${NC}" >&2
+                exit 1
+            fi
         else
             echo -e "${RED}❌ Snapshot ID is required${NC}" >&2
             echo -e "${YELLOW}💡 Tip: You can use --latest-snapshot to automatically use the most recent snapshot${NC}" >&2
