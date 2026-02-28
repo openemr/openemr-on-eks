@@ -267,7 +267,7 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 #### **Environment Configuration**
 
 - **Python**: 3.14.0
-- **Terraform**: 1.14.5
+- **Terraform**: 1.14.6
 - **Kubectl**: v1.34.2
 - **Operating System**: Ubuntu 24.04
 
@@ -408,7 +408,7 @@ Automated version awareness system that monitors all project dependencies and cr
 
 #### **Environment Configuration**
 
-- **Terraform**: 1.14.5
+- **Terraform**: 1.14.6
 - **Kubectl**: v1.33.0
 - **Operating System**: Ubuntu 24.04
 - **Tools**: `yq`, `jq`, `curl` for API interactions

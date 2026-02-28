@@ -50,9 +50,9 @@ permissions:
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
   TRIVY_VERSION: '0.69.1'
-  CHECKOV_VERSION: '3.2.504'
+  CHECKOV_VERSION: '3.2.506'
   KICS_VERSION: 'v2.1.19'
-  GOSEC_VERSION: 'v2.23.0'
+  GOSEC_VERSION: 'v2.24.0'
   PYTHON_VERSION: '3.14'
   GO_VERSION: '1.25'
 
@@ -368,7 +368,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Set up Go
-        uses: actions/setup-go@v6.2.0
+        uses: actions/setup-go@v6.3.0
         with:
           go-version: ${{ env.GO_VERSION }}
 

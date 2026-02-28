@@ -67,7 +67,7 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 82.2.0)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 82.4.3)
 #   CHART_LOKI_VERSION         Loki chart version (default: 6.53.0)
 #   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.4.2)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
@@ -229,7 +229,7 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-82.2.0}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-82.4.3}"
 readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.53.0}"
 readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.4.2}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"

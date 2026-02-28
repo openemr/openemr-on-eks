@@ -27,7 +27,7 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="82.2.0"     # kube-prometheus-stack
+CHART_KPS_VERSION="82.4.3"     # kube-prometheus-stack
 CHART_LOKI_VERSION="6.53.0"    # Grafana Loki stack
 CHART_TEMPO_VERSION="2.4.2"    # Grafana Tempo Distributed (distributed tracing in microservice mode)
 CHART_MIMIR_VERSION="6.0.5"    # Grafana Mimir (long-term metrics storage)

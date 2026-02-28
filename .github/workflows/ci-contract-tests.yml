@@ -44,7 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - uses: hashicorp/setup-terraform@v3.1.2
+      - uses: hashicorp/setup-terraform@v4.0.0
 
       - name: Terraform fmt check
         run: terraform fmt -check -recursive terraform/
@@ -105,11 +105,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
+      - name: Set up Go
+        uses: actions/setup-go@v6.3.0
+        with:
+          go-version: '1.25'
+
       - name: Install dependencies
         run: |
-          sudo apt-get update && sudo apt-get install -y bats shellcheck
+          sudo apt-get update && sudo apt-get install -y bats
           sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
+
+      - name: Download Go modules
+        working-directory: console
+        run: go mod download
 
       - name: Run ALL BATS tests
         run: bats tests/bats/*.bats

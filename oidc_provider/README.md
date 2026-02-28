@@ -55,7 +55,7 @@ This Terraform module provisions the GitHub OIDC provider and IAM roles needed f
 
 ## Prerequisites
 
-- **Terraform 1.14.5** (see main README for installation instructions)
+- **Terraform 1.14.6** (see main README for installation instructions)
 - **AWS CLI 2.15+** (must be installed and configured)
 - **IAM permissions** to create OIDC providers and IAM roles:
   - `iam:CreateOpenIDConnectProvider`

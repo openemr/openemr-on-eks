@@ -54,8 +54,12 @@ The OpenEMR on EKS Console is a Terminal User Interface (TUI) built with the [Bu
 
 ## Features
 
-- **Simple Navigation**: Use arrow keys to navigate through available commands
+- **Categorized Menu**: Commands grouped into Deployment, Operations, and Information sections
+- **Simple Navigation**: Use arrow keys or vim-style j/k to navigate through available commands
 - **Clear Descriptions**: Each command includes a brief description of what it does
+- **Interactive Input Prompts**: Commands that require arguments display styled inline forms with field validation, Tab/Shift+Tab navigation, and placeholder hints
+- **Destructive Action Safety**: Confirmation prompt before irreversible operations like infrastructure destruction
+- **Status Bar**: Shows the resolved project root path and console version
 - **Integrated Execution**: Commands run directly from the console interface
 - **Error Handling**: Clear error messages when commands fail
 - **No Configuration Required**: Automatically detects project structure and script locations
@@ -128,13 +132,28 @@ Simply run:
 
 ### Navigation
 
-- **↑/↓ Arrow Keys**: Navigate up and down through the command list
-- **Enter**: Execute the selected command
-- **Esc** or **Ctrl+C**: Quit the console
+- **↑/↓ Arrow Keys** or **k/j**: Navigate up and down through the command list
+- **g / Home**: Jump to first command
+- **G / End**: Jump to last command
+- **Enter**: Execute the selected command (opens input form if arguments are needed, or confirmation for destructive actions)
+- **?**: Toggle expanded help panel
+- **q**, **Esc**, or **Ctrl+C**: Quit the console
+
+#### Input Form Controls
+
+When a command requires arguments (e.g., Restore from Backup, Search Codebase), a styled input form appears:
+
+- **Tab / ↓**: Move to next field
+- **Shift+Tab / ↑**: Move to previous field
+- **Enter**: Submit (on last field) or advance to next field
+- **Esc**: Cancel and return to menu
+- **Home / End**: Jump to start/end of text within a field
+
+Required fields are marked with a red asterisk (`*`). Optional fields show placeholder hints. Validation errors appear if you try to submit with empty required fields.
 
 ### Available Commands
 
-The console provides access to 10 essential operations:
+The console provides access to 11 essential operations organized into three categories:
 
 #### 1. Validate Prerequisites
 **Script**: [`../scripts/validate-deployment.sh`](../scripts/validate-deployment.sh)
@@ -196,7 +215,27 @@ The console provides access to 10 essential operations:
 
 **Note**: Requires AWS credentials with appropriate permissions
 
-#### 5. Clean Deployment
+#### 5. Restore from Backup
+**Script**: [`../scripts/restore.sh`](../scripts/restore.sh)
+
+**Description**: Restore infrastructure and application data from a previous backup
+
+**Input prompts**:
+- **Backup Bucket** (required): The S3 bucket name containing the backup
+- **Snapshot ID** (optional): Specific snapshot to restore; leave empty to use `--latest-snapshot`
+
+**What it does**:
+- Restores RDS Aurora cluster from snapshot
+- Restores Kubernetes namespace resources from S3 backup
+- Restores application data from EFS backup
+- Validates data integrity after restoration
+- Provides detailed restore status and reporting
+
+**When to use**: After a disaster, for testing restore procedures, or to recover from a failed deployment
+
+**Note**: Requires a prior backup created by "Backup Deployment"
+
+#### 6. Clean Deployment
 **Script**: [`../scripts/clean-deployment.sh`](../scripts/clean-deployment.sh)
 
 **Description**: Remove application layer while preserving infrastructure
@@ -212,7 +251,7 @@ The console provides access to 10 essential operations:
 
 **Safety**: Only removes application layer - infrastructure remains intact
 
-#### 6. Destroy Infrastructure
+#### 7. Destroy Infrastructure
 **Script**: [`../scripts/destroy.sh`](../scripts/destroy.sh)
 
 **Description**: Completely destroy all infrastructure resources (use with caution)
@@ -227,7 +266,7 @@ The console provides access to 10 essential operations:
 
 **Warning**: This will permanently delete all data and infrastructure. Use with extreme caution.
 
-#### 7. Check Component Versions
+#### 8. Check Component Versions
 **Script**: [`../scripts/version-manager.sh`](../scripts/version-manager.sh)
 
 **Description**: Check for available updates across all project components
@@ -243,10 +282,13 @@ The console provides access to 10 essential operations:
 
 **Note**: Some checks require AWS CLI credentials for EKS add-on version checking
 
-#### 8. Check OpenEMR Versions
+#### 9. Check OpenEMR Versions
 **Script**: [`../scripts/check-openemr-versions.sh`](../scripts/check-openemr-versions.sh)
 
 **Description**: Discover available OpenEMR Docker image versions from Docker Hub
+
+**Input prompts**:
+- **Search Pattern** (optional): Filter versions (e.g., `7.0` or `8.0`); leave empty to show latest
 
 **What it does**:
 - Queries Docker Hub for available OpenEMR versions
@@ -256,10 +298,13 @@ The console provides access to 10 essential operations:
 
 **When to use**: Before version upgrades, checking for new releases, or version planning
 
-#### 9. Search Codebase
+#### 10. Search Codebase
 **Script**: [`../scripts/search-codebase.sh`](../scripts/search-codebase.sh)
 
-**Description**: Search for terms across the entire codebase (interactive)
+**Description**: Search for terms across the entire codebase
+
+**Input prompts**:
+- **Search Term** (required): The term to search for (e.g., `OPENEMR_VERSION`, `backup`, `deploy`)
 
 **What it does**:
 - Searches all files in the project for the specified term
@@ -270,9 +315,7 @@ The console provides access to 10 essential operations:
 
 **When to use**: Finding where specific terms, functions, or configurations are used in the codebase
 
-**Note**: Interactive - prompts for search term if not provided as argument
-
-#### 10. Deploy Training Setup
+#### 11. Deploy Training Setup
 **Script**: [`../scripts/deploy-training-openemr-setup.sh`](../scripts/deploy-training-openemr-setup.sh)
 
 **Description**: Deploy OpenEMR with synthetic patient data for training/testing
@@ -369,6 +412,21 @@ Example:
 },
 ```
 
+To add a command with interactive input prompts:
+```go
+{
+    title:       "Your Prompted Command",
+    description: "Asks the user for input before running",
+    script:      filepath.Join(scriptsPath, "your-script.sh"),
+    prompts: []inputField{
+        {label: "Name", placeholder: "e.g. my-resource", required: true},
+        {label: "Region", placeholder: "us-east-1", required: false, flag: "region"},
+    },
+},
+```
+
+Fields with `flag` set produce `--flag value` arguments; fields without produce positional arguments.
+
 ### Running Commands Directly
 
 If you prefer to run commands directly without the console, all scripts are available in the `scripts/` directory and can be executed manually:
@@ -390,11 +448,26 @@ If you prefer to run commands directly without the console, all scripts are avai
 
 | Key | Action |
 |-----|--------|
-| ↑ | Move selection up |
-| ↓ | Move selection down |
+| ↑ / k | Move selection up |
+| ↓ / j | Move selection down |
+| g / Home | Jump to first command |
+| G / End | Jump to last command |
 | Enter | Execute selected command |
-| Esc | Quit console |
+| Y | Confirm destructive action |
+| ? | Toggle help panel |
+| q | Quit console |
+| Esc | Quit / close help / cancel input |
 | Ctrl+C | Quit console |
+
+**Input Form Keys** (when filling in arguments):
+
+| Key | Action |
+|-----|--------|
+| Tab / ↓ | Next field |
+| Shift+Tab / ↑ | Previous field |
+| Enter | Submit form (last field) / next field |
+| Home / End | Start / end of text |
+| Esc | Cancel and return to menu |
 
 ## Support
 
@@ -412,8 +485,8 @@ For issues or questions:
 - **Framework**: [Bubbletea](https://github.com/charmbracelet/bubbletea) (Go TUI framework)
 - **Language**: Go 1.25+
 - **Dependencies**:
-  - [`github.com/charmbracelet/bubbletea v1.3.10`](https://github.com/charmbracelet/bubbletea) - TUI framework
-  - [`github.com/charmbracelet/lipgloss v1.1.0`](https://github.com/charmbracelet/lipgloss) - Styling
+  - [`charm.land/bubbletea/v2 v2.0.0`](https://github.com/charmbracelet/bubbletea) - TUI framework
+  - [`charm.land/lipgloss/v2 v2.0.0`](https://github.com/charmbracelet/lipgloss) - Styling
 
 **Version Management**: All Go dependencies are tracked in `versions.yaml` under the `go_packages` section for automated version checking and update notifications.
 

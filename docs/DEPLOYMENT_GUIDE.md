@@ -51,7 +51,7 @@ This comprehensive guide provides step-by-step instructions for deploying a prod
 ```bash
 # Required tools and minimum versions
 aws-cli >= 2.15.0
-terraform >= 1.14.5
+terraform >= 1.14.6
 kubectl >= 1.29.0
 helm >= 3.12.0
 jq >= 1.6
@@ -952,7 +952,7 @@ Next steps:
    • Basic deployment: CloudWatch logs only
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v82.2.0 (metrics & alerting)
+     - Prometheus v82.4.3 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.53.0 (log aggregation with S3 storage)
      - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)

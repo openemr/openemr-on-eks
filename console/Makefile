@@ -6,7 +6,7 @@
 # called openemr-eks-console.exe that can be double-clicked to launch.
 # =============================================================================
 
-.PHONY: build install uninstall clean run
+.PHONY: build test install uninstall clean run
 
 BINARY_NAME=openemr-eks-console
 INSTALL_PATH=/usr/local/bin
@@ -48,9 +48,17 @@ uninstall:
 		echo "Nothing to uninstall."; \
 	fi
 
+test:
+	@echo "Running unit tests..."
+	@go test -v -race -coverprofile=coverage.out ./...
+	@echo ""
+	@echo "📊 Coverage summary:"
+	@go tool cover -func=coverage.out | tail -1
+	@rm -f coverage.out
+
 clean:
 	@echo "Cleaning..."
-	@rm -f $(BINARY_NAME)
+	@rm -f $(BINARY_NAME) coverage.out
 	@echo "Clean complete"
 
 run: build

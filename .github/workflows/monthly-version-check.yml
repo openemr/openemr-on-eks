@@ -61,8 +61,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.14.5"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.35.1"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.14.6"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.35.2"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -93,7 +93,7 @@ jobs:
 
       # Step 2: Set up Terraform for infrastructure version checking
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TF_VERSION }}
 

@@ -39,15 +39,15 @@ infrastructure:
     description: "Amazon EKS cluster version"
 
   terraform:
-    current: "1.14.5"
+    current: "1.14.6"
     notify_on_update: true
     requires_aws_cli: false
-    description: "Terraform version used in documentation"
+    description: "Terraform version used in documentation and as the required_version constraint in terraform/main.tf and oidc_provider/main.tf"
 
 # Database Versions
 databases:
   aurora_mysql:
-    current: "8.0.mysql_aurora.3.11.1"
+    current: "8.0.mysql_aurora.3.12.0"
     aws_available_versions_url: "https://docs.aws.amazon.com/cdk/api/v2/docs/aws-cdk-lib.aws_rds.AuroraMysqlEngineVersion.html"
     notify_on_update: true
     requires_aws_cli: true
@@ -58,7 +58,7 @@ databases:
 # Note: CoreDNS, kube-proxy, VPC CNI, and EBS CSI Driver are managed by EKS Auto Mode
 eks_addons:
   efs_csi_driver:
-    current: "v2.3.0-eksbuild.1"
+    current: "v2.3.0-eksbuild.2"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "aws-efs-csi-driver"
@@ -123,13 +123,13 @@ github_workflows:
     description: "Github action for setting up a specified Python version."
 
   actions_setup_go:
-    current: "v6.2.0"
+    current: "v6.3.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Go version."
 
   actions_setup_terraform:
-    current: "v3.1.2"
+    current: "v4.0.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Terraform version."
@@ -197,7 +197,7 @@ pre_commit_hooks:
     description: "https://github.com/pycqa/flake8"
 
   bandit:
-    current: "1.9.3"
+    current: "1.9.4"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/pycqa/bandit"
@@ -227,7 +227,7 @@ pre_commit_hooks:
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.13.8"
+    current: "v4.13.9"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -241,13 +241,13 @@ semver_packages:
     description: "Version of Python used in Github CI/CD workflows."
 
   terraform_version:
-    current: "1.14.5"
+    current: "1.14.6"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Terraform used in Github CI/CD workflows."
 
   kubectl_version:
-    current: "v1.35.1"
+    current: "v1.35.2"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Kubectl used in Github CI/CD workflows."
@@ -269,22 +269,24 @@ go_packages:
     min_version: "1.25"
 
   bubbletea:
-    current: "v1.3.10"
+    current: "v2.0.0"
     package_manager: "go"
     repository: "github.com/charmbracelet/bubbletea"
+    module_path: "charm.land/bubbletea/v2"
     notify_on_update: true
     requires_aws_cli: false
     description: "Bubbletea TUI framework for the console application"
-    min_version: "v1.3.10"
+    min_version: "v2.0.0"
 
   lipgloss:
-    current: "v1.1.0"
+    current: "v2.0.0"
     package_manager: "go"
     repository: "github.com/charmbracelet/lipgloss"
+    module_path: "charm.land/lipgloss/v2"
     notify_on_update: true
     requires_aws_cli: false
     description: "Lipgloss styling library for the console TUI"
-    min_version: "v1.1.0"
+    min_version: "v2.0.0"
 
 # Python Package Dependencies (Warp Project + Credential Rotation)
 python_packages:
@@ -297,12 +299,12 @@ python_packages:
     min_version: "1.1.2"
 
   boto3:
-    current: "1.42.54"
+    current: "1.42.59"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS SDK for Python - used by Warp (S3 data access) and credential rotation (Secrets Manager)"
-    min_version: "1.42.54"
+    min_version: "1.42.59"
 
   requests:
     current: "2.32.5"
@@ -363,7 +365,7 @@ python_packages:
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "82.2.0"
+    current: "82.4.3"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
@@ -421,7 +423,7 @@ security_tools:
     description: "Trivy vulnerability, secret, and misconfiguration scanner"
 
   checkov:
-    current: "3.2.504"
+    current: "3.2.506"
     package_manager: "pip"
     repository: "bridgecrewio/checkov"
     notify_on_update: true
@@ -436,7 +438,7 @@ security_tools:
     description: "KICS (Keeping Infrastructure as Code Secure) scanner"
 
   gosec:
-    current: "v2.23.0"
+    current: "v2.24.0"
     repository: "securego/gosec"
     notify_on_update: true
     requires_aws_cli: false

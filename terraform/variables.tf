@@ -204,7 +204,7 @@ variable "audit_logs_retention_days" {
 variable "rds_engine_version" {
   description = "Aurora MySQL engine version (check AWS docs for available versions)"
   type        = string
-  default     = "8.0.mysql_aurora.3.11.1" # Stable Aurora MySQL 8.0 version
+  default     = "8.0.mysql_aurora.3.12.0" # Stable Aurora MySQL 8.0 version (compatible with MySQL 8.0.44)
 }
 
 # =============================================================================

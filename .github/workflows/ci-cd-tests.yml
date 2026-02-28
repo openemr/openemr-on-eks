@@ -56,8 +56,8 @@ permissions:
 # Environment variables for consistent tool versions across all jobs
 env:
   PYTHON_VERSION: '3.14.3'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.14.5' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.35.1'  # kubectl version for Kubernetes manifest validation
+  TERRAFORM_VERSION: '1.14.6' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.35.2'  # kubectl version for Kubernetes manifest validation
 
 jobs:
   # Primary test job - runs test suites in parallel using matrix strategy
@@ -102,7 +102,7 @@ jobs:
 
       # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
@@ -202,7 +202,7 @@ jobs:
 
       # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3.1.2
+        uses: hashicorp/setup-terraform@v4.0.0
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 

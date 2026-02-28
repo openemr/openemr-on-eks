@@ -15,7 +15,8 @@
 <td>
   <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/ci-cd-tests.yml?branch=main&style=flat&label=CI%2FCD%20Tests&logo=githubactions&logoColor=white" alt="CI/CD Tests"></a>
   <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/ci-contract-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/ci-contract-tests.yml?branch=main&style=flat&label=Contract%20%26%20BATS%20Tests&logo=gnubash&logoColor=white" alt="Contract &amp; BATS Tests"></a>
-  <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/console-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/console-ci.yml?branch=main&style=flat&label=Console%20CI&logo=go&logoColor=white" alt="Console CI"></a>
+  <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/console-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/console-ci.yml?branch=main&style=flat&label=Console%20Unit%20Tests&logo=go&logoColor=white" alt="Console Unit Tests"></a>
+  <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/console-ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/console-ci.yml?branch=main&style=flat&label=Console%20Build&logo=go&logoColor=white" alt="Console Build"></a>
   <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/ci-cd-tests.yml?branch=main&style=flat&label=Warp%20Tests&logo=pytest&logoColor=white" alt="Warp Tests"></a>
   <a href="https://github.com/openemr/openemr-on-eks/actions/workflows/ci-cd-tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/openemr/openemr-on-eks/ci-cd-tests.yml?branch=main&style=flat&label=Credential%20Rotation%20Tests&logo=pytest&logoColor=white" alt="Credential Rotation Tests"></a>
 </td>
@@ -52,11 +53,20 @@
 <td>
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Terraform-1.14.5-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
+  <img src="https://img.shields.io/badge/Terraform-1.14.6-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
   <img src="https://img.shields.io/badge/EKS-Auto%20Mode-FF9900?style=flat&logo=amazoneks&logoColor=white" alt="EKS Auto Mode">
   <img src="https://img.shields.io/badge/Kubernetes-1.35-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
   <img src="https://img.shields.io/badge/Aurora-MySQL%208.0-4479A1?style=flat&logo=mysql&logoColor=white" alt="Aurora MySQL">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
+</td>
+</tr>
+<tr>
+<td><strong>Tools</strong></td>
+<td>
+  <a href="console/README.md"><img src="https://img.shields.io/badge/Console_TUI-v6.3.0-00ADD8?style=flat&logo=go&logoColor=white" alt="Console TUI"></a>
+  <a href="warp/README.md"><img src="https://img.shields.io/badge/Warp-v0.2.0-3776AB?style=flat&logo=python&logoColor=white" alt="Warp"></a>
+  <a href="tools/credential-rotation/README.md"><img src="https://img.shields.io/badge/Credential_Rotation-automated-6D4C9F?style=flat&logo=amazonaws&logoColor=white" alt="Credential Rotation"></a>
+  <a href="monitoring/README.md"><img src="https://img.shields.io/badge/Monitoring-full_stack-E6522C?style=flat&logo=prometheus&logoColor=white" alt="Monitoring"></a>
 </td>
 </tr>
 </table>
@@ -454,7 +464,7 @@ The diagram below is auto-generated from the Terraform source code using [Terrav
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.14.5)**
+#### **Terraform Installation (Required: v1.14.6)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -462,17 +472,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.14.5/
+# Visit: https://releases.hashicorp.com/terraform/1.14.6/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.14.5
-tfenv use 1.14.5
+tfenv install 1.14.6
+tfenv use 1.14.6
 
 # Verify installation
-terraform --version  # Should show v1.14.5
+terraform --version  # Should show v1.14.6
 ```
 
 #### **Other Required Tools**
@@ -567,11 +577,11 @@ brew install awscli helm jq kubectl terraform
 # install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.14.5/
+# Download from: https://releases.hashicorp.com/terraform/1.14.6/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.14.5
-# tfenv use 1.14.5
+# tfenv install 1.14.6
+# tfenv use 1.14.6
 
 # Configure AWS credentials
 aws configure
@@ -691,7 +701,7 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v82.2.0 (metrics & alerting)
+     - Prometheus v82.4.3 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v6.53.0 (log aggregation with S3 storage)
      - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)
@@ -943,7 +953,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v82.2.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v82.4.3 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response

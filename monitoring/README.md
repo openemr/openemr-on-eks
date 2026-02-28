@@ -240,7 +240,7 @@ Layer 2: Node-level (EKS Auto Mode)
 kubectl version --client # >= 1.29
 helm version             # >= 3.12
 jq --version             # >= 1.6
-terraform version        # >= 1.14.5 (for S3 bucket and IAM role setup)
+terraform version        # >= 1.14.6 (for S3 bucket and IAM role setup)
 
 # Check cluster access
 kubectl cluster-info

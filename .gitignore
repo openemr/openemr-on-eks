@@ -4,6 +4,7 @@ terraform/.terraform.lock.hcl
 terraform/terraform.tfstate
 terraform/.terraform.tfstate.lock.info
 terraform/terraform.tfstate.backup
+terraform/tfplan
 terraform.tfstate
 .idea/*
 backups/*

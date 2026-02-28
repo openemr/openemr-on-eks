@@ -44,8 +44,12 @@ Instead of remembering complex command-line arguments, you can navigate through 
 
 ## Features
 
-- **Simple Navigation**: Use arrow keys to navigate through available commands
+- **Categorized Menu**: Commands grouped into Deployment, Operations, and Information sections
+- **Simple Navigation**: Use arrow keys or vim-style j/k to navigate through available commands
 - **Clear Descriptions**: Each command includes a brief description of what it does
+- **Interactive Input Prompts**: Commands that require arguments display styled inline forms with field validation, Tab/Shift+Tab navigation, and placeholder hints
+- **Destructive Action Safety**: Confirmation prompt before irreversible operations like infrastructure destruction
+- **Status Bar**: Shows the resolved project root path and console version
 - **Integrated Execution**: Commands run directly from the console interface
 - **Error Handling**: Clear error messages when commands fail
 - **No Configuration Required**: Automatically detects project structure and script locations
@@ -93,6 +97,7 @@ go build -o openemr-eks-console main.go
 ```bash
 cd console
 make build     # Build the console
+make test      # Run unit tests with race detection and coverage
 make install   # Install to /usr/local/bin (requires sudo)
 make uninstall # Remove from /usr/local/bin (requires sudo)
 make run       # Build and run
@@ -107,22 +112,44 @@ openemr-eks-console
 
 ## Navigation
 
-- **↑/↓ Arrow Keys**: Navigate up and down through the command list
-- **Enter**: Execute the selected command
-- **Esc** or **Ctrl+C**: Quit the console
+- **↑/↓ Arrow Keys** or **k/j**: Navigate up and down through the command list
+- **g / Home**: Jump to first command
+- **G / End**: Jump to last command
+- **Enter**: Execute the selected command (opens input form if arguments are needed, or confirmation for destructive actions)
+- **?**: Toggle expanded help panel
+- **q**, **Esc**, or **Ctrl+C**: Quit the console
+
+### Input Form Controls
+
+When a command requires arguments (e.g., Restore from Backup, Search Codebase), a styled input form appears:
+
+- **Tab / ↓**: Move to next field
+- **Shift+Tab / ↑**: Move to previous field
+- **Enter**: Submit (on last field) or advance to next field
+- **Esc**: Cancel and return to menu
+- **Home / End**: Jump to start/end of text within a field
 
 ## Available Commands
 
+### Deployment
+
 1. **Validate Prerequisites** - Check required tools, AWS credentials, and deployment readiness
 2. **Quick Deploy** - Deploy infrastructure, OpenEMR, and monitoring stack in one command
-3. **Check Deployment Health** - Validate current deployment status and infrastructure health
-4. **Backup Deployment** - Create comprehensive backup of RDS, Kubernetes configs, and application data
-5. **Clean Deployment** - Remove application layer while preserving infrastructure
-6. **Destroy Infrastructure** - Completely destroy all infrastructure resources (use with caution)
-7. **Check Component Versions** - Check for available updates across all project components
-8. **Check OpenEMR Versions** - Discover available OpenEMR Docker image versions from Docker Hub
-9. **Search Codebase** - Search for terms across the entire codebase (interactive)
-10. **Deploy Training Setup** - Deploy OpenEMR with synthetic patient data for training/testing
+3. **Deploy Training Setup** - Deploy OpenEMR with synthetic patient data for training/testing
+
+### Operations
+
+4. **Check Deployment Health** - Validate current deployment status and infrastructure health
+5. **Backup Deployment** - Create comprehensive backup of RDS, Kubernetes configs, and application data
+6. **Restore from Backup** - Restore infrastructure and application data from a previous backup (prompts for bucket name and optional snapshot ID)
+7. **Clean Deployment** - Remove application layer while preserving infrastructure
+8. **⚠ Destroy Infrastructure** - Completely destroy all infrastructure resources (requires confirmation)
+
+### Information
+
+9. **Check Component Versions** - Check for available updates across all project components
+10. **Check OpenEMR Versions** - Discover available OpenEMR Docker image versions (prompts for optional search pattern)
+11. **Search Codebase** - Search for terms across the entire codebase (prompts for search term)
 
 ## Prerequisites
 
@@ -150,17 +177,18 @@ go version
 
 ```
 console/
-├── main.go   # Main console application
-├── go.mod    # Go module definition
-├── go.sum    # Go module checksums
-├── Makefile  # Build automation
-└── README.md # This file
+├── main.go      # Main console application
+├── main_test.go # Unit tests (87 tests covering navigation, rendering, input, state)
+├── go.mod       # Go module definition
+├── go.sum       # Go module checksums
+├── Makefile     # Build automation (build, test, install, clean)
+└── README.md    # This file
 ```
 
 ## Dependencies
 
-- [`github.com/charmbracelet/bubbletea v1.3.10`](https://github.com/charmbracelet/bubbletea) - TUI framework
-- [`github.com/charmbracelet/lipgloss v1.1.0`](https://github.com/charmbracelet/lipgloss) - Styling
+- [`charm.land/bubbletea/v2 v2.0.0`](https://github.com/charmbracelet/bubbletea) - TUI framework
+- [`charm.land/lipgloss/v2 v2.0.0`](https://github.com/charmbracelet/lipgloss) - Styling
 
 **Version Management**: All Go dependencies are tracked in `../versions.yaml` under the `go_packages` section for automated version checking and update notifications.
 
@@ -299,6 +327,22 @@ To add new commands to the console:
     args:        []string{"arg1", "arg2"},
 },
 ```
+
+To add a command with interactive input prompts:
+
+```go
+{
+    title:       "Your Prompted Command",
+    description: "Asks the user for input before running",
+    script:      filepath.Join(scriptsPath, "your-script.sh"),
+    prompts: []inputField{
+        {label: "Name", placeholder: "e.g. my-resource", required: true},
+        {label: "Region", placeholder: "us-east-1", required: false, flag: "region"},
+    },
+},
+```
+
+Fields with `flag` set produce `--flag value` args; fields without `flag` produce positional args. Required fields are validated before submission.
 
 3. Rebuild: `make build` or `go build -o openemr-eks-console main.go`
 

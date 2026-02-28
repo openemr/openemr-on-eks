@@ -62,7 +62,7 @@ This project supports **two authentication methods** for GitHub Actions to acces
 
 ### Prerequisites
 
-- Terraform 1.14.5 (see main README for installation)
+- Terraform 1.14.6 (see main README for installation)
 - AWS CLI 2.15+ configured with credentials
 - IAM permissions to create OIDC providers and roles
 

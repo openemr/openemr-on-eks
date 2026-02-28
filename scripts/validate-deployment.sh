@@ -544,7 +544,7 @@ provide_recommendations() {
     echo -e "   • Basic deployment: CloudWatch logs only"
     echo -e "   • Optional: Enhanced monitoring stack: cd $PROJECT_ROOT/monitoring && ./install-monitoring.sh"
     echo -e "   • Enhanced stack includes:"
-    echo -e "     - Prometheus v82.2.0 (metrics & alerting)"
+    echo -e "     - Prometheus v82.4.3 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
     echo -e "     - Loki v6.53.0 (log aggregation)"
     echo -e "     - Tempo v2.4.2 (distributed tracing with S3 storage, microservice mode)"

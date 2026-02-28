@@ -63,7 +63,7 @@ repos:
 
   # Bandit - Python Security Linter (ZERO-TOLERANCE)
   - repo: https://github.com/pycqa/bandit
-    rev: 1.9.3
+    rev: 1.9.4
     hooks:
       - id: bandit
         args: ["-r", "-ll", "-ii", "-x", "tests/,**/tests/,*_test.py,test_*.py"]
@@ -159,7 +159,7 @@ repos:
   # Commit Message Validation
   # ===========================================================================
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.8
+    rev: v4.13.9
     hooks:
       - id: commitizen
         stages: [commit-msg]

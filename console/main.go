@@ -24,8 +24,8 @@ import (
 	"runtime"
 	"strings"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // embeddedProjectRoot is set at build time using -ldflags during compilation.
@@ -40,10 +40,18 @@ import (
 // environment variable, which takes precedence over the embedded path.
 var embeddedProjectRoot string
 
+const version = "6.3.0"
+
+// category groups related commands under a visual heading in the menu.
+type category struct {
+	name     string
+	icon     string
+	commands []command
+}
+
 // TUI styling definitions using lipgloss for consistent terminal UI appearance.
-// These styles are applied globally throughout the console interface.
+// Color codes reference: https://www.ditig.com/publications/256-colors-cheat-sheet
 var (
-	// titleStyle: Bold magenta text with rounded border for the main title
 	titleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("205")).
@@ -51,71 +59,134 @@ var (
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("205"))
 
-	// itemStyle: Light gray text for unselected menu items
+	categoryStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(lipgloss.Color("99")).
+			PaddingLeft(1).
+			PaddingTop(1)
+
 	itemStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("252")).
-			PaddingLeft(2)
+			PaddingLeft(4)
 
-	// selectedStyle: Bold magenta text with dark gray background for selected menu items
 	selectedStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("205")).
 			Bold(true).
-			PaddingLeft(2).
+			PaddingLeft(4).
 			Background(lipgloss.Color("236"))
 
-	// descStyle: Dim gray italic text for command descriptions
 	descStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("243")).
-			PaddingLeft(4).
+			PaddingLeft(6).
 			Italic(true)
 
-	// scriptStyle: Very dim gray text for script path display
 	scriptStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("240")).
-			PaddingLeft(4).
+			PaddingLeft(6).
 			Faint(true)
 
-	// helpStyle: Dim gray text for help/instruction text at the bottom
 	helpStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("241")).
 			PaddingTop(1)
+
+	statusBarStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("243")).
+			Faint(true).
+			PaddingTop(1)
+
+	destructiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("196")).
+				Bold(true)
+
+	confirmBoxStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true).
+			Padding(1, 2).
+			Border(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("196"))
+
+	formBoxStyle = lipgloss.NewStyle().
+			Padding(1, 2).
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(lipgloss.Color("99"))
+
+	fieldLabelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("99")).
+			Bold(true)
+
+	fieldActiveStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("205")).
+			Bold(true)
+
+	fieldInactiveStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("252"))
+
+	placeholderStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("240")).
+			Italic(true)
+
+	fieldErrorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196")).
+			Bold(true)
+
+	requiredMarkerStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("196")).
+				Bold(true)
 )
 
+// inputField defines a single prompt shown to the user before command execution.
+type inputField struct {
+	label       string // displayed above the text field
+	placeholder string // greyed hint text when the field is empty
+	required    bool   // must be non-empty to submit
+	flag        string // if non-empty, prepend "--flag" before value; empty means positional arg
+}
+
+// inputState holds the transient state while the user fills in a form.
+type inputState struct {
+	fields    []inputField
+	values    []string // current text per field
+	active    int      // focused field index
+	cursor    int      // cursor position within the active field's text
+	attempted bool     // true after a failed submit (shows validation errors)
+}
+
 // command represents a single executable command in the console menu.
-// Each command has a display title, description, script path, and optional arguments.
 type command struct {
-	title       string   // Display name shown in the menu
-	description string   // Help text explaining what the command does
-	script      string   // Full path to the bash script to execute
-	args        []string // Command-line arguments to pass to the script
+	title       string
+	description string
+	script      string
+	args        []string
+	prompts     []inputField // if non-nil, show input form before execution
+	destructive bool         // requires confirmation before execution
 }
 
 // model represents the application state for the Bubbletea TUI framework.
-// It follows the Model-Update-View pattern where:
-//   - model holds the current state
-//   - Update() processes messages/events and returns new state
-//   - View() renders the current state to the terminal
 type model struct {
-	commands    []command // List of available commands to display
-	cursor      int       // Current cursor position in the menu (0-indexed)
-	selected    int       // Index of the command currently being executed
-	quitting    bool      // Flag indicating the user wants to exit
-	executing   bool      // Flag indicating a command is currently running
-	output      string    // Success output message from command execution
-	error       string    // Error message from command execution
-	projectRoot string    // Resolved project root directory path
+	categories  []category
+	flatIndex   []flatEntry // flattened list for cursor navigation
+	cursor      int
+	selected    int
+	quitting    bool
+	executing   bool
+	confirming  bool        // waiting for destructive-action confirmation
+	showHelp    bool        // expanded help panel
+	input       *inputState // non-nil when collecting user input
+	output      string
+	error       string
+	projectRoot string
+	cmdCount    int // total selectable commands (cached)
+}
+
+// flatEntry maps a cursor position to either a category header or a command.
+type flatEntry struct {
+	isCategory bool
+	catIdx     int
+	cmdIdx     int
 }
 
 // verifyProjectStructure validates that a directory contains all required
-// project subdirectories. This is used to confirm that a path is actually
-// the OpenEMR on EKS project root, not just any directory.
-//
-// Required directories:
-//   - scripts/: Contains deployment and management bash scripts
-//   - terraform/: Contains Terraform infrastructure definitions
-//   - k8s/: Contains Kubernetes manifests and configurations
-//
-// Returns true if all required directories exist, false otherwise.
+// project subdirectories (scripts/, terraform/, k8s/).
 func verifyProjectStructure(rootPath string) bool {
 	requiredDirs := []string{"scripts", "terraform", "k8s"}
 	for _, dir := range requiredDirs {
@@ -127,59 +198,48 @@ func verifyProjectStructure(rootPath string) bool {
 	return true
 }
 
-// convertWindowsPathToUnix converts a Windows path to Unix-style path for bash
+// convertWindowsPathToUnix converts a Windows path to Unix-style path for bash.
 // Uses Git Bash format: C:\Users\name\file.sh -> /c/Users/name/file.sh
-// Note: WSL uses /mnt/c/ format, but we'll let WSL handle conversion via wslpath if needed
 func convertWindowsPathToUnix(windowsPath string) string {
-	// Convert to absolute path first
 	absPath, err := filepath.Abs(windowsPath)
 	if err != nil {
-		// If conversion fails, just use the original path with forward slashes
 		return strings.ReplaceAll(windowsPath, "\\", "/")
 	}
-
-	// Replace backslashes with forward slashes
 	unixPath := strings.ReplaceAll(absPath, "\\", "/")
-
-	// Convert drive letter to Git Bash format (C: -> /c)
 	if len(unixPath) >= 2 && unixPath[1] == ':' {
 		drive := strings.ToLower(string(unixPath[0]))
 		unixPath = "/" + drive + unixPath[2:]
 	}
-
 	return unixPath
 }
 
+// buildFlatIndex creates a flattened navigation index from categories.
+func buildFlatIndex(cats []category) []flatEntry {
+	var entries []flatEntry
+	for ci, cat := range cats {
+		entries = append(entries, flatEntry{isCategory: true, catIdx: ci})
+		for cmi := range cat.commands {
+			entries = append(entries, flatEntry{isCategory: false, catIdx: ci, cmdIdx: cmi})
+		}
+	}
+	return entries
+}
+
 // initialModel initializes the TUI application model with project root detection
-// and command definitions. This function is called once at application startup.
+// and categorized command definitions.
 //
 // Project Root Detection Strategy (in priority order):
-//  1. OPENEMR_EKS_PROJECT_ROOT environment variable (highest priority)
-//     - Allows users to override the embedded path if the project was moved
-//     - Useful when the binary was built in one location but the project moved
+//  1. OPENEMR_EKS_PROJECT_ROOT environment variable
 //  2. Embedded project root (set at build time via -ldflags)
-//     - Automatically embedded during compilation by start_console.ps1 (Windows)
-//     - or Makefile (macOS)
-//  3. If neither is valid, the application exits with detailed error messages
-//
-// The function validates that the detected project root contains all required
-// subdirectories (scripts/, terraform/, k8s/) before proceeding.
-//
-// Returns a fully initialized model ready for the TUI, or exits the program
-// if project root cannot be determined.
+//  3. Exit with detailed error messages
 func initialModel() model {
 	var projectRoot string
 	var validationErrors []string
 
-	// Priority 1: Check environment variable (allows override if project was moved)
-	// This takes precedence over the embedded path to support relocating the project
 	if envRoot := os.Getenv("OPENEMR_EKS_PROJECT_ROOT"); envRoot != "" {
-		// Verify it has all required project directories
 		if verifyProjectStructure(envRoot) {
 			projectRoot = envRoot
 		} else {
-			// Collect missing directories for detailed error reporting
-			// This helps users understand what's wrong with their path
 			requiredDirs := []string{"scripts", "terraform", "k8s"}
 			for _, dir := range requiredDirs {
 				if _, err := os.Stat(filepath.Join(envRoot, dir)); os.IsNotExist(err) {
@@ -189,14 +249,10 @@ func initialModel() model {
 		}
 	}
 
-	// Priority 2: Use embedded path (set during build/install)
-	// Only check this if environment variable wasn't set or wasn't valid
 	if projectRoot == "" && embeddedProjectRoot != "" {
-		// Verify it has all required project directories
 		if verifyProjectStructure(embeddedProjectRoot) {
 			projectRoot = embeddedProjectRoot
 		} else {
-			// Collect missing directories for detailed error reporting
 			requiredDirs := []string{"scripts", "terraform", "k8s"}
 			for _, dir := range requiredDirs {
 				if _, err := os.Stat(filepath.Join(embeddedProjectRoot, dir)); os.IsNotExist(err) {
@@ -206,18 +262,13 @@ func initialModel() model {
 		}
 	}
 
-	// If no valid project root found, exit with detailed error messages
-	// Provide platform-specific instructions to help users resolve the issue
 	if projectRoot == "" {
 		fmt.Fprintf(os.Stderr, "❌ Error: Project root not found or invalid\n\n")
-
-		// Report embedded path status and issues
 		if embeddedProjectRoot != "" {
 			fmt.Fprintf(os.Stderr, "Embedded project root: %s\n", embeddedProjectRoot)
 			if _, err := os.Stat(embeddedProjectRoot); os.IsNotExist(err) {
 				fmt.Fprintf(os.Stderr, "  → Directory does not exist\n")
 			} else {
-				// Report all missing directories from embedded path validation
 				for _, errMsg := range validationErrors {
 					if strings.HasPrefix(errMsg, "Embedded path:") {
 						fmt.Fprintf(os.Stderr, "  → %s\n", strings.TrimPrefix(errMsg, "Embedded path: "))
@@ -227,8 +278,6 @@ func initialModel() model {
 		} else {
 			fmt.Fprintf(os.Stderr, "No embedded project root found (binary was not built with -ldflags)\n")
 		}
-
-		// Report environment variable validation errors if any
 		if len(validationErrors) > 0 {
 			for _, errMsg := range validationErrors {
 				if strings.HasPrefix(errMsg, "OPENEMR_EKS_PROJECT_ROOT:") {
@@ -236,8 +285,6 @@ func initialModel() model {
 				}
 			}
 		}
-
-		// Provide platform-specific solutions
 		fmt.Fprintf(os.Stderr, "\nRequired directories: scripts/, terraform/, k8s/\n")
 		fmt.Fprintf(os.Stderr, "\nSolutions:\n")
 		fmt.Fprintf(os.Stderr, "1. If you moved the project, set OPENEMR_EKS_PROJECT_ROOT:\n")
@@ -254,116 +301,168 @@ func initialModel() model {
 		os.Exit(1)
 	}
 
-	// Build the path to the scripts directory for command definitions
 	scriptsPath := filepath.Join(projectRoot, "scripts")
 
-	// Initialize and return the model with all available commands
-	// Each command represents a script that can be executed from the TUI menu
-	return model{
-		projectRoot: projectRoot,
-		commands: []command{
-			{
-				title:       "Validate Prerequisites",
-				description: "Check required tools, AWS credentials, and deployment readiness",
-				script:      filepath.Join(scriptsPath, "validate-deployment.sh"),
-				args:        []string{},
+	categories := []category{
+		{
+			name: "Deployment",
+			icon: "🚀",
+			commands: []command{
+				{
+					title:       "Validate Prerequisites",
+					description: "Check required tools, AWS credentials, and deployment readiness",
+					script:      filepath.Join(scriptsPath, "validate-deployment.sh"),
+				},
+				{
+					title:       "Quick Deploy",
+					description: "Deploy infrastructure, OpenEMR, and monitoring stack in one command",
+					script:      filepath.Join(scriptsPath, "quick-deploy.sh"),
+				},
+				{
+					title:       "Deploy Training Setup",
+					description: "Deploy OpenEMR with synthetic patient data for training/testing",
+					script:      filepath.Join(scriptsPath, "deploy-training-openemr-setup.sh"),
+					args:        []string{"--use-default-dataset", "--max-records", "100"},
+				},
 			},
+		},
+		{
+			name: "Operations",
+			icon: "⚙️",
+			commands: []command{
+				{
+					title:       "Check Deployment Health",
+					description: "Validate current deployment status and infrastructure health",
+					script:      filepath.Join(scriptsPath, "validate-deployment.sh"),
+				},
+				{
+					title:       "Backup Deployment",
+					description: "Create comprehensive backup of RDS, Kubernetes configs, and application data",
+					script:      filepath.Join(scriptsPath, "backup.sh"),
+				},
 			{
-				title:       "Quick Deploy",
-				description: "Deploy infrastructure, OpenEMR, and monitoring stack in one command",
-				script:      filepath.Join(scriptsPath, "quick-deploy.sh"),
-				args:        []string{},
+				title:       "Restore from Backup",
+				description: "Restore infrastructure and application data from a previous backup",
+				script:      filepath.Join(scriptsPath, "restore.sh"),
+				prompts: []inputField{
+					{label: "Backup Bucket", placeholder: "my-openemr-backup-bucket", required: true},
+					{label: "Snapshot ID", placeholder: "openemr-snapshot-20260227 or leave empty for --latest-snapshot", required: false},
+				},
 			},
-			{
-				title:       "Check Deployment Health",
-				description: "Validate current deployment status and infrastructure health",
-				script:      filepath.Join(scriptsPath, "validate-deployment.sh"),
-				args:        []string{},
+				{
+					title:       "Clean Deployment",
+					description: "Remove application layer while preserving infrastructure",
+					script:      filepath.Join(scriptsPath, "clean-deployment.sh"),
+				},
+				{
+					title:       "Destroy Infrastructure",
+					description: "Completely destroy all infrastructure resources",
+					script:      filepath.Join(scriptsPath, "destroy.sh"),
+					destructive: true,
+				},
 			},
-			{
-				title:       "Backup Deployment",
-				description: "Create comprehensive backup of RDS, Kubernetes configs, and application data",
-				script:      filepath.Join(scriptsPath, "backup.sh"),
-				args:        []string{},
-			},
-			{
-				title:       "Clean Deployment",
-				description: "Remove application layer while preserving infrastructure",
-				script:      filepath.Join(scriptsPath, "clean-deployment.sh"),
-				args:        []string{},
-			},
-			{
-				title:       "Destroy Infrastructure",
-				description: "Completely destroy all infrastructure resources (use with caution)",
-				script:      filepath.Join(scriptsPath, "destroy.sh"),
-				args:        []string{},
-			},
-			{
-				title:       "Check Component Versions",
-				description: "Check for available updates across all project components",
-				script:      filepath.Join(scriptsPath, "version-manager.sh"),
-				args:        []string{"check"},
-			},
+		},
+		{
+			name: "Information",
+			icon: "📋",
+			commands: []command{
+				{
+					title:       "Check Component Versions",
+					description: "Check for available updates across all project components",
+					script:      filepath.Join(scriptsPath, "version-manager.sh"),
+					args:        []string{"check"},
+				},
 			{
 				title:       "Check OpenEMR Versions",
 				description: "Discover available OpenEMR Docker image versions from Docker Hub",
 				script:      filepath.Join(scriptsPath, "check-openemr-versions.sh"),
-				args:        []string{},
+				prompts: []inputField{
+					{label: "Search Pattern", placeholder: "e.g. 7.0 or 8.0 (leave empty to show latest)", required: false, flag: "search"},
+				},
 			},
 			{
 				title:       "Search Codebase",
-				description: "Search for terms across the entire codebase (interactive)",
+				description: "Search for terms across the entire codebase",
 				script:      filepath.Join(scriptsPath, "search-codebase.sh"),
-				args:        []string{},
+				prompts: []inputField{
+					{label: "Search Term", placeholder: "e.g. OPENEMR_VERSION, backup, deploy", required: true},
+				},
 			},
-			{
-				title:       "Deploy Training Setup",
-				description: "Deploy OpenEMR with synthetic patient data for training/testing",
-				script:      filepath.Join(scriptsPath, "deploy-training-openemr-setup.sh"),
-				args:        []string{"--use-default-dataset", "--max-records", "100"},
 			},
 		},
+	}
+
+	flat := buildFlatIndex(categories)
+	startCursor := 0
+	cmdTotal := 0
+	for i, e := range flat {
+		if !e.isCategory {
+			if startCursor == 0 {
+				startCursor = i
+			}
+			cmdTotal++
+		}
+	}
+
+	return model{
+		categories:  categories,
+		flatIndex:   flat,
+		cursor:      startCursor,
+		projectRoot: projectRoot,
+		cmdCount:    cmdTotal,
 	}
 }
 
 // Init is called by Bubbletea when the program starts.
-// We don't need any initial commands, so we return nil.
 func (m model) Init() tea.Cmd {
 	return nil
 }
 
-// Update processes messages/events and updates the model state accordingly.
-// This is the core of the Bubbletea Model-Update-View pattern.
-//
-// Message handling order:
-//  1. Command execution results (outputMsg, errorMsg) - handled first
-//  2. User input during command execution (only quit keys allowed)
-//  3. User input in menu mode (navigation and selection)
-//
-// Returns the updated model and any commands to run (for async operations).
+// Update processes messages/events and updates the model state.
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	// Handle command execution results first (these come from async operations)
 	switch msg := msg.(type) {
 	case outputMsg:
 		m.output = string(msg)
 		m.executing = false
-		// Force a refresh by returning a command that does nothing
-		// This ensures the View() function is called to display the result
-		return m, tea.Batch()
+		return m, nil
 	case errorMsg:
 		m.error = string(msg)
 		m.executing = false
-		// Force a refresh to display the error message
-		return m, tea.Batch()
+		return m, nil
 	}
 
-	// If a command is currently executing, only allow quit operations
-	// This prevents users from navigating away while a command is running
+	// Input form for commands that require arguments
+	if m.input != nil {
+		if msg, ok := msg.(tea.KeyPressMsg); ok {
+			return m.updateInput(msg)
+		}
+		return m, nil
+	}
+
+	// Confirmation dialog for destructive actions
+	if m.confirming {
+		if msg, ok := msg.(tea.KeyPressMsg); ok {
+			switch msg.String() {
+			case "y", "Y":
+				m.confirming = false
+				m.executing = true
+				m.output = ""
+				m.error = ""
+				entry := m.flatIndex[m.cursor]
+				cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+				return m, m.executeCommand(cmd)
+			default:
+				m.confirming = false
+				return m, nil
+			}
+		}
+		return m, nil
+	}
+
 	if m.executing {
-		switch msg := msg.(type) {
-		case tea.KeyMsg:
-			// Allow user to cancel/return from execution view
-			if msg.Type == tea.KeyCtrlC || msg.Type == tea.KeyEsc || msg.Type == tea.KeyEnter {
+		if msg, ok := msg.(tea.KeyPressMsg); ok {
+			switch msg.String() {
+			case "ctrl+c", "esc", "enter":
 				m.executing = false
 				m.output = ""
 				m.error = ""
@@ -373,66 +472,275 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle user input in menu mode
-	switch msg := msg.(type) {
-	case tea.KeyMsg:
-		switch msg.Type {
-		case tea.KeyCtrlC, tea.KeyEsc:
-			// Quit the application
+	if msg, ok := msg.(tea.KeyPressMsg); ok {
+		switch msg.String() {
+		case "ctrl+c", "q":
+			m.quitting = true
+			return m, tea.Quit
+		case "esc":
+			if m.showHelp {
+				m.showHelp = false
+				return m, nil
+			}
 			m.quitting = true
 			return m, tea.Quit
 
-		case tea.KeyUp:
-			// Navigate up in the menu (with wrap-around)
-			if m.cursor > 0 {
-				m.cursor--
-			} else {
-				m.cursor = len(m.commands) - 1
-			}
+		case "?":
+			m.showHelp = !m.showHelp
+			return m, nil
 
-		case tea.KeyDown:
-			// Navigate down in the menu (with wrap-around)
-			if m.cursor < len(m.commands)-1 {
-				m.cursor++
-			} else {
-				m.cursor = 0
-			}
+		case "up", "k":
+			m.moveCursor(-1)
+		case "down", "j":
+			m.moveCursor(1)
+		case "g", "home":
+			m.jumpTo(true)
+		case "G", "end":
+			m.jumpTo(false)
 
-		case tea.KeyEnter:
-			// Execute the selected command
+		case "enter":
+			entry := m.flatIndex[m.cursor]
+			if entry.isCategory {
+				m.moveCursor(1)
+				return m, nil
+			}
+			cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+			if len(cmd.prompts) > 0 {
+				m.input = newInputState(cmd.prompts)
+				return m, nil
+			}
+			if cmd.destructive {
+				m.confirming = true
+				return m, nil
+			}
 			m.selected = m.cursor
 			m.executing = true
 			m.output = ""
 			m.error = ""
-			// executeCommand returns a tea.Cmd that will send a message when done
-			return m, m.executeCommand(m.commands[m.cursor])
+			return m, m.executeCommand(cmd)
 		}
 	}
 
 	return m, nil
 }
 
+// moveCursor advances the cursor by delta, skipping category headers.
+func (m *model) moveCursor(delta int) {
+	n := len(m.flatIndex)
+	next := m.cursor
+	for {
+		next = (next + delta + n) % n
+		if !m.flatIndex[next].isCategory {
+			break
+		}
+		if next == m.cursor {
+			break
+		}
+	}
+	m.cursor = next
+}
+
+// jumpTo moves the cursor to the first or last selectable command.
+func (m *model) jumpTo(first bool) {
+	if first {
+		for i, e := range m.flatIndex {
+			if !e.isCategory {
+				m.cursor = i
+				return
+			}
+		}
+	} else {
+		for i := len(m.flatIndex) - 1; i >= 0; i-- {
+			if !m.flatIndex[i].isCategory {
+				m.cursor = i
+				return
+			}
+		}
+	}
+}
+
+// commandPosition returns the 1-based position of the current cursor
+// among selectable commands (e.g., "3" out of total).
+func (m model) commandPosition() int {
+	pos := 0
+	for i, e := range m.flatIndex {
+		if !e.isCategory {
+			pos++
+		}
+		if i == m.cursor {
+			return pos
+		}
+	}
+	return pos
+}
+
+// newInputState creates a fresh input form from field definitions.
+func newInputState(fields []inputField) *inputState {
+	return &inputState{
+		fields: fields,
+		values: make([]string, len(fields)),
+	}
+}
+
+// updateInput handles key events while the input form is active.
+func (m model) updateInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	inp := m.input
+	key := msg.String()
+
+	switch key {
+	case "esc":
+		m.input = nil
+		return m, nil
+
+	case "ctrl+c":
+		m.quitting = true
+		return m, tea.Quit
+
+	case "tab", "down":
+		inp.active = (inp.active + 1) % len(inp.fields)
+		inp.cursor = len(inp.values[inp.active])
+		return m, nil
+
+	case "shift+tab", "up":
+		inp.active = (inp.active - 1 + len(inp.fields)) % len(inp.fields)
+		inp.cursor = len(inp.values[inp.active])
+		return m, nil
+
+	case "enter":
+		if inp.active < len(inp.fields)-1 {
+			inp.active++
+			inp.cursor = len(inp.values[inp.active])
+			return m, nil
+		}
+		return m.submitInput()
+
+	case "left":
+		if inp.cursor > 0 {
+			inp.cursor--
+		}
+		return m, nil
+
+	case "right":
+		if inp.cursor < len(inp.values[inp.active]) {
+			inp.cursor++
+		}
+		return m, nil
+
+	case "home":
+		inp.cursor = 0
+		return m, nil
+
+	case "end":
+		inp.cursor = len(inp.values[inp.active])
+		return m, nil
+
+	case "backspace":
+		v := inp.values[inp.active]
+		if inp.cursor > 0 {
+			inp.values[inp.active] = v[:inp.cursor-1] + v[inp.cursor:]
+			inp.cursor--
+		}
+		return m, nil
+
+	case "delete":
+		v := inp.values[inp.active]
+		if inp.cursor < len(v) {
+			inp.values[inp.active] = v[:inp.cursor] + v[inp.cursor+1:]
+		}
+		return m, nil
+
+	default:
+		if msg.Text != "" && !msg.Mod.Contains(tea.ModCtrl) && !msg.Mod.Contains(tea.ModAlt) {
+			v := inp.values[inp.active]
+			inp.values[inp.active] = v[:inp.cursor] + msg.Text + v[inp.cursor:]
+			inp.cursor += len(msg.Text)
+		}
+		return m, nil
+	}
+}
+
+// submitInput validates required fields and, if valid, builds args and executes.
+func (m model) submitInput() (tea.Model, tea.Cmd) {
+	inp := m.input
+
+	for _, f := range inp.fields {
+		if f.required && strings.TrimSpace(inp.values[fieldIndex(inp.fields, f)]) == "" {
+			inp.attempted = true
+			return m, nil
+		}
+	}
+
+	entry := m.flatIndex[m.cursor]
+	cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+
+	built := buildArgsFromInput(cmd, inp)
+	execCmd := command{
+		title:       cmd.title,
+		description: cmd.description,
+		script:      cmd.script,
+		args:        built,
+		destructive: cmd.destructive,
+	}
+
+	m.input = nil
+
+	if cmd.destructive {
+		m.confirming = true
+		return m, nil
+	}
+
+	m.selected = m.cursor
+	m.executing = true
+	m.output = ""
+	m.error = ""
+	return m, m.executeCommand(execCmd)
+}
+
+// buildArgsFromInput assembles command-line arguments from user input.
+// For restore.sh: if snapshot ID is empty, append --latest-snapshot instead.
+func buildArgsFromInput(cmd command, inp *inputState) []string {
+	var args []string
+	args = append(args, cmd.args...)
+
+	isRestore := strings.HasSuffix(cmd.script, "restore.sh")
+	hasSnapshotValue := false
+
+	for i, f := range inp.fields {
+		val := strings.TrimSpace(inp.values[i])
+		if val == "" {
+			continue
+		}
+		if f.flag != "" {
+			args = append(args, "--"+f.flag, val)
+		} else {
+			args = append(args, val)
+			if isRestore && i == 1 {
+				hasSnapshotValue = true
+			}
+		}
+	}
+
+	if isRestore && !hasSnapshotValue {
+		args = append(args, "--latest-snapshot")
+	}
+
+	return args
+}
+
+// fieldIndex returns the index of a field within the fields slice.
+func fieldIndex(fields []inputField, target inputField) int {
+	for i, f := range fields {
+		if f.label == target.label {
+			return i
+		}
+	}
+	return 0
+}
+
 // executeCommand launches a bash script in a new terminal window.
-// The implementation differs significantly between platforms:
-//
-// macOS:
-//   - Uses osascript to open a new Terminal.app window
-//   - Executes the bash script directly in the terminal
-//
-// Windows:
-//   - Uses PowerShell Start-Process to open a new PowerShell window
-//   - Generates a temporary PowerShell script that:
-//     1. Detects available bash (Git Bash, WSL, or system bash)
-//     2. Converts Windows paths to appropriate format for the detected bash
-//     3. Executes the bash script with proper error handling
-//     4. Keeps the window open even on errors for debugging
-//
-// The function returns a tea.Cmd that will send an outputMsg or errorMsg
-// when the command execution is initiated (not when it completes, since
-// execution happens in a separate terminal window).
+// macOS uses osascript; Windows uses PowerShell Start-Process.
 func (m model) executeCommand(cmd command) tea.Cmd {
 	return func() tea.Msg {
-		// Validate that the script file exists before attempting execution
 		if _, err := os.Stat(cmd.script); os.IsNotExist(err) {
 			msg := fmt.Sprintf("Script not found: %s\n\n", cmd.script)
 			if embeddedProjectRoot != "" {
@@ -446,71 +754,30 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			return errorMsg(msg)
 		}
 
-		// Ensure the script has execute permissions (important for Unix-like systems)
-		// On Windows, this is a no-op but doesn't hurt
-		// #nosec G302 -- Script must be executable to run; this is intentional behavior
+		// #nosec G302 -- Script must be executable to run
 		os.Chmod(cmd.script, 0755)
 
-		// Prepare script path, arguments, and working directory
 		scriptPath := cmd.script
 		scriptArgs := strings.Join(cmd.args, " ")
 		workingDir := filepath.Dir(cmd.script)
 
-		// Platform-specific execution: open command in a new terminal window
 		if runtime.GOOS == "darwin" {
-			// macOS: Use osascript to open a new Terminal.app window
-			// osascript allows us to programmatically control Terminal.app
-			// and execute commands in new windows.
-			//
-			// We escape single quotes by replacing them with: '"\''"'
-			// This is the standard shell escaping technique for single quotes
 			escapedScriptPath := strings.ReplaceAll(scriptPath, "'", "'\"'\"'")
 			escapedArgs := strings.ReplaceAll(scriptArgs, "'", "'\"'\"'")
 			escapedWorkingDir := strings.ReplaceAll(workingDir, "'", "'\"'\"'")
-
-			// Build the command string that will be executed in the new terminal
-			// The command changes directory, runs the script, then waits for user input
 			command := fmt.Sprintf("cd '%s' && '%s' %s; echo ''; echo 'Press any key and then return to go back to the command line'; read -n 1", escapedWorkingDir, escapedScriptPath, escapedArgs)
-
-			// Use osascript to tell Terminal.app to execute the command in a new window
-			// #nosec G204 -- Command constructed from internal script paths, not user input
+			// #nosec G204 -- Command constructed from internal script paths
 			execCmd := exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "%s"`, command))
-
-			// Execute the command to open terminal
 			if err := execCmd.Run(); err != nil {
 				return errorMsg(fmt.Sprintf("Failed to open terminal window: %s", err.Error()))
 			}
 		} else if runtime.GOOS == "windows" {
-			// Windows: Use PowerShell Start-Process to open a new PowerShell window
-			//
-			// Windows execution is complex because:
-			// 1. We need to detect which bash is available (Git Bash, WSL, or system bash)
-			// 2. Each bash variant requires different path formats:
-			//    - Git Bash: /c/Users/... (Unix-style with drive letter conversion)
-			//    - WSL: /mnt/c/Users/... (uses wslpath for conversion)
-			//    - System bash: Depends on installation, usually Unix-style
-			// 3. PowerShell commands (like Set-Location) need Windows paths
-			// 4. We generate a temporary PowerShell script to avoid complex escaping issues
-			//
-			// Path conversion strategy:
-			// - Convert to Unix-style for Git Bash and system bash
-			// - Keep Windows-style for WSL (WSL will convert via wslpath)
-			// - Keep original Windows path for PowerShell Set-Location cmdlet
-
-			// Convert Windows paths to Unix-style paths for Git Bash
 			scriptPathUnix := convertWindowsPathToUnix(scriptPath)
 			workingDirUnix := convertWindowsPathToUnix(workingDir)
-
-			// Keep Windows paths with forward slashes for WSL (WSL prefers / over \)
 			scriptPathWin := strings.ReplaceAll(scriptPath, "\\", "/")
 			workingDirWin := strings.ReplaceAll(workingDir, "\\", "/")
-
-			// Keep the original Windows path with backslashes for PowerShell Set-Location
-			// PowerShell's Set-Location cmdlet expects Windows paths, not Unix-style paths
 			workingDirWinPS := workingDir
 
-			// Escape single quotes for PowerShell (PowerShell uses '' to escape single quotes)
-			// This is different from bash which uses '\'' for escaping
 			escapedScriptPathUnix := strings.ReplaceAll(scriptPathUnix, "'", "''")
 			escapedScriptPathWin := strings.ReplaceAll(scriptPathWin, "'", "''")
 			escapedArgs := strings.ReplaceAll(scriptArgs, "'", "''")
@@ -518,61 +785,26 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			escapedWorkingDirWin := strings.ReplaceAll(workingDirWin, "'", "''")
 			escapedWorkingDirWinPS := strings.ReplaceAll(workingDirWinPS, "'", "''")
 
-			// Build PowerShell script that will be written to a temporary file
-			// We use bytes.Buffer instead of string concatenation for:
-			// 1. Better performance with many string operations
-			// 2. Explicit control over newlines (\r\n for Windows)
-			// 3. Cleaner code structure
-			//
-			// The script structure:
-			// 1. Set error handling and window title
-			// 2. Display header information
-			// 3. Try block: Detect bash and execute script
-			// 4. Catch block: Display detailed error information
-			// 5. Finally block: Keep window open for user to read output
 			var scriptBuf bytes.Buffer
-
-			// Set error handling: Continue on errors so we can catch and display them
 			scriptBuf.WriteString("$ErrorActionPreference = 'Continue'\r\n")
-
-			// Set window title for easy identification
 			scriptBuf.WriteString("$Host.UI.RawUI.WindowTitle = 'OpenEMR EKS Console - Script Execution'\r\n")
-
-			// Display header with colored output
 			scriptBuf.WriteString("Write-Host 'OpenEMR EKS Console - Script Execution' -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("Write-Host '========================================' -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("Write-Host ''\r\n")
-
-			// Begin try-catch-finally block for error handling
 			scriptBuf.WriteString("try {\r\n")
-			// Set up path variables that will be used by the bash detection logic
 			scriptBuf.WriteString(fmt.Sprintf("  $workingDirUnix = '%s'\r\n", escapedWorkingDirUnix))
 			scriptBuf.WriteString(fmt.Sprintf("  $scriptPathUnix = '%s'\r\n", escapedScriptPathUnix))
 			scriptBuf.WriteString(fmt.Sprintf("  $scriptArgs = '%s'\r\n", escapedArgs))
-
-			// Initialize variables that will be set during bash detection
 			scriptBuf.WriteString("  $bashCmd = $null\r\n")
 			scriptBuf.WriteString("  $finalScriptPath = $null\r\n")
 			scriptBuf.WriteString("  $finalWorkingDir = $null\r\n")
 			scriptBuf.WriteString("  $finalWorkingDirPS = $null\r\n")
-
 			scriptBuf.WriteString("  Write-Host 'Looking for bash...' -ForegroundColor Cyan\r\n")
-
-			// Bash detection strategy (in priority order):
-			// 1. Git Bash - Most common on Windows, uses /c/ path format
-			// 2. WSL - Windows Subsystem for Linux, uses /mnt/c/ path format
-			// 3. System bash - Any bash in PATH (less common)
-			//
-			// We try Git Bash first because it's the most common installation
-			scriptBuf.WriteString("  # Try Git Bash first\r\n")
-			// Common Git Bash installation paths (check all to handle different install locations)
 			scriptBuf.WriteString("  $gitBashPaths = @('C:\\Program Files\\Git\\bin\\bash.exe', 'C:\\Program Files (x86)\\Git\\bin\\bash.exe', \"$env:LOCALAPPDATA\\Programs\\Git\\bin\\bash.exe\")\r\n")
-			// Check each Git Bash path until we find one that exists
 			scriptBuf.WriteString("  Write-Host 'Checking Git Bash locations...' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("  foreach ($path in $gitBashPaths) {\r\n")
 			scriptBuf.WriteString("    Write-Host \"  Checking: $path\" -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    if (Test-Path $path) {\r\n")
-			// Git Bash found: use Unix-style paths (already converted)
 			scriptBuf.WriteString("      $bashCmd = $path\r\n")
 			scriptBuf.WriteString(fmt.Sprintf("      $finalScriptPath = '%s'\r\n", escapedScriptPathUnix))
 			scriptBuf.WriteString(fmt.Sprintf("      $finalWorkingDir = '%s'\r\n", escapedWorkingDirUnix))
@@ -581,24 +813,16 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      break\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  }\r\n")
-
-			// If Git Bash not found, try WSL (Windows Subsystem for Linux)
-			// WSL requires different path handling: we use wslpath to convert Windows paths
-			scriptBuf.WriteString("  # Try WSL bash\r\n")
 			scriptBuf.WriteString("  if (-not $bashCmd) {\r\n")
 			scriptBuf.WriteString("    Write-Host 'Checking for WSL...' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    $wslCmd = Get-Command wsl -ErrorAction SilentlyContinue\r\n")
 			scriptBuf.WriteString("    if ($wslCmd) {\r\n")
 			scriptBuf.WriteString("      Write-Host 'WSL found, converting paths...' -ForegroundColor Cyan\r\n")
-			// WSL path conversion: use Windows paths (with forward slashes) and let wslpath convert them
 			scriptBuf.WriteString(fmt.Sprintf("      $scriptPathWin = '%s'\r\n", escapedScriptPathWin))
 			scriptBuf.WriteString(fmt.Sprintf("      $workingDirWin = '%s'\r\n", escapedWorkingDirWin))
-			// Use wslpath -a to convert Windows absolute path to WSL path format
-			// This handles the /mnt/c/ conversion automatically
 			scriptBuf.WriteString("      $wslScriptPath = (wsl wslpath -a $scriptPathWin 2>$null).Trim()\r\n")
 			scriptBuf.WriteString("      $wslWorkingDir = (wsl wslpath -a $workingDirWin 2>$null).Trim()\r\n")
 			scriptBuf.WriteString("      if ($wslScriptPath -and $wslWorkingDir) {\r\n")
-			// WSL found and paths converted successfully
 			scriptBuf.WriteString("        $bashCmd = 'wsl'\r\n")
 			scriptBuf.WriteString("        $finalScriptPath = $wslScriptPath\r\n")
 			scriptBuf.WriteString("        $finalWorkingDir = $wslWorkingDir\r\n")
@@ -611,15 +835,10 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host 'WSL not found' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  }\r\n")
-
-			// Last resort: check for any bash in the system PATH
-			// This is less common but some users may have bash installed elsewhere
-			scriptBuf.WriteString("  # Try system bash\r\n")
 			scriptBuf.WriteString("  if (-not $bashCmd) {\r\n")
 			scriptBuf.WriteString("    Write-Host 'Checking for system bash in PATH...' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    $sysBash = Get-Command bash -ErrorAction SilentlyContinue\r\n")
 			scriptBuf.WriteString("    if ($sysBash) {\r\n")
-			// System bash found: assume it uses Unix-style paths (like Git Bash)
 			scriptBuf.WriteString("      $bashCmd = 'bash'\r\n")
 			scriptBuf.WriteString(fmt.Sprintf("      $finalScriptPath = '%s'\r\n", escapedScriptPathUnix))
 			scriptBuf.WriteString(fmt.Sprintf("      $finalWorkingDir = '%s'\r\n", escapedWorkingDirUnix))
@@ -629,28 +848,16 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host 'System bash not found in PATH' -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  }\r\n")
-			// Execute the script if bash was found
 			scriptBuf.WriteString("  if ($bashCmd) {\r\n")
 			scriptBuf.WriteString("    try {\r\n")
-			// Set-Location requires Windows paths (with backslashes), not Unix-style paths
-			// This is why we maintain $finalWorkingDirPS separately
-			scriptBuf.WriteString("      # Use Windows path for PowerShell Set-Location\r\n")
 			scriptBuf.WriteString("      Set-Location $finalWorkingDirPS\r\n")
 			scriptBuf.WriteString("      Write-Host \"Working directory: $finalWorkingDir\" -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("      Write-Host \"Executing: $finalScriptPath $scriptArgs\" -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("      Write-Host ''\r\n")
-
-			// WSL requires special handling: we need to pass the entire command as a string
-			// to bash -c, with proper escaping of quotes within the command
 			scriptBuf.WriteString("      if ($bashCmd -eq 'wsl') {\r\n")
-			scriptBuf.WriteString("        # For WSL, properly escape the command\r\n")
-			scriptBuf.WriteString("        # Use backticks (`) to escape quotes within the double-quoted string\r\n")
 			scriptBuf.WriteString("        $escapedCmd = \"cd `\"$finalWorkingDir`\" && bash `\"$finalScriptPath`\" $scriptArgs\"\r\n")
 			scriptBuf.WriteString("        wsl bash -c $escapedCmd\r\n")
 			scriptBuf.WriteString("      } else {\r\n")
-			// Git Bash and system bash can accept the script path and arguments separately
-			// This is simpler and avoids complex escaping issues
-			scriptBuf.WriteString("        # For Git Bash or system bash, pass script path and args separately\r\n")
 			scriptBuf.WriteString("        if ($scriptArgs) {\r\n")
 			scriptBuf.WriteString("          $argArray = $scriptArgs -split ' '\r\n")
 			scriptBuf.WriteString("          & $bashCmd $finalScriptPath $argArray\r\n")
@@ -658,17 +865,11 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("          & $bashCmd $finalScriptPath\r\n")
 			scriptBuf.WriteString("        }\r\n")
 			scriptBuf.WriteString("      }\r\n")
-
-			// Check exit code and display warning if script failed
-			// Note: We don't treat non-zero exit codes as errors here because
-			// the script itself may have valid reasons to exit with non-zero (e.g., validation failures)
 			scriptBuf.WriteString("      if ($LASTEXITCODE -ne 0) {\r\n")
 			scriptBuf.WriteString("        Write-Host ''\r\n")
 			scriptBuf.WriteString("        Write-Host \"Script exited with code $LASTEXITCODE\" -ForegroundColor Yellow\r\n")
 			scriptBuf.WriteString("      }\r\n")
 			scriptBuf.WriteString("    } catch {\r\n")
-			// Catch block: Display detailed error information for debugging
-			// This helps users understand what went wrong
 			scriptBuf.WriteString("      Write-Host ''\r\n")
 			scriptBuf.WriteString("      Write-Host \"Error executing script: $_\" -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("      Write-Host \"Bash command: $bashCmd\" -ForegroundColor Red\r\n")
@@ -677,83 +878,49 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host \"Script args: $scriptArgs\" -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  } else {\r\n")
-			// No bash found: provide helpful installation instructions
 			scriptBuf.WriteString("    Write-Host 'Error: bash not found.' -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("    Write-Host ''\r\n")
 			scriptBuf.WriteString("    Write-Host 'Please install one of the following:' -ForegroundColor Yellow\r\n")
 			scriptBuf.WriteString("    Write-Host '  1. Git Bash: https://git-scm.com/download/win' -ForegroundColor Yellow\r\n")
 			scriptBuf.WriteString("    Write-Host '  2. WSL (Windows Subsystem for Linux)' -ForegroundColor Yellow\r\n")
 			scriptBuf.WriteString("  }\r\n")
-			// Outer catch block: Handle any unexpected errors in the PowerShell script itself
 			scriptBuf.WriteString("} catch {\r\n")
 			scriptBuf.WriteString("  Write-Host ''\r\n")
 			scriptBuf.WriteString("  Write-Host 'Unexpected error occurred:' -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("  Write-Host $_.Exception.Message -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("  Write-Host $_.ScriptStackTrace -ForegroundColor Gray\r\n")
 			scriptBuf.WriteString("} finally {\r\n")
-			// Finally block: Always keep the window open so users can read output/errors
-			// This is critical for debugging - we want to see what happened even if there's an error
 			scriptBuf.WriteString("  Write-Host ''\r\n")
 			scriptBuf.WriteString("  Write-Host 'Press any key to close this window...' -ForegroundColor Yellow\r\n")
 			scriptBuf.WriteString("  try {\r\n")
-			// ReadKey waits for user input before closing
 			scriptBuf.WriteString("    $null = $Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')\r\n")
 			scriptBuf.WriteString("  } catch {\r\n")
-			// Fallback: If ReadKey fails (e.g., in some terminal environments), wait 5 seconds
-			// This gives users time to read the output before the window closes
-			scriptBuf.WriteString("    # If ReadKey fails, wait a bit then exit\r\n")
 			scriptBuf.WriteString("    Start-Sleep -Seconds 5\r\n")
 			scriptBuf.WriteString("  }\r\n")
 			scriptBuf.WriteString("}\r\n")
 			powershellScript := scriptBuf.String()
 
-			// Create a temporary PowerShell script file to avoid complex escaping issues
-			// Why use a temp file instead of inline execution?
-			// 1. Avoids PowerShell's complex quote escaping rules
-			// 2. More reliable than base64 encoding (which has encoding issues)
-			// 3. Easier to debug (users can inspect the generated script)
-			// 4. Handles multi-line scripts cleanly
 			tmpScript, err := os.CreateTemp("", "openemr-console-*.ps1")
 			if err != nil {
 				return errorMsg(fmt.Sprintf("Failed to create temporary script: %s", err.Error()))
 			}
-			// Note: We intentionally don't delete the temp file immediately
-			// The file will be cleaned up by Windows temp file cleanup (typically on reboot)
-			// This is acceptable because:
-			// 1. Temp files are small (a few KB)
-			// 2. Windows handles cleanup automatically
-			// 3. Immediate deletion could cause issues if PowerShell is still reading it
-
-			// Write UTF-8 BOM (Byte Order Mark) for PowerShell compatibility
-			// PowerShell requires BOM to properly detect UTF-8 encoding
-			// Without BOM, PowerShell may misinterpret special characters
 			bom := []byte{0xEF, 0xBB, 0xBF}
 			if _, err := tmpScript.Write(bom); err != nil {
 				tmpScript.Close()
 				return errorMsg(fmt.Sprintf("Failed to write BOM: %s", err.Error()))
 			}
-			// Write the actual script content
 			if _, err := tmpScript.WriteString(powershellScript); err != nil {
 				tmpScript.Close()
 				return errorMsg(fmt.Sprintf("Failed to write temporary script: %s", err.Error()))
 			}
 			tmpScript.Close()
 
-			// Launch PowerShell in a new window with the temporary script
-			// Arguments:
-			//   -NoExit: Keep the window open after script execution (handled by our script's ReadKey)
-			//   -ExecutionPolicy Bypass: Skip execution policy checks (needed for temp scripts)
-			//   -File: Execute the script file
-			scriptPath := strings.ReplaceAll(tmpScript.Name(), "'", "''")
+			tmpPath := strings.ReplaceAll(tmpScript.Name(), "'", "''")
 			startProcessCmd := fmt.Sprintf(
 				"Start-Process powershell -ArgumentList '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', '%s'",
-				scriptPath)
-
-			// #nosec G204 -- Command constructed from internal script paths, not user input
+				tmpPath)
+			// #nosec G204 -- Command constructed from internal script paths
 			execCmd := exec.Command("powershell", "-Command", startProcessCmd)
-
-			// Execute the command to open PowerShell window
-			// This returns immediately - the actual script execution happens in the new window
 			if err := execCmd.Run(); err != nil {
 				return errorMsg(fmt.Sprintf("Failed to open PowerShell window: %s", err.Error()))
 			}
@@ -761,128 +928,207 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			return errorMsg(fmt.Sprintf("Terminal execution is currently only supported on macOS and Windows. Detected OS: %s", runtime.GOOS))
 		}
 
-		// Return success message
 		return outputMsg(fmt.Sprintf("✅ Command opened in new terminal window\n\nScript: %s\nWorking directory: %s\n\nCheck the terminal window for output.", scriptPath, workingDir))
 	}
 }
 
-// outputMsg and errorMsg are message types used by Bubbletea to communicate
-// command execution results from async operations back to the Update function.
 type outputMsg string
 type errorMsg string
 
 // View renders the current state of the TUI to the terminal.
-// This function is called by Bubbletea whenever the model state changes.
-//
-// The view has three modes:
-//  1. Quitting: Simple goodbye message
-//  2. Executing: Shows command execution status with output/error messages
-//  3. Menu: Displays the interactive command menu with navigation
-//
-// Returns the formatted string that will be displayed in the terminal.
-func (m model) View() string {
-	// Quitting state: Show goodbye message
+func (m model) View() tea.View {
+	var content string
+
 	if m.quitting {
-		return "\n  See you later!\n\n"
-	}
+		content = "\n  See you later!\n\n"
+	} else if m.input != nil {
+		entry := m.flatIndex[m.cursor]
+		cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+		content = m.renderInputForm(cmd)
+	} else if m.confirming {
+		var s strings.Builder
+		s.WriteString(titleStyle.Render("OpenEMR on EKS Console"))
+		s.WriteString("\n\n")
+		entry := m.flatIndex[m.cursor]
+		cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+		s.WriteString(confirmBoxStyle.Render(
+			fmt.Sprintf("⚠️  DESTRUCTIVE ACTION: %s\n\nThis will permanently destroy all infrastructure resources.\nThis action is irreversible.\n\nPress Y to confirm, any other key to cancel.", cmd.title),
+		))
+		s.WriteString("\n")
+		content = s.String()
+	} else if m.executing {
+		var s strings.Builder
+		s.WriteString(titleStyle.Render("OpenEMR on EKS Console"))
+		s.WriteString("\n\n")
+		entry := m.flatIndex[m.cursor]
+		cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+		s.WriteString(itemStyle.Render("Executing: " + cmd.title))
+		s.WriteString("\n\n")
 
-	// Executing state: Show command execution status
-	if m.executing {
-		var view strings.Builder
-		view.WriteString(titleStyle.Render("OpenEMR on EKS Console"))
-		view.WriteString("\n\n")
-		view.WriteString(itemStyle.Render("Executing: " + m.commands[m.selected].title))
-		view.WriteString("\n\n")
-
-		// Display error message if command failed
 		if m.error != "" {
-			view.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("❌ Error:\n"))
-			view.WriteString("\n")
-			// Write error output directly (may contain ANSI codes from script output)
-			view.WriteString(m.error)
-			view.WriteString("\n\n")
+			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true).Render("❌ Error:\n"))
+			s.WriteString("\n")
+			s.WriteString(m.error)
+			s.WriteString("\n\n")
 		} else if m.output != "" {
-			// Display success message with output
-			view.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Render("✅ Output:\n"))
-			view.WriteString("\n")
-			// Limit output display to last 100 lines to prevent overwhelming the screen
-			// This is important because some scripts produce large amounts of output
+			s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("46")).Bold(true).Render("✅ Output:\n"))
+			s.WriteString("\n")
 			lines := strings.Split(m.output, "\n")
 			start := 0
 			if len(lines) > 100 {
 				start = len(lines) - 100
-				view.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Italic(true).Render("(Showing last 100 lines of output)\n\n"))
+				s.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Italic(true).Render("(Showing last 100 lines of output)\n\n"))
 			}
-			// Preserve ANSI color codes from script output - write raw output
-			// This allows scripts' color codes (from tools like kubectl, terraform, etc.)
-			// to display properly in the TUI
-			view.WriteString(strings.Join(lines[start:], "\n"))
-			view.WriteString("\n\n")
+			s.WriteString(strings.Join(lines[start:], "\n"))
+			s.WriteString("\n\n")
 		} else {
-			// Command is running but no output yet
-			view.WriteString(descStyle.Render("⏳ Running command..."))
-			view.WriteString("\n\n")
+			s.WriteString(descStyle.Render("⏳ Running command..."))
+			s.WriteString("\n\n")
 		}
 
-		view.WriteString(helpStyle.Render("Press Enter, Esc, or Ctrl+C to return to menu"))
-		return view.String()
+		s.WriteString(helpStyle.Render("Press Enter, Esc, or Ctrl+C to return to menu"))
+		content = s.String()
+	} else {
+		var s strings.Builder
+		s.WriteString(titleStyle.Render(fmt.Sprintf("OpenEMR on EKS Console  v%s", version)))
+		s.WriteString("\n")
+
+		for _, entry := range m.flatIndex {
+			if entry.isCategory {
+				cat := m.categories[entry.catIdx]
+				s.WriteString(categoryStyle.Render(fmt.Sprintf("%s %s", cat.icon, cat.name)))
+				s.WriteString("\n")
+				continue
+			}
+
+			cmd := m.categories[entry.catIdx].commands[entry.cmdIdx]
+			idx := 0
+			for fi, fe := range m.flatIndex {
+				if fe == entry {
+					idx = fi
+					break
+				}
+			}
+
+			cursor := " "
+			titleText := cmd.title
+			if cmd.destructive {
+				titleText = "⚠ " + titleText
+			}
+
+			if m.cursor == idx {
+				cursor = "▸"
+				s.WriteString(selectedStyle.Render(fmt.Sprintf("%s %s", cursor, titleText)))
+			} else {
+				if cmd.destructive {
+					s.WriteString(itemStyle.Render(fmt.Sprintf("%s %s", cursor, destructiveStyle.Render(titleText))))
+				} else {
+					s.WriteString(itemStyle.Render(fmt.Sprintf("%s %s", cursor, titleText)))
+				}
+			}
+			s.WriteString("\n")
+
+			s.WriteString(descStyle.Render(cmd.description))
+			s.WriteString("\n")
+
+			scriptPath := cmd.script
+			if absPath, err := filepath.Abs(cmd.script); err == nil {
+				if relPath, err := filepath.Rel(m.projectRoot, absPath); err == nil {
+					scriptPath = relPath
+				}
+			}
+			scriptDisplay := scriptPath
+			if len(cmd.args) > 0 {
+				scriptDisplay = fmt.Sprintf("%s %s", scriptPath, strings.Join(cmd.args, " "))
+			}
+			s.WriteString(scriptStyle.Render(fmt.Sprintf("📜 %s", scriptDisplay)))
+			s.WriteString("\n")
+		}
+
+		s.WriteString("\n")
+		if m.showHelp {
+			s.WriteString(helpStyle.Render("  ↑/k  Up          ↓/j  Down        Enter  Execute"))
+			s.WriteString("\n")
+			s.WriteString(helpStyle.Render("  g    First item   G    Last item   ?      Toggle help"))
+			s.WriteString("\n")
+			s.WriteString(helpStyle.Render("  q    Quit         Esc  Quit        Y      Confirm destructive"))
+		} else {
+			s.WriteString(helpStyle.Render("↑/k: Up  ↓/j: Down  Enter: Execute  q: Quit  ?: Help"))
+		}
+		s.WriteString("\n")
+		s.WriteString(statusBarStyle.Render(fmt.Sprintf("📂 %s  ·  %d/%d", m.projectRoot, m.commandPosition(), m.cmdCount)))
+		content = s.String()
 	}
 
-	// Menu state: Display the interactive command menu
+	v := tea.NewView(content)
+	v.AltScreen = true
+	return v
+}
+
+// renderInputForm draws the styled input form for commands with prompts.
+func (m model) renderInputForm(cmd command) string {
+	inp := m.input
 	var s strings.Builder
+
 	s.WriteString(titleStyle.Render("OpenEMR on EKS Console"))
 	s.WriteString("\n\n")
 
-	// Render each command in the menu
-	for i, cmd := range m.commands {
-		// Determine cursor symbol: ">" for selected item, " " for others
-		cursor := " "
-		if m.cursor == i {
-			cursor = ">"
-			// Selected item: Use highlighted style
-			s.WriteString(selectedStyle.Render(fmt.Sprintf("%s %s", cursor, cmd.title)))
+	var formContent strings.Builder
+	formContent.WriteString(fieldLabelStyle.Render(fmt.Sprintf("  %s", cmd.title)))
+	formContent.WriteString("\n")
+	formContent.WriteString(descStyle.Render(cmd.description))
+	formContent.WriteString("\n")
+
+	for i, f := range inp.fields {
+		formContent.WriteString("\n")
+
+		label := f.label
+		if f.required {
+			label += " " + requiredMarkerStyle.Render("*")
 		} else {
-			// Unselected item: Use normal style
-			s.WriteString(itemStyle.Render(fmt.Sprintf("%s %s", cursor, cmd.title)))
+			label += " " + lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Render("(optional)")
 		}
-		s.WriteString("\n")
+		formContent.WriteString("  " + fieldLabelStyle.Render(label))
+		formContent.WriteString("\n")
 
-		// Display command description
-		s.WriteString(descStyle.Render(cmd.description))
-		s.WriteString("\n")
+		val := inp.values[i]
+		isActive := i == inp.active
+		showError := inp.attempted && f.required && strings.TrimSpace(val) == ""
 
-		// Display script path (relative to project root for cleaner display)
-		// Convert absolute path to relative path if possible
-		scriptPath := cmd.script
-		if absPath, err := filepath.Abs(cmd.script); err == nil {
-			if relPath, err := filepath.Rel(m.projectRoot, absPath); err == nil {
-				scriptPath = relPath
+		if isActive {
+			var display string
+			if val == "" && !isActive {
+				display = placeholderStyle.Render(f.placeholder)
+			} else {
+				before := val[:inp.cursor]
+				after := val[inp.cursor:]
+				display = fieldActiveStyle.Render("  ▸ "+before) + fieldActiveStyle.Render("█") + fieldActiveStyle.Render(after)
 			}
+			formContent.WriteString(display)
+		} else if val == "" {
+			formContent.WriteString("  " + placeholderStyle.Render("  "+f.placeholder))
+		} else {
+			formContent.WriteString("  " + fieldInactiveStyle.Render("  "+val))
 		}
+		formContent.WriteString("\n")
 
-		// Format script path with arguments if any
-		scriptDisplay := scriptPath
-		if len(cmd.args) > 0 {
-			scriptDisplay = fmt.Sprintf("%s %s", scriptPath, strings.Join(cmd.args, " "))
+		if showError {
+			formContent.WriteString("  " + fieldErrorStyle.Render("  ⚠ This field is required"))
+			formContent.WriteString("\n")
 		}
-		s.WriteString(scriptStyle.Render(fmt.Sprintf("📜 %s", scriptDisplay)))
-		s.WriteString("\n\n")
 	}
 
-	// Display help text at the bottom
-	s.WriteString(helpStyle.Render("↑/↓: Navigate  Enter: Execute  Esc/Ctrl+C: Quit"))
+	formContent.WriteString("\n")
+	formContent.WriteString(helpStyle.Render("  Tab/↓: Next field  Shift+Tab/↑: Prev  Enter: Submit  Esc: Cancel"))
+
+	s.WriteString(formBoxStyle.Render(formContent.String()))
+	s.WriteString("\n")
+
 	return s.String()
 }
 
-// main is the entry point of the application.
-// It initializes the Bubbletea program with the initial model and starts the TUI.
-//
-// tea.WithAltScreen() enables the alternate screen buffer, which:
-//   - Clears the terminal when the program starts
-//   - Restores the original terminal state when the program exits
-//   - Provides a cleaner user experience
 func main() {
-	p := tea.NewProgram(initialModel(), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error: %v", err)
 		os.Exit(1)

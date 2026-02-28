@@ -16,7 +16,7 @@
 #   - Destroys OIDC provider and IAM roles via Terraform
 #
 # Prerequisites:
-#   - Terraform 1.14.5+ installed and in PATH
+#   - Terraform 1.14.6+ installed and in PATH
 #   - AWS CLI 2.15+ installed and configured
 #   - AWS credentials with permissions to delete OIDC providers and IAM roles
 #   - Proper IAM permissions (see oidc_provider/README.md)
