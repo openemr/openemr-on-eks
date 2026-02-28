@@ -65,7 +65,7 @@
 <td>
   <a href="console/README.md"><img src="https://img.shields.io/badge/Console_TUI-v6.3.0-00ADD8?style=flat&logo=go&logoColor=white" alt="Console TUI"></a>
   <a href="warp/README.md"><img src="https://img.shields.io/badge/Warp-v0.2.0-3776AB?style=flat&logo=python&logoColor=white" alt="Warp"></a>
-  <a href="tools/credential-rotation/README.md"><img src="https://img.shields.io/badge/Credential_Rotation-automated-6D4C9F?style=flat&logo=amazonaws&logoColor=white" alt="Credential Rotation"></a>
+  <a href="tools/credential-rotation/README.md"><img src="https://img.shields.io/badge/Credential_Rotation-available-6D4C9F?style=flat&logo=amazonaws&logoColor=white" alt="Credential Rotation"></a>
   <a href="monitoring/README.md"><img src="https://img.shields.io/badge/Monitoring-full_stack-E6522C?style=flat&logo=prometheus&logoColor=white" alt="Monitoring"></a>
 </td>
 </tr>
@@ -290,7 +290,7 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 ```
 
 <details>
-<summary><strong>Animated Demo</strong></summary>
+<summary><strong>Console Preview</strong></summary>
 
 <img src="./images/tui.png" alt="OpenEMR on EKS Console TUI launch screen" width="500">
 
