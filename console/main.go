@@ -115,15 +115,15 @@ var (
 			Bold(true)
 
 	fieldActiveStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("205")).
-			Bold(true)
+				Foreground(lipgloss.Color("205")).
+				Bold(true)
 
 	fieldInactiveStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("252"))
 
 	placeholderStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("240")).
-			Italic(true)
+				Foreground(lipgloss.Color("240")).
+				Italic(true)
 
 	fieldErrorStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color("196")).
@@ -340,15 +340,15 @@ func initialModel() model {
 					description: "Create comprehensive backup of RDS, Kubernetes configs, and application data",
 					script:      filepath.Join(scriptsPath, "backup.sh"),
 				},
-			{
-				title:       "Restore from Backup",
-				description: "Restore infrastructure and application data from a previous backup",
-				script:      filepath.Join(scriptsPath, "restore.sh"),
-				prompts: []inputField{
-					{label: "Backup Bucket", placeholder: "my-openemr-backup-bucket", required: true},
-					{label: "Snapshot ID", placeholder: "openemr-snapshot-20260227 or leave empty for --latest-snapshot", required: false},
+				{
+					title:       "Restore from Backup",
+					description: "Restore infrastructure and application data from a previous backup",
+					script:      filepath.Join(scriptsPath, "restore.sh"),
+					prompts: []inputField{
+						{label: "Backup Bucket", placeholder: "my-openemr-backup-bucket", required: true},
+						{label: "Snapshot ID", placeholder: "openemr-snapshot-20260227 or leave empty for --latest-snapshot", required: false},
+					},
 				},
-			},
 				{
 					title:       "Clean Deployment",
 					description: "Remove application layer while preserving infrastructure",
@@ -372,22 +372,22 @@ func initialModel() model {
 					script:      filepath.Join(scriptsPath, "version-manager.sh"),
 					args:        []string{"check"},
 				},
-			{
-				title:       "Check OpenEMR Versions",
-				description: "Discover available OpenEMR Docker image versions from Docker Hub",
-				script:      filepath.Join(scriptsPath, "check-openemr-versions.sh"),
-				prompts: []inputField{
-					{label: "Search Pattern", placeholder: "e.g. 7.0 or 8.0 (leave empty to show latest)", required: false, flag: "search"},
+				{
+					title:       "Check OpenEMR Versions",
+					description: "Discover available OpenEMR Docker image versions from Docker Hub",
+					script:      filepath.Join(scriptsPath, "check-openemr-versions.sh"),
+					prompts: []inputField{
+						{label: "Search Pattern", placeholder: "e.g. 7.0 or 8.0 (leave empty to show latest)", required: false, flag: "search"},
+					},
 				},
-			},
-			{
-				title:       "Search Codebase",
-				description: "Search for terms across the entire codebase",
-				script:      filepath.Join(scriptsPath, "search-codebase.sh"),
-				prompts: []inputField{
-					{label: "Search Term", placeholder: "e.g. OPENEMR_VERSION, backup, deploy", required: true},
+				{
+					title:       "Search Codebase",
+					description: "Search for terms across the entire codebase",
+					script:      filepath.Join(scriptsPath, "search-codebase.sh"),
+					prompts: []inputField{
+						{label: "Search Term", placeholder: "e.g. OPENEMR_VERSION, backup, deploy", required: true},
+					},
 				},
-			},
 			},
 		},
 	}
