@@ -40,7 +40,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
   - [Scripts Table of Contents Section Picture (`scripts_table_of_contents_section_picture.png`)](#scripts-table-of-contents-section-picture-scripts_table_of_contents_section_picturepng)
   - [Terraform Table of Contents Section Picture (`terraform_table_of_contents_section_picture.png`)](#terraform-table-of-contents-section-picture-terraform_table_of_contents_section_picturepng)
   - [K8s Table of Contents Section Picture (`k8s_table_of_contents_section_picture.png`)](#k8s-table-of-contents-section-picture-k8s_table_of_contents_section_picturepng)
-  - [Console Launch Screen (`tui.gif`)](#console-launch-screen-tuigif)
+  - [Console Launch Screen (`tui.png`)](#console-launch-screen-tuigif)
   - [Console Table of Contents Section Picture (`console_table_of_contents_section_picture.png`)](#console-table-of-contents-section-picture-console_table_of_contents_section_picturepng)
   - [Images Table of Contents Section Picture (`images_table_of_contents_section_picture.png`)](#images-table-of-contents-section-picture-images_table_of_contents_section_picturepng)
   - [GitHub Table of Contents Section Picture (`github_table_of_contents_section_picture.png`)](#github-table-of-contents-section-picture-github_table_of_contents_section_picturepng)
@@ -122,7 +122,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **`scripts_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the scripts README
 - **`terraform_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the terraform README
 - **`k8s_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the k8s README
-- **`tui.gif`** - Animated GIF showing the Terminal User Interface (TUI) console launch screen for macOS and Windows
+- **`tui.png`** - Screenshot of the Terminal User Interface (TUI) console launch screen for macOS and Windows
 - **`console_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the console README
 - **`images_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the images README
 - **`github_table_of_contents_section_picture.png`** - Project mascot image used in the table of contents section of the GitHub workflows README
@@ -338,7 +338,7 @@ This directory contains visual assets and branding materials for the OpenEMR on 
 - **Context**: Provides a friendly, approachable visual element that makes the Kubernetes documentation's table of contents section more engaging and memorable
 - **Placement**: Positioned just under the "📋 Table of Contents" header in the k8s README
 
-### **Console Launch Screen (`tui.gif`)**
+### **Console Launch Screen (`tui.png`)**
 
 - **Purpose**: Visual demonstration of the Terminal User Interface (TUI) console launch screen
 - **Format**: Animated GIF

@@ -292,7 +292,7 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 <details>
 <summary><strong>Animated Demo</strong></summary>
 
-<img src="./images/tui.gif" alt="OpenEMR on EKS Console TUI launch screen" width="500">
+<img src="./images/tui.png" alt="OpenEMR on EKS Console TUI launch screen" width="500">
 
 </details>
 
