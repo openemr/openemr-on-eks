@@ -24,9 +24,10 @@ spec:
   # Schedule: Run every 2 days at 2 AM UTC
   # This ensures certificates are always fresh and reduces browser warnings
   schedule: "0 2 */2 * *"
-  concurrencyPolicy: Forbid     # Prevent overlapping renewal jobs
-  successfulJobsHistoryLimit: 3 # Keep history of successful renewals
-  failedJobsHistoryLimit: 3     # Keep history of failed renewals for debugging
+  concurrencyPolicy: Forbid             # Prevent overlapping renewal jobs
+  startingDeadlineSeconds: 86400        # 24h window to start missed jobs after downtime
+  successfulJobsHistoryLimit: 3         # Keep history of successful renewals
+  failedJobsHistoryLimit: 3             # Keep history of failed renewals for debugging
   jobTemplate:
     spec:
       template:
