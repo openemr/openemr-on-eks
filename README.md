@@ -697,6 +697,7 @@ Next steps for first-time deployment:
    • Set up cost alerts and budgets
 
 📊 Monitoring Setup:
+   • CloudWatch Database Insights for Aurora monitoring (standard mode included free)
    • CloudWatch logging with Fluent Bit sidecar (included in OpenEMR deployment)
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
@@ -742,6 +743,9 @@ aurora_min_capacity = 0.5 # Always-on minimum
 aurora_max_capacity = 16  # Peak capacity
 redis_max_data_storage = 20
 redis_max_ecpu_per_second = 5000
+
+# Database Monitoring (CloudWatch Database Insights)
+database_insights_mode = "standard" # "standard" (free) or "advanced" (paid, 465-day retention)
 
 # Network Configuration
 vpc_cidr = "10.0.0.0/16"

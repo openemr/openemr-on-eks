@@ -12,6 +12,10 @@ backup_retention_days = 30
 aurora_min_capacity = 0.5
 aurora_max_capacity = 16
 
+# Database Monitoring - CloudWatch Database Insights
+# Use "advanced" for 465-day retention and enhanced diagnostics in production
+database_insights_mode = "advanced"
+
 # Enable WAF for production security
 enable_waf = true
 

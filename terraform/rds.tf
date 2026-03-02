@@ -89,6 +89,13 @@ resource "aws_rds_cluster" "openemr" {
     min_capacity = var.aurora_min_capacity # Minimum scaling capacity (default: 0.5 ACUs)
   }
 
+  # CloudWatch Database Insights (replaces Performance Insights console, deprecated June 30, 2026)
+  # Standard mode: free, 7-day retention. Advanced mode: paid, 465-day retention with enhanced diagnostics.
+  database_insights_mode                = var.database_insights_mode
+  performance_insights_enabled          = true
+  performance_insights_kms_key_id       = aws_kms_key.rds.arn
+  performance_insights_retention_period = var.database_insights_mode == "advanced" ? 465 : 7
+
   # Data protection and snapshot configuration
   deletion_protection       = var.rds_deletion_protection # Prevent accidental deletion
   skip_final_snapshot       = false                       # Create final snapshot on deletion
@@ -118,11 +125,14 @@ resource "aws_rds_cluster_instance" "openemr" {
   # Auto minor version upgrade for security patches
   auto_minor_version_upgrade = true # Automatically apply minor version upgrades
 
-  # Enhanced monitoring and performance insights for operational visibility
-  monitoring_interval             = 60                              # 60-second monitoring interval
-  monitoring_role_arn             = aws_iam_role.rds_monitoring.arn # IAM role for enhanced monitoring
-  performance_insights_enabled    = true                            # Enable Performance Insights
-  performance_insights_kms_key_id = aws_kms_key.rds.arn             # KMS key for Performance Insights encryption
+  # Enhanced monitoring for operational visibility
+  monitoring_interval = 60                              # 60-second monitoring interval
+  monitoring_role_arn = aws_iam_role.rds_monitoring.arn # IAM role for enhanced monitoring
+
+  # Performance Insights (managed via CloudWatch Database Insights at the cluster level)
+  performance_insights_enabled          = true
+  performance_insights_kms_key_id       = aws_kms_key.rds.arn
+  performance_insights_retention_period = var.database_insights_mode == "advanced" ? 465 : 7
 
   tags = {
     Name = "${var.cluster_name}-aurora-${count.index}"

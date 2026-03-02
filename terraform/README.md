@@ -232,7 +232,8 @@ graph TD
   - Aurora MySQL cluster with Serverless V2
   - Multi-AZ deployment with 2 instances
   - Automated backups and snapshots
-  - Performance Insights and monitoring
+  - CloudWatch Database Insights (configurable standard/advanced mode)
+  - Enhanced monitoring with 60-second intervals
   - Encryption with dedicated KMS key
 - **Dependencies**: `vpc.tf`, `kms.tf`
 - **Maintenance Notes**:

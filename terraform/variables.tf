@@ -194,6 +194,27 @@ variable "audit_logs_retention_days" {
 }
 
 # =============================================================================
+# DATABASE MONITORING CONFIGURATION
+# =============================================================================
+# Configuration for CloudWatch Database Insights (successor to Performance Insights)
+
+# CloudWatch Database Insights mode for Aurora cluster
+# "standard" (free): 7-day retention, basic database monitoring via CloudWatch
+# "advanced" (paid): 465-day retention, lock contention diagnostics, execution plans,
+#                     fleet-level monitoring, and CloudWatch Application Signals integration
+# See: https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Database-Insights.html
+variable "database_insights_mode" {
+  description = "CloudWatch Database Insights mode for Aurora cluster (standard = free, advanced = paid)"
+  type        = string
+  default     = "standard"
+
+  validation {
+    condition     = contains(["standard", "advanced"], var.database_insights_mode)
+    error_message = "database_insights_mode must be 'standard' or 'advanced'."
+  }
+}
+
+# =============================================================================
 # DATABASE ENGINE CONFIGURATION
 # =============================================================================
 # Configuration for the database engine version and compatibility

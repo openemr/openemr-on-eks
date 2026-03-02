@@ -18,6 +18,10 @@ public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
 aurora_min_capacity = 0.5 # Minimum ACUs (always running cost: ~$43/month)
 aurora_max_capacity = 16  # Maximum ACUs for scaling
 
+# Database Monitoring (CloudWatch Database Insights)
+# "standard" = free, 7-day retention | "advanced" = paid, 465-day retention with enhanced diagnostics
+database_insights_mode = "standard"
+
 # Cache Configuration (Valkey Serverless)
 redis_max_data_storage    = 20   # GB
 redis_max_ecpu_per_second = 5000 # ECPUs
