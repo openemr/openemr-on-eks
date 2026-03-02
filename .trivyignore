@@ -188,11 +188,3 @@ AVD-KSV-0104
 # AVD-KSV-0118: Default security context in warp test/benchmark jobs
 # Reason: Test jobs dynamically install packages and need root access
 AVD-KSV-0118
-
-# =============================================================================
-# DO NOT ADD ENTRIES ABOVE WITHOUT:
-# 1. Security team review and approval
-# 2. Documented justification
-# 3. Compensating control or mitigation plan
-# 4. Tracking ticket number
-# =============================================================================
