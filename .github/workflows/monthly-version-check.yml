@@ -71,7 +71,7 @@ env:
 
 # Required permissions for version checking and issue creation
 permissions:
-  id-token: write     # Required for OIDC authentication (more secure than and preferred over static credentials)
+  id-token: write     # kics-scan ignore-line - OIDC permission for GitHub-to-AWS authentication, not a secret
   contents: read      # Read repository contents for version analysis
   issues: write       # Create GitHub issues for update notifications
   pull-requests: read # Read pull request information

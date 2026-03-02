@@ -69,7 +69,7 @@ spec:
 
         # Container-level security context
         securityContext:
-          allowPrivilegeEscalation: true # Allow privilege escalation for OpenEMR setup
+          allowPrivilegeEscalation: true # kics-scan ignore-line - OpenEMR requires privilege escalation for Apache/PHP setup scripts (SETUID/SETGID capabilities)
           readOnlyRootFilesystem: false  # Allow writes to root filesystem for OpenEMR
           runAsUser: 0                   # Run as root (required for OpenEMR file permissions)
           runAsGroup: 0                  # Run as root group
@@ -379,11 +379,13 @@ spec:
         persistentVolumeClaim:
           claimName: openemr-letsencrypt-pvc
       # Host /proc filesystem for system metrics (Fluent Bit node_exporter_metrics)
+      # kics-scan ignore-block - Fluent Bit sidecar requires read-only hostPath for node metrics collection
       - name: proc
         hostPath:
           path: /proc     # Host /proc filesystem
           type: Directory # Ensure it's a directory
       # Host /sys filesystem for system metrics (Fluent Bit node_exporter_metrics)
+      # kics-scan ignore-block - Fluent Bit sidecar requires read-only hostPath for node metrics collection
       - name: sys
         hostPath:
           path: /sys      # Host /sys filesystem

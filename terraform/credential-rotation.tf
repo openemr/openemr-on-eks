@@ -26,14 +26,14 @@ resource "aws_secretsmanager_secret_version" "rds_slots" {
     active_slot = "A"
     A = {
       username = "openemr_a"
-      password = "PLACEHOLDER_SEEDED_BY_DEPLOY_SCRIPT"
+      password = "PLACEHOLDER_SEEDED_BY_DEPLOY_SCRIPT" # kics-scan ignore-line - placeholder overwritten by deploy script; lifecycle ignore_changes prevents drift
       host     = aws_rds_cluster.openemr.endpoint
       port     = tostring(aws_rds_cluster.openemr.port)
       dbname   = "openemr"
     }
     B = {
       username = "openemr_b"
-      password = "PLACEHOLDER_SEEDED_BY_DEPLOY_SCRIPT"
+      password = "PLACEHOLDER_SEEDED_BY_DEPLOY_SCRIPT" # kics-scan ignore-line - placeholder overwritten by deploy script; lifecycle ignore_changes prevents drift
       host     = aws_rds_cluster.openemr.endpoint
       port     = tostring(aws_rds_cluster.openemr.port)
       dbname   = "openemr"
@@ -64,7 +64,7 @@ resource "aws_secretsmanager_secret_version" "rds_admin" {
   secret_id = aws_secretsmanager_secret.rds_admin.id
   secret_string = jsonencode({
     username = aws_rds_cluster.openemr.master_username
-    password = random_password.db_password.result
+    password = random_password.db_password.result # kics-scan ignore-line - Terraform resource reference, not a hardcoded secret
     host     = aws_rds_cluster.openemr.endpoint
     port     = tostring(aws_rds_cluster.openemr.port)
     dbname   = "openemr"

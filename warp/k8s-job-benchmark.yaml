@@ -28,6 +28,8 @@ spec:
         # Version is managed in versions.yaml under applications.python
         image: python:3.14-slim
         workingDir: /app
+        securityContext:
+          allowPrivilegeEscalation: false
 
         env:
         # Database connection (from Kubernetes secrets)

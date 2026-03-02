@@ -61,7 +61,7 @@ resource "aws_rds_cluster" "openemr" {
 
   # Master user credentials for database access
   master_username = "openemr"                          # Master username
-  master_password = random_password.db_password.result # Secure random password
+  master_password = random_password.db_password.result # kics-scan ignore-line - Terraform resource reference to random_password, not a hardcoded secret
 
   # Network and security configuration
   vpc_security_group_ids = [aws_security_group.rds.id]      # Security group for network access
