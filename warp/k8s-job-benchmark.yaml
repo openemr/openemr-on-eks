@@ -30,6 +30,9 @@ spec:
         workingDir: /app
         securityContext:
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          seccompProfile:
+            type: RuntimeDefault
 
         env:
         # Database connection (from Kubernetes secrets)
