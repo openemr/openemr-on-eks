@@ -255,6 +255,7 @@ jobs:
         with:
           path: '.'
           fail_on: high,medium,low
+          config_path: kics.config
           output_path: kics-results/
           output_formats: 'json,sarif'
           exclude_paths: '.git,node_modules,venv,.trivycache'
