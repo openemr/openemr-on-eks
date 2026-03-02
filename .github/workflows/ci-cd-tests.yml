@@ -295,7 +295,6 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM,LOW' # Include all severities - zero tolerance
           scanners: 'vuln,secret,misconfig'    # Enable vulnerability, secret, and misconfig scanners
           exit-code: '1'                       # FAIL the build on ANY finding (zero-tolerance)
-          skip-db-update: false                # Allow database updates
           cache-dir: '.trivycache'             # Use local cache directory
           trivyignores: '.trivyignore'         # Use ignore file for false positives only
 

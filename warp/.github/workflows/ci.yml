@@ -153,7 +153,6 @@ jobs:
           severity: 'CRITICAL,HIGH,MEDIUM,LOW'  # All severities - zero tolerance
           scanners: 'vuln,secret,config'
           exit-code: '1'                        # FAIL on any finding
-          skip-db-update: false
           cache-dir: '.trivycache'
           trivyignores: '.trivyignore'          # Use ignore file for false positives only
 
