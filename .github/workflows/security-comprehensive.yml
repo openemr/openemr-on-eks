@@ -47,6 +47,10 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: write
 
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
