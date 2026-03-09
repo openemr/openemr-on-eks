@@ -19,15 +19,13 @@ logger = logging.getLogger(__name__)
 class OpenEMRDBImporter:
     """
     Direct database importer for OpenEMR.
-    
+
     This is the ONLY supported method for uploading data to OpenEMR.
     Direct database access bypasses the API/web interface entirely for
     maximum performance and reliability.
     """
 
-    def __init__(
-        self, db_host: str, db_user: str, db_password: str, db_name: str = "openemr"
-    ):
+    def __init__(self, db_host: str, db_user: str, db_password: str, db_name: str = "openemr"):
         """
         Initialize database connection
 
@@ -150,9 +148,7 @@ class OpenEMRDBImporter:
                     "AND activity = 1 ORDER BY is_default DESC, seq ASC LIMIT 1"
                 )
                 pricelevel_result = cursor.fetchone()
-                pricelevel = (
-                    pricelevel_result["option_id"] if pricelevel_result else "standard"
-                )
+                pricelevel = pricelevel_result["option_id"] if pricelevel_result else "standard"
 
                 # Extract name (OMOP doesn't have names, so we'll use person_id as placeholder)
                 person_id = person_data.get("PERSON_ID", str(pid))
@@ -215,9 +211,7 @@ class OpenEMRDBImporter:
                 inserted_id = cursor.lastrowid
 
                 # Verify UUID was set (OpenEMR sets UUID if empty, but we set it)
-                cursor.execute(
-                    "SELECT uuid FROM patient_data WHERE id = %s", (inserted_id,)
-                )
+                cursor.execute("SELECT uuid FROM patient_data WHERE id = %s", (inserted_id,))
                 result = cursor.fetchone()
                 if result and not result["uuid"]:
                     # UUID wasn't set, update it (matching OpenEMR's behavior)
@@ -307,9 +301,7 @@ class OpenEMRDBImporter:
             begdate = None
             if drug_exposure_start_date:
                 try:
-                    begdate = datetime.strptime(
-                        drug_exposure_start_date, "%Y-%m-%d"
-                    ).date()
+                    begdate = datetime.strptime(drug_exposure_start_date, "%Y-%m-%d").date()
                 except (ValueError, TypeError):
                     pass
 

@@ -25,9 +25,7 @@ class OMOPToCCDAConverter:
         "xsi": "http://www.w3.org/2001/XMLSchema-instance",
     }
 
-    def __init__(
-        self, data_source: str, aws_region: str = "us-east-1"
-    ):
+    def __init__(self, data_source: str, aws_region: str = "us-east-1"):
         """
         Initialize converter
 
@@ -135,9 +133,7 @@ class OMOPToCCDAConverter:
         logger.info("Loading medication data...")
         try:
             all_medications = self._load_csv("DRUG_EXPOSURE")
-            medications = [
-                m for m in all_medications if m.get("person_id") in person_ids
-            ]
+            medications = [m for m in all_medications if m.get("person_id") in person_ids]
         except Exception as e:
             logger.warning(f"Could not load DRUG_EXPOSURE: {e}")
             medications = []
@@ -145,9 +141,7 @@ class OMOPToCCDAConverter:
         logger.info("Loading observation data...")
         try:
             all_observations = self._load_csv("OBSERVATION")
-            observations = [
-                o for o in all_observations if o.get("person_id") in person_ids
-            ]
+            observations = [o for o in all_observations if o.get("person_id") in person_ids]
         except Exception as e:
             logger.warning(f"Could not load OBSERVATION: {e}")
             observations = []
@@ -199,9 +193,7 @@ class OMOPToCCDAConverter:
 
         # Add ID
         doc_id = SubElement(root, "{urn:hl7-org:v3}id")
-        doc_id.set(
-            "root", f"1.2.840.113619.6.197.{person_data.get('person_id', 'unknown')}"
-        )
+        doc_id.set("root", f"1.2.840.113619.6.197.{person_data.get('person_id', 'unknown')}")
 
         # Add code
         code = SubElement(root, "{urn:hl7-org:v3}code")
@@ -211,9 +203,7 @@ class OMOPToCCDAConverter:
 
         # Add title
         title = SubElement(root, "{urn:hl7-org:v3}title")
-        title.text = (
-            f"Clinical Summary for Patient {person_data.get('person_id', 'Unknown')}"
-        )
+        title.text = f"Clinical Summary for Patient {person_data.get('person_id', 'Unknown')}"
 
         # Add effective time
         effective_time = SubElement(root, "{urn:hl7-org:v3}effectiveTime")
@@ -281,9 +271,7 @@ class OMOPToCCDAConverter:
         # Birth time
         if person_data.get("birth_datetime"):
             birth_time = SubElement(patient, "{urn:hl7-org:v3}birthTime")
-            birth_time.set(
-                "value", self._format_datetime(person_data.get("birth_datetime"))
-            )
+            birth_time.set("value", self._format_datetime(person_data.get("birth_datetime")))
 
         # Add component section for problems/conditions
         if conditions:
@@ -346,7 +334,7 @@ class OMOPToCCDAConverter:
         gender_map = {
             8507: "M",  # Male
             8532: "F",  # Female
-            8570: "UN", # Unknown
+            8570: "UN",  # Unknown
         }
         return gender_map.get(int(gender_concept_id))
 

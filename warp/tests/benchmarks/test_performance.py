@@ -8,7 +8,8 @@ import os
 
 # Skip benchmarks if pytest-benchmark is not installed
 try:
-    import pytest_benchmark
+    import pytest_benchmark  # noqa: F401
+
     BENCHMARK_AVAILABLE = True
 except ImportError:
     BENCHMARK_AVAILABLE = False
@@ -25,29 +26,22 @@ def test_ccda_conversion_speed(benchmark):
     os.makedirs(temp_dir, exist_ok=True)
 
     try:
-        converter = OMOPToCCDAConverter(
-            data_source=temp_dir
-        )
+        converter = OMOPToCCDAConverter(data_source=temp_dir)
 
         person_data = {
-            'person_id': '123',
-            'first_name': 'John',
-            'last_name': 'Doe',
-            'gender_concept_id': '8507',
-            'birth_datetime': '1980-01-15 00:00:00'
+            "person_id": "123",
+            "first_name": "John",
+            "last_name": "Doe",
+            "gender_concept_id": "8507",
+            "birth_datetime": "1980-01-15 00:00:00",
         }
 
-        result = benchmark(
-            converter.convert_to_ccda,
-            person_data,
-            [],
-            [],
-            []
-        )
+        result = benchmark(converter.convert_to_ccda, person_data, [], [], [])
 
-        assert 'ClinicalDocument' in result
+        assert "ClinicalDocument" in result
     finally:
         import shutil
+
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
@@ -61,18 +55,15 @@ def test_csv_parsing_speed(benchmark):
     os.makedirs(temp_dir, exist_ok=True)
 
     try:
-        converter = OMOPToCCDAConverter(
-            data_source=temp_dir
-        )
+        converter = OMOPToCCDAConverter(data_source=temp_dir)
 
-        csv_content = "person_id,first_name,last_name\n" + \
-                      "\n".join([f"{i},Name{i},Last{i}" for i in range(1000)])
+        csv_content = "person_id,first_name,last_name\n" + "\n".join([f"{i},Name{i},Last{i}" for i in range(1000)])
 
         result = benchmark(converter._parse_csv, csv_content)
 
         assert len(result) == 1000
     finally:
         import shutil
+
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
-

@@ -18,12 +18,8 @@ class CredentialDiscovery:
     def __init__(self, namespace: str = "openemr", terraform_dir: Optional[str] = None):
         self.namespace = namespace
         self.terraform_dir = terraform_dir
-        self.project_root = os.path.abspath(
-            os.path.join(os.path.dirname(__file__), "../../..")
-        )
-        self.credentials_file_path = os.path.join(
-            self.project_root, "k8s", "openemr-credentials.txt"
-        )
+        self.project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.."))
+        self.credentials_file_path = os.path.join(self.project_root, "k8s", "openemr-credentials.txt")
 
     def get_db_credentials(self) -> Optional[Dict[str, str]]:
         """Get database credentials for direct DB access"""
@@ -59,11 +55,7 @@ class CredentialDiscovery:
                         "host": base64.b64decode(host_b64).decode("utf-8"),
                         "user": base64.b64decode(user_b64).decode("utf-8"),
                         "password": base64.b64decode(password_b64).decode("utf-8"),
-                        "database": (
-                            base64.b64decode(database_b64).decode("utf-8")
-                            if database_b64
-                            else "openemr"
-                        ),
+                        "database": (base64.b64decode(database_b64).decode("utf-8") if database_b64 else "openemr"),
                     }
         except Exception as e:
             logger.debug(f"DB credential discovery failed: {e}")
