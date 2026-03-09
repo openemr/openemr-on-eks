@@ -47,6 +47,11 @@ on:
         - warp
         - credential_rotation
 
+# Cancel in-progress runs when a new commit is pushed to the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 # Required permissions for the workflow
 permissions:
   contents: read         # Read repository contents for testing
@@ -181,7 +186,6 @@ jobs:
   lint-and-validate:
     name: Lint and Validate
     runs-on: ubuntu-24.04
-    needs: test  # Wait for test job to complete before running validation
 
     steps:
       # Step 1: Checkout repository code for validation
@@ -276,7 +280,6 @@ jobs:
   security-scan:
     name: Security Scan (Zero-Tolerance)
     runs-on: ubuntu-24.04
-    needs: test  # Wait for test job to complete before running security scan
 
     steps:
       # Step 1: Checkout repository code for security scanning
@@ -364,7 +367,6 @@ jobs:
   code-quality:
     name: Code Quality
     runs-on: ubuntu-24.04
-    needs: test  # Wait for test job to complete before running quality checks
 
     steps:
       # Step 1: Checkout repository code for quality analysis
@@ -461,7 +463,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd warp
-          pytest tests/ -v --cov=warp --cov-report=term-missing --cov-report=html --ignore=tests/benchmarks
+          pytest tests/ -v --cov=warp --cov-report=term-missing --cov-report=html --ignore=tests/benchmarks --cov-fail-under=90
 
       # Step 7: Upload coverage reports as artifacts
       - name: Upload coverage reports
@@ -472,17 +474,17 @@ jobs:
           path: warp/htmlcov/
           retention-days: 7
 
-      # Step 8: Format code with black (auto-fix whitespace and formatting)
-      - name: Format code with black
+      # Step 8: Check code formatting with black (fail if unformatted)
+      - name: Format check with black
         run: |
           cd warp
-          black warp/ tests/ --line-length 127
+          black warp/ tests/ --line-length 127 --check --diff
 
       # Step 9: Run flake8 linting (after formatting)
       - name: Run flake8
         run: |
           cd warp
-          flake8 warp/ --max-line-length=127 --extend-ignore=E203 --count --statistics
+          flake8 warp/ tests/ --max-line-length=127 --extend-ignore=E203 --count --statistics
 
       # Step 10: Run type checking with mypy
       - name: Run type checking with mypy
@@ -546,7 +548,7 @@ jobs:
       - name: Run pytest with coverage
         run: |
           cd tools/credential-rotation
-          PYTHONPATH=src pytest tests/ -v --cov=credential_rotation --cov-report=term-missing --cov-report=html
+          PYTHONPATH=src pytest tests/ -v --cov=credential_rotation --cov-report=term-missing --cov-report=html --cov-fail-under=90
 
       - name: Upload coverage reports
         uses: actions/upload-artifact@v6

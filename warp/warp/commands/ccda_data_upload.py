@@ -100,9 +100,7 @@ class CCDADataUploadCommand:
         )
 
         # Output options
-        parser.add_argument(
-            "--dry-run", action="store_true", help="Validate data without uploading"
-        )
+        parser.add_argument("--dry-run", action="store_true", help="Validate data without uploading")
 
     def execute(self, args):
         """Execute the command"""
@@ -112,9 +110,7 @@ class CCDADataUploadCommand:
         logger.info("=" * 60)
 
         # Discover database credentials
-        discovery = CredentialDiscovery(
-            namespace=args.namespace, terraform_dir=args.terraform_dir
-        )
+        discovery = CredentialDiscovery(namespace=args.namespace, terraform_dir=args.terraform_dir)
 
         # Get database credentials (auto-discover or use provided)
         db_host = args.db_host
@@ -129,9 +125,7 @@ class CCDADataUploadCommand:
             if not db_creds:
                 logger.error("Could not auto-discover database credentials.")
                 logger.error("Please provide --db-host, --db-user, and --db-password")
-                logger.error(
-                    "Or ensure Kubernetes secrets or Terraform outputs are available"
-                )
+                logger.error("Or ensure Kubernetes secrets or Terraform outputs are available")
                 return 1
 
             if not db_host:
@@ -159,9 +153,7 @@ class CCDADataUploadCommand:
 
             if not db_importer.connect():
                 logger.error("Failed to connect to OpenEMR database")
-                logger.error(
-                    "Please verify database credentials and network connectivity"
-                )
+                logger.error("Please verify database credentials and network connectivity")
                 return 1
 
             logger.info("✓ Connected to OpenEMR database")

@@ -40,18 +40,14 @@ class Uploader:
             workers: Number of parallel workers (default: CPU count)
         """
         if not db_importer:
-            raise ValueError(
-                "db_importer is required - direct database import is the only supported method"
-            )
+            raise ValueError("db_importer is required - direct database import is the only supported method")
 
         self.converter = converter
         self.db_importer = db_importer
         self.batch_size = batch_size
         self.workers = workers or os.cpu_count() or 1
 
-        logger.info(
-            f"Uploader initialized with {self.workers} workers (DIRECT DATABASE MODE)"
-        )
+        logger.info(f"Uploader initialized with {self.workers} workers (DIRECT DATABASE MODE)")
 
     def process_and_upload(
         self,
@@ -76,14 +72,10 @@ class Uploader:
         try:
             # Load data
             logger.info("Loading OMOP data...")
-            data = self.converter.load_data(
-                max_records=max_records, start_from=start_from
-            )
+            data = self.converter.load_data(max_records=max_records, start_from=start_from)
 
             total_records = len(data["persons"])
-            logger.info(
-                f"Processing {total_records} records with {self.workers} workers..."
-            )
+            logger.info(f"Processing {total_records} records with {self.workers} workers...")
 
             # Process in parallel batches
             with ThreadPoolExecutor(max_workers=self.workers) as executor:
@@ -125,20 +117,12 @@ class Uploader:
                 person_id = person.get("person_id") or person.get("PERSON_ID")
 
                 # Get related data (handle both case variations)
-                conditions = [
-                    c
-                    for c in data.get("conditions", [])
-                    if (c.get("person_id") or c.get("PERSON_ID")) == person_id
-                ]
+                conditions = [c for c in data.get("conditions", []) if (c.get("person_id") or c.get("PERSON_ID")) == person_id]
                 medications = [
-                    m
-                    for m in data.get("medications", [])
-                    if (m.get("person_id") or m.get("PERSON_ID")) == person_id
+                    m for m in data.get("medications", []) if (m.get("person_id") or m.get("PERSON_ID")) == person_id
                 ]
                 observations = [
-                    o
-                    for o in data.get("observations", [])
-                    if (o.get("person_id") or o.get("PERSON_ID")) == person_id
+                    o for o in data.get("observations", []) if (o.get("person_id") or o.get("PERSON_ID")) == person_id
                 ]
 
                 if dry_run:

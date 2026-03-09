@@ -81,7 +81,11 @@ def atomic_write(path: Path, content: str) -> None:
             except OSError:
                 pass
     with tempfile.NamedTemporaryFile(
-        mode="w", encoding="utf-8", dir=str(path.parent), prefix=f".{path.name}.", delete=False
+        mode="w",
+        encoding="utf-8",
+        dir=str(path.parent),
+        prefix=f".{path.name}.",
+        delete=False,
     ) as tmp:
         tmp.write(content)
         tmp.flush()
