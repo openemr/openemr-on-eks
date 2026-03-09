@@ -37,6 +37,11 @@ on:
   # Manual trigger
   workflow_dispatch:
 
+# Cancel in-progress runs when a new commit is pushed to the same branch/PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
 # Required permissions
 permissions:
   contents: read         # Read repository contents

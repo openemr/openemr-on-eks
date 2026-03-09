@@ -16,12 +16,9 @@ from credential_rotation.validators import ValidationError, validate_openemr_hea
 
 class TestValidateRdsConnection:
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_success(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_success(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = (1,)
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "db.example.com", "username": "user", "password": "pw", "dbname": "openemr", "port": 3306}
@@ -38,12 +35,9 @@ class TestValidateRdsConnection:
             validate_rds_connection(slot)
 
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_unexpected_query_result_raises_validation_error(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_unexpected_query_result_raises_validation_error(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = (0,)
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d"}
@@ -51,12 +45,9 @@ class TestValidateRdsConnection:
             validate_rds_connection(slot)
 
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_null_result_raises_validation_error(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_null_result_raises_validation_error(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = None
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d"}
@@ -64,12 +55,9 @@ class TestValidateRdsConnection:
             validate_rds_connection(slot)
 
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_ssl_disabled_when_ssl_required_false(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_ssl_disabled_when_ssl_required_false(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = (1,)
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d", "ssl_required": False}
@@ -79,12 +67,9 @@ class TestValidateRdsConnection:
         assert call_kwargs.get("ssl") is None
 
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_ssl_enabled_by_default(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_ssl_enabled_by_default(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = (1,)
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d"}
@@ -94,12 +79,9 @@ class TestValidateRdsConnection:
         assert call_kwargs.get("ssl") == {"ssl": {}}
 
     @patch("credential_rotation.validators.pymysql.connect")
-    def test_default_port(self, mock_connect):
-        mock_cursor = MagicMock()
+    def test_default_port(self, mock_connect, mock_pymysql_conn):
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_cursor.fetchone.return_value = (1,)
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
         mock_connect.return_value = mock_conn
 
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d"}

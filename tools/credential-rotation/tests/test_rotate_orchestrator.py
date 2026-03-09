@@ -16,50 +16,11 @@ import pymysql
 import pytest
 
 from credential_rotation.rotate import (
-    RotationContext,
-    RotationOrchestrator,
     main_json_error,
 )
 from credential_rotation.secrets_manager import SecretsManagerSlots, SlotSecretState
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _make_context(tmp_path: Path, dry_run: bool = False, health_url: str | None = None) -> RotationContext:
-    return RotationContext(
-        region="us-east-1",
-        rds_slots_secret_id="arn:slots",
-        rds_admin_secret_id="arn:admin",
-        sites_mount_root=str(tmp_path),
-        k8s_namespace="openemr",
-        k8s_deployment_name="openemr",
-        k8s_secret_name="openemr-db-credentials",
-        openemr_health_url=health_url,
-        dry_run=dry_run,
-    )
-
-
-def _slot(name: str = "a", host: str = "db.example.com", port: str = "3306", dbname: str = "openemr") -> Dict[str, Any]:
-    return {
-        "host": host,
-        "port": port,
-        "username": f"openemr_{name}",
-        "password": f"pass_{name}",
-        "dbname": dbname,
-    }
-
-
-def _rds_state(active: str = "A", slot_a: dict | None = None, slot_b: dict | None = None) -> SlotSecretState:
-    return SlotSecretState(
-        secret_arn="arn:slots",
-        payload={
-            "active_slot": active,
-            "A": slot_a or _slot("a"),
-            "B": slot_b or _slot("b"),
-        },
-    )
+from conftest import NoValidateOrchestrator, make_context, make_rds_state, make_slot
 
 
 _SAMPLE_SQLCONF = """\
@@ -90,13 +51,6 @@ $dbase = 'openemr';
 """
 
 
-class _NoValidateOrchestrator(RotationOrchestrator):
-    """Orchestrator subclass that stubs _validate_runtime."""
-
-    def _validate_runtime(self, rds_slot):
-        pass
-
-
 # ---------------------------------------------------------------------------
 # _slot_matches_sqlconf
 # ---------------------------------------------------------------------------
@@ -104,8 +58,8 @@ class _NoValidateOrchestrator(RotationOrchestrator):
 
 class TestSlotMatchesSqlconf:
     def test_exact_match(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
-        slot = _slot("a")
+        orch = NoValidateOrchestrator(make_context(tmp_path))
+        slot = make_slot("a")
         sqlconf = {
             "host": "db.example.com",
             "port": "3306",
@@ -116,8 +70,8 @@ class TestSlotMatchesSqlconf:
         assert orch._slot_matches_sqlconf(slot, sqlconf) is True
 
     def test_mismatch_username(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
-        slot = _slot("a")
+        orch = NoValidateOrchestrator(make_context(tmp_path))
+        slot = make_slot("a")
         sqlconf = {
             "host": "db.example.com",
             "port": "3306",
@@ -128,14 +82,14 @@ class TestSlotMatchesSqlconf:
         assert orch._slot_matches_sqlconf(slot, sqlconf) is False
 
     def test_mismatch_password(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
-        slot = _slot("a")
+        orch = NoValidateOrchestrator(make_context(tmp_path))
+        slot = make_slot("a")
         sqlconf = {"host": "db.example.com", "port": "3306", "username": "openemr_a", "password": "wrong", "dbname": "openemr"}
         assert orch._slot_matches_sqlconf(slot, sqlconf) is False
 
     def test_mismatch_host(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
-        slot = _slot("a")
+        orch = NoValidateOrchestrator(make_context(tmp_path))
+        slot = make_slot("a")
         sqlconf = {
             "host": "other-host.com",
             "port": "3306",
@@ -146,13 +100,13 @@ class TestSlotMatchesSqlconf:
         assert orch._slot_matches_sqlconf(slot, sqlconf) is False
 
     def test_port_defaults(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
+        orch = NoValidateOrchestrator(make_context(tmp_path))
         slot = {"host": "h", "username": "u", "password": "p", "dbname": "d"}
         sqlconf = {"host": "h", "username": "u", "password": "p", "dbname": "d"}
         assert orch._slot_matches_sqlconf(slot, sqlconf) is True
 
     def test_port_coerced_to_string(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
+        orch = NoValidateOrchestrator(make_context(tmp_path))
         slot = {"host": "h", "port": 3306, "username": "u", "password": "p", "dbname": "d"}
         sqlconf = {"host": "h", "port": "3306", "username": "u", "password": "p", "dbname": "d"}
         assert orch._slot_matches_sqlconf(slot, sqlconf) is True
@@ -165,7 +119,7 @@ class TestSlotMatchesSqlconf:
 
 class TestEnsureSlotInitialized:
     def test_fills_missing_fields(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
+        orch = NoValidateOrchestrator(make_context(tmp_path))
         slot: Dict[str, Any] = {}
         with patch("credential_rotation.rotate.generate_password", return_value="gen_pwd"):
             orch._ensure_slot_initialized(slot, fallback_host="fb_host", fallback_db="fb_db")
@@ -176,7 +130,7 @@ class TestEnsureSlotInitialized:
         assert slot["dbname"] == "fb_db"
 
     def test_does_not_overwrite_existing_fields(self, tmp_path):
-        orch = _NoValidateOrchestrator(_make_context(tmp_path))
+        orch = NoValidateOrchestrator(make_context(tmp_path))
         slot = {"username": "existing", "password": "existing_pw", "host": "my_host", "port": "5432", "dbname": "my_db"}
         orch._ensure_slot_initialized(slot, fallback_host="fb_host", fallback_db="fb_db")
         assert slot["username"] == "existing"
@@ -195,12 +149,12 @@ class TestBootstrapSlotsFromSqlconf:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", side_effect=["pw_a", "pw_b"])
     def test_bootstrap_dry_run_skips_upsert(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=True)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=True)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
         orch._upsert_openemr_db_user = MagicMock()
 
-        rds_state = _rds_state()
+        rds_state = make_rds_state()
         sqlconf = {"host": "h", "port": "3306", "dbname": "openemr"}
 
         orch._bootstrap_slots_from_sqlconf(sqlconf, rds_state, active="A", standby="B")
@@ -212,12 +166,12 @@ class TestBootstrapSlotsFromSqlconf:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", side_effect=["pw_a", "pw_b"])
     def test_bootstrap_creates_app_users_and_updates_secret(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=False)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=False)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
         orch._upsert_openemr_db_user = MagicMock()
 
-        rds_state = _rds_state()
+        rds_state = make_rds_state()
         sqlconf = {"host": "h", "port": "3306", "dbname": "openemr"}
 
         orch._bootstrap_slots_from_sqlconf(sqlconf, rds_state, active="A", standby="B")
@@ -246,12 +200,12 @@ class TestReconcileActiveSlotToStandby:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     def test_reconcile_flips_active_and_rotates_old(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=False)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=False)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
         orch._upsert_openemr_db_user = MagicMock()
 
-        rds_state = _rds_state(active="A")
+        rds_state = make_rds_state(active="A")
         orch.secrets.get_secret.return_value = rds_state
         orch.secrets.standby_slot = SecretsManagerSlots.standby_slot
 
@@ -264,12 +218,12 @@ class TestReconcileActiveSlotToStandby:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     def test_reconcile_dry_run_skips_put(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=True)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=True)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
         orch._upsert_openemr_db_user = MagicMock()
 
-        rds_state = _rds_state(active="A")
+        rds_state = make_rds_state(active="A")
         orch.secrets.get_secret.return_value = rds_state
         orch.secrets.standby_slot = SecretsManagerSlots.standby_slot
 
@@ -287,10 +241,10 @@ class TestRotateOldSlot:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", return_value="rotated_pw")
     def test_dry_run_does_not_mutate(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=True)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=True)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
-        orch.secrets.get_secret.return_value = _rds_state()
+        orch.secrets.get_secret.return_value = make_rds_state()
         orch._upsert_openemr_db_user = MagicMock()
 
         orch._rotate_old_slot(new_active="A", old_slot="B")
@@ -302,10 +256,10 @@ class TestRotateOldSlot:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", return_value="rotated_pw")
     def test_rotates_old_slot_password(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path, dry_run=False)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=False)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
-        orch.secrets.get_secret.return_value = _rds_state()
+        orch.secrets.get_secret.return_value = make_rds_state()
         orch._upsert_openemr_db_user = MagicMock()
 
         orch._rotate_old_slot(new_active="A", old_slot="B")
@@ -329,14 +283,11 @@ class TestRotateOldSlot:
 
 class TestUpsertOpenemrDbUser:
     @patch("credential_rotation.rotate.pymysql.connect")
-    def test_upsert_creates_and_grants(self, mock_connect, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+    def test_upsert_creates_and_grants(self, mock_connect, tmp_path, mock_pymysql_conn):
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_connect.return_value = mock_conn
 
         admin = {"host": "admin-host", "port": 3306, "username": "admin", "password": "admin_pw"}
@@ -357,8 +308,8 @@ class TestUpsertOpenemrDbUser:
 
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_upsert_rejects_unsafe_dbname(self, mock_connect, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch._load_admin_secret = MagicMock(return_value={"host": "h", "port": 3306, "username": "a", "password": "p"})
 
         slot = {"host": "h", "port": "3306", "username": "u", "password": "p", "dbname": "openemr; DROP TABLE"}
@@ -367,8 +318,8 @@ class TestUpsertOpenemrDbUser:
 
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_upsert_closes_connection_on_error(self, mock_connect, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch._load_admin_secret = MagicMock(return_value={"host": "h", "port": 3306, "username": "a", "password": "p"})
 
         mock_cursor = MagicMock()
@@ -393,8 +344,8 @@ class TestUpsertOpenemrDbUser:
 class TestLoadAdminSecret:
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_returns_admin_when_password_works(self, mock_connect, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
 
         admin_payload = {"host": "h", "port": 3306, "username": "admin", "password": "good_pw"}
@@ -410,8 +361,8 @@ class TestLoadAdminSecret:
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_tries_slot_passwords_on_drift(self, mock_connect, tmp_path):
         """When the admin secret's password is stale, fall back to slot passwords."""
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
 
         admin_payload = {"host": "h", "port": 3306, "username": "admin", "password": "stale_pw"}
@@ -442,8 +393,8 @@ class TestLoadAdminSecret:
 
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_raises_when_no_password_works(self, mock_connect, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
 
         admin_payload = {"host": "h", "port": 3306, "username": "admin", "password": "bad_pw"}
@@ -473,18 +424,15 @@ class TestLoadAdminSecret:
 class TestRotateAdminPassword:
     @patch("credential_rotation.rotate.generate_password", return_value="new_admin_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
-    def test_rotates_admin_password_successfully(self, mock_connect, mock_gen, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+    def test_rotates_admin_password_successfully(self, mock_connect, mock_gen, tmp_path, mock_pymysql_conn):
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
 
         admin = {"host": "h", "port": 3306, "username": "admin", "password": "old_pw"}
         orch._load_admin_secret = MagicMock(return_value=admin)
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, mock_cursor = mock_pymysql_conn
         mock_connect.return_value = mock_conn
 
         orch._rotate_admin_password()
@@ -509,10 +457,10 @@ class TestSyncDbUsers:
     @patch("credential_rotation.rotate.validate_rds_connection")
     @patch("credential_rotation.rotate.generate_password", return_value="gen_pw")
     def test_syncs_both_slots(self, mock_gen, mock_validate, tmp_path):
-        ctx = _make_context(tmp_path)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
-        orch.secrets.get_secret.return_value = _rds_state()
+        orch.secrets.get_secret.return_value = make_rds_state()
         orch._upsert_openemr_db_user = MagicMock()
 
         orch.sync_db_users()
@@ -535,8 +483,8 @@ class TestRotateFlow:
         return sqlconf
 
     def _make_orch(self, tmp_path, dry_run=False):
-        ctx = _make_context(tmp_path, dry_run=dry_run)
-        orch = _NoValidateOrchestrator(ctx)
+        ctx = make_context(tmp_path, dry_run=dry_run)
+        orch = NoValidateOrchestrator(ctx)
         orch.secrets = MagicMock()
         orch.secrets.standby_slot = SecretsManagerSlots.standby_slot
         return orch
@@ -563,16 +511,14 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_dry_run_returns_early(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         self._setup_sqlconf(tmp_path, _SAMPLE_SQLCONF)
         orch = self._make_orch(tmp_path, dry_run=True)
-        self._setup_secrets(orch, _rds_state())
+        self._setup_secrets(orch, make_rds_state())
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         orch.rotate()
@@ -589,17 +535,15 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_normal_rotation_active_a(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         """Config matches active slot A; should rotate to standby slot B."""
         self._setup_sqlconf(tmp_path, _SAMPLE_SQLCONF)
         orch = self._make_orch(tmp_path, dry_run=False)
-        self._setup_secrets(orch, _rds_state(active="A"))
+        self._setup_secrets(orch, make_rds_state(active="A"))
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         orch.rotate()
@@ -619,18 +563,19 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_bootstrap_when_neither_slot_matches(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         """When sqlconf doesn't match either slot, bootstrap both slots."""
         self._setup_sqlconf(tmp_path, _SAMPLE_SQLCONF_UNKNOWN)
         orch = self._make_orch(tmp_path, dry_run=False)
 
-        initial_state = _rds_state(active="A")
+        initial_state = make_rds_state(active="A")
         admin_state = SlotSecretState(
             secret_arn="arn:admin",
             payload={"host": "db.example.com", "port": 3306, "username": "admin", "password": "admin_pw"},
         )
-        post_bootstrap_state = _rds_state(
+        post_bootstrap_state = make_rds_state(
             active="A",
             slot_a={
                 "host": "db.example.com",
@@ -660,10 +605,7 @@ class TestRotateFlow:
 
         orch.secrets.get_secret.side_effect = get_secret_side_effect
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         orch.rotate()
@@ -678,17 +620,15 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_reconcile_when_standby_matches(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         """When sqlconf matches the standby slot, reconcile (flip active_slot)."""
         self._setup_sqlconf(tmp_path, _SAMPLE_SQLCONF_STANDBY)
         orch = self._make_orch(tmp_path, dry_run=False)
-        self._setup_secrets(orch, _rds_state(active="A"))
+        self._setup_secrets(orch, make_rds_state(active="A"))
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         orch.rotate()
@@ -704,17 +644,15 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_rollback_triggered_on_failure(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         """Verify rollback is triggered when an exception occurs during rotation."""
         self._setup_sqlconf(tmp_path, _SAMPLE_SQLCONF)
         orch = self._make_orch(tmp_path, dry_run=False)
-        self._setup_secrets(orch, _rds_state(active="A"))
+        self._setup_secrets(orch, make_rds_state(active="A"))
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         mock_k8s.side_effect = RuntimeError("K8s patch failed")
@@ -732,7 +670,8 @@ class TestRotateFlow:
     @patch("credential_rotation.rotate.generate_password", return_value="new_pw")
     @patch("credential_rotation.rotate.pymysql.connect")
     def test_active_b_rotates_old_slot_only(
-        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate, mock_atomic, mock_k8s, mock_rollout, tmp_path
+        self, mock_pymysql, mock_gen, mock_health, mock_rds_validate,
+        mock_atomic, mock_k8s, mock_rollout, tmp_path, mock_pymysql_conn
     ):
         """When config matches active B, just rotate the old slot (A) — no flip."""
         sqlconf_b = """\
@@ -745,12 +684,9 @@ $dbase = 'openemr';
 """
         self._setup_sqlconf(tmp_path, sqlconf_b)
         orch = self._make_orch(tmp_path, dry_run=False)
-        self._setup_secrets(orch, _rds_state(active="B"))
+        self._setup_secrets(orch, make_rds_state(active="B"))
 
-        mock_cursor = MagicMock()
-        mock_conn = MagicMock()
-        mock_conn.cursor.return_value.__enter__ = lambda s: mock_cursor
-        mock_conn.cursor.return_value.__exit__ = MagicMock(return_value=False)
+        mock_conn, _ = mock_pymysql_conn
         mock_pymysql.return_value = mock_conn
 
         orch.rotate()
