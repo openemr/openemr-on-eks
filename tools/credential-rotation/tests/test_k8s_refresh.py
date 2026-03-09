@@ -1,7 +1,10 @@
 import base64
 from unittest.mock import patch, MagicMock
 
-from credential_rotation.k8s_refresh import update_k8s_db_secret, rollout_restart_deployment
+from credential_rotation.k8s_refresh import (
+    update_k8s_db_secret,
+    rollout_restart_deployment,
+)
 
 
 @patch("credential_rotation.k8s_refresh._load_k8s_config")
@@ -10,7 +13,12 @@ def test_update_k8s_db_secret_patches_correct_data(mock_client, mock_config):
     mock_v1 = MagicMock()
     mock_client.CoreV1Api.return_value = mock_v1
 
-    slot = {"host": "db.example.com", "username": "openemr_a", "password": "s3cret!", "dbname": "openemr"}
+    slot = {
+        "host": "db.example.com",
+        "username": "openemr_a",
+        "password": "s3cret!",
+        "dbname": "openemr",
+    }
     update_k8s_db_secret(namespace="openemr", secret_name="openemr-db-credentials", slot=slot)
 
     mock_v1.patch_namespaced_secret.assert_called_once()

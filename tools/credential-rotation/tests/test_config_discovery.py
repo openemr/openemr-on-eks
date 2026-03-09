@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from credential_rotation.config_discovery import RuntimeConfigPaths, discover_runtime_paths
+from credential_rotation.config_discovery import (
+    RuntimeConfigPaths,
+    discover_runtime_paths,
+)
 
 
 def test_discover_runtime_paths_success(tmp_path: Path):

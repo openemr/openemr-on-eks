@@ -7,7 +7,11 @@ from unittest.mock import MagicMock, patch
 import pymysql
 import pytest
 
-from credential_rotation.validators import ValidationError, validate_openemr_health, validate_rds_connection
+from credential_rotation.validators import (
+    ValidationError,
+    validate_openemr_health,
+    validate_rds_connection,
+)
 
 # ---------------------------------------------------------------------------
 # validate_rds_connection
@@ -21,7 +25,13 @@ class TestValidateRdsConnection:
         mock_cursor.fetchone.return_value = (1,)
         mock_connect.return_value = mock_conn
 
-        slot = {"host": "db.example.com", "username": "user", "password": "pw", "dbname": "openemr", "port": 3306}
+        slot = {
+            "host": "db.example.com",
+            "username": "user",
+            "password": "pw",
+            "dbname": "openemr",
+            "port": 3306,
+        }
         validate_rds_connection(slot)
 
         mock_connect.assert_called_once()
@@ -60,7 +70,13 @@ class TestValidateRdsConnection:
         mock_cursor.fetchone.return_value = (1,)
         mock_connect.return_value = mock_conn
 
-        slot = {"host": "h", "username": "u", "password": "p", "dbname": "d", "ssl_required": False}
+        slot = {
+            "host": "h",
+            "username": "u",
+            "password": "p",
+            "dbname": "d",
+            "ssl_required": False,
+        }
         validate_rds_connection(slot)
 
         call_kwargs = mock_connect.call_args.kwargs

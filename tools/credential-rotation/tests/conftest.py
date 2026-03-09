@@ -11,7 +11,6 @@ import pytest
 from credential_rotation.rotate import RotationContext, RotationOrchestrator
 from credential_rotation.secrets_manager import SlotSecretState
 
-
 # ---------------------------------------------------------------------------
 # Orchestrator subclass that stubs _validate_runtime
 # ---------------------------------------------------------------------------
@@ -43,7 +42,12 @@ def make_context(tmp_path: Path, dry_run: bool = False, health_url: str | None =
     )
 
 
-def make_slot(name: str = "a", host: str = "db.example.com", port: str = "3306", dbname: str = "openemr") -> Dict[str, Any]:
+def make_slot(
+    name: str = "a",
+    host: str = "db.example.com",
+    port: str = "3306",
+    dbname: str = "openemr",
+) -> Dict[str, Any]:
     return {
         "host": host,
         "port": port,

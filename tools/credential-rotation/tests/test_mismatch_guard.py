@@ -13,8 +13,20 @@ $dbase = 'openemr';
 """
     parsed = parse_sqlconf(sqlconf_content)
 
-    slot_a = {"host": "db.example.com", "port": "3306", "username": "openemr_a", "password": "password_a", "dbname": "openemr"}
-    slot_b = {"host": "db.example.com", "port": "3306", "username": "openemr_b", "password": "password_b", "dbname": "openemr"}
+    slot_a = {
+        "host": "db.example.com",
+        "port": "3306",
+        "username": "openemr_a",
+        "password": "password_a",
+        "dbname": "openemr",
+    }
+    slot_b = {
+        "host": "db.example.com",
+        "port": "3306",
+        "username": "openemr_b",
+        "password": "password_b",
+        "dbname": "openemr",
+    }
 
     def matches(slot, conf):
         return (

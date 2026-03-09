@@ -7,7 +7,12 @@ from unittest.mock import patch
 
 import pytest
 
-from credential_rotation.efs_editor import atomic_write, parse_sqlconf, read_text, render_sqlconf
+from credential_rotation.efs_editor import (
+    atomic_write,
+    parse_sqlconf,
+    read_text,
+    render_sqlconf,
+)
 
 # ---------------------------------------------------------------------------
 # read_text
@@ -103,7 +108,13 @@ $login = 'user';
 $pass  = 'pw';
 $dbase = 'db';
 """
-        slot = {"host": "h", "port": "3306", "username": "u", "password": "p", "dbname": "d"}
+        slot = {
+            "host": "h",
+            "port": "3306",
+            "username": "u",
+            "password": "p",
+            "dbname": "d",
+        }
         with pytest.raises(ValueError, match=r"Unable to locate \$host"):
             render_sqlconf(content, slot)
 
@@ -115,7 +126,13 @@ $port = '3306';
 $pass  = 'pw';
 $dbase = 'db';
 """
-        slot = {"host": "h", "port": "3306", "username": "u", "password": "p", "dbname": "d"}
+        slot = {
+            "host": "h",
+            "port": "3306",
+            "username": "u",
+            "password": "p",
+            "dbname": "d",
+        }
         with pytest.raises(ValueError, match=r"Unable to locate \$login"):
             render_sqlconf(content, slot)
 
@@ -127,7 +144,13 @@ $port = '3306';
 $login = 'u';
 $dbase = 'db';
 """
-        slot = {"host": "h", "port": "3306", "username": "u", "password": "p", "dbname": "d"}
+        slot = {
+            "host": "h",
+            "port": "3306",
+            "username": "u",
+            "password": "p",
+            "dbname": "d",
+        }
         with pytest.raises(ValueError, match=r"Unable to locate \$pass"):
             render_sqlconf(content, slot)
 

@@ -25,7 +25,13 @@ def test_rollback_restores_sqlconf_and_k8s(mock_k8s_secret, mock_rollout, mock_a
     ctx = make_context(tmp_path)
     orch = _DummyOrchestrator(ctx)
 
-    active_slot = {"host": "h", "port": 3306, "username": "u", "password": "p", "dbname": "d"}
+    active_slot = {
+        "host": "h",
+        "port": 3306,
+        "username": "u",
+        "password": "p",
+        "dbname": "d",
+    }
     orch._rollback(sqlconf, "original-content", active_slot)
 
     mock_atomic_write.assert_called_once_with(sqlconf, "original-content")
@@ -53,7 +59,13 @@ def test_rollback_calls_in_correct_order(mock_k8s_secret, mock_rollout, mock_ato
 
     orch = _OrderTrackingOrch(ctx)
     sqlconf = tmp_path / "sqlconf.php"
-    active_slot = {"host": "h", "port": 3306, "username": "u", "password": "p", "dbname": "d"}
+    active_slot = {
+        "host": "h",
+        "port": 3306,
+        "username": "u",
+        "password": "p",
+        "dbname": "d",
+    }
     orch._rollback(sqlconf, "orig", active_slot)
 
     assert call_order == ["atomic_write", "k8s_secret", "rollout", "validate"]

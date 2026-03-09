@@ -27,7 +27,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--dry-run", action="store_true", help="Evaluate flow without mutating state")
     parser.add_argument("--log-json", action="store_true", help="Emit structured JSON status output")
     parser.add_argument(
-        "--fix-permissions", action="store_true", help="Only fix sqlconf.php permissions (chmod 644), then exit"
+        "--fix-permissions",
+        action="store_true",
+        help="Only fix sqlconf.php permissions (chmod 644), then exit",
     )
     parser.add_argument(
         "--sync-db-users",

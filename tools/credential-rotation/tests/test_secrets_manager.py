@@ -2,7 +2,11 @@ import string
 
 import pytest
 
-from credential_rotation.secrets_manager import SecretsManagerSlots, SlotSecretState, generate_password
+from credential_rotation.secrets_manager import (
+    SecretsManagerSlots,
+    SlotSecretState,
+    generate_password,
+)
 
 
 def test_standby_slot_a_returns_b():
