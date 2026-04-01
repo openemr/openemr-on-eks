@@ -334,7 +334,7 @@ variable "openemr_scale_up_stabilization_seconds" {
 variable "openemr_version" {
   description = "OpenEMR Docker image version to deploy (use specific versions for production)"
   type        = string
-  default     = "8.0.0" # Stable OpenEMR version
+  default     = "8.1.0" # Stable OpenEMR version
 
   # Validation ensures proper version format
   validation {

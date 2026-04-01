@@ -39,14 +39,14 @@ repos:
   # Python Code Quality
   # ===========================================================================
   - repo: https://github.com/psf/black
-    rev: 26.1.0
+    rev: 26.3.1
     hooks:
       - id: black
         language_version: python3
         types: [python]
 
   - repo: https://github.com/pycqa/isort
-    rev: 8.0.0
+    rev: 8.0.1
     hooks:
       - id: isort
         args: ["--profile", "black"]
@@ -78,7 +78,7 @@ repos:
 
   # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
   - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.499
+    rev: 3.2.513
     hooks:
       - id: checkov
         args: [
@@ -144,7 +144,7 @@ repos:
   # Documentation and YAML
   # ===========================================================================
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.47.0
+    rev: v0.48.0
     hooks:
       - id: markdownlint
         args: ["--fix", "--config", ".markdownlint.json"]

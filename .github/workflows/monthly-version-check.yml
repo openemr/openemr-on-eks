@@ -61,8 +61,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.14.6"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.35.2"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.14.8"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.35.3"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -99,7 +99,7 @@ jobs:
 
       # Step 3: Set up kubectl for Kubernetes version checking
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v4.0.1
+        uses: azure/setup-kubectl@v5.0.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 

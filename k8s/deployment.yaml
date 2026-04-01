@@ -277,7 +277,7 @@ spec:
 
       # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
-        image: fluent/fluent-bit:4.2.3                                        # Fluent Bit log processor and forwarder
+        image: fluent/fluent-bit:5.0.1                                        # Fluent Bit log processor and forwarder
 
         # Container-level security context for Fluent Bit
         # trivy:ignore:AVD-KSV-0012 Fluent Bit needs root to read log files
@@ -339,7 +339,7 @@ spec:
         # Liveness probe for Fluent Bit sidecar
         livenessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.3)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.1)
             port: 2020            # Fluent Bit HTTP monitoring endpoint
           initialDelaySeconds: 30 # Fluent Bit starts quickly
           periodSeconds: 30       # Check every 30 seconds
@@ -348,7 +348,7 @@ spec:
         # Readiness probe for Fluent Bit sidecar
         readinessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 4.2.3)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.1)
             port: 2020            # Fluent Bit HTTP monitoring port
           initialDelaySeconds: 15 # Fluent Bit starts quickly
           periodSeconds: 15       # Check every 15 seconds

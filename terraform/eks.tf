@@ -123,7 +123,7 @@ resource "time_sleep" "wait_for_compute" {
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "metrics-server"    # Essential for autoscaling
-  addon_version               = "v0.8.1-eksbuild.1" # Latest stable version for Kubernetes 1.35
+  addon_version               = "v0.8.1-eksbuild.4" # Latest stable version for Kubernetes 1.35
   resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
 
@@ -147,7 +147,7 @@ resource "aws_eks_addon" "metrics_server" {
 resource "aws_eks_addon" "efs_csi_driver" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "aws-efs-csi-driver" # CSI driver for EFS integration
-  addon_version               = "v2.3.0-eksbuild.2"  # Latest stable version for Kubernetes 1.35
+  addon_version               = "v2.3.1-eksbuild.1"  # Latest stable version for Kubernetes 1.35
   resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
 

@@ -6,7 +6,7 @@
 # provisioning across different environments and team members.
 terraform {
   # Minimum Terraform version required for this configuration
-  required_version = ">= 1.14.6"
+  required_version = ">= 1.14.8"
 
   # Provider version constraints to ensure consistent behavior
   # Pinning to specific versions prevents unexpected breaking changes

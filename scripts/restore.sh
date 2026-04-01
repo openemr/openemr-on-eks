@@ -82,7 +82,7 @@ readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}     # Storage lim
 # Default configuration values
 readonly DEFAULT_NAMESPACE="openemr"
 readonly DEFAULT_AWS_REGION="us-west-2"
-readonly DEFAULT_OPENEMR_VERSION="8.0.0"
+readonly DEFAULT_OPENEMR_VERSION="8.1.0"
 
 # Script directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

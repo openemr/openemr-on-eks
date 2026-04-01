@@ -61,8 +61,8 @@ permissions:
 # Environment variables for consistent tool versions across all jobs
 env:
   PYTHON_VERSION: '3.14.3'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.14.6' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.35.2'  # kubectl version for Kubernetes manifest validation
+  TERRAFORM_VERSION: '1.14.8' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.35.3'  # kubectl version for Kubernetes manifest validation
 
 jobs:
   # Primary test job - runs test suites in parallel using matrix strategy
@@ -113,7 +113,7 @@ jobs:
 
       # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4.0.1
+        uses: azure/setup-kubectl@v5.0.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -212,7 +212,7 @@ jobs:
 
       # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v4.0.1
+        uses: azure/setup-kubectl@v5.0.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -457,7 +457,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
           # Install test dependencies (versions pinned to match versions.yaml)
-          pip install pytest==9.0.2 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.1
+          pip install pytest==9.0.2 pytest-cov==7.1.0 flake8==7.3.0 black==26.3.1 mypy==1.20.0
 
       # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
@@ -543,7 +543,7 @@ jobs:
           cd tools/credential-rotation
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest==9.0.2 pytest-cov==7.0.0 flake8==7.3.0 black==25.12.0 mypy==1.19.1
+          pip install pytest==9.0.2 pytest-cov==7.1.0 flake8==7.3.0 black==26.3.1 mypy==1.20.0
 
       - name: Run pytest with coverage
         run: |
