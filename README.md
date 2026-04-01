@@ -6,7 +6,7 @@
 <p>
   <a href="../../blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
-  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.0.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
+  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.1.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
 </p>
 
 <table>
@@ -66,7 +66,7 @@
   <a href="console/README.md"><img src="https://img.shields.io/badge/Console_TUI-v6.3.0-00ADD8?style=flat&logo=go&logoColor=white" alt="Console TUI"></a>
   <a href="warp/README.md"><img src="https://img.shields.io/badge/Warp-v0.2.0-3776AB?style=flat&logo=python&logoColor=white" alt="Warp"></a>
   <a href="tools/credential-rotation/README.md"><img src="https://img.shields.io/badge/Credential_Rotation-available-6D4C9F?style=flat&logo=amazonaws&logoColor=white" alt="Credential Rotation"></a>
-  <a href="monitoring/README.md"><img src="https://img.shields.io/badge/Monitoring-full_stack-E6522C?style=flat&logo=prometheus&logoColor=white" alt="Monitoring"></a>
+  <a href="monitoring/README.md"><img src="https://img.shields.io/badge/Monitoring-Grafana_Loki_Mimir_OTEBPF_Prometheus_Tempo-E6522C?style=flat&logo=prometheus&logoColor=white" alt="Monitoring"></a>
 </td>
 </tr>
 </table>
