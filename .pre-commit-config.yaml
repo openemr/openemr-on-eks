@@ -78,7 +78,7 @@ repos:
 
   # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
   - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.513
+    rev: 3.2.526
     hooks:
       - id: checkov
         args: [

@@ -67,12 +67,12 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 82.16.0)
-#   CHART_LOKI_VERSION         Loki chart version (default: 6.55.0)
-#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.8.0)
-#   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.5)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 84.4.0)
+#   CHART_LOKI_VERSION         Loki chart version (default: 7.0.0)
+#   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.17.8)
+#   CHART_MIMIR_VERSION        Mimir chart version (default: 6.0.6)
 #   OTEBPF_VERSION             OTeBPF version (default: v0.4.1)
-#   CERT_MANAGER_VERSION       cert-manager version (default: v1.19.1)
+#   CERT_MANAGER_VERSION       cert-manager version (default: v1.20.2)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Timeout and Retry Configuration                                         │
@@ -229,10 +229,10 @@ readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-82.16.0}"
-readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-6.55.0}"
-readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.8.0}"
-readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.5}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-84.4.0}"
+readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-7.0.0}"
+readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.17.8}"
+readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.0.6}"
 # OpenTelemetry eBPF Instrumentation version (OTeBPF)
 # Using Docker Hub image: otel/ebpf-instrument
 # Official image repository: https://hub.docker.com/r/otel/ebpf-instrument
@@ -263,7 +263,7 @@ readonly ALERTMANAGER_REPEAT_INTERVAL="${ALERTMANAGER_REPEAT_INTERVAL:-24h}"    
 readonly LOKI_INDEX_PERIOD="${LOKI_INDEX_PERIOD:-24h}"  # Period for Loki index rotation
 
 # kubectl wait timeouts (can be shorter than TIMEOUT_KUBECTL for specific operations)
-readonly KUBECTL_WAIT_TIMEOUT_SHORT="${KUBECTL_WAIT_TIMEOUT_SHORT:-180s}"   # Short timeout for quick operations (e.g., Grafana restart)
+readonly KUBECTL_WAIT_TIMEOUT_SHORT="${KUBECTL_WAIT_TIMEOUT_SHORT:-180s}"   # Short timeout for quick operations (preflight / fast checks)
 readonly KUBECTL_WAIT_TIMEOUT_MEDIUM="${KUBECTL_WAIT_TIMEOUT_MEDIUM:-300s}" # Medium timeout for standard operations
 readonly KUBECTL_WAIT_TIMEOUT_LONG="${KUBECTL_WAIT_TIMEOUT_LONG:-600s}"     # Long timeout for slow operations (e.g., Mimir initialization)
 
@@ -514,7 +514,7 @@ readonly TEMPO_SPAN_START_TIME_SHIFT="${TEMPO_SPAN_START_TIME_SHIFT:-1h}"
 readonly TEMPO_SPAN_END_TIME_SHIFT="${TEMPO_SPAN_END_TIME_SHIFT:--1h}"
 
 # ---- cert-manager (pinned version for TLS certificate management)
-readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.19.1}"
+readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.20.2}"
 
 # Colors
 readonly RED='\033[0;31m'; readonly GREEN='\033[0;32m'
@@ -2480,16 +2480,20 @@ verify_installation(){
   fi
   fi
   
-  # Check Grafana - at least one pod should be ready (more lenient due to restart scenarios)
-  if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_SHORT}" >/dev/null 2>&1; then
+  # Check Grafana: prefer Deployment rollout (init containers + Pending during node/CNI bring-up in EKS Auto Mode),
+  # then Ready wait + Running fallback using MEDIUM timeout (same budget as Prometheus / Alertmanager).
+  log_info "Waiting for Grafana deployment rollout..."
+  if kubectl rollout status deployment prometheus-stack-grafana -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_MEDIUM}" >/dev/null 2>&1; then
+    log_info "Grafana deployment rollout complete"
+  elif ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_MEDIUM}" >/dev/null 2>&1; then
     local grafana_running
     grafana_running=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app.kubernetes.io/name=grafana --field-selector=status.phase=Running -o name 2>/dev/null | wc -l | tr -d ' ')
     if [[ "$grafana_running" -gt 0 ]]; then
       log_warn "Grafana pods are running but not all ready (may be restarting) - continuing verification"
     else
       log_error "Grafana pods not ready or running - CRITICAL FAILURE"
-    return 1
-  fi
+      return 1
+    fi
   fi
   
   # Check Alertmanager - at least one pod should be ready
@@ -2859,7 +2863,7 @@ EOF
   if kubectl rollout restart deployment prometheus-stack-grafana -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
     log_info "Waiting for Grafana rollout to complete after restart..."
     # Wait for rollout to complete (this ensures old pods are terminated before new ones start)
-    if kubectl rollout status deployment prometheus-stack-grafana -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_SHORT}" >/dev/null 2>&1; then
+    if kubectl rollout status deployment prometheus-stack-grafana -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_MEDIUM}" >/dev/null 2>&1; then
       log_success "Grafana restarted - CloudWatch/X-Ray datasources should now use IRSA credentials"
     else
       # Rollout didn't complete within timeout - check if at least one Grafana pod is running

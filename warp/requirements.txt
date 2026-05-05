@@ -2,10 +2,10 @@
 # Versions pinned to match versions.yaml for consistency
 
 # Direct database access
-pymysql==1.1.2
+pymysql==1.1.3
 
 # AWS SDK - for S3 data access
-boto3==1.42.80
+boto3==1.43.1
 
 # Transitive dependency pin - CVE-2025-66418, CVE-2025-66471, CVE-2026-21441
 urllib3>=2.6.3

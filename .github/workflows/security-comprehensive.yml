@@ -52,10 +52,10 @@ permissions:
 
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
-  TRIVY_VERSION: '0.69.3'
-  CHECKOV_VERSION: '3.2.513'
+  TRIVY_VERSION: '0.70.0'
+  CHECKOV_VERSION: '3.2.526'
   KICS_VERSION: 'v2.1.20'
-  GOSEC_VERSION: 'v2.25.0'
+  GOSEC_VERSION: 'v2.26.1'
   PYTHON_VERSION: '3.14'
   GO_VERSION: '1.25'
 
@@ -378,7 +378,7 @@ jobs:
           cache-dependency-path: console/go.sum
 
       - name: Install gosec
-        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+        run: go install github.com/securego/gosec/v2/cmd/gosec@${{ env.GOSEC_VERSION }}
 
       - name: Run gosec
         working-directory: console/
