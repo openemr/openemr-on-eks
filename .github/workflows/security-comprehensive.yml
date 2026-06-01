@@ -53,9 +53,9 @@ permissions:
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
   TRIVY_VERSION: '0.70.0'
-  CHECKOV_VERSION: '3.2.526'
+  CHECKOV_VERSION: '3.2.531'
   KICS_VERSION: 'v2.1.20'
-  GOSEC_VERSION: 'v2.26.1'
+  GOSEC_VERSION: 'v2.27.0'
   PYTHON_VERSION: '3.14'
   GO_VERSION: '1.25'
 

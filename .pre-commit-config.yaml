@@ -39,7 +39,7 @@ repos:
   # Python Code Quality
   # ===========================================================================
   - repo: https://github.com/psf/black
-    rev: 26.3.1
+    rev: 26.5.1
     hooks:
       - id: black
         language_version: python3
@@ -78,7 +78,7 @@ repos:
 
   # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
   - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.2.526
+    rev: 3.2.531
     hooks:
       - id: checkov
         args: [
@@ -111,7 +111,7 @@ repos:
   # Terraform Hooks
   # ===========================================================================
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.105.0
+    rev: v1.106.0
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
@@ -159,7 +159,7 @@ repos:
   # Commit Message Validation
   # ===========================================================================
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.13.9
+    rev: v4.16.3
     hooks:
       - id: commitizen
         stages: [commit-msg]

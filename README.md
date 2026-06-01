@@ -53,7 +53,7 @@
 <td>
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Terraform-1.15.0-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
+  <img src="https://img.shields.io/badge/Terraform-1.15.5-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
   <img src="https://img.shields.io/badge/EKS-Auto%20Mode-FF9900?style=flat&logo=amazoneks&logoColor=white" alt="EKS Auto Mode">
   <img src="https://img.shields.io/badge/Kubernetes-1.35-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
   <img src="https://img.shields.io/badge/Aurora-MySQL%208.0-4479A1?style=flat&logo=mysql&logoColor=white" alt="Aurora MySQL">
@@ -702,10 +702,10 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v84.4.0 (metrics & alerting)
+     - Prometheus v86.1.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
-     - Tempo v2.17.8 (distributed tracing with S3 storage, microservice mode)
+     - Tempo v2.23.1 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.0.6 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
@@ -957,7 +957,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v84.4.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v86.1.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
@@ -966,7 +966,7 @@ cd ../scripts
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Tempo**: v2.17.8 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+- 🔍 **Tempo**: v2.23.1 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
 - 📈 **Mimir**: v6.0.6 (long-term metrics storage with S3 backend)

@@ -49,7 +49,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
-      - uses: hashicorp/setup-terraform@v4.0.0
+      - uses: hashicorp/setup-terraform@v4.0.1
 
       - name: Terraform fmt check
         run: terraform fmt -check -recursive terraform/
