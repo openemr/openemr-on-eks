@@ -75,7 +75,7 @@ eks_addons:
 terraform_modules:
   terraform_aws:
     source: "hashicorp/aws"
-    current: "6.28.0"
+    current: "6.47.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "Official AWS provider from Hashicorp for Terraform."

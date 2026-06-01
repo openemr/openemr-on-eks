@@ -12,10 +12,10 @@ terraform {
   # Pinning to specific versions prevents unexpected breaking changes
   required_providers {
     # AWS Provider - Core infrastructure provider for AWS services
-    # Version 6.16.0 provides support for latest AWS services and features
+    # Version 6.47.0 satisfies the EKS module's required AWS provider constraint (>= 6.42.0)
     aws = {
       source  = "hashicorp/aws"
-      version = "6.28.0"
+      version = "6.47.0"
     }
     # Kubernetes Provider - For managing Kubernetes resources
     # Version 2.38.0 supports latest Kubernetes API versions and features
