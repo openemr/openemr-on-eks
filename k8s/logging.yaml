@@ -136,8 +136,8 @@ data:
     [FILTER]
         Name                record_modifier
         Match               *
-        Record              cluster_name openemr-eks-test
-        Record              region us-west-2
+        Record              cluster_name ${CLUSTER_NAME}
+        Record              region ${AWS_REGION}
         Record              openemr_version 8.1.0
         Record              pod_name ${HOSTNAME}
 
@@ -146,8 +146,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               test.logs
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/test
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/test
         log_stream_prefix   test-
         auto_create_group   true
         retry_limit         3
@@ -157,8 +157,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               apache.*
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/apache
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/apache
         log_stream_prefix   apache-
         auto_create_group   true
         retry_limit         3
@@ -168,8 +168,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               forward.logs
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/forward
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/forward
         log_stream_prefix   forward-
         auto_create_group   true
         retry_limit         3
@@ -179,8 +179,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.application
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/application
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/application
         log_stream_prefix   application-
         auto_create_group   true
         retry_limit         3
@@ -190,8 +190,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.system
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/system
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/system
         log_stream_prefix   system-
         auto_create_group   true
         retry_limit         3
@@ -201,8 +201,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.audit
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/audit
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/audit
         log_stream_prefix   audit-
         auto_create_group   true
         retry_limit         3
@@ -212,8 +212,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               openemr.php_error
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/openemr/php_error
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/openemr/php_error
         log_stream_prefix   php-error-
         auto_create_group   true
         retry_limit         3
@@ -223,8 +223,8 @@ data:
     [OUTPUT]
         Name                cloudwatch_logs
         Match               fluent-bit.metrics
-        region              us-west-2
-        log_group_name      /aws/eks/openemr-eks-test/fluent-bit/metrics
+        region              ${AWS_REGION}
+        log_group_name      /aws/eks/${CLUSTER_NAME}/fluent-bit/metrics
         log_stream_prefix   metrics-
         auto_create_group   true
         retry_limit         3
@@ -243,7 +243,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=test, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=test, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -257,7 +257,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=apache, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=apache, cluster=${CLUSTER_NAME}
         label_keys          $tag
         line_format         json
         auto_kubernetes_labels on
@@ -272,7 +272,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=forward, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=forward, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -286,7 +286,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=application, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=application, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -300,7 +300,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=system, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=system, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -314,7 +314,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=audit, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=audit, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -328,7 +328,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=openemr, namespace=openemr, log_type=php_error, cluster=openemr-eks-test
+        labels              job=openemr, namespace=openemr, log_type=php_error, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False
@@ -342,7 +342,7 @@ data:
         host                loki-gateway.monitoring.svc.cluster.local
         port                80
         uri                 /loki/api/v1/push
-        labels              job=fluent-bit, namespace=openemr, log_type=metrics, cluster=openemr-eks-test
+        labels              job=fluent-bit, namespace=openemr, log_type=metrics, cluster=${CLUSTER_NAME}
         line_format         json
         auto_kubernetes_labels on
         Retry_Limit         False

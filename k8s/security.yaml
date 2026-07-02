@@ -22,7 +22,7 @@ metadata:
   annotations:
     # IRSA Annotation - Links this service account to an AWS IAM role
     # The role provides permissions for AWS services (S3, CloudWatch, etc.)
-    eks.amazonaws.com/role-arn: arn:aws:iam::440744216926:role/openemr-service-account-role
+    eks.amazonaws.com/role-arn: ${OPENEMR_ROLE_ARN}
 automountServiceAccountToken: true  # Mount service account token for AWS SDK
 
 ---

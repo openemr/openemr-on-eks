@@ -64,7 +64,7 @@ spec:
       containers:
       # Main OpenEMR application container
       - name: openemr
-        image: openemr/openemr:8.1.1 # OpenEMR Docker image with version from environment
+        image: openemr/openemr:${OPENEMR_VERSION} # OpenEMR Docker image with version from environment
         imagePullPolicy: IfNotPresent             # Only pull if image not present locally
 
         # Container-level security context
@@ -302,13 +302,13 @@ spec:
           protocol: TCP
         env:
           - name: AWS_REGION
-            value: "us-west-2"                                            # AWS region for CloudWatch logs
+            value: "${AWS_REGION}"                                            # AWS region for CloudWatch logs
           - name: CLUSTER_NAME
-            value: "openemr-eks-test"                                          # EKS cluster name for log grouping
+            value: "${CLUSTER_NAME}"                                          # EKS cluster name for log grouping
           - name: AWS_WEB_IDENTITY_TOKEN_FILE
             value: "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"  # IRSA token path
           - name: AWS_ROLE_ARN
-            value: "arn:aws:iam::440744216926:role/openemr-service-account-role"                                      # IAM role ARN for CloudWatch permissions
+            value: "${OPENEMR_ROLE_ARN}"                                      # IAM role ARN for CloudWatch permissions
 
 
         # Resource limits for Fluent Bit sidecar
