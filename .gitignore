@@ -9,6 +9,8 @@ terraform.tfstate
 .idea/*
 backups/*
 test-results/
+.e2e-test-state
+.tools/
 
 # Python virtual environments
 .venv/

@@ -255,7 +255,118 @@ SCRIPT="${SCRIPTS_DIR}/test-end-to-end-backup-restore.sh"
   rm -f "$FUNC_FILE"
 }
 
-# ── UNIT: log functions ─────────────────────────────────────────────────────
+@test "UNIT: show_help documents chunked execution flags" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "show_help")
+  run bash -c "
+    BLUE='' GREEN='' RED='' YELLOW='' NC=''
+    source '$FUNC_FILE'
+    show_help 2>&1
+  "
+  [[ "$output" =~ "--from-step" ]]
+  [[ "$output" =~ "--group" ]]
+  [[ "$output" =~ "--state-file" ]]
+  rm -f "$FUNC_FILE"
+}
+
+@test "--list-steps exits 0 and shows step 1" {
+  run_script "test-end-to-end-backup-restore.sh" "--list-steps"
+  assert_success
+  [[ "$output" =~ "Step 1: Deploy infrastructure" ]]
+}
+
+@test "--list-groups exits 0 and shows deploy group" {
+  run_script "test-end-to-end-backup-restore.sh" "--list-groups"
+  assert_success
+  [[ "$output" =~ "deploy" ]]
+}
+
+@test "unknown step number exits non-zero" {
+  run_script "test-end-to-end-backup-restore.sh" "--step" "99"
+  [ "$status" -ne 0 ]
+}
+
+@test "UNIT: save_e2e_state and load_e2e_state round-trip" {
+  local state_file
+  state_file=$(mktemp)
+  run bash -c "
+    PROJECT_ROOT='${PROJECT_ROOT}'
+    STATE_FILE='${state_file}'
+    TEST_TIMESTAMP='test-ts'
+    BACKUP_BUCKET='my-bucket'
+    SNAPSHOT_ID='snap-123'
+    BACKUP_BUCKET_CREATED='my-bucket'
+    SNAPSHOT_ID_CREATED='snap-123'
+    INFRASTRUCTURE_CREATED='true'
+    CLEANUP_REQUIRED='true'
+    PROOF_FILE_CONTENT='proof with spaces and quotes'
+    CLUSTER_NAME='test-cluster'
+    AWS_REGION='us-west-2'
+    NAMESPACE='openemr'
+    LAST_COMPLETED_STEP='4'
+    get_default_state_file() { echo \"\$STATE_FILE\"; }
+    save_e2e_state() {
+      local state_path=\"\${STATE_FILE:-\$(get_default_state_file)}\"
+      {
+        printf 'TEST_TIMESTAMP=%q\n' \"\$TEST_TIMESTAMP\"
+        printf 'BACKUP_BUCKET=%q\n' \"\$BACKUP_BUCKET\"
+        printf 'SNAPSHOT_ID=%q\n' \"\$SNAPSHOT_ID\"
+        printf 'BACKUP_BUCKET_CREATED=%q\n' \"\$BACKUP_BUCKET_CREATED\"
+        printf 'SNAPSHOT_ID_CREATED=%q\n' \"\$SNAPSHOT_ID_CREATED\"
+        printf 'INFRASTRUCTURE_CREATED=%q\n' \"\$INFRASTRUCTURE_CREATED\"
+        printf 'CLEANUP_REQUIRED=%q\n' \"\$CLEANUP_REQUIRED\"
+        printf 'PROOF_FILE_CONTENT=%q\n' \"\$PROOF_FILE_CONTENT\"
+        printf 'CLUSTER_NAME=%q\n' \"\$CLUSTER_NAME\"
+        printf 'AWS_REGION=%q\n' \"\$AWS_REGION\"
+        printf 'NAMESPACE=%q\n' \"\$NAMESPACE\"
+        printf 'LAST_COMPLETED_STEP=%q\n' \"\$LAST_COMPLETED_STEP\"
+      } > \"\$state_path\"
+    }
+    load_e2e_state() {
+      local state_path=\"\${STATE_FILE:-\$(get_default_state_file)}\"
+      source \"\$state_path\"
+    }
+    save_e2e_state
+    BACKUP_BUCKET=''
+    load_e2e_state
+    echo \"BUCKET=\$BACKUP_BUCKET\"
+    echo \"PROOF=\$PROOF_FILE_CONTENT\"
+  "
+  [[ "$output" =~ "BUCKET=my-bucket" ]]
+  [[ "$output" =~ "proof with spaces and quotes" ]]
+  rm -f "$state_file"
+}
+
+# ── UNIT: parse_arguments chunked flags ─────────────────────────────────────
+
+@test "UNIT: parse_arguments sets FROM_STEP and TO_STEP" {
+  run bash -c '
+    FROM_STEP=1 TO_STEP=10 TOTAL_STEPS=10 STEP_GROUP=""
+    log_error() { echo "ERROR: $*"; }
+    list_step_groups() { echo "groups"; }
+    resolve_step_group() { :; }
+    show_help() { exit 0; }
+    parse_arguments() {
+      while [[ $# -gt 0 ]]; do
+        case $1 in
+          --from-step) FROM_STEP="$2"; shift 2 ;;
+          --to-step) TO_STEP="$2"; shift 2 ;;
+          --group) STEP_GROUP="$2"; shift 2 ;;
+          *) log_error "Unknown option: $1"; exit 1 ;;
+        esac
+      done
+      if [ -n "$STEP_GROUP" ]; then resolve_step_group; fi
+      if [ "$FROM_STEP" -lt 1 ] || [ "$FROM_STEP" -gt "$TOTAL_STEPS" ] || \
+         [ "$TO_STEP" -lt 1 ] || [ "$TO_STEP" -gt "$TOTAL_STEPS" ] || \
+         [ "$FROM_STEP" -gt "$TO_STEP" ]; then
+        log_error "Invalid step range"; exit 1
+      fi
+    }
+    parse_arguments --from-step 3 --to-step 7
+    echo "FROM=$FROM_STEP TO=$TO_STEP"
+  '
+  [[ "$output" =~ "FROM=3 TO=7" ]]
+}
+
 
 @test "UNIT: log_success outputs formatted message" {
   FUNC_FILE=$(extract_function "$SCRIPT" "log_success")

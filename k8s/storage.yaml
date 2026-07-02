@@ -25,7 +25,7 @@ parameters:
   # EFS Access Point provisioning mode for better performance and security
   provisioningMode: efs-ap
   # EFS File System ID - replaced by deployment script with actual EFS ID
-  fileSystemId: ${EFS_ID}
+  fileSystemId: fs-0cfc1dcf729f76070
   # Directory permissions for OpenEMR (root:root with 755 permissions)
   directoryPerms: "0755"
   # Base path within the EFS file system for OpenEMR data
@@ -112,7 +112,7 @@ parameters:
   # EFS Access Point provisioning mode for backup operations
   provisioningMode: efs-ap
   # EFS File System ID - replaced by deployment script with actual EFS ID
-  fileSystemId: ${EFS_ID}
+  fileSystemId: fs-0cfc1dcf729f76070
   # Directory permissions for backup data (root:root with 755 permissions)
   directoryPerms: "0755"
   # Base path within the EFS file system for backup data

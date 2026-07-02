@@ -102,6 +102,13 @@ applications:
 
 ### 2. Version Manager Script (`scripts/version-manager.sh`)
 
+For a quick human-readable summary, use the dashboard wrapper:
+
+```bash
+./scripts/version-dashboard.sh          # Current pinned versions
+./scripts/version-dashboard.sh check    # Check for available updates
+```
+
 The main script for checking and updating versions:
 
 ```bash

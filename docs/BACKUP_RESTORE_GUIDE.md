@@ -815,7 +815,7 @@ For comprehensive testing of the entire backup and restore process, use the auto
 - This test creates and destroys real AWS resources
 - AWS resources will be created and destroyed during testing
 - Requires proper AWS credentials and permissions
-- Test duration: 160-165 minutes (~2.7 hours, measured from actual test runs)
+- Test duration: ~150-160 minutes (~2.5 hours on OpenEMR 8.1.x)
 - Backup creation: ~30-35 seconds, Restore: 38-43 minutes (comprehensive restore with verification)
 
 ## Cross-Region Disaster Recovery

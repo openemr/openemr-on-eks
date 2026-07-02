@@ -94,7 +94,20 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Application Deployment (Kubernetes)
 
-**Total Time:** 22-23 minutes (updated December 2025)
+**Total Time (OpenEMR 8.1.x):** 8-12 minutes typical for `k8s/deploy.sh` end-to-end
+
+| Component | Duration (8.1.x) | Notes |
+|-----------|------------------|-------|
+| **EFS CSI / prerequisites** | 2-4 min | Addon rollouts, PVC binding |
+| **OpenEMR pod ready** | 3-6 min | HTTP readiness; much faster than 8.0.x |
+| **Load Balancer** | 2-3 min | AWS ALB provisioning (parallel with pod startup) |
+| **DB verify + SSL setup** | 1-2 min | Included in deploy.sh |
+
+**OpenEMR 8.1.x (July 2026):** Pod readiness typically **3-6 minutes**; plan **10 minutes** as a safe ceiling.
+
+**December 2025 measurements (OpenEMR 8.0.x era — slower startup):**
+
+**Total Time:** 22-23 minutes (full deploy.sh including slower swarm init)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -117,10 +130,12 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Combined Initial Deployment
 
-**Total Time:** 40-45 minutes
+**Total Time (OpenEMR 8.1.x):** 35-42 minutes
 - Infrastructure (Terraform): 30-32 min
-- Application (Kubernetes): 7-11 min
+- Application (Kubernetes): 3-6 min typical, 8-12 min full deploy.sh
 - Buffer for variations: 2-4 min
+
+**Resume deploy chunk (infra already exists):** 10-15 minutes for steps 2-3 only
 
 ---
 
@@ -349,7 +364,12 @@ These operations have very predictable timing:
 
 These operations can vary significantly:
 
-- **OpenEMR Deployment:** ±135% variation (7-19 min)
+- **OpenEMR Deployment (8.1.x):** ±50% variation (3-10 min)
+  - Normal: 3-6 min to HTTP ready
+  - Spike: ~10 min (pod startup issues)
+  - Recommendation: Plan for 10-12 min; timeouts use 15-20 min ceilings
+
+- **OpenEMR Deployment (8.0.x and earlier):** ±135% variation (7-19 min)
   - Normal: 7-11 min
   - Anomaly: 19 min (pod startup issues)
   - Recommendation: Plan for 15 min to be safe
@@ -390,11 +410,17 @@ These operations can vary significantly:
 
 ### For Development/Testing
 
-**Typical Time Budgets:**
+**Typical Time Budgets (OpenEMR 8.1.x, July 2026):**
+- **Quick iteration:** 8-12 min (app changes only; pod ready ~3-6 min)
+- **Full infrastructure test:** 35-45 min (single cold deployment)
+- **Complete E2E test:** 150-160 min (~2.5 hours)
+- **Daily CI/CD run:** 160-170 min (includes retries and reporting)
+
+**December 2025 baselines (OpenEMR 8.0.x era):**
 - **Quick iteration:** 10-15 min (app changes only)
 - **Full infrastructure test:** 45-60 min (single deployment)
-- **Complete E2E test:** 220-230 min (includes buffer for failures) - updated December 2025
-- **Daily CI/CD run:** 240-250 min (includes retries and reporting) - updated December 2025
+- **Complete E2E test:** 220-230 min (includes buffer for failures)
+- **Daily CI/CD run:** 240-250 min (includes retries and reporting)
 
 ### For Disaster Recovery Planning
 
@@ -420,13 +446,15 @@ These operations can vary significantly:
 | Operation | Quick (Best Case) | Typical | Slow (Worst Case) | Notes |
 |-----------|-------------------|---------|-------------------|-------|
 | **Infrastructure Deploy** | 24.6 min | 25 min | 25.3 min | Very consistent (Dec 2025) |
-| **App Deploy** | 22 min | 23 min | 25.5 min | Consistent (Dec 2025) |
+| **App Deploy (8.1.x)** | 3 min | 5 min | 10 min | OpenEMR 8.1.x (July 2026) |
+| **App Deploy (8.0.x)** | 22 min | 23 min | 25.5 min | Historical (Dec 2025) |
 | **Backup** | 34 sec | 34.5 sec | 35 sec | Very consistent |
 | **Restore** | 52.8 min | 54 min | 55.4 min | Very consistent (Dec 2025) |
 | **Infrastructure Delete** | 16.4 min | 16.5 min | 17.4 min | Very consistent (Dec 2025) |
 | **Infrastructure Recreation** | 45.2 min | 47 min | 49.3 min | Very consistent (Dec 2025) |
 | **Monitoring Stack (install/uninstall)** | 27 min | 27.5 min | 28 min | Very consistent (Dec 2025) |
-| **Full E2E Test** | 211 min | 214 min | 217 min | Includes all phases (Dec 2025) |
+| **Full E2E Test (8.1.x)** | 145 min | 155 min | 165 min | OpenEMR 8.1.x (July 2026 est.) |
+| **Full E2E Test (8.0.x)** | 211 min | 214 min | 217 min | Historical (Dec 2025) |
 
 ---
 

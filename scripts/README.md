@@ -484,12 +484,27 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Purpose**: End-to-end backup/restore testing
 - **Dependencies**: kubectl, aws, helm, terraform, jq
 - **Key Features**:
-  - Tests complete backup/restore cycle
+  - Tests complete backup/restore cycle (10 steps, ~2.5 hours full run on 8.1.x)
+  - **Chunked execution** via `--from-step`, `--to-step`, `--step`, or `--group` for faster development iteration
+  - Deploy chunk: ~35-40 min cold, ~10-15 min when infra already exists
+  - Persists state (backup bucket, snapshot ID) to `.e2e-test-state` between chunks
   - Validates data integrity
   - Tests infrastructure recreation
+- **Usage**:
+  ```bash
+  # Full test
+  ./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+
+  # Development: run step groups
+  ./scripts/test-end-to-end-backup-restore.sh --list-groups
+  ./scripts/test-end-to-end-backup-restore.sh --group deploy
+  ./scripts/test-end-to-end-backup-restore.sh --from-step 4 --state-file .e2e-test-state
+  ./scripts/test-end-to-end-backup-restore.sh --group restore --no-emergency-cleanup
+  ```
 - **Maintenance Notes**:
   - Update test data as needed
   - Modify test validation criteria as needed
+  - Pre-release requirement: full 10-step test must pass
 
 #### `test-warp-pinned-versions.sh`
 

@@ -48,7 +48,7 @@ spec:
           # SSL Renewal Container
           # Uses OpenEMR image to ensure compatibility with existing certificates
           - name: ssl-renewal
-            image: openemr/openemr:${OPENEMR_VERSION}
+            image: openemr/openemr:8.1.1
             imagePullPolicy: IfNotPresent
             securityContext:
               allowPrivilegeEscalation: false # Security: prevent privilege escalation
@@ -167,7 +167,7 @@ spec:
       serviceAccountName: openemr-sa
       containers:
       - name: ssl-renewal-test
-        image: openemr/openemr:${OPENEMR_VERSION}
+        image: openemr/openemr:8.1.1
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false

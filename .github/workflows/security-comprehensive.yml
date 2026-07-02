@@ -52,10 +52,10 @@ permissions:
 
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
-  TRIVY_VERSION: '0.70.0'
-  CHECKOV_VERSION: '3.2.531'
+  TRIVY_VERSION: '0.72.0'
+  CHECKOV_VERSION: '3.3.6'
   KICS_VERSION: 'v2.1.20'
-  GOSEC_VERSION: 'v2.27.0'
+  GOSEC_VERSION: 'v2.27.1'
   PYTHON_VERSION: '3.14'
   GO_VERSION: '1.25'
 
@@ -65,12 +65,12 @@ jobs:
   # =====================================================================
   trivy-scan:
     name: Trivy Security Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'trivy' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Run Trivy filesystem scan (STRICT)
         uses: aquasecurity/trivy-action@master
@@ -139,15 +139,15 @@ jobs:
   # =====================================================================
   checkov-scan:
     name: Checkov IaC Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'checkov' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -246,12 +246,12 @@ jobs:
   # =====================================================================
   kics-scan:
     name: KICS IaC Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'kics' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Run KICS scan
         uses: Checkmarx/kics-github-action@v2.1.20
@@ -295,15 +295,15 @@ jobs:
   # =====================================================================
   bandit-scan:
     name: Bandit Python Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'bandit' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -364,15 +364,15 @@ jobs:
   # =====================================================================
   gosec-scan:
     name: gosec Go Security Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'gosec' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Go
-        uses: actions/setup-go@v6.4.0
+        uses: actions/setup-go@v6.5.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -422,12 +422,12 @@ jobs:
   # =====================================================================
   shellcheck-scan:
     name: ShellCheck Shell Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: ${{ github.event.inputs.scan_type == 'all' || github.event.inputs.scan_type == 'shellcheck' || github.event_name != 'workflow_dispatch' }}
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Install ShellCheck
         run: |
@@ -473,7 +473,7 @@ jobs:
   # =====================================================================
   security-summary:
     name: Security Summary & Enforcement
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [trivy-scan, checkov-scan, kics-scan, bandit-scan, gosec-scan, shellcheck-scan]
     if: always()
 

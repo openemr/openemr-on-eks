@@ -78,6 +78,42 @@ cd /path/to/openemr-on-eks
   --namespace openemr
 ```
 
+### **Chunked Execution (Development Iteration)**
+
+The full E2E test takes ~2.5 hours on OpenEMR 8.1.x (~150-160 min). For faster iteration while developing, run **step groups** or **individual steps**. State (backup bucket, snapshot ID, test timestamp) is persisted to `.e2e-test-state` between runs.
+
+```bash
+# List all steps and predefined groups
+./scripts/test-end-to-end-backup-restore.sh --list-steps
+./scripts/test-end-to-end-backup-restore.sh --list-groups
+
+# Common development workflows
+./scripts/test-end-to-end-backup-restore.sh --group deploy          # Steps 1-3 (~35-40 min cold; ~10-15 min warm)
+./scripts/test-end-to-end-backup-restore.sh --group backup          # Step 4 only
+./scripts/test-end-to-end-backup-restore.sh --step 5                # Monitoring stack only
+./scripts/test-end-to-end-backup-restore.sh --group backup-restore  # Steps 4-9
+
+# Resume after a completed chunk (state file carries backup bucket + snapshot ID)
+./scripts/test-end-to-end-backup-restore.sh --from-step 6 --state-file .e2e-test-state
+
+# On failure, keep AWS resources for debugging instead of emergency cleanup
+./scripts/test-end-to-end-backup-restore.sh --group restore --no-emergency-cleanup
+
+# Skip k8s manifest reset when resuming mid-test
+./scripts/test-end-to-end-backup-restore.sh --from-step 8 --skip-restore-defaults
+```
+
+| Group | Steps | Use when |
+|-------|-------|----------|
+| `deploy` | 1–3 | Infrastructure + OpenEMR + test data (~35-40 min cold; ~10-15 min warm) |
+| `backup` | 4 | Testing backup script in isolation |
+| `monitoring` | 5 | Testing monitoring install/uninstall |
+| `destroy` / `recreate` | 6 / 7 | Testing infrastructure teardown/rebuild |
+| `restore` | 8–9 | Testing restore + verification (requires prior backup) |
+| `cleanup` | 10 | Manual cleanup after debugging |
+
+**Note:** Steps 8+ require a state file from a prior run that completed step 4 (backup). The mandatory pre-release requirement remains the **full 10-step test**.
+
 ### **Expected Test Flow**
 
 ```mermaid
@@ -242,18 +278,18 @@ All changes must include:
 
 **Test Date**: 2025-10-26
 **Test Environment**: openemr-eks-test
-**Test Duration**: 2 hours 40 minutes (160-165 minutes measured)
+**Test Duration**: 2 hours 30 minutes (150-160 minutes on OpenEMR 8.1.x)
 **Resources Used**: AWS resources created and destroyed
 
 ### Test Results
 - ✅ Infrastructure Deployment: PASS (31 minutes)
-- ✅ OpenEMR Installation: PASS (8 minutes)
+- ✅ OpenEMR Installation: PASS (5 minutes)
 - ✅ Test Data Creation: PASS (8 seconds)
 - ✅ Backup Creation: PASS (32 seconds)
 - ✅ Monitoring Stack Test: PASS (8 minutes)
 - ✅ Infrastructure Destruction: PASS (16 minutes)
-- ✅ Infrastructure Recreation: PASS (40 minutes)
-- ✅ Backup Restoration: PASS (40 minutes)
+- ✅ Infrastructure Recreation: PASS (35 minutes)
+- ✅ Backup Restoration: PASS (35 minutes)
 - ✅ Verification: PASS (10 seconds)
 - ✅ Final Cleanup: PASS (14 minutes)
 

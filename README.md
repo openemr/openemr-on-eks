@@ -6,7 +6,7 @@
 <p>
   <a href="../../blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
-  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.1.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
+  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.1.1-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
 </p>
 
 <table>
@@ -53,9 +53,9 @@
 <td>
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Terraform-1.15.5-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
+  <img src="https://img.shields.io/badge/Terraform-1.15.7-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
   <img src="https://img.shields.io/badge/EKS-Auto%20Mode-FF9900?style=flat&logo=amazoneks&logoColor=white" alt="EKS Auto Mode">
-  <img src="https://img.shields.io/badge/Kubernetes-1.35-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
+  <img src="https://img.shields.io/badge/Kubernetes-1.36-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
   <img src="https://img.shields.io/badge/Aurora-MySQL%208.0-4479A1?style=flat&logo=mysql&logoColor=white" alt="Aurora MySQL">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat&logo=docker&logoColor=white" alt="Docker">
 </td>
@@ -675,9 +675,9 @@ Next steps for first-time deployment:
    5. cd /path/to/GitHub/openemr-on-eks/k8s
    6. ./deploy.sh
 
-⏱️  Expected deployment time: 40-45 minutes total
+⏱️  Expected deployment time: 35-42 minutes total (OpenEMR 8.1.x)
    • Infrastructure (Terraform): 30-32 minutes
-   • Application (Kubernetes): 7-11 minutes
+   • Application (Kubernetes): 3-6 minutes typical (up to ~10 min)
 
 📋 Deployment Recommendations
 =============================
@@ -702,11 +702,11 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v86.1.0 (metrics & alerting)
+     - Prometheus v87.4.0 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
-     - Tempo v2.23.1 (distributed tracing with S3 storage, microservice mode)
-     - Mimir v6.0.6 (long-term metrics storage)
+     - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
+     - Mimir v6.2.0 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
@@ -727,11 +727,11 @@ cp terraform.tfvars.example terraform.tfvars
 cat > terraform.tfvars <<EOF
 # Cluster Configuration
 cluster_name = "openemr-eks"
-kubernetes_version = "1.35"  # Latest stable with Auto Mode
+kubernetes_version = "1.36"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "8.0.0"    # Latest stable OpenEMR version
+openemr_version = "8.1.1"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -879,7 +879,7 @@ cd ../k8s
 # Update kubeconfig
 aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 
-# For testing deployments (~7-11 minutes) (uses self-signed certificates)
+# For testing deployments (~3-6 minutes on OpenEMR 8.1.x) (uses self-signed certificates)
 ./deploy.sh
 
 # To time run for testing deployments (uses self-signed certificates)
@@ -957,7 +957,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v86.1.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v87.4.0 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
@@ -966,10 +966,10 @@ cd ../scripts
   - **Production-Grade Storage**: Uses AWS S3 for log storage (as [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/)) instead of filesystem storage
   - **Benefits**: Better durability, scalability, cost-effectiveness, and lifecycle management compared to filesystem storage
   - **IAM Integration**: Uses IRSA (IAM Roles for Service Accounts) for secure, credential-free S3 access
-- 🔍 **Tempo**: v2.23.1 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
+- 🔍 **Tempo**: v2.26.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
-- 📈 **Mimir**: v6.0.6 (long-term metrics storage with S3 backend)
+- 📈 **Mimir**: v6.2.0 (long-term metrics storage with S3 backend)
   - **Remote Write**: Prometheus automatically forwards metrics to Mimir for long-term retention
   - **S3 Storage**: All metrics stored in S3 with lifecycle policies
   - **Retention**: 365 days of metrics storage
@@ -2110,7 +2110,7 @@ The project includes a comprehensive **automated end-to-end backup/restore test 
 #### **⚠️ Test Considerations**
 
 - **Resources**: AWS resources will be created and destroyed during testing
-- **Duration**: 2.7 hours (160-165 minutes measured in actual test runs)
+- **Duration**: ~2.5 hours (150-160 minutes on OpenEMR 8.1.x)
 - **Resources**: Creates and destroys real AWS resources
 - **Requirements**: Proper AWS credentials and permissions
 

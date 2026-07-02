@@ -35,7 +35,7 @@ variable "cluster_name" {
 variable "kubernetes_version" {
   description = "Kubernetes version for the EKS cluster"
   type        = string
-  default     = "1.35" # Latest stable version (DRA GA, Cgroup autoconfiguration GA)
+  default     = "1.36" # Latest stable version (DRA GA, Cgroup autoconfiguration GA)
 }
 
 # =============================================================================
@@ -334,7 +334,7 @@ variable "openemr_scale_up_stabilization_seconds" {
 variable "openemr_version" {
   description = "OpenEMR Docker image version to deploy (use specific versions for production)"
   type        = string
-  default     = "8.1.0" # Stable OpenEMR version
+  default     = "8.1.1" # Stable OpenEMR version
 
   # Validation ensures proper version format
   validation {

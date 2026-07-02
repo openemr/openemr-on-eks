@@ -60,9 +60,9 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.5'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.15.5' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.36.1'  # kubectl version for Kubernetes manifest validation
+  PYTHON_VERSION: '3.14.6'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.15.7' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.36.2'  # kubectl version for Kubernetes manifest validation
 
 jobs:
   # Primary test job - runs test suites in parallel using matrix strategy
@@ -70,7 +70,7 @@ jobs:
   # to validate code quality, Kubernetes manifests, script syntax, and documentation
   test:
     name: Run Test Suite
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Matrix strategy for parallel execution of different test suites
     # Each test suite runs independently, allowing for faster overall execution
     strategy:
@@ -91,11 +91,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code for testing
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -185,16 +185,16 @@ jobs:
   # and best practices enforcement across different file types
   lint-and-validate:
     name: Lint and Validate
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code for validation
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -279,12 +279,12 @@ jobs:
   # and misconfigurations across the entire repository. ALL findings will fail the build.
   security-scan:
     name: Security Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code for security scanning
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Run Trivy vulnerability scanner in table format (STRICT MODE)
       # This scan produces human-readable output and FAILS on ANY finding
@@ -366,16 +366,16 @@ jobs:
   # and ensuring proper file permissions and structure
   code-quality:
     name: Code Quality
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Set up Python environment for quality checks
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -420,7 +420,7 @@ jobs:
   # It runs when warp/ files change, versions.yaml changes, or when explicitly triggered
   warp-ci:
     name: Warp CI/CD
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     # Run if manually triggered with 'all' or 'warp', or on push/PR (workflow paths filter handles file detection)
     if: |
       (github.event_name == 'workflow_dispatch' &&
@@ -430,11 +430,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -457,7 +457,7 @@ jobs:
           pip install -r requirements.txt
           pip install -e .
           # Install test dependencies (versions pinned to match versions.yaml)
-          pip install pytest==9.0.3 pytest-cov==7.1.0 flake8==7.3.0 black==26.5.1 mypy==2.1.0
+          pip install pytest==9.1.1 pytest-cov==7.1.0 flake8==7.3.0 black==26.5.1 mypy==2.1.0
 
       # Step 6: Run pytest with coverage (exclude benchmarks)
       - name: Run pytest with coverage
@@ -523,7 +523,7 @@ jobs:
   # It validates the dual-slot rotation logic, EFS atomic writes, and K8s integration
   credential-rotation-ci:
     name: Credential Rotation CI
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: |
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'credential_rotation')) ||
@@ -531,10 +531,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       - name: Set up Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -543,7 +543,7 @@ jobs:
           cd tools/credential-rotation
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pytest==9.0.3 pytest-cov==7.1.0 flake8==7.3.0 black==26.5.1 mypy==2.1.0
+          pip install pytest==9.1.1 pytest-cov==7.1.0 flake8==7.3.0 black==26.5.1 mypy==2.1.0
 
       - name: Run pytest with coverage
         run: |
@@ -602,14 +602,14 @@ jobs:
   # overview of the entire CI/CD pipeline execution
   summary:
     name: Test Summary
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [test, lint-and-validate, security-scan, code-quality, warp-ci, credential-rotation-ci]
     if: always()  # Run summary regardless of job outcomes
 
     steps:
       # Step 1: Checkout repository code for summary generation
       - name: Checkout code
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
 
       # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results

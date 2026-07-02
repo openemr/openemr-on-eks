@@ -79,7 +79,7 @@ readonly TERRAFORM_DIR # Terraform directory for state access
 # Deployment timeouts - carefully tuned based on OpenEMR's startup characteristics
 # These timeouts account for OpenEMR's complex initialization process which includes
 # database schema creation, configuration setup, and service startup.
-readonly POD_READY_TIMEOUT=1800   # 30 minutes - OpenEMR can take 7-11 minutes normally (can spike to 19 min)
+readonly POD_READY_TIMEOUT=1200  # 20 minutes ceiling - OpenEMR 8.1.x typically ready in 3-6 min
 readonly HEALTH_CHECK_TIMEOUT=600 # 10 minutes - For PVC binding and service readiness
 readonly EFS_CSI_TIMEOUT=300      # 5 minutes - EFS CSI driver operations
 readonly CLEANUP_WAIT_TIME=5      # 5 seconds - Wait after cleanup operations
@@ -257,7 +257,7 @@ show_deployment_status() {
     # Show detailed pod startup phases for better user understanding
     if [ "$pod_count" -gt 0 ]; then
         if [ "$ready_replicas" -eq 0 ] && [ "$running_pods" -gt 0 ]; then
-            echo -e "${YELLOW}🔄 Phase: OpenEMR init → Database setup (10+ min) → Apache start → Ready${NC}"
+            echo -e "${YELLOW}🔄 Phase: OpenEMR init → Database setup (2-5 min) → Apache start → Ready${NC}"
         elif [ "$ready_replicas" -gt 0 ] && [ "$ready_replicas" -lt "$desired_replicas" ]; then
             echo -e "${YELLOW}🔄 Phase: Scaling up ($ready_replicas ready, waiting for $desired_replicas)${NC}"
         elif [ "$ready_replicas" -eq "$desired_replicas" ] && [ "$ready_replicas" -gt 0 ]; then
@@ -777,7 +777,7 @@ validate_deployment_success() {
     done
     
     if [ "$ready_pods" -eq 0 ]; then
-        log_error "No OpenEMR pods are running after 30 minutes"
+        log_error "No OpenEMR pods are running after 20 minutes"
         log_info "Debugging pod status..."
         kubectl get pods -n "$NAMESPACE" -l app=openemr
         kubectl describe pods -n "$NAMESPACE" -l app=openemr
@@ -1615,19 +1615,19 @@ fi
 
 # Wait for deployment rollout to complete with enhanced monitoring
 log_step "Waiting for deployment rollout to complete..."
-log_info "This may take 7-11 minutes for first startup (measured from E2E tests, can spike to 19 min)..."
-log_info "OpenEMR containers typically take 7-11 minutes to start responding to HTTP requests"
+log_info "OpenEMR 8.1.x typically ready in 3-6 minutes (timeout ceiling: 20 min)..."
+log_info "OpenEMR containers start responding to HTTP requests much faster on 8.1.x"
 
 # Enhanced monitoring with periodic status updates
 log_info "📊 Monitoring deployment progress..."
-log_info "⏳ Leader pod: ~9-11 minutes (database setup) | Follower pods: ~7-9 minutes"
+log_info "⏳ Leader pod: ~4-6 minutes (database setup) | Follower pods: ~3-5 minutes"
 log_info "💡 Startup phases: OpenEMR init → Database setup → Apache start → Ready"
 echo ""
 
 # Monitor with periodic status updates, startup logs, and stuck-leader recovery
 {
     attempt=0
-    max_attempts=60  # 30 minutes at 30-second intervals (accommodates 10min leader + buffer)
+    max_attempts=40  # 20 minutes at 30-second intervals (ceiling for 8.1.x)
     leader_wait_count=0
 
     while [ $attempt -lt $max_attempts ]; do

@@ -284,7 +284,7 @@ Compute config is not supported for Kubernetes version 1.28
 
 ```hcl
 # In terraform.tfvars, ensure:
-kubernetes_version = "1.35"  # Must be 1.29 or higher
+kubernetes_version = "1.36"  # Must be 1.29 or higher
 ```
 
 #### Issue: Insufficient IAM Permissions

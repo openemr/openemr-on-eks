@@ -62,7 +62,7 @@ jobs:
   # Job 1: Determine release type and validate inputs
   # This job processes the workflow inputs and determines the appropriate version bump
   determine-release-type:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       release-type: ${{ steps.determine-type.outputs.release-type }} # Type of release (major/minor/patch)
       bump-version: ${{ steps.determine-type.outputs.bump-version }} # Version bump type for semver
@@ -88,13 +88,13 @@ jobs:
   # since the last tagged release
   check-changes:
     needs: determine-release-type  # Wait for release type determination
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       has-changes: ${{ steps.check-changes.outputs.has-changes }} # Boolean indicating if changes exist
       last-tag: ${{ steps.check-changes.outputs.last-tag }}       # Last release tag for reference
     steps:
       # Step 1: Checkout repository with full history for change detection
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0  # Fetch complete git history for change detection
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -129,20 +129,20 @@ jobs:
   create-release:
     needs: [determine-release-type, check-changes]        # Wait for previous jobs
     if: needs.check-changes.outputs.has-changes == 'true' # Only run if changes exist
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     outputs:
       new-version: ${{ steps.new-version.outputs.new-version }} # Calculated new version
       release-url: ${{ steps.create-release.outputs.html_url }} # GitHub release URL
     steps:
       # Step 1: Checkout repository with full history for release creation
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@v7.0.0
         with:
           fetch-depth: 0  # Fetch complete git history for release notes
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Step 2: Set up Python environment for semantic versioning
       - name: Setup Python
-        uses: actions/setup-python@v6.2.0
+        uses: actions/setup-python@v6.3.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -325,7 +325,7 @@ jobs:
   # and generates detailed summaries for both successful and failed releases
   notify-completion:
     needs: [determine-release-type, check-changes, create-release]  # Wait for all previous jobs
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     if: always()  # Run regardless of previous job outcomes
     steps:
       # Step 1: Generate comprehensive workflow summary

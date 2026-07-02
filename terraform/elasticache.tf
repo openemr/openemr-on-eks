@@ -48,7 +48,8 @@ resource "aws_security_group" "elasticache" {
 # Valkey Serverless provides automatic scaling and high availability for caching
 resource "aws_elasticache_serverless_cache" "openemr" {
   engine = "valkey"                                                               # Valkey engine (Redis-compatible)
-  name   = "${var.cluster_name}-valkey-serverless-${random_id.global_suffix.hex}" # Unique cache name
+  # AWS limit: serverless cache name must be <= 40 characters
+  name   = substr("${var.cluster_name}-vs-${random_id.global_suffix.hex}", 0, 40)
 
   # Cache usage limits for cost control and performance
   # These limits define the maximum resources the cache can consume
@@ -91,7 +92,7 @@ resource "aws_elasticache_serverless_cache" "openemr" {
 # ElastiCache OpenEMR User for Serverless authentication
 # This user provides application-level access to the cache with specific permissions
 resource "aws_elasticache_user" "openemr" {
-  user_id       = "${var.cluster_name}-openemr-user"              # Unique user identifier
+  user_id       = substr("${var.cluster_name}-oemr-user", 0, 40)   # AWS user_id length limit
   user_name     = "openemr"                                       # Username for cache authentication
   access_string = "on ~* &* +@all"                                # Full access permissions for OpenEMR
   engine        = "valkey"                                        # Valkey engine for user
@@ -106,7 +107,8 @@ resource "aws_elasticache_user" "openemr" {
 # User groups provide a way to manage multiple users and their permissions
 resource "aws_elasticache_user_group" "openemr" {
   engine        = "valkey"                                                                               # Valkey engine
-  user_group_id = "${var.cluster_name}-valkey-user-group-${random_id.elasticache_user_group_suffix.hex}" # Unique group ID
+  # AWS limit: user_group_id must be < 40 characters
+  user_group_id = substr("${var.cluster_name}-vug-${random_id.elasticache_user_group_suffix.hex}", 0, 39)
   user_ids      = [aws_elasticache_user.openemr.user_id]                                                 # Users in this group
 
   tags = {

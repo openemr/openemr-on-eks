@@ -50,12 +50,12 @@ metadata:
       routing.http.x_amzn_tls_version_and_cipher_suite.enabled=true, # TLS information
       routing.http.xff_client_port.enabled=true,                     # Include client port in X-Forwarded-For
       access_logs.s3.enabled=true,                                   # Enable access logging for audit trails
-      access_logs.s3.bucket=${S3_BUCKET_NAME},                       # S3 bucket for access logs
+      access_logs.s3.bucket=openemr-eks-test-alb-logs-1825183c,                       # S3 bucket for access logs
       access_logs.s3.prefix=alb-logs                                 # Log prefix for organization
 
     # WAF Integration for Security
     # Web Application Firewall ACL for protection against common attacks
-    alb.ingress.kubernetes.io/wafv2-acl-arn: "${WAF_ACL_ARN}"
+    alb.ingress.kubernetes.io/wafv2-acl-arn: "arn:aws:wafv2:us-west-2:440744216926:regional/webacl/openemr-eks-test-waf-acl/5af49f08-94ec-4382-906f-092c1fecbf2e"
 
 spec:
   rules:

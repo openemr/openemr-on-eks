@@ -27,7 +27,7 @@
 # Prerequisites:
 #   - AWS CLI configured with appropriate permissions
 #   - Terraform >= 1.14.6
-#   - kubectl >= 1.35.0
+#   - kubectl >= 1.36.0
 #   - jq, tar, gzip
 #
 # =============================================================================
@@ -215,7 +215,7 @@ deploy_openemr() {
     cd "$PROJECT_ROOT/k8s" || exit 1
     
     log_step "Running OpenEMR deployment script..."
-    log_info "This may take 7-11 minutes for OpenEMR to initialize..."
+    log_info "This may take 3-6 minutes for OpenEMR 8.1.x to initialize..."
     ./deploy.sh --cluster-name "$CLUSTER_NAME" --aws-region "$AWS_REGION" --namespace "$NAMESPACE"
     
     log_success "OpenEMR deployed successfully"

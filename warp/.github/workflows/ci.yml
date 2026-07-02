@@ -52,7 +52,7 @@ jobs:
   # Test job - runs pytest with coverage
   test:
     name: Run Tests
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code
@@ -75,7 +75,7 @@ jobs:
           # Install test dependencies
           # These versions are pinned in versions.yaml
           # If these are changed update versions.yaml and vice-versa
-          pip install pytest==9.0.3 pytest-cov==7.1.0
+          pip install pytest==9.1.1 pytest-cov==7.1.0
 
       # Step 4: Run pytest with coverage
       - name: Run pytest with coverage
@@ -95,7 +95,7 @@ jobs:
   # Lint and format job - performs code quality checks
   lint-and-format:
     name: Lint and Format Check
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code
@@ -135,7 +135,7 @@ jobs:
   # Security scanning job - ZERO-TOLERANCE policy for comprehensive security analysis
   security-scan:
     name: Security Scan (Zero-Tolerance)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository code
@@ -203,7 +203,7 @@ jobs:
   # Summary job - generates comprehensive test results summary
   summary:
     name: Test Summary
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [test, lint-and-format, security-scan]
     if: always()
 

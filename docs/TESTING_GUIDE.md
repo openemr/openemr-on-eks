@@ -250,8 +250,13 @@ This test ensures that the optional monitoring stack doesn't interfere with core
 **Running the test:**
 
 ```bash
-cd scripts
-./test-end-to-end-backup-restore.sh
+# Full test (~2.5 hours on OpenEMR 8.1.x)
+./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+
+# Chunked execution for development (see docs/END_TO_END_TESTING_REQUIREMENTS.md)
+./scripts/test-end-to-end-backup-restore.sh --list-groups
+./scripts/test-end-to-end-backup-restore.sh --group deploy
+./scripts/test-end-to-end-backup-restore.sh --from-step 4 --state-file .e2e-test-state
 ```
 
 ### 6. Credential Rotation Tests
