@@ -122,10 +122,10 @@ resource "time_sleep" "wait_for_compute" {
 # Metrics Server provides resource utilization metrics for HPA (Horizontal Pod Autoscaler)
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
-  addon_name                  = "metrics-server"    # Essential for autoscaling
+  addon_name                  = "metrics-server"     # Essential for autoscaling
   addon_version               = "v0.8.1-eksbuild.11" # Latest stable version for Kubernetes 1.36
-  resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
-  resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
+  resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
+  resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
 
   # Wait for compute infrastructure to be ready
   # Metrics Server needs compute nodes to collect metrics from

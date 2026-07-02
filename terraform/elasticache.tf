@@ -47,9 +47,9 @@ resource "aws_security_group" "elasticache" {
 # ElastiCache Serverless Cache - Main cache cluster for OpenEMR
 # Valkey Serverless provides automatic scaling and high availability for caching
 resource "aws_elasticache_serverless_cache" "openemr" {
-  engine = "valkey"                                                               # Valkey engine (Redis-compatible)
+  engine = "valkey" # Valkey engine (Redis-compatible)
   # AWS limit: serverless cache name must be <= 40 characters
-  name   = substr("${var.cluster_name}-vs-${random_id.global_suffix.hex}", 0, 40)
+  name = substr("${var.cluster_name}-vs-${random_id.global_suffix.hex}", 0, 40)
 
   # Cache usage limits for cost control and performance
   # These limits define the maximum resources the cache can consume
@@ -92,7 +92,7 @@ resource "aws_elasticache_serverless_cache" "openemr" {
 # ElastiCache OpenEMR User for Serverless authentication
 # This user provides application-level access to the cache with specific permissions
 resource "aws_elasticache_user" "openemr" {
-  user_id       = substr("${var.cluster_name}-oemr-user", 0, 40)   # AWS user_id length limit
+  user_id       = substr("${var.cluster_name}-oemr-user", 0, 40)  # AWS user_id length limit
   user_name     = "openemr"                                       # Username for cache authentication
   access_string = "on ~* &* +@all"                                # Full access permissions for OpenEMR
   engine        = "valkey"                                        # Valkey engine for user
@@ -106,10 +106,10 @@ resource "aws_elasticache_user" "openemr" {
 # ElastiCache User Group for Serverless access control
 # User groups provide a way to manage multiple users and their permissions
 resource "aws_elasticache_user_group" "openemr" {
-  engine        = "valkey"                                                                               # Valkey engine
+  engine = "valkey" # Valkey engine
   # AWS limit: user_group_id must be < 40 characters
   user_group_id = substr("${var.cluster_name}-vug-${random_id.elasticache_user_group_suffix.hex}", 0, 39)
-  user_ids      = [aws_elasticache_user.openemr.user_id]                                                 # Users in this group
+  user_ids      = [aws_elasticache_user.openemr.user_id] # Users in this group
 
   tags = {
     Name = "${var.cluster_name}-valkey-user-group"
