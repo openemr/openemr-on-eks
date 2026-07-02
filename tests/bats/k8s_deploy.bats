@@ -95,8 +95,8 @@ K8S_DEPLOY="${PROJECT_ROOT}/k8s/deploy.sh"
   [ "$status" -eq 0 ]
 }
 
-@test "POD_READY_TIMEOUT is 1800 seconds" {
-  run grep 'POD_READY_TIMEOUT=1800' "$K8S_DEPLOY"
+@test "POD_READY_TIMEOUT is 1200 seconds" {
+  run grep 'POD_READY_TIMEOUT=1200' "$K8S_DEPLOY"
   [ "$status" -eq 0 ]
 }
 

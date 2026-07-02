@@ -388,7 +388,7 @@ monitoring:
     description: "Tempo for distributed tracing with S3 storage in microservice mode (replaces Jaeger)."
 
   mimir:
-    current: "6.2.0"
+    current: "6.1.0"
     chart: "mimir-distributed"
     repository: "grafana"
     notify_on_update: true

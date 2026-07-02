@@ -706,7 +706,7 @@ Next steps for first-time deployment:
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
-     - Mimir v6.2.0 (long-term metrics storage)
+     - Mimir v6.1.0 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
@@ -969,7 +969,7 @@ cd ../scripts
 - 🔍 **Tempo**: v2.26.0 (distributed tracing with S3 storage in microservice mode, replaces Jaeger)
   - **S3 Storage**: All trace data stored in S3 for durability and scalability
   - **Integration**: Seamless correlation with Loki logs and Prometheus metrics
-- 📈 **Mimir**: v6.2.0 (long-term metrics storage with S3 backend)
+- 📈 **Mimir**: v6.1.0 (long-term metrics storage with S3 backend)
   - **Remote Write**: Prometheus automatically forwards metrics to Mimir for long-term retention
   - **S3 Storage**: All metrics stored in S3 with lifecycle policies
   - **Retention**: 365 days of metrics storage

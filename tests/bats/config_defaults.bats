@@ -44,8 +44,8 @@ setup() { cd "$PROJECT_ROOT"; }
   [ "$status" -eq 0 ]
 }
 
-@test "restore.sh default OpenEMR version is '8.1.0'" {
-  run grep 'DEFAULT_OPENEMR_VERSION.*8.1.0' "${SCRIPTS_DIR}/restore.sh"
+@test "restore.sh default OpenEMR version is '8.1.1'" {
+  run grep 'DEFAULT_OPENEMR_VERSION.*8.1.1' "${SCRIPTS_DIR}/restore.sh"
   [ "$status" -eq 0 ]
 }
 
@@ -121,8 +121,8 @@ setup() { cd "$PROJECT_ROOT"; }
   [ "$status" -eq 0 ]
 }
 
-@test "k8s/deploy.sh POD_READY_TIMEOUT is 1800" {
-  run grep 'POD_READY_TIMEOUT=1800' "${PROJECT_ROOT}/k8s/deploy.sh"
+@test "k8s/deploy.sh POD_READY_TIMEOUT is 1200" {
+  run grep 'POD_READY_TIMEOUT=1200' "${PROJECT_ROOT}/k8s/deploy.sh"
   [ "$status" -eq 0 ]
 }
 

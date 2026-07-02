@@ -27,18 +27,18 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
-# Get script directory and project root
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"
-WARP_DIR="$PROJECT_ROOT/warp"
-
-# Check if yq is available
+# Check dependencies before path resolution (dirname/cd may be unavailable in minimal PATH)
 if ! command -v yq >/dev/null 2>&1; then
     echo -e "${RED}ERROR: yq is required but not found${NC}"
     echo "Install yq: https://github.com/mikefarah/yq"
     exit 1
 fi
+
+# Get script directory and project root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"
+WARP_DIR="$PROJECT_ROOT/warp"
 
 # Check if versions.yaml exists
 if [ ! -f "$VERSIONS_FILE" ]; then

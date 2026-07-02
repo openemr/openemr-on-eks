@@ -961,7 +961,7 @@ Next steps:
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
-     - Mimir v6.2.0 (long-term metrics storage)
+     - Mimir v6.1.0 (long-term metrics storage)
      - OTeBPF v0.4.1 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
