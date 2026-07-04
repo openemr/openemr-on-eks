@@ -88,6 +88,22 @@ _all_tf_output_names() {
   [[ "$output" == *"$yaml_ver"* ]]
 }
 
+@test "CONTRACT: manual-releases workflow PYTHON_VERSION matches versions.yaml semver_packages" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.semver_packages.python_version.current' "$VERSIONS_FILE")
+  run grep "PYTHON_VERSION:" "${PROJECT_ROOT}/.github/workflows/manual-releases.yml"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CONTRACT: warp CI workflow PYTHON_VERSION matches versions.yaml semver_packages" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.semver_packages.python_version.current' "$VERSIONS_FILE")
+  run grep "PYTHON_VERSION:" "${PROJECT_ROOT}/warp/.github/workflows/ci.yml"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
 @test "CONTRACT: CI workflow TERRAFORM_VERSION matches versions.yaml" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
   local yaml_ver

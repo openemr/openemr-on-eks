@@ -45,7 +45,7 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.0' # Python version (matches main CI/CD workflow)
+  PYTHON_VERSION: '3.14.6' # Python version (matches versions.yaml semver_packages.python_version)
   WARP_DIR: 'warp'         # Warp project directory
 
 jobs:

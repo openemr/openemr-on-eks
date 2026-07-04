@@ -266,7 +266,7 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.0
+- **Python**: 3.14.6
 - **Terraform**: 1.14.6
 - **Kubectl**: v1.34.2
 - **Operating System**: Ubuntu 24.04
@@ -348,7 +348,7 @@ Controlled release management system that allows manual version bumping and rele
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.0
+- **Python**: 3.14.6
 - **Semver Package**: 3.0.4
 - **Operating System**: Ubuntu 24.04
 
