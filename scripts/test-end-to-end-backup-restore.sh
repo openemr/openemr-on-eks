@@ -18,6 +18,7 @@
 #   - Emergency cleanup on test failures with comprehensive resource cleanup
 #   - Enhanced error handling and debugging capabilities
 #   - Comprehensive test reporting with detailed timing and status
+#   - Automatic latest-run timing report updates in docs/DEPLOYMENT_TIMINGS.md
 #
 # Prerequisites:
 #   - AWS CLI configured with appropriate permissions
@@ -47,12 +48,11 @@
 #
 # Notes:
 #   ⚠️  WARNING: This is a destructive test that creates and destroys AWS
-#   resources. Only run in development/testing environments. Takes ~150-160 minutes
-#   (~2.5 hours) on OpenEMR 8.1.x. Measured timings: Infrastructure deployment
-#   30-32 min, Application deployment 3-6 min (8.1.x; can spike to ~10 min), Backup
-#   ~30-35 sec, Monitoring stack test ~6-7 min, Infrastructure deletion 13-16 min,
-#   Infrastructure recreation 40-42 min, Restore 38-43 min, Final cleanup 13-14 min.
-#   Deploy chunk (steps 1-3): ~35-40 min cold start, ~10-15 min when infra already exists.
+#   resources. Only run in development/testing environments. The OpenEMR 8.2.0
+#   full-run baseline is 169m 9s: infrastructure 23m 52s, OpenEMR 17m 30s,
+#   test data 5m 14s, backup 40s, monitoring 18m 15s, deletion 21m 30s,
+#   recreation 26m 15s, restore 33m 33s, verification 51s, and cleanup 21m 23s.
+#   Deploy chunk (steps 1-3): 46m 36s cold; steps 2-3 measured 22m 44s.
 #
 # Examples:
 #   ./test-end-to-end-backup-restore.sh
@@ -104,8 +104,9 @@ TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S) # Unique timestamp for test identification
 PROOF_FILE_CONTENT="OpenEMR Backup/Restore Test - Created: $(date '+%Y-%m-%d %H:%M:%S UTC') - Test ID: ${TEST_TIMESTAMP}"
 
 # Test results tracking
-TEST_RESULTS=()             # Array to store test results
-TEST_START_TIME=$(date +%s) # Start time for overall test duration
+TEST_RESULTS=()              # Array to store test results
+TEST_START_TIME=$(date +%s)  # Start time for overall test duration
+TEST_TOTAL_DURATION=""       # Frozen when results are first printed
 
 # Global variables for cleanup tracking
 INFRASTRUCTURE_CREATED=false # Flag to track if infrastructure was created during test
@@ -126,6 +127,8 @@ SKIP_ORPHAN_CHECK=false
 SKIP_STEPS=""                # Space-separated step numbers to skip (e.g. "5 6 7" for inplace restore)
 STATE_FILE=""                # Defaults to ${PROJECT_ROOT}/.e2e-test-state after get_directories
 PRESERVE_INFRA_ON_FAILURE=false  # Skip emergency destroy when restore prerequisites are missing
+UPDATE_TIMING_REPORT=true        # Update the generated documentation section after success
+TIMING_REPORT_FILE="${E2E_TIMING_REPORT_FILE:-$PROJECT_ROOT/docs/DEPLOYMENT_TIMINGS.md}"
 TOTAL_STEPS=10
 
 # Step metadata for --list-steps / --list-groups
@@ -453,40 +456,57 @@ run_e2e_step() {
     return 0
 }
 
+require_option_value() {
+    local option="$1"
+    local value="${2:-}"
+    if [ -z "$value" ] || [[ "$value" == --* ]]; then
+        log_error "$option requires a value"
+        return 1
+    fi
+}
+
 # Parse command line arguments
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case $1 in
             --cluster-name)
+                require_option_value "$1" "${2:-}" || exit 1
                 CLUSTER_NAME="$2"
                 shift 2
                 ;;
             --aws-region)
+                require_option_value "$1" "${2:-}" || exit 1
                 AWS_REGION="$2"
                 shift 2
                 ;;
             --namespace)
+                require_option_value "$1" "${2:-}" || exit 1
                 NAMESPACE="$2"
                 shift 2
                 ;;
             --from-step)
+                require_option_value "$1" "${2:-}" || exit 1
                 FROM_STEP="$2"
                 shift 2
                 ;;
             --to-step)
+                require_option_value "$1" "${2:-}" || exit 1
                 TO_STEP="$2"
                 shift 2
                 ;;
             --step)
+                require_option_value "$1" "${2:-}" || exit 1
                 FROM_STEP="$2"
                 TO_STEP="$2"
                 shift 2
                 ;;
             --group)
+                require_option_value "$1" "${2:-}" || exit 1
                 STEP_GROUP="$2"
                 shift 2
                 ;;
             --state-file)
+                require_option_value "$1" "${2:-}" || exit 1
                 STATE_FILE="$2"
                 shift 2
                 ;;
@@ -500,6 +520,15 @@ parse_arguments() {
                 ;;
             --no-emergency-cleanup)
                 NO_EMERGENCY_CLEANUP=true
+                shift
+                ;;
+            --timing-report)
+                require_option_value "$1" "${2:-}" || exit 1
+                TIMING_REPORT_FILE="$2"
+                shift 2
+                ;;
+            --no-timing-report)
+                UPDATE_TIMING_REPORT=false
                 shift
                 ;;
             --list-steps)
@@ -743,6 +772,8 @@ show_help() {
     echo "  --skip-orphan-check       Allow existing cluster/resources (resume after partial deploy)"
     echo "  --skip-restore-defaults   Skip k8s manifest reset (use when resuming mid-test)"
     echo "  --no-emergency-cleanup    On failure, leave AWS resources for debugging"
+    echo "  --timing-report PATH      Generated timing report target (default: docs/DEPLOYMENT_TIMINGS.md)"
+    echo "  --no-timing-report        Do not update documentation after a successful run"
     echo "  --list-steps              List all steps and exit"
     echo "  --list-groups             List step groups and exit"
     echo "  --help                    Show this help message"
@@ -751,6 +782,7 @@ show_help() {
     echo "  CLUSTER_NAME            EKS cluster name"
     echo "  AWS_REGION              AWS region"
     echo "  NAMESPACE               Kubernetes namespace"
+    echo "  E2E_TIMING_REPORT_FILE  Override the generated timing report target"
     echo ""
     echo "Examples:"
     echo "  $0                                              # Full 10-step test"
@@ -766,6 +798,33 @@ show_help() {
     exit 0
 }
 
+validate_timing_report_target() {
+    if [ "$UPDATE_TIMING_REPORT" != "true" ]; then
+        return 0
+    fi
+    if [ ! -f "$TIMING_REPORT_FILE" ]; then
+        log_error "Timing report file not found: $TIMING_REPORT_FILE"
+        return 1
+    fi
+    if [ ! -w "$TIMING_REPORT_FILE" ] || [ ! -w "$(dirname "$TIMING_REPORT_FILE")" ]; then
+        log_error "Timing report file and parent directory must be writable: $TIMING_REPORT_FILE"
+        return 1
+    fi
+
+    local start_marker="<!-- BEGIN AUTOMATED E2E TIMINGS -->"
+    local end_marker="<!-- END AUTOMATED E2E TIMINGS -->"
+    local start_count end_count start_line end_line
+    start_count=$(grep -Fc "$start_marker" "$TIMING_REPORT_FILE" || true)
+    end_count=$(grep -Fc "$end_marker" "$TIMING_REPORT_FILE" || true)
+    start_line=$(grep -Fn "$start_marker" "$TIMING_REPORT_FILE" | cut -d: -f1 || true)
+    end_line=$(grep -Fn "$end_marker" "$TIMING_REPORT_FILE" | cut -d: -f1 || true)
+    if [ "$start_count" -ne 1 ] || [ "$end_count" -ne 1 ] || \
+       [ -z "$start_line" ] || [ -z "$end_line" ] || [ "$start_line" -ge "$end_line" ]; then
+        log_error "Timing report markers are missing, duplicated, or out of order: $TIMING_REPORT_FILE"
+        return 1
+    fi
+}
+
 
 # Check prerequisites
 check_prerequisites() {
@@ -776,6 +835,10 @@ check_prerequisites() {
     command -v helm >/dev/null 2>&1 || { log_error "Helm is required but not installed."; exit 1; }
     command -v terraform >/dev/null 2>&1 || { log_error "Terraform is required but not installed."; exit 1; }
     command -v jq >/dev/null 2>&1 || { log_error "jq is required but not installed."; exit 1; }
+    if [ "$UPDATE_TIMING_REPORT" = "true" ]; then
+        command -v yq >/dev/null 2>&1 || { log_error "yq is required to update the timing report."; exit 1; }
+        command -v python3 >/dev/null 2>&1 || { log_error "python3 is required to update the timing report."; exit 1; }
+    fi
 
     # Check AWS credentials
     if ! aws sts get-caller-identity >/dev/null 2>&1; then
@@ -1157,7 +1220,7 @@ deploy_infrastructure() {
 
     # Initialize Terraform
     log_info "Initializing Terraform..."
-    if ! terraform init -upgrade; then
+    if ! terraform init -lockfile=readonly; then
         log_error "Terraform init failed"
         return 1
     fi
@@ -1173,6 +1236,9 @@ deploy_infrastructure() {
     fi
 
     log_info "Applying infrastructure deployment..."
+    # A failed apply can still leave a partial deployment in Terraform state.
+    INFRASTRUCTURE_CREATED=true
+    CLEANUP_REQUIRED=true
     if ! terraform apply -auto-approve tfplan; then
         log_error "Terraform apply failed"
         return 1
@@ -1222,10 +1288,6 @@ deploy_infrastructure() {
     log_success "Infrastructure deployed successfully"
     log_info "Backup bucket will be created during backup step"
 
-    # Mark infrastructure as created for cleanup tracking
-    INFRASTRUCTURE_CREATED=true
-    CLEANUP_REQUIRED=true
-
     local step_duration
     step_duration=$(get_duration "$step_start")
     add_test_result "Infrastructure Deployment" "SUCCESS" "Cluster: $CLUSTER_NAME" "$step_duration"
@@ -1260,7 +1322,7 @@ deploy_openemr() {
 
     # Wait for deployment to be ready with extended timeout
     # The deploy script may trigger a rolling restart, so we need to wait for it to complete
-    log_info "Waiting for OpenEMR deployment to be ready (typically 3-8 min on OpenEMR 8.1.x)..."
+    log_info "Waiting for OpenEMR deployment (8.2.0 full deployment step measured 17m 30s)..."
     
     # First, wait for deployment to exist
     log_info "Validating OpenEMR deployment exists..."
@@ -1501,10 +1563,10 @@ deploy_test_data() {
 
     # Wait for pod to be ready (both containers) - with progress feedback
     log_info "Waiting for pod to be fully ready (both containers)..."
-    log_info "OpenEMR 8.1.x typically ready in 3-6 minutes..."
+    log_info "OpenEMR 8.2.0 full deployment step measured 17m 30s; readiness uses a 20-minute ceiling..."
 
     # Use a more robust wait with progress feedback
-    local wait_timeout=1200 # 20 minutes (ceiling; 8.1.x usually much faster)
+    local wait_timeout=1200 # 20-minute ceiling
     local check_interval=30 # Check every 30 seconds
     local elapsed=0
 
@@ -1535,7 +1597,7 @@ deploy_test_data() {
     log_info "========================================="
     log_info "Waiting for OpenEMR swarm mode initialization to complete..."
     log_info "This prevents test data from being overwritten during swarm init"
-    log_info "May take 5-10 minutes for database setup on fresh deployments (8.1.x is faster)"
+    log_info "Fresh database initialization is included in the 17m 30s OpenEMR 8.2.0 deployment baseline"
     log_info "========================================="
     
     local swarm_max_wait=900  # 15 minutes (ceiling)
@@ -1589,7 +1651,7 @@ deploy_test_data() {
     
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive..."
-    log_info "OpenEMR 8.1.x is typically responsive within a few minutes..."
+    log_info "Waiting for OpenEMR responsiveness within the measured 8.2.0 deployment flow..."
     local max_attempts=72  # 72 × 10s = 12 minutes (ceiling)
     local attempt=1
 
@@ -2125,7 +2187,7 @@ test_monitoring_stack() {
 
     # Test monitoring stack installation
     log_info "Installing monitoring stack..."
-    log_info "This may take 10-15 minutes for full installation..."
+    log_info "The 8.2.0 install/verify/uninstall test cycle measured 18m 15s..."
     
     # Run monitoring installation
     if ! "$monitoring_script" install; then
@@ -2217,9 +2279,15 @@ recreate_infrastructure() {
 
     # Clean up existing Kubernetes resources before recreating infrastructure
     log_info "Cleaning up existing Kubernetes resources..."
-    ./scripts/restore-defaults.sh --force
+    if ! "$PROJECT_ROOT/scripts/restore-defaults.sh" --force; then
+        log_error "Failed to reset Kubernetes manifests before infrastructure recreation"
+        return 1
+    fi
 
-    cd "$TERRAFORM_DIR"
+    if ! cd "$TERRAFORM_DIR"; then
+        log_error "Cannot access Terraform directory: $TERRAFORM_DIR"
+        return 1
+    fi
 
     # Clean up manual RDS snapshots that might interfere with cluster recreation
     cleanup_manual_snapshots
@@ -2227,16 +2295,55 @@ recreate_infrastructure() {
     # Clean up existing CloudWatch log groups that might conflict
     cleanup_existing_log_groups
 
+    # Destroy removes state and plan artifacts, but the committed provider lock
+    # file must remain available for deterministic read-only initialization.
+    rm -f tfplan
+    if [ ! -s ".terraform.lock.hcl" ]; then
+        log_error "Terraform dependency lock file is missing: $TERRAFORM_DIR/.terraform.lock.hcl"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
+
     # Initialize Terraform
     log_info "Initializing Terraform..."
-    terraform init
+    if ! terraform init -lockfile=readonly; then
+        log_error "Terraform init failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
 
     # Plan and apply infrastructure
     log_info "Planning infrastructure recreation..."
-    terraform plan -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION" -var="skip_rds_creation=true" -out=tfplan
+    if ! terraform plan \
+            -var="cluster_name=$CLUSTER_NAME" \
+            -var="aws_region=$AWS_REGION" \
+            -var="skip_rds_creation=true" \
+            -out=tfplan; then
+        log_error "Terraform plan failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
 
     log_info "Applying infrastructure recreation (RDS deferred to restore step)..."
-    terraform apply -auto-approve tfplan
+    # Terraform may create resources before returning a failed apply. Mark the
+    # infrastructure for cleanup before apply so the ERR/EXIT trap tears down
+    # any partial deployment instead of leaving billable resources behind.
+    INFRASTRUCTURE_CREATED=true
+    CLEANUP_REQUIRED=true
+    if ! terraform apply -auto-approve tfplan; then
+        log_error "Terraform apply failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
+
+    if ! cd "$PROJECT_ROOT"; then
+        log_error "Cannot return to project root after infrastructure recreation"
+        return 1
+    fi
+    if ! save_e2e_state; then
+        log_error "Failed to persist E2E state after infrastructure recreation"
+        return 1
+    fi
 
     # Wait for infrastructure to be ready
     log_info "Waiting for infrastructure to be ready..."
@@ -2244,21 +2351,23 @@ recreate_infrastructure() {
 
     # Update kubectl context to point to the new cluster
     log_info "Updating kubectl context to point to the new cluster..."
-    aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+    if ! aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"; then
+        log_error "Failed to update kubeconfig for recreated cluster: $CLUSTER_NAME"
+        return 1
+    fi
 
     # EFS CSI add-on starts before Pod Identity association in the same apply.
     log_info "Ensuring EFS CSI driver has Pod Identity credentials..."
-    ./scripts/ensure-efs-csi-ready.sh
+    if ! "$PROJECT_ROOT/scripts/ensure-efs-csi-ready.sh"; then
+        log_error "EFS CSI driver did not become ready after infrastructure recreation"
+        return 1
+    fi
 
     # Get outputs
     log_info "Getting Terraform outputs..."
     # Backup bucket will be created dynamically by backup script
 
     log_success "Infrastructure recreated successfully"
-
-    # Mark infrastructure as created again for cleanup tracking
-    INFRASTRUCTURE_CREATED=true
-    CLEANUP_REQUIRED=true
 
     # OpenEMR deploy is handled by restore.sh in step 8 (deploy here was redundant and
     # added ~15 min before restore wiped and redeployed everything anyway).
@@ -2371,7 +2480,7 @@ restore_from_backup() {
 
     # Run restore script with force flag for automated testing
     log_info "Running restore script with force flag..."
-    log_info "This may take 10-15 minutes for database restore and file restoration..."
+    log_info "The 8.2.0 full restore phase measured 33m 33s, including post-restore observation..."
     log_info "Using backup bucket: $BACKUP_BUCKET"
     log_info "Using snapshot ID: $SNAPSHOT_ID"
     log_info "Using AWS region: $AWS_REGION"
@@ -2425,7 +2534,7 @@ verify_restoration() {
 
     # Wait for OpenEMR to be ready - extended timeout for startup
     log_info "Waiting for OpenEMR to be ready after restoration..."
-    log_info "This may take 10-15 minutes for first startup..."
+    log_info "The 8.2.0 verification phase measured 51s; extended timeouts cover slower recovery..."
 
     # Check current deployment status first
     log_info "Checking current OpenEMR deployment status..."
@@ -2638,7 +2747,7 @@ verify_restoration() {
 
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive after restoration..."
-    log_info "This may take 10-15 minutes for OpenEMR to fully initialize after restoration..."
+    log_info "The 8.2.0 verification phase measured 51s; allowing extra time for initialization..."
     local max_attempts=60  # Increased to 60 attempts (10 minutes) for better reliability
     local attempt=1
 
@@ -2901,9 +3010,10 @@ cleanup_final() {
 
 # Print test results
 print_test_results() {
-    local test_end_time
-    test_end_time=$(date +%s)
-    local total_duration=$((test_end_time - TEST_START_TIME))
+    if [ -z "$TEST_TOTAL_DURATION" ]; then
+        TEST_TOTAL_DURATION=$(get_duration "$TEST_START_TIME")
+    fi
+    local total_duration="$TEST_TOTAL_DURATION"
 
     echo ""
     echo -e "${BLUE}========================================${NC}"
@@ -2967,6 +3077,101 @@ print_test_results() {
 
     echo ""
     echo -e "${YELLOW}💡 Test completed in ${total_duration}s${NC}"
+}
+
+# Replace the bounded generated section in docs/DEPLOYMENT_TIMINGS.md after a
+# successful full or chunked E2E run. Details that can contain resource IDs,
+# bucket names, or snapshots are deliberately excluded from the report.
+update_deployment_timing_report() {
+    if [ "$UPDATE_TIMING_REPORT" != "true" ]; then
+        log_info "Skipping deployment timing documentation update"
+        return 0
+    fi
+    if [ ! -f "$TIMING_REPORT_FILE" ]; then
+        log_error "Timing report file not found: $TIMING_REPORT_FILE"
+        return 1
+    fi
+
+    local openemr_version
+    openemr_version=$(yq eval '.applications.openemr.current' "$PROJECT_ROOT/versions.yaml")
+    local generated_at
+    generated_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+    local total_duration="${TEST_TOTAL_DURATION:-$(get_duration "$TEST_START_TIME")}"
+    local scope="steps ${FROM_STEP}-${TO_STEP}"
+    if [ "$FROM_STEP" -eq 1 ] && [ "$TO_STEP" -eq "$TOTAL_STEPS" ] && [ -z "$SKIP_STEPS" ]; then
+        scope="full 10-step suite"
+    elif [ -n "$SKIP_STEPS" ]; then
+        scope="${scope} (skipped: ${SKIP_STEPS})"
+    fi
+
+    local section_file
+    section_file=$(mktemp "${TMPDIR:-/tmp}/openemr-e2e-timings.XXXXXX")
+    {
+        echo "<!-- BEGIN AUTOMATED E2E TIMINGS -->"
+        echo "## Latest Automated E2E Timing Report"
+        echo ""
+        echo "- **Generated:** ${generated_at}"
+        echo "- **OpenEMR:** ${openemr_version}"
+        echo "- **AWS Region:** ${AWS_REGION}"
+        echo "- **Scope:** ${scope}"
+        echo "- **Run ID:** ${TEST_TIMESTAMP}"
+        echo "- **Total elapsed:** ${total_duration}s ($((total_duration / 60))m $((total_duration % 60))s)"
+        echo ""
+        echo "| Phase | Status | Seconds | Duration |"
+        echo "|---|---:|---:|---:|"
+        local result step status details duration
+        for result in "${TEST_RESULTS[@]}"; do
+            IFS='|' read -r step status details duration <<< "$result"
+            : "$details"
+            printf '| %s | %s | %s | %dm %02ds |\n' \
+                "$step" "$status" "$duration" "$((duration / 60))" "$((duration % 60))"
+        done
+        echo ""
+        echo "<!-- END AUTOMATED E2E TIMINGS -->"
+    } > "$section_file"
+
+    if ! python3 - "$TIMING_REPORT_FILE" "$section_file" <<'PY'
+import os
+import shutil
+import sys
+import tempfile
+from pathlib import Path
+
+report_path = Path(sys.argv[1]).resolve()
+section_path = Path(sys.argv[2])
+start = "<!-- BEGIN AUTOMATED E2E TIMINGS -->"
+end = "<!-- END AUTOMATED E2E TIMINGS -->"
+text = report_path.read_text(encoding="utf-8")
+if text.count(start) != 1 or text.count(end) != 1 or text.index(start) > text.index(end):
+    raise SystemExit("timing report markers are missing, duplicated, or out of order")
+section = section_path.read_text(encoding="utf-8").rstrip() + "\n\n"
+updated = text[: text.index(start)] + section + text[text.index(end) + len(end) :].lstrip("\n")
+temporary_name = None
+try:
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=report_path.parent,
+        prefix=f".{report_path.name}.",
+        delete=False,
+    ) as stream:
+        stream.write(updated)
+        temporary_name = stream.name
+    shutil.copystat(report_path, temporary_name, follow_symlinks=False)
+    os.replace(temporary_name, report_path)
+    temporary_name = None
+finally:
+    if temporary_name is not None:
+        Path(temporary_name).unlink(missing_ok=True)
+PY
+    then
+        rm -f "$section_file"
+        log_error "Failed to update deployment timing report"
+        return 1
+    fi
+
+    rm -f "$section_file"
+    log_success "Updated deployment timing report: $TIMING_REPORT_FILE"
 }
 
 # Storage class validation functions
@@ -3085,6 +3290,10 @@ main() {
         list_step_groups
         exit 0
     fi
+
+    # Fail before any AWS, Terraform, manifest-reset, or Kubernetes operation
+    # when the requested documentation target cannot be updated safely.
+    validate_timing_report_target || exit 1
     
     # Detect AWS region from Terraform state if not explicitly set via --aws-region
     get_aws_region
@@ -3158,6 +3367,7 @@ main() {
 
     # Print results
     print_test_results
+    update_deployment_timing_report
 
     log_success "🎉 END-TO-END TEST COMPLETED SUCCESSFULLY! 🎉"
     if [ "$TO_STEP" -lt "$TOTAL_STEPS" ]; then

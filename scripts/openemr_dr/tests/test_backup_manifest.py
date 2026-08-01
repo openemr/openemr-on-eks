@@ -14,7 +14,7 @@ def test_build_manifest_v2_fields() -> None:
         cluster_name="c",
         namespace="openemr",
         backup_bucket="bucket",
-        openemr_version="8.1.1",
+        openemr_version="8.2.0",
         aurora_cluster_id="cluster",
         snapshot_id="snap",
         backup_success=True,

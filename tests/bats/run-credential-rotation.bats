@@ -126,7 +126,9 @@ SCRIPT="${SCRIPTS_DIR}/run-credential-rotation.sh"
 
 # ── Health check URL discovery ──────────────────────────────────────────────
 
-@test "script discovers health check URL from LoadBalancer" {
+@test "script discovers health check URL from the ALB Ingress" {
+  run grep 'get ingress openemr-ingress' "$SCRIPT"
+  [ "$status" -eq 0 ]
   run grep 'loadBalancer.ingress' "$SCRIPT"
   [ "$status" -eq 0 ]
 }

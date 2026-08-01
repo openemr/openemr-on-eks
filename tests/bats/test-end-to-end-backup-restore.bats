@@ -58,6 +58,13 @@ SCRIPT="${SCRIPTS_DIR}/test-end-to-end-backup-restore.sh"
   [[ "$output" =~ (help|Usage|usage) ]]
 }
 
+@test "--timing-report requires a value without starting cloud work" {
+  run_script "test-end-to-end-backup-restore.sh" "--timing-report" "--list-steps"
+  assert_failure
+  [[ "$output" =~ "--timing-report requires a value" ]]
+  [[ ! "$output" =~ "Checking prerequisites" ]]
+}
+
 # ── Static analysis ────────────────────────────────────────────────────────
 
 @test "script uses set -euo pipefail" {
@@ -112,6 +119,8 @@ SCRIPT="${SCRIPTS_DIR}/test-end-to-end-backup-restore.sh"
   [[ "$output" =~ "--cluster-name" ]]
   [[ "$output" =~ "--aws-region" ]]
   [[ "$output" =~ "--namespace" ]]
+  [[ "$output" =~ "--timing-report" ]]
+  [[ "$output" =~ "--no-timing-report" ]]
   rm -f "$FUNC_FILE"
 }
 
@@ -163,6 +172,98 @@ SCRIPT="${SCRIPTS_DIR}/test-end-to-end-backup-restore.sh"
   [[ "$output" =~ "2" ]]
   [[ "$output" =~ "step1|PASS|all good|5s" ]]
   [[ "$output" =~ "step2|FAIL|broken|10s" ]]
+}
+
+@test "UNIT: timing report updater replaces only its bounded generated section" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  if ! command -v python3 >/dev/null 2>&1; then skip "python3 not installed"; fi
+  local report_file func_file
+  report_file=$(mktemp)
+  func_file=$(extract_function "$SCRIPT" "update_deployment_timing_report")
+  cat > "$report_file" <<'EOF'
+# Timing Fixture
+
+<!-- BEGIN AUTOMATED E2E TIMINGS -->
+old generated content
+<!-- END AUTOMATED E2E TIMINGS -->
+
+## Preserved Guidance
+Keep this text.
+EOF
+  chmod 0644 "$report_file"
+
+  run bash -c "
+    UPDATE_TIMING_REPORT=true
+    TIMING_REPORT_FILE='$report_file'
+    PROJECT_ROOT='$PROJECT_ROOT'
+    AWS_REGION='us-west-2'
+    TEST_TIMESTAMP='20260731-200700'
+    TEST_START_TIME=1
+    TEST_TOTAL_DURATION=185
+    FROM_STEP=1
+    TO_STEP=10
+    TOTAL_STEPS=10
+    SKIP_STEPS=''
+    TEST_RESULTS=(
+      'Infrastructure Deployment|SUCCESS|secret-bucket-name|61'
+      'OpenEMR Deployment|SUCCESS|secret-snapshot-id|125'
+    )
+    RED='' GREEN='' YELLOW='' BLUE='' NC=''
+    log_info() { :; }
+    log_success() { :; }
+    log_error() { echo \"ERROR: \$*\" >&2; }
+    get_duration() { echo 186; }
+    source '$func_file'
+    update_deployment_timing_report
+  "
+  assert_success
+  grep -Fq '**OpenEMR:** 8.2.0' "$report_file"
+  grep -Fq '**Total elapsed:** 185s (3m 5s)' "$report_file"
+  grep -Fq '| Infrastructure Deployment | SUCCESS | 61 | 1m 01s |' "$report_file"
+  grep -Fq '| OpenEMR Deployment | SUCCESS | 125 | 2m 05s |' "$report_file"
+  grep -Fq '## Preserved Guidance' "$report_file"
+  ! grep -Fq 'secret-bucket-name' "$report_file"
+  ! grep -Fq 'secret-snapshot-id' "$report_file"
+  [ "$(grep -Fc '<!-- BEGIN AUTOMATED E2E TIMINGS -->' "$report_file")" -eq 1 ]
+  [ "$(grep -Fc '<!-- END AUTOMATED E2E TIMINGS -->' "$report_file")" -eq 1 ]
+  local report_mode report_content
+  report_mode=$(stat -c '%a' "$report_file" 2>/dev/null || stat -f '%Lp' "$report_file")
+  [ "$report_mode" = "644" ]
+  report_content=$(<"$report_file")
+  [[ "$report_content" == *$'| OpenEMR Deployment | SUCCESS | 125 | 2m 05s |\n\n<!-- END AUTOMATED E2E TIMINGS -->'* ]]
+  rm -f "$report_file" "$func_file"
+}
+
+@test "UNIT: timing report validation rejects malformed targets before E2E" {
+  local report_file func_file
+  report_file=$(mktemp)
+  func_file=$(extract_function "$SCRIPT" "validate_timing_report_target")
+  printf '%s\n' '<!-- BEGIN AUTOMATED E2E TIMINGS -->' > "$report_file"
+
+  run bash -c "
+    UPDATE_TIMING_REPORT=true
+    TIMING_REPORT_FILE='$report_file'
+    log_error() { echo \"ERROR: \$*\" >&2; }
+    source '$func_file'
+    validate_timing_report_target
+  "
+  assert_failure
+  [[ "$output" =~ "markers are missing, duplicated, or out of order" ]]
+  rm -f "$report_file" "$func_file"
+}
+
+@test "UNIT: timing report opt-out does not inspect the target" {
+  local func_file
+  func_file=$(extract_function "$SCRIPT" "validate_timing_report_target")
+  run bash -c "
+    UPDATE_TIMING_REPORT=false
+    TIMING_REPORT_FILE='/does/not/exist'
+    log_error() { echo \"ERROR: \$*\" >&2; }
+    source '$func_file'
+    validate_timing_report_target
+  "
+  assert_success
+  rm -f "$func_file"
 }
 
 # ── UNIT: parse_arguments ───────────────────────────────────────────────────
@@ -334,6 +435,134 @@ SCRIPT="${SCRIPTS_DIR}/test-end-to-end-backup-restore.sh"
   [[ "$output" =~ "BUCKET=my-bucket" ]]
   [[ "$output" =~ "proof with spaces and quotes" ]]
   rm -f "$state_file"
+}
+
+@test "UNIT: failed initial deployment marks partial apply for cleanup" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "deploy_infrastructure")
+  mkdir -p "$fixture/terraform"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    INFRASTRUCTURE_CREATED=false
+    CLEANUP_REQUIRED=false
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_existing_log_groups() { :; }
+    terraform() {
+      if [ "$1" = "apply" ]; then
+        printf "%s %s\n" "$INFRASTRUCTURE_CREATED" "$CLEANUP_REQUIRED" \
+          > "$PROJECT_ROOT/cleanup-flags"
+        return 1
+      fi
+      return 0
+    }
+    source "$2"
+    deploy_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform apply failed" ]]
+  [ "$(cat "$fixture/cleanup-flags")" = "true true" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
+@test "UNIT: infrastructure recreation stops after Terraform init failure" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  mkdir -p "$fixture/scripts" "$fixture/terraform"
+  printf '#!/bin/bash\nexit 0\n' > "$fixture/scripts/restore-defaults.sh"
+  chmod +x "$fixture/scripts/restore-defaults.sh"
+  printf 'locked\n' > "$fixture/terraform/.terraform.lock.hcl"
+  printf 'stale plan\n' > "$fixture/terraform/tfplan"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_manual_snapshots() { :; }
+    cleanup_existing_log_groups() { :; }
+    save_e2e_state() { :; }
+    terraform() {
+      printf "%s\n" "$*" >> "$PROJECT_ROOT/terraform-calls"
+      [ "$1" != "init" ]
+    }
+    source "$2"
+    recreate_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform init failed during infrastructure recreation" ]]
+  grep -q '^init ' "$fixture/terraform-calls"
+  ! grep -q '^plan ' "$fixture/terraform-calls"
+  ! grep -q '^apply ' "$fixture/terraform-calls"
+  [ ! -e "$fixture/terraform/tfplan" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
+@test "UNIT: failed infrastructure recreation marks partial apply for cleanup" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  mkdir -p "$fixture/scripts" "$fixture/terraform"
+  printf '#!/bin/bash\nexit 0\n' > "$fixture/scripts/restore-defaults.sh"
+  chmod +x "$fixture/scripts/restore-defaults.sh"
+  printf 'locked\n' > "$fixture/terraform/.terraform.lock.hcl"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    INFRASTRUCTURE_CREATED=false
+    CLEANUP_REQUIRED=false
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_manual_snapshots() { :; }
+    cleanup_existing_log_groups() { :; }
+    terraform() {
+      if [ "$1" = "apply" ]; then
+        printf "%s %s\n" "$INFRASTRUCTURE_CREATED" "$CLEANUP_REQUIRED" \
+          > "$PROJECT_ROOT/cleanup-flags"
+        return 1
+      fi
+      return 0
+    }
+    source "$2"
+    recreate_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform apply failed during infrastructure recreation" ]]
+  [ "$(cat "$fixture/cleanup-flags")" = "true true" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
+@test "infrastructure recreation guards each Terraform stage" {
+  local func_file
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  grep -Fq 'if ! terraform init -lockfile=readonly' "$func_file"
+  grep -Fq 'if ! terraform plan \' "$func_file"
+  grep -Fq 'if ! terraform apply -auto-approve tfplan' "$func_file"
+  grep -Fq '"$PROJECT_ROOT/scripts/ensure-efs-csi-ready.sh"' "$func_file"
+  rm -f "$func_file"
 }
 
 # ── UNIT: parse_arguments chunked flags ─────────────────────────────────────

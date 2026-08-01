@@ -6,7 +6,7 @@
 # Core Application Versions
 applications:
   openemr:
-    current: "8.1.1"
+    current: "8.2.0"
     registry: "openemr/openemr"
     release_notes_url: "https://hub.docker.com/r/openemr/openemr/tags"
     notify_on_update: true
@@ -14,7 +14,7 @@ applications:
     description: "Version of OpenEMR docker image we use."
 
   fluent_bit:
-    current: "5.0.8"
+    current: "5.0.9"
     registry: "fluent/fluent-bit"
     notify_on_update: true
     requires_aws_cli: false
@@ -39,7 +39,7 @@ infrastructure:
     description: "Amazon EKS cluster version"
 
   terraform:
-    current: "1.15.7"
+    current: "1.15.8"
     notify_on_update: true
     requires_aws_cli: false
     description: "Terraform version used in documentation and as the required_version constraint in terraform/main.tf and oidc_provider/main.tf"
@@ -58,14 +58,14 @@ databases:
 # Note: CoreDNS, kube-proxy, VPC CNI, and EBS CSI Driver are managed by EKS Auto Mode
 eks_addons:
   efs_csi_driver:
-    current: "v3.3.0-eksbuild.1"
+    current: "v3.4.1-eksbuild.1"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "aws-efs-csi-driver"
     description: "EFS CSI Driver for persistent storage"
 
   metrics_server:
-    current: "v0.8.1-eksbuild.11"
+    current: "v0.9.0-eksbuild.4"
     notify_on_update: true
     requires_aws_cli: true
     aws_addon_name: "metrics-server"
@@ -76,6 +76,7 @@ terraform_modules:
   terraform_aws:
     source: "hashicorp/aws"
     current: "6.52.0"
+    kind: "provider"
     notify_on_update: true
     requires_aws_cli: false
     description: "Official AWS provider from Hashicorp for Terraform."
@@ -83,20 +84,45 @@ terraform_modules:
   terraform_kubernetes:
     source: "hashicorp/kubernetes"
     current: "3.0.1"
+    kind: "provider"
     notify_on_update: true
     requires_aws_cli: false
     description: "Official Kubernetes provider from Hashicorp for Terraform."
 
+  terraform_random:
+    source: "hashicorp/random"
+    current: "3.9.0"
+    kind: "provider"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "HashiCorp random provider used for unique resource suffixes."
+
+  terraform_time:
+    source: "hashicorp/time"
+    current: "0.14.0"
+    kind: "provider"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "HashiCorp time provider used by infrastructure workflows."
+
+  terraform_http:
+    source: "hashicorp/http"
+    current: "3.6.0"
+    kind: "provider"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "HashiCorp HTTP provider used by infrastructure data sources."
+
   aws_pod_identity:
     source: "terraform-aws-modules/eks-pod-identity/aws"
-    current: "2.8.1"
+    current: "2.8.2"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS pod identities for Terraform."
 
   aws_eks:
     source: "terraform-aws-modules/eks/aws"
-    current: "21.24.0"
+    current: "21.24.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "AWS provided module for EKS for Terraform."
@@ -111,58 +137,124 @@ terraform_modules:
 # GitHub Workflow Actions Dependencies
 github_workflows:
   actions_checkout:
-    current: "v7.0.0"
+    current: "v7.0.1"
+    repository: "actions/checkout"
+    sha: "3d3c42e5aac5ba805825da76410c181273ba90b1"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for checking out code from a registry."
 
   actions_setup_python:
-    current: "v6.3.0"
+    current: "v7.0.0"
+    repository: "actions/setup-python"
+    sha: "5fda3b95a4ea91299a34e894583c3862153e4b97"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Python version."
 
   actions_setup_go:
-    current: "v6.5.0"
+    current: "v7.0.0"
+    repository: "actions/setup-go"
+    sha: "b7ad1dad31e06c5925ef5d2fc7ad053ef454303e"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Go version."
 
   actions_setup_terraform:
     current: "v4.0.1"
+    repository: "hashicorp/setup-terraform"
+    sha: "dfe3c3f87815947d99a8997f908cb6525fc44e9e"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Terraform version."
 
   actions_setup_kubectl:
     current: "v5.1.0"
+    repository: "azure/setup-kubectl"
+    sha: "829323503d1be3d00ca8346e5391ca0b07a9ab0d"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for setting up a specified Kubectl version (azure/setup-kubectl)."
 
   actions_upload_artifact:
-    current: "v6"
+    current: "v7.0.1"
+    repository: "actions/upload-artifact"
+    sha: "043fb46d1a93c77aae656e7c1c64a875d1fc6a0a"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for uploading an artifact for storage."
 
   actions_download_artifact:
-    current: "v7"
+    current: "v8.0.1"
+    repository: "actions/download-artifact"
+    sha: "3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for downloading an artifact as part of a workflow."
 
   codeql_action:
-    current: "v4"
+    current: "v4.37.4"
+    repository: "github/codeql-action"
+    sha: "f205ea1c3313d32999d8d6a48b4f6530d4437b38"
     notify_on_update: true
     requires_aws_cli: false
     description: "Uploads the generated Trivy report in Sarif format to the Github Security tab."
 
+  trivy_action:
+    current: "v0.36.0"
+    repository: "aquasecurity/trivy-action"
+    sha: "ed142fd0673e97e23eac54620cfb913e5ce36c25"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Runs Trivy vulnerability and misconfiguration scans in GitHub Actions."
+
   aws_configure_credentials:
-    current: "v5"
+    current: "v6.2.3"
+    repository: "aws-actions/configure-aws-credentials"
+    sha: "e6de054238d6b7531b4efff3b6587d9aade6a06c"
     notify_on_update: true
     requires_aws_cli: false
     description: "Github action for configuring AWS credentials (aws-actions/configure-aws-credentials)."
+
+  github_script:
+    current: "v9.0.0"
+    repository: "actions/github-script"
+    sha: "3a2844b7e9c422d3c10d287c895573f7108da1b3"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Runs JavaScript in GitHub Actions workflows."
+
+  paths_filter:
+    current: "v4.0.2"
+    repository: "dorny/paths-filter"
+    sha: "7b450fff21473bca461d4b92ce414b9d0420d706"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Selects CI jobs based on changed repository paths."
+
+  setup_tflint:
+    current: "v6.3.0"
+    repository: "terraform-linters/setup-tflint"
+    sha: "6e1e0642c0289bd619021bf6b34e3c08ed1e005a"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Installs the pinned TFLint release in CI."
+
+  kics_action:
+    current: "v2.1.20"
+    repository: "Checkmarx/kics-github-action"
+    sha: "05aa5eb70eede1355220f4ca5238d96b397e30a6"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Runs KICS infrastructure-as-code scanning."
+
+  release_action:
+    current: "v1.21.0"
+    repository: "ncipollo/release-action"
+    sha: "339a81892b84b4eeb0f6e744e4574d79d0d9b8dd"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Publishes GitHub releases from the manual release workflow."
 
   github_runner:
     current: "ubuntu-26.04"
@@ -203,7 +295,7 @@ pre_commit_hooks:
     description: "https://github.com/pycqa/bandit"
 
   terraform_hooks:
-    current: "v1.108.0"
+    current: "v1.108.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/antonbabenko/pre-commit-terraform"
@@ -215,7 +307,7 @@ pre_commit_hooks:
     description: "https://github.com/koalaman/shellcheck-precommit"
 
   markdownlint:
-    current: "v0.49.0"
+    current: "v0.49.1"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/igorshubovych/markdownlint-cli"
@@ -227,7 +319,7 @@ pre_commit_hooks:
     description: "https://github.com/adrienverge/yamllint"
 
   commitizen:
-    current: "v4.16.4"
+    current: "v4.17.0"
     notify_on_update: true
     requires_aws_cli: false
     description: "https://github.com/commitizen-tools/commitizen"
@@ -241,13 +333,13 @@ semver_packages:
     description: "Version of Python used in Github CI/CD workflows."
 
   terraform_version:
-    current: "1.15.7"
+    current: "1.15.8"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Terraform used in Github CI/CD workflows."
 
   kubectl_version:
-    current: "v1.36.2"
+    current: "v1.36.3"
     notify_on_update: true
     requires_aws_cli: false
     description: "Version of Kubectl used in Github CI/CD workflows."
@@ -262,14 +354,14 @@ semver_packages:
 # Go Package Dependencies (Console TUI)
 go_packages:
   go_version:
-    current: "1.25.5"
+    current: "1.25.12"
     notify_on_update: true
     requires_aws_cli: false
     description: "Go programming language version required for the console TUI application"
     min_version: "1.25"
 
   bubbletea:
-    current: "v2.0.7"
+    current: "v2.0.8"
     package_manager: "go"
     repository: "github.com/charmbracelet/bubbletea"
     module_path: "charm.land/bubbletea/v2"
@@ -279,7 +371,7 @@ go_packages:
     min_version: "v2.0.0"
 
   lipgloss:
-    current: "v2.0.4"
+    current: "v2.0.5"
     package_manager: "go"
     repository: "github.com/charmbracelet/lipgloss"
     module_path: "charm.land/lipgloss/v2"
@@ -288,7 +380,7 @@ go_packages:
     description: "Lipgloss styling library for the console TUI"
     min_version: "v2.0.0"
 
-# Python Package Dependencies (Warp, Credential Rotation, openemr_dr)
+# Python Package Dependencies (Warp, Credential Rotation, openemr_dr, Knowledge MCP)
 python_packages:
   pymysql:
     current: "1.2.0"
@@ -299,7 +391,7 @@ python_packages:
     min_version: "1.1.3"
 
   boto3:
-    current: "1.43.38"
+    current: "1.43.62"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
@@ -315,7 +407,7 @@ python_packages:
     min_version: "2.32.5"
 
   kubernetes:
-    current: "36.0.2"
+    current: "36.0.3"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
@@ -355,12 +447,36 @@ python_packages:
     min_version: "25.0.0"
 
   mypy:
-    current: "2.1.0"
+    current: "2.3.0"
     package_manager: "pip"
     notify_on_update: true
     requires_aws_cli: false
     description: "Static type checker for Warp and credential rotation projects"
     min_version: "1.0.0"
+
+  fastmcp:
+    current: "3.4.5"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Framework for the local read-only OpenEMR EKS knowledge MCP server"
+    min_version: "3.4.5"
+
+  pyyaml:
+    current: "6.0.3"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "YAML parser used by the knowledge MCP server and repository validation"
+    min_version: "6.0.3"
+
+  uv:
+    current: "0.11.26"
+    package_manager: "pip"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Python package manager used to lock, test, build, and run the knowledge MCP server"
+    min_version: "0.11.26"
 
   ruff:
     current: "0.11.12"
@@ -392,11 +508,17 @@ python_projects:
     venv: tools/credential-rotation/.venv
     coverage_min: 90
     tools: [black, flake8, mypy, bandit, pytest]
+  knowledge_mcp:
+    path: tools/codebase-mcp
+    requirements_dev: tools/codebase-mcp/pyproject.toml
+    venv: tools/codebase-mcp/.venv
+    coverage_min: 90
+    tools: [ruff, mypy, bandit, pytest]
 
 # Monitoring Stack Versions
 monitoring:
   prometheus_operator:
-    current: "87.4.0"
+    current: "88.0.1"
     chart: "kube-prometheus-stack"
     notify_on_update: true
     requires_aws_cli: false
@@ -406,17 +528,23 @@ monitoring:
     current: "7.0.0"
     chart: "loki"
     repository: "grafana"
+    update_policy: "manual-migration"
+    migration_target_repository: "grafana-community"
+    migration_notes_url: "https://grafana.com/docs/loki/latest/setup/upgrade/upgrade-to-community/"
     notify_on_update: true
     requires_aws_cli: false
-    description: "Loki for log aggregation."
+    description: "Loki for log aggregation. The current grafana chart is on the GEL maintenance track; migrate to the OSS grafana-community chart in a dedicated change."
 
   tempo:
     current: "2.26.0"
     chart: "tempo-distributed"
     repository: "grafana-community"
+    update_policy: "manual-migration"
+    migration_target_repository: "grafana-community"
+    migration_notes_url: "https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/migrate-to-3/"
     notify_on_update: true
     requires_aws_cli: false
-    description: "Tempo for distributed tracing with S3 storage in microservice mode (replaces Jaeger)."
+    description: "Tempo 2.x distributed tracing with S3. Chart 3.x requires Kafka and a dedicated architecture migration."
 
   mimir:
     current: "6.1.0"
@@ -437,7 +565,7 @@ monitoring:
 
 
   cert_manager:
-    current: "v1.20.2"
+    current: "v1.21.1"
     chart: "cert-manager"
     repository: "jetstack"
     notify_on_update: true
@@ -454,7 +582,7 @@ security_tools:
     description: "Trivy vulnerability, secret, and misconfiguration scanner"
 
   checkov:
-    current: "3.3.6"
+    current: "3.3.8"
     package_manager: "pip"
     repository: "bridgecrewio/checkov"
     notify_on_update: true
@@ -463,14 +591,16 @@ security_tools:
 
   kics:
     current: "v2.1.20"
-    repository: "Checkmarx/kics"
+    repository: "Checkmarx/kics-github-action"
     notify_on_update: true
     requires_aws_cli: false
-    description: "KICS (Keeping Infrastructure as Code Secure) scanner"
+    description: "KICS GitHub Action (scanner v2.1.21 has no corresponding action tag yet)"
 
   gosec:
-    current: "v2.27.1"
+    current: "v2.28.0"
     repository: "securego/gosec"
+    minimum_go_version: "1.25.8"
+    compatibility_source: "https://github.com/securego/gosec/blob/v2.28.0/go.mod"
     notify_on_update: true
     requires_aws_cli: false
     description: "gosec Go security checker"

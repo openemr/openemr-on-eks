@@ -30,7 +30,7 @@ def from_metadata_dict(data: dict[str, Any], metadata_uri: str) -> RestorePlan:
         backup_bucket=bucket,
         snapshot_id=snapshot or "",
         app_data_key=app_data_key or "",
-        openemr_version=plan.get("openemr_version") or data.get("openemr_version") or "8.1.1",
+        openemr_version=plan.get("openemr_version") or data.get("openemr_version") or "8.2.0",
         backup_strategy=plan.get("backup_strategy") or data.get("backup_strategy") or "same-region",
         backup_region=plan.get("backup_region")
         or data.get("backup_region")

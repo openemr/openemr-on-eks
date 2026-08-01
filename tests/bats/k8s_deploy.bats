@@ -149,6 +149,12 @@ K8S_DEPLOY="${PROJECT_ROOT}/k8s/deploy.sh"
   [ "$status" -eq 0 ]
 }
 
+@test "single-replica initialization removes the deployed HPA name" {
+  run grep -F 'kubectl delete hpa openemr-hpa' "$K8S_DEPLOY"
+  assert_success
+  ! grep -Eq 'kubectl delete hpa openemr([[:space:]]|$)' "$K8S_DEPLOY"
+}
+
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
 
 @test "UNIT: show_help prints usage" {

@@ -44,8 +44,8 @@ setup() { cd "$PROJECT_ROOT"; }
   [ "$status" -eq 0 ]
 }
 
-@test "restore.sh default OpenEMR version is '8.1.1'" {
-  run grep 'DEFAULT_OPENEMR_VERSION.*8.1.1' "${SCRIPTS_DIR}/restore.sh"
+@test "restore.sh default OpenEMR version is '8.2.0'" {
+  run grep 'DEFAULT_OPENEMR_VERSION.*8.2.0' "${SCRIPTS_DIR}/restore.sh"
   [ "$status" -eq 0 ]
 }
 

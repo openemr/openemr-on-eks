@@ -81,9 +81,6 @@ PASSED_TESTS=0  # Counter for passed tests
 FAILED_TESTS=0  # Counter for failed tests
 SKIPPED_TESTS=0 # Counter for skipped tests
 
-# Initialize test results directory for storing output files
-mkdir -p "$TEST_RESULTS_DIR"
-
 # Logging functions - provide consistent, color-coded output for different message types
 # These functions ensure all test operations have clear, categorized feedback
 log_info() {
@@ -335,7 +332,7 @@ test_terraform_validation() {
 
     cd "$PROJECT_ROOT/terraform" || return 1
     log_info "Initializing Terraform..."
-    if ! output=$(terraform init -backend=false 2>&1); then
+    if ! output=$(terraform init -backend=false -lockfile=readonly 2>&1); then
         log_error "Terraform init failed"
         log_error "Error details: $output"
         failed=1
@@ -685,6 +682,27 @@ run_documentation_tests() {
     run_test "Documentation Validation" "markdown_validation" "docs/*.md"
 }
 
+# Print a read-only execution plan. This path must not create reports, initialize
+# Terraform, install dependencies, or run any validation command.
+show_dry_run() {
+    local planned_suites=()
+    case "$TEST_SUITE" in
+        all)
+            planned_suites=(code_quality kubernetes_manifests script_validation documentation)
+            ;;
+        code_quality|kubernetes_manifests|script_validation|documentation)
+            planned_suites=("$TEST_SUITE")
+            ;;
+        *)
+            log_error "Unknown test suite: $TEST_SUITE"
+            return 1
+            ;;
+    esac
+
+    log_info "Dry run: no tests or external commands will be executed."
+    printf 'Planned suite: %s\n' "${planned_suites[@]}"
+}
+
 # Generate test report
 generate_report() {
     local report_file="$TEST_RESULTS_DIR/test-report-$TIMESTAMP.txt"
@@ -730,6 +748,14 @@ main() {
     log_info "Starting OpenEMR EKS CI/CD Test Suite"
     log_info "Project root: $PROJECT_ROOT"
     log_info "Test suite: $TEST_SUITE"
+
+    if [[ "$DRY_RUN" == "true" ]]; then
+        show_dry_run
+        return
+    fi
+
+    # Create output only when tests will actually execute.
+    mkdir -p "$TEST_RESULTS_DIR"
 
     # Parse configuration
     parse_test_config

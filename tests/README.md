@@ -218,7 +218,10 @@ SCRIPT="${SCRIPTS_DIR}/example.sh"
 
 ## Test Coverage Summary
 
-**849 tests** across all 31 test files, covering function-level behavior, cross-file contracts, and version consistency.
+**976 tests** across 33 BATS files at the July 2026 audit point, covering
+function-level behavior, cross-file contracts, and version consistency. Since
+the suite changes frequently, treat CI and the current `@test` declarations as
+the source of truth rather than relying on this snapshot alone.
 
 ### Contract & Consistency Tests
 
@@ -226,9 +229,9 @@ These test suites catch configuration drift between files — the kind of issue 
 
 | Test File | Tests | What It Catches |
 |-----------|-------|-----------------|
-| `contract-tests.bats` | 30 | Terraform output-to-script contracts, K8s manifest consistency, version sync between Dockerfile/requirements.txt/versions.yaml |
-| `run-test-suite.bats` | 21 | CLI flag parsing, logging helpers, record_test_result counters, environment defaults, structural integrity |
-| `versions_yaml.bats` | 29 | YAML structure, version format, cross-file version drift (CI workflows, Dockerfiles, requirements.txt) |
+| `contract-tests.bats` | 54 | Terraform output-to-script contracts, K8s manifest consistency, scanner policy, and version sync |
+| `run-test-suite.bats` | 22 | CLI flag parsing, logging helpers, record_test_result counters, environment defaults, structural integrity |
+| `versions_yaml.bats` | 30 | YAML structure, version format, cross-file version drift (CI workflows, Dockerfiles, requirements files) |
 
 A dedicated CI workflow (`.github/workflows/ci-contract-tests.yml`) runs these on every push/PR alongside Terraform validate, K8s manifest schema validation (kubeconform), and the full BATS suite.
 

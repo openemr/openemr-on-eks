@@ -39,6 +39,7 @@ def test_from_env_succeeds_with_all_vars(mock_boto):
         "OPENEMR_SITES_MOUNT_ROOT": "/mnt/sites",
         "K8S_NAMESPACE": "openemr",
         "K8S_DEPLOYMENT_NAME": "openemr",
+        # checkov:skip=CKV_SECRET_6:Kubernetes Secret name, not secret material.
         "K8S_SECRET_NAME": "openemr-db-credentials",
     }
     with patch.dict(os.environ, env, clear=True):

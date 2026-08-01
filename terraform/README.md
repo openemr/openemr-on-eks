@@ -125,8 +125,8 @@ graph TD
 
 - **Purpose**: Provider configuration and data sources
 - **Key Components**:
-  - AWS provider configuration (v6.6.0)
-  - Kubernetes provider configuration
+  - AWS provider configuration (v6.52.0)
+  - Kubernetes provider configuration (v3.0.1)
   - Data sources for availability zones, caller identity, and public IP
   - Common tags and local values
 - **Dependencies**: None (foundation file)
@@ -215,7 +215,7 @@ graph TD
 
 - **Purpose**: KMS keys for encryption
 - **Key Components**:
-  - 6 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch)
+  - 7 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup)
   - Comprehensive key policies
   - Key rotation enabled
   - KMS aliases for easy reference
@@ -272,13 +272,16 @@ graph TD
 
 #### `s3.tf`
 
-- **Purpose**: S3 buckets for logs and backups
+- **Purpose**: S3 buckets for load-balancer/WAF logs and optional observability storage
 - **Key Components**:
   - ALB access logs bucket
   - WAF logs bucket (conditional)
+  - Loki, Tempo, Mimir blocks/ruler, and AlertManager storage buckets
   - Encryption with KMS
   - Lifecycle policies
-  - Proper bucket policies for log delivery
+  - `BucketOwnerEnforced` object ownership and public-access blocks
+  - Bucket policies that deny non-TLS access
+  - WAF lifecycle filtering on its actual `AWSLogs/` delivery prefix
 - **Dependencies**: `kms.tf`
 - **Maintenance Notes**:
   - Update lifecycle policies when necessary
@@ -289,7 +292,7 @@ graph TD
 
 - **Purpose**: CloudWatch log groups
 - **Key Components**:
-  - 10+ log groups for OpenEMR 8.0.0
+  - 10+ log groups for OpenEMR 8.2.0
   - Fluent Bit metrics log group
   - Different retention periods for different log types
   - KMS encryption for all log groups
@@ -318,10 +321,13 @@ graph TD
 - **Purpose**: CloudTrail audit logging
 - **Key Components**:
   - Multi-region CloudTrail
-  - S3 bucket for log storage
-  - KMS encryption
-  - S3 object access logging
-- **Dependencies**: `s3.tf`, `kms.tf`
+  - KMS-encrypted, versioned S3 bucket with a 365-day lifecycle
+  - Source-account and trail-ARN restrictions on CloudTrail S3 delivery
+  - KMS-encrypted CloudWatch Logs group `/aws/cloudtrail/${cluster_name}` with
+    365-day retention
+  - Dedicated least-privilege IAM role for CloudTrail log delivery
+  - Management and S3 object data event selectors with log-file validation
+- **Dependencies**: `kms.tf`
 - **Maintenance Notes**:
   - Update log retention policies
   - Modify event selectors
@@ -409,7 +415,9 @@ graph TD
 ### Updating Existing Resources
 
 1. **Version Updates**:
-   - Update provider versions in main.tf
+   - Update provider versions in `versions.yaml` and `main.tf`
+   - Regenerate both committed `.terraform.lock.hcl` files for Linux AMD64
+     and macOS ARM64
    - Update module versions in respective files
    - Test changes in testing environment first
 
@@ -477,8 +485,9 @@ graph TD
 ### Common Issues
 
 1. **Provider Version Conflicts**:
-   - Update provider versions
-   - Run `terraform init -upgrade`
+   - Confirm `main.tf`, `versions.yaml`, and `.terraform.lock.hcl` agree
+   - Regenerate the lock files deliberately when changing constraints; normal
+     deployments use `terraform init -lockfile=readonly`
 
 2. **Resource Dependencies**:
    - Check dependency order
@@ -492,7 +501,7 @@ graph TD
 
 ```bash
 # Plan with detailed output
-terraform init --upgrade && terraform plan -detailed-exitcode
+terraform init -lockfile=readonly && terraform plan -detailed-exitcode
 
 # Show current state
 terraform show

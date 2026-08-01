@@ -27,12 +27,12 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="87.4.0"     # kube-prometheus-stack
+CHART_KPS_VERSION="88.0.1"     # kube-prometheus-stack
 CHART_LOKI_VERSION="7.0.0"     # Grafana Loki stack
 CHART_TEMPO_VERSION="2.26.0"   # Grafana Tempo Distributed (distributed tracing in microservice mode)
 CHART_MIMIR_VERSION="6.1.0"    # Grafana Mimir (long-term metrics storage)
 OTEBPF_VERSION="v0.4.1"        # OTeBPF (eBPF auto-instrumentation) - Docker Hub: otel/ebpf-instrument
-CERT_MANAGER_VERSION="v1.20.2" # cert-manager (TLS certificate management)
+CERT_MANAGER_VERSION="v1.21.1" # cert-manager (TLS certificate management)
 
 # =============================================================================
 # TIMEOUTS AND RETRIES
@@ -78,7 +78,7 @@ SLACK_WEBHOOK_URL="" # Slack webhook URL (must start with https://hooks.slack.co
 SLACK_CHANNEL=""     # Slack channel (e.g., "#openemr-alerts")
 
 # Example Slack configuration:
-# SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+# SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX" # checkov:skip=CKV_SECRET_14:Nonfunctional documented placeholder.
 # SLACK_CHANNEL="#openemr-alerts"
 
 # =============================================================================
@@ -99,8 +99,7 @@ DEBUG="0"                       # Set to "1" for verbose debug output
 # Customize storage directories
 CREDENTIALS_DIR="./credentials"         # Secure credential storage
 BACKUP_DIR="./backups"                  # Configuration backups
-VALUES_FILE="./prometheus-values.yaml"  # Generated Prometheus values file
-TEMPO_VALUES_FILE="./tempo-values.yaml" # Generated Tempo values file (reference)
+# VALUES_FILE="./runtime-prometheus-values.yaml" # Optional; defaults to a temporary file
 
 # =============================================================================
 # AUTOSCALING CONFIGURATION
@@ -109,16 +108,16 @@ TEMPO_VALUES_FILE="./tempo-values.yaml" # Generated Tempo values file (reference
 ENABLE_AUTOSCALING="1"                  # Set to "0" to disable autoscaling
 
 # Component-specific replica limits
-GRAFANA_MIN_REPLICAS="1"      # Minimum Grafana replicas
-GRAFANA_MAX_REPLICAS="3"      # Maximum Grafana replicas
-PROMETHEUS_MIN_REPLICAS="1"   # Minimum Prometheus replicas
-PROMETHEUS_MAX_REPLICAS="3"   # Maximum Prometheus replicas
+GRAFANA_MIN_REPLICAS="1"      # Fixed at one because Grafana uses a single RWO PVC
+GRAFANA_MAX_REPLICAS="1"      # Must remain equal to GRAFANA_MIN_REPLICAS
+PROMETHEUS_MIN_REPLICAS="1"   # Static Prometheus replica count
+PROMETHEUS_MAX_REPLICAS="1"   # Must equal PROMETHEUS_MIN_REPLICAS (no chart-level HPA)
 LOKI_MIN_REPLICAS="2"         # Minimum Loki replicas (SimpleScalable mode requires at least 2)
 LOKI_MAX_REPLICAS="3"         # Maximum Loki replicas
-TEMPO_MIN_REPLICAS="1"        # Minimum Tempo replicas
-TEMPO_MAX_REPLICAS="3"        # Maximum Tempo replicas
-MIMIR_MIN_REPLICAS="1"        # Minimum Mimir replicas
-MIMIR_MAX_REPLICAS="3"        # Maximum Mimir replicas
+TEMPO_MIN_REPLICAS="1"        # Baseline and stateless-component HPA minimum
+TEMPO_MAX_REPLICAS="3"        # Stateless-component HPA maximum
+MIMIR_MIN_REPLICAS="1"        # Core replicas and gateway HPA minimum
+MIMIR_MAX_REPLICAS="3"        # Gateway HPA maximum
 ALERTMANAGER_MIN_REPLICAS="1" # Minimum AlertManager replicas
 ALERTMANAGER_MAX_REPLICAS="3" # Maximum AlertManager replicas
 

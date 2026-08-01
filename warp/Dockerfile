@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_2: Batch CLI image exits after its command; it has no long-running service to probe.
 FROM python:3.14-slim
 
 WORKDIR /app
@@ -22,7 +23,8 @@ COPY README.md .
 RUN pip install --no-cache-dir -e .
 
 # Create non-root user for security
-RUN useradd --create-home --shell /bin/bash warp && \
+RUN groupadd --gid 10001 warp && \
+    useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash warp && \
     chown -R warp:warp /app
 USER warp
 

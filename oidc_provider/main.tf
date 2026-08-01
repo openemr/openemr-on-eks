@@ -15,12 +15,12 @@
 # =============================================================================
 
 terraform {
-  required_version = ">= 1.15.7"
+  required_version = ">= 1.15.8"
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "6.47.0"
+      version = "6.52.0"
     }
   }
 }
@@ -40,15 +40,6 @@ provider "aws" {
     }
   }
 }
-
-# =============================================================================
-# DATA SOURCES
-# =============================================================================
-# Get current AWS account information for ARN construction
-data "aws_caller_identity" "current" {}
-
-# Get current AWS region (for provider configuration)
-data "aws_region" "current" {}
 
 # =============================================================================
 # GITHUB OIDC PROVIDER
@@ -173,4 +164,3 @@ resource "aws_iam_role_policy" "github_actions_version_check" {
 #   role       = aws_iam_role.github_actions.name
 #   policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
 # }
-

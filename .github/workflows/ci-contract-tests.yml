@@ -27,11 +27,11 @@ jobs:
     name: Contract & Version Consistency
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install yq
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
       - name: Install BATS
@@ -47,47 +47,78 @@ jobs:
     name: Terraform Validate (offline)
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: hashicorp/setup-terraform@v4.0.1
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.15.8
 
       - name: Terraform fmt check
         run: terraform fmt -check -recursive terraform/
 
       - name: Terraform init and validate
-        run: cd terraform && terraform init -backend=false && terraform validate
+        run: cd terraform && terraform init -backend=false -lockfile=readonly && terraform validate
 
   k8s-manifest-validate:
     name: K8s Manifest Schema Validation
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install kubeconform
         run: |
-          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo apt-get update
+          sudo apt-get install -y gettext-base
+          curl --fail --silent --show-error --location \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz |
+            tar xz
           sudo mv kubeconform /usr/local/bin/
 
       - name: Validate K8s manifests
         run: |
-          # Validate manifests that don't use shell variable substitution
-          # Skip files with ${...} placeholders (credential-rotation templates)
+          export SSL_CERT_ARN='arn:aws:acm:us-west-2:111122223333:certificate/00000000-0000-0000-0000-000000000000'
+          export S3_BUCKET_NAME='openemr-ci-alb-logs'
+          export WAF_ACL_ARN='arn:aws:wafv2:us-west-2:111122223333:regional/webacl/openemr/00000000-0000-0000-0000-000000000000'
+          export OPENEMR_VERSION='8.2.0'
+          export AWS_REGION='us-west-2'
+          export CLUSTER_NAME='openemr-ci'
+          export OPENEMR_ROLE_ARN='arn:aws:iam::111122223333:role/openemr-ci'
+          export VPC_CIDR='10.0.0.0/16'
+          export EFS_ID='fs-00000000000000000'
+          export OPENEMR_MIN_REPLICAS='2'
+          export OPENEMR_MAX_REPLICAS='10'
+          export OPENEMR_CPU_THRESHOLD='70'
+          export OPENEMR_MEMORY_THRESHOLD='80'
+          export OPENEMR_SCALE_DOWN_STABILIZATION='300'
+          export OPENEMR_SCALE_UP_STABILIZATION='60'
+          export CREDENTIAL_ROTATION_ROLE_ARN='arn:aws:iam::111122223333:role/credential-rotation-ci'
+          export CREDENTIAL_ROTATION_IMAGE='111122223333.dkr.ecr.us-west-2.amazonaws.com/credential-rotation:ci'
+          export CREDENTIAL_ROTATION_ARGS='["--log-json"]'
+          export RDS_SLOT_SECRET_ARN='arn:aws:secretsmanager:us-west-2:111122223333:secret:slot'
+          export RDS_ADMIN_SECRET_ARN='arn:aws:secretsmanager:us-west-2:111122223333:secret:admin'
+          export OPENEMR_HEALTHCHECK_URL='https://example.invalid/interface/login/login.php'
+
+          substitutions='${SSL_CERT_ARN} ${S3_BUCKET_NAME} ${WAF_ACL_ARN} ${OPENEMR_VERSION} ${AWS_REGION} ${CLUSTER_NAME} ${OPENEMR_ROLE_ARN} ${VPC_CIDR} ${EFS_ID} ${OPENEMR_MIN_REPLICAS} ${OPENEMR_MAX_REPLICAS} ${OPENEMR_CPU_THRESHOLD} ${OPENEMR_MEMORY_THRESHOLD} ${OPENEMR_SCALE_DOWN_STABILIZATION} ${OPENEMR_SCALE_UP_STABILIZATION} ${CREDENTIAL_ROTATION_ROLE_ARN} ${CREDENTIAL_ROTATION_IMAGE} ${CREDENTIAL_ROTATION_ARGS} ${RDS_SLOT_SECRET_ARN} ${RDS_ADMIN_SECRET_ARN} ${OPENEMR_HEALTHCHECK_URL}'
+          render_dir=$(mktemp -d)
+          trap 'rm -rf "$render_dir"' EXIT
+          failed=0
           for f in k8s/*.yaml; do
-            if grep -q '\${' "$f"; then
-              echo "Skipping template file: $f"
-              continue
-            fi
             echo "Validating: $f"
-            kubeconform -strict -summary "$f" || true
+            rendered="$render_dir/$(basename "$f")"
+            envsubst "$substitutions" < "$f" > "$rendered"
+            if ! kubeconform -strict -ignore-missing-schemas -summary "$rendered"; then
+              failed=1
+            fi
           done
+          exit "$failed"
 
   tflint:
     name: TFLint
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: terraform-linters/setup-tflint@6e1e0642c0289bd619021bf6b34e3c08ed1e005a # v6.3.0
 
       - name: Run TFLint
         run: |
@@ -108,18 +139,18 @@ jobs:
     name: Full BATS Test Suite
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version: '1.25'
+          go-version: '1.25.12'
           cache-dependency-path: console/go.sum
 
       - name: Install dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y bats
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
       - name: Download Go modules

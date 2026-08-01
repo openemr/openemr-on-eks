@@ -41,6 +41,7 @@ resource "aws_wafv2_regex_pattern_set" "ua_suspicious" {
 # This is the main WAF configuration that defines rules for protecting the OpenEMR application.
 # It includes AWS managed rule sets and custom rules for comprehensive protection.
 resource "aws_wafv2_web_acl" "openemr" {
+  # checkov:skip=CKV2_AWS_31: aws_wafv2_web_acl_logging_configuration.openemr sends this conditional ACL's logs to the dedicated WAF bucket.
   count = var.enable_waf ? 1 : 0
 
   name        = "${var.cluster_name}-waf-acl"

@@ -32,6 +32,7 @@
 name: Version Check & Awareness
 
 # Workflow triggers - scheduled and manual
+# checkov:skip=CKV_GHA_7: The constrained inputs select a fixed component category and whether the scheduled report creates an issue.
 on:
   schedule:
     # Run on the 1st of every month at 9:00 AM UTC
@@ -61,8 +62,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.15.7"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.36.2"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.15.8"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.36.3"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -82,24 +83,24 @@ jobs:
   # This job sets up the environment, runs version checks, and generates reports
   version-check:
     name: Check for Updates
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-26.04
 
     steps:
       # Step 1: Checkout repository with full history for version analysis
       - name: Checkout Repository
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for comprehensive analysis
 
       # Step 2: Set up Terraform for infrastructure version checking
       - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
       # Step 3: Set up kubectl for Kubernetes version checking
       - name: Setup kubectl
-        uses: azure/setup-kubectl@v5.1.0
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -111,7 +112,7 @@ jobs:
           sudo apt-get install -y curl jq  # curl for API calls, jq for JSON processing
 
           # Install yq for YAML processing
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
 
@@ -126,7 +127,7 @@ jobs:
       # This step enables AWS API access for enhanced version checking via OIDC
       - name: Configure AWS credentials (OIDC preferred)
         if: env.AWS_OIDC_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
@@ -136,7 +137,7 @@ jobs:
       # This step falls back to static credentials if OIDC is not configured
       - name: Configure AWS credentials (static fallback)
         if: env.AWS_OIDC_ROLE_ARN == '' && env.AWS_ACCESS_KEY_ID != ''
-        uses: aws-actions/configure-aws-credentials@v5
+        uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -147,6 +148,9 @@ jobs:
       # This step runs the version-manager.sh script with appropriate parameters
       - name: Run Version Awareness Check
         id: version_check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHECK_TYPE: ${{ inputs.check_type || 'all' }}
         run: |
           # Initialize log file for detailed tracking
           touch scripts/version-check.log
@@ -155,6 +159,7 @@ jobs:
           if [ ! -f "scripts/version-manager.sh" ]; then
             echo "ERROR: version-manager.sh not found" | tee scripts/version-check.log
             echo "updates_found=false" >> $GITHUB_OUTPUT
+            echo "VERSION_CHECK_FAILED=true" >> $GITHUB_ENV
             exit 1
           fi
 
@@ -167,10 +172,14 @@ jobs:
           echo "versions.yaml exists: $(test -f versions.yaml && echo 'yes' || echo 'no')" >> scripts/version-check.log
 
           # Test basic script functionality before full execution
-          ./scripts/version-manager.sh status >> scripts/version-check.log 2>&1 || echo "Script status check failed" >> scripts/version-check.log
+          if ! ./scripts/version-manager.sh status >> scripts/version-check.log 2>&1; then
+            echo "Script status check failed" >> scripts/version-check.log
+            echo "VERSION_CHECK_FAILED=true" >> $GITHUB_ENV
+            exit 1
+          fi
 
           # Determine run type and set appropriate environment variables
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # Manual run - use timestamp for unique identification
             TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S UTC")
             REPORT_TITLE="Manual Version Check Report - $TIMESTAMP"
@@ -187,34 +196,42 @@ jobs:
           fi
 
           # Execute version check based on input parameters
-          echo "Running version check for: ${{ github.event.inputs.check_type || 'all' }}" >> scripts/version-check.log
+          echo "Running version check for: $CHECK_TYPE" >> scripts/version-check.log
           echo "Report title: $REPORT_TITLE" >> scripts/version-check.log
 
-          # Run version-manager.sh with appropriate component type
-          case "${{ github.event.inputs.check_type || 'all' }}" in
+          # Build one command so its real status is preserved through tee.
+          check_args=(check --create-issue --month "$REPORT_TITLE")
+          case "$CHECK_TYPE" in
             "applications")
-              ./scripts/version-manager.sh check --components applications --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components applications)
               ;;
             "infrastructure")
-              ./scripts/version-manager.sh check --components infrastructure --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components infrastructure)
               ;;
             "terraform_modules")
-              ./scripts/version-manager.sh check --components terraform_modules --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components terraform_modules)
               ;;
             "github_workflows")
-              ./scripts/version-manager.sh check --components github_workflows --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components github_workflows)
               ;;
             "monitoring")
-              ./scripts/version-manager.sh check --components monitoring --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components monitoring)
               ;;
             "eks_addons")
-              ./scripts/version-manager.sh check --components eks_addons --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
+              check_args+=(--components eks_addons)
               ;;
-            *)
-              # Default: check all components
-              ./scripts/version-manager.sh check --create-issue --month "$REPORT_TITLE" 2>&1 | tee -a scripts/version-check.log || echo "Script failed with exit code $?" | tee -a scripts/version-check.log
-              ;;
+            *) ;;
           esac
+          set +e
+          ./scripts/version-manager.sh "${check_args[@]}" 2>&1 | tee -a scripts/version-check.log
+          check_status=${PIPESTATUS[0]}
+          set -e
+          if [ "$check_status" -ne 0 ]; then
+            echo "Version check incomplete (exit $check_status)" | tee -a scripts/version-check.log
+            echo "VERSION_CHECK_FAILED=true" >> $GITHUB_ENV
+          else
+            echo "VERSION_CHECK_FAILED=false" >> $GITHUB_ENV
+          fi
 
           # Prepare log files for artifact upload and report generation
           if [ -f "version-updates.log" ]; then
@@ -238,10 +255,12 @@ jobs:
           # Ensure updates_found status is set for downstream jobs
           echo "Final updates_found status: $(grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log && echo 'true' || echo 'false')" | tee -a scripts/version-check.log
 
+          exit "$check_status"
+
       # Step 9: Upload version check logs as artifacts
       # This step preserves detailed logs for analysis and troubleshooting
       - name: Upload Version Check Logs
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()  # Upload artifacts regardless of job outcome
         with:
           name: version-check-logs-${{ github.run_number }}
@@ -286,7 +305,13 @@ jobs:
           echo "" >> update-report.md
           echo "## 🔍 Check Results" >> update-report.md
           echo "" >> update-report.md
-          if [ -f "scripts/version-check.log" ] || [ -f "scripts/version-updates.log" ]; then
+          if [ "${{ env.VERSION_CHECK_FAILED }}" = "true" ]; then
+            echo "### ❌ Check Incomplete" >> update-report.md
+            echo "" >> update-report.md
+            echo "One or more upstream version lookups failed. Partial results may be present, but this run cannot conclude that all components are current." >> update-report.md
+            echo "" >> update-report.md
+            echo "Review the uploaded logs and rerun the check after resolving the reported API, network, or credential failure." >> update-report.md
+          elif [ -f "scripts/version-check.log" ] || [ -f "scripts/version-updates.log" ]; then
             # Extract only the summary section from the log
             if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
               echo "### ✅ Updates Available" >> update-report.md
@@ -410,7 +435,11 @@ jobs:
             echo "## 🔍 Check Results" >> detailed-report.md
             echo "" >> detailed-report.md
             # Analyze log files for available updates
-            if grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
+            if [ "${{ env.VERSION_CHECK_FAILED }}" = "true" ]; then
+              echo "### ❌ Check Incomplete" >> detailed-report.md
+              echo "" >> detailed-report.md
+              echo "At least one upstream lookup failed. Treat any listed updates as partial results and review the full logs before making version decisions." >> detailed-report.md
+            elif grep -q "Found.*component.*with.*available.*updates" scripts/version-check.log 2>/dev/null || grep -q "Found.*component.*with.*available.*updates" scripts/version-updates.log 2>/dev/null; then
               echo "### ✅ Updates Available" >> detailed-report.md
               echo "" >> detailed-report.md
               echo "**Available Updates:**" >> detailed-report.md
@@ -470,7 +499,7 @@ jobs:
 
       # Step 12: Upload detailed report as artifact
       - name: Upload Detailed Report
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()  # Upload regardless of job outcome
         with:
           name: detailed-version-report-${{ github.run_number }}
@@ -482,7 +511,7 @@ jobs:
       # Step 13: Create GitHub issue for update awareness (if enabled)
       - name: Create GitHub Issue
         if: always() && (github.event_name == 'schedule' || github.event.inputs.create_issue == 'true')
-        uses: actions/github-script@v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         with:
           script: |
             const fs = require('fs');

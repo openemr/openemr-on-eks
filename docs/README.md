@@ -22,7 +22,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [End-to-End Testing Requirements](#end_to_end_testing_requirementsmd)
 - [Manual Releases](#manual_releasesmd)
 - [Version Management](#version_managementmd)
-- [Dependencies Guide](#dependenciesmd)
+- [Codebase Knowledge MCP](#knowledge_mcpmd)
 - [Troubleshooting Guide](#troubleshootingmd)
 
 ### **🔗 Related Documentation**
@@ -33,6 +33,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Monitoring Documentation](../monitoring/README.md)
 - [Warp Project Documentation](../warp/README.md)
 - [Credential Rotation Tool](../tools/credential-rotation/README.md)
+- [Codebase Knowledge MCP Package](../tools/codebase-mcp/README.md)
 
 ### **📖 Documentation Maintenance**
 - [Maintenance Guidelines](#maintenance-guidelines)
@@ -54,6 +55,7 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - **`END_TO_END_TESTING_REQUIREMENTS.md`** - Mandatory testing requirements
 - **`MANUAL_RELEASES.md`** - Release management and version control
 - **`VERSION_MANAGEMENT.md`** - Version awareness and dependency management
+- **`KNOWLEDGE_MCP.md`** - Secure local, read-only MCP server for repository knowledge
 - **`TROUBLESHOOTING.md`** - Common issues and resolution procedures
 
 ## Documentation Dependency Graph
@@ -83,6 +85,10 @@ graph TD
     M --> I[VERSION]
     M --> S
     L[scripts/] --> M
+    T[tools/codebase-mcp/] --> KM[KNOWLEDGE_MCP.md]
+    M --> KM
+    A --> KM
+    E --> KM
 
     I --> H
     J[terraform/] --> A
@@ -104,6 +110,7 @@ graph TD
     style M fill:#e1f5fe
     style S fill:#e1f5fe
     style CR fill:#ffebee
+    style KM fill:#e1f5fe
 ```
 
 ## File Descriptions
@@ -184,7 +191,7 @@ graph TD
 
 - **Purpose**: Comprehensive logging configuration with CloudWatch and Loki integration
 - **Key Features**:
-  - OpenEMR 8.0.0 logging architecture
+  - OpenEMR 8.2.0 logging architecture
   - Fluent Bit sidecar configuration
   - Dual output to CloudWatch and Loki
   - CloudWatch log groups and retention
@@ -304,6 +311,21 @@ graph TD
   - Keep version checking logic current
   - Adjust AWS CLI integration as APIs evolve
   - Update tracking for new components
+
+#### `KNOWLEDGE_MCP.md`
+
+- **Purpose**: Configure and maintain the local, read-only codebase knowledge MCP server
+- **Key Features**:
+  - Curated architecture, deployment, operations, and troubleshooting topics
+  - Deterministic bounded search and safe repository text reads
+  - Dynamic version inventory and risk-labelled command guidance
+  - `uvx` installation and Cursor STDIO configuration
+  - Explicit path, secret, symlink, size, and network security boundaries
+- **Dependencies**: `tools/codebase-mcp/`, `versions.yaml`, repository source and documentation
+- **Maintenance Notes**:
+  - Keep curated topics and authoritative source paths aligned with repository changes
+  - Update package dependencies and `uv.lock` together
+  - Run the package's offline-capable test suite after policy or interface changes
 
 ### Troubleshooting and Support
 

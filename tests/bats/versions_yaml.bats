@@ -105,6 +105,16 @@ setup() {
   [ "$output" != "null" ]
 }
 
+@test "versions.yaml: knowledge MCP package versions are set" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local package
+  for package in fastmcp pyyaml uv; do
+    run yq eval ".python_packages.${package}.current" "$VERSIONS_FILE"
+    [ "$status" -eq 0 ]
+    [ "$output" != "null" ]
+  done
+}
+
 # ── Registry values ────────────────────────────────────────────────────────
 
 @test "versions.yaml: OpenEMR registry is 'openemr/openemr'" {

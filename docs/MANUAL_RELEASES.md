@@ -9,9 +9,9 @@
 - [Manual Release Process](#-manual-release-process)
 - [End-to-End Testing Requirements](#-end-to-end-testing-requirements)
 - [Release Notes Generation](#-release-notes-generation)
-- [Safety Features](#️-safety-features)
+- [Safety Features](#safety-features)
 - [File Structure](#-file-structure)
-- [Configuration](#️-configuration)
+- [Configuration](#configuration)
 - [Workflow Jobs](#-workflow-jobs)
 - [Monitoring and Debugging](#-monitoring-and-debugging)
 - [Best Practices](#-best-practices)
@@ -143,10 +143,12 @@ The system creates:
 
 ### Triggering a Manual Release
 
-1. **🔒 MANDATORY**: Run end-to-end backup/restore test before any changes
+1. **🔒 MANDATORY PROCESS GATE**: Run the full end-to-end backup/restore test
+   before triggering the release
 
    ```bash
-   ./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+   AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+     --cluster-name openemr-eks-test --aws-region us-west-2
    ```
 
    - All 10 test steps must pass successfully
@@ -180,6 +182,10 @@ The system creates:
 
 Before any manual release can be created, the end-to-end backup/restore test script **must** pass successfully. This is a core requirement that ensures disaster recovery capabilities remain intact.
 
+The GitHub release workflow does not run or verify this destructive AWS test.
+The release operator must enforce the gate, retain `e2e-full-test.log`, and
+record the result in the release evidence.
+
 #### **Why This Is Critical**
 
 - **Disaster Recovery**: Ensures the core backup/restore functionality remains intact
@@ -191,8 +197,9 @@ Before any manual release can be created, the end-to-end backup/restore test scr
 #### **Testing Process**
 
 ```bash
-# Run the complete end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Run the complete end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # Expected outcome: All 10 test steps must pass
 # ✅ Infrastructure deployment
@@ -286,7 +293,7 @@ Every release includes comprehensive tracking of who triggered it:
 
 This provides complete auditability and accountability for all releases.
 
-## 🛡️ Safety Features
+## Safety Features
 
 ### Change Detection
 
@@ -322,7 +329,7 @@ docs/
 VERSION                        # Current version file
 ```
 
-## ⚙️ Configuration
+## Configuration
 
 ### Workflow File Location
 
@@ -466,7 +473,8 @@ For issues with the manual release system:
 1. Check the workflow logs in GitHub Actions
 2. Review this documentation
 3. Check the workflow file for configuration issues
-4. Create an [issue](../../../issues) in the repository with detailed error information
+4. Create an [issue](https://github.com/openemr/openemr-on-eks/issues) with
+   detailed error information
 
 ---
 

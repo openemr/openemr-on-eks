@@ -4,7 +4,34 @@
 
 This guide provides measured timing data for various operations in the OpenEMR on EKS deployment, based on actual end-to-end test runs. All timings are measured in AWS `us-west-2` region with standard configurations.
 
-> **Note:** Timings can vary based on AWS region, time of day, AWS service load, and network conditions. The ranges provided represent typical behavior observed across multiple test runs.
+> **Note:** Timings can vary based on AWS region, time of day, AWS service
+> load, and network conditions. The OpenEMR 8.2.0 figures are one complete
+> baseline run; historical ranges are labeled separately.
+
+<!-- BEGIN AUTOMATED E2E TIMINGS -->
+## Latest Automated E2E Timing Report
+
+- **Generated:** 2026-08-01 16:16:16 UTC
+- **OpenEMR:** 8.2.0
+- **AWS Region:** us-west-2
+- **Scope:** full 10-step suite
+- **Run ID:** 20260801-092706
+- **Total elapsed:** 10149s (169m 9s)
+
+| Phase | Status | Seconds | Duration |
+|---|---:|---:|---:|
+| Infrastructure Deployment | SUCCESS | 1432 | 23m 52s |
+| OpenEMR Deployment | SUCCESS | 1050 | 17m 30s |
+| Test Data Deployment | SUCCESS | 314 | 5m 14s |
+| Backup Creation | SUCCESS | 40 | 0m 40s |
+| Monitoring Stack Test | SUCCESS | 1095 | 18m 15s |
+| Infrastructure Deletion | SUCCESS | 1290 | 21m 30s |
+| Infrastructure Recreation | SUCCESS | 1575 | 26m 15s |
+| Backup Restoration | SUCCESS | 2013 | 33m 33s |
+| Restoration Verification | SUCCESS | 51 | 0m 51s |
+| Final Cleanup | SUCCESS | 1283 | 21m 23s |
+
+<!-- END AUTOMATED E2E TIMINGS -->
 
 ## 📋 Table of Contents
 
@@ -25,7 +52,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### **Cleanup & Monitoring**
 
-- [Cleanup Operations](#%EF%B8%8F-cleanup-operations)
+- [Cleanup Operations](#cleanup-operations)
   - [Infrastructure Deletion (Terraform Destroy)](#infrastructure-deletion-terraform-destroy)
   - [S3 Bucket Cleanup](#s3-bucket-cleanup)
   - [CloudWatch Log Group Cleanup](#cloudwatch-log-group-cleanup)
@@ -69,7 +96,10 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Infrastructure Deployment (Terraform)
 
-**Total Time:** 24-25 minutes (updated December 2025)
+**Current OpenEMR 8.2.0 full-run measurement:** 23 minutes 52 seconds
+(1,432 seconds, August 1, 2026).
+
+**Historical total time:** 24-25 minutes (OpenEMR 8.0.x, December 2025)
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -78,7 +108,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 | **VPC & NAT Gateways** | 3-5 min | Network infrastructure setup |
 | **Other Resources** | 5-8 min | S3, EFS, ElastiCache, KMS, WAF, CloudWatch |
 
-**December 2025 Measurements:**
+**Historical December 2025 measurements:**
 - Test Run 1: 25.25 minutes (1,515 seconds)
 - Test Run 2: 24.57 minutes (1,474 seconds)
 - Average: ~25 minutes (consistent with previous measurements)
@@ -93,6 +123,14 @@ This guide provides measured timing data for various operations in the OpenEMR o
 - **Monitoring** (CloudWatch Log Groups): 1-2 min
 
 ### Application Deployment (Kubernetes)
+
+**Current OpenEMR 8.2.0 full-run measurement:** 17 minutes 30 seconds
+(1,050 seconds, August 1, 2026). This is the complete E2E application
+deployment phase, including deployment-script prerequisites and readiness
+checks.
+
+> **Historical benchmark:** The OpenEMR 8.1.x timings below were recorded in
+> July 2026 and are retained for comparison.
 
 **Total Time (OpenEMR 8.1.x):** 8-12 minutes typical for `k8s/deploy.sh` end-to-end
 
@@ -130,12 +168,16 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Combined Initial Deployment
 
-**Total Time (OpenEMR 8.1.x):** 35-42 minutes
+**Current OpenEMR 8.2.0 full-run measurement:** 41 minutes 22 seconds for
+steps 1-2 (infrastructure plus OpenEMR). Including test-data setup, steps 1-3
+took 46 minutes 36 seconds.
+
+**Historical total time (OpenEMR 8.1.x):** 35-42 minutes
 - Infrastructure (Terraform): 30-32 min
 - Application (Kubernetes): 3-6 min typical, 8-12 min full deploy.sh
 - Buffer for variations: 2-4 min
 
-**Resume deploy chunk (infra already exists):** 10-15 minutes for steps 2-3 only
+**Current resume deploy chunk:** 22 minutes 44 seconds for steps 2-3 only.
 
 ---
 
@@ -143,7 +185,9 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Backup Creation
 
-**Total Time:** 30-35 seconds (very consistent)
+**Current OpenEMR 8.2.0 full-run measurement:** 40 seconds.
+
+**Historical total time:** 30-35 seconds.
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -167,7 +211,20 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Restore from Backup
 
-**Total Time:** 53-55 minutes (updated December 2025)
+**Current OpenEMR 8.2.0 full-run measurement:** 33 minutes 33 seconds
+(2,013 seconds, August 1, 2026).
+
+This full-suite E2E phase used the current
+`preflight → bootstrap → rds → data → deploy → verify` flow and includes the
+configured 180-second post-restore observation window. An earlier resumed
+recovery-path sample measured 34 minutes 57 seconds.
+
+**Historical Total Time:** 53-55 minutes (OpenEMR 8.0.x, December 2025)
+
+These measurements predate the current
+`preflight → bootstrap → rds → data → deploy → verify` default flow. Treat them
+as historical planning evidence; the current OpenEMR 8.2.0 measurement is
+reported above.
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -177,7 +234,7 @@ This guide provides measured timing data for various operations in the OpenEMR o
 | **RDS Cluster Restore** | 11-13 min | Restore from snapshot, create instances |
 | **Application Data Restore** | <1 min | Download from S3 and extract to EFS |
 | **Crypto Key Cleanup** | 40 sec | Delete sixa/sixb, wait for regeneration |
-| **Verification (with retry)** | 43 sec | Poll for pod readiness (3 attempts max) |
+| **Verification (with retry)** | 43 sec | Historical success time; current default permits 6 attempts |
 
 **Performance Characteristics:**
 - **December 2025 Test Run 1:** 55.35 minutes (3,321 seconds)
@@ -185,9 +242,10 @@ This guide provides measured timing data for various operations in the OpenEMR o
 - **Average:** ~54 minutes
 - **Variation:** ±2.5% (very consistent)
 
-**Process Enhancements (v3.0.0):**
+**Current restore controls:**
 - ✅ **Automatic crypto key cleanup** - Prevents encryption key mismatches
-- ✅ **Verification with retry** - Up to 3 attempts with 5-minute timeout each
+- ✅ **Verification with retry** - Up to 6 attempts with a 5-minute poll
+  window per attempt
 - ✅ **Configurable polling** - Adjustable timeout and interval via environment variables
 - ✅ **IRSA for data restoration** - Secure AWS credentials for S3 access
 - ✅ **Fail-fast deployment detection** - Detects missing deployments immediately
@@ -198,7 +256,15 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Full Infrastructure Recreation (After Deletion)
 
-**Total Time:** 45-49 minutes (updated December 2025)
+**Current OpenEMR 8.2.0 full-run measurement:** 26 minutes 15 seconds
+(1,575 seconds, August 1, 2026).
+
+The current step 7 plan uses `skip_rds_creation=true`, then performs its
+60-second infrastructure wait and EFS CSI readiness check. Aurora is restored
+separately in step 8. An earlier resumed recovery-path sample measured
+25 minutes 35 seconds.
+
+**Historical Total Time:** 45-49 minutes (December 2025)
 
 **December 2025 Measurements:**
 - Test Run 1: 49.27 minutes (2,956 seconds)
@@ -213,11 +279,20 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ---
 
-## 🗑️ Cleanup Operations
+## Cleanup Operations
 
 ### Infrastructure Deletion (Terraform Destroy)
 
-**Total Time:** 13-16 minutes
+**Current OpenEMR 8.2.0 infrastructure-deletion measurement:** 21 minutes
+30 seconds (1,290 seconds, step 6).
+
+The final-cleanup phase measured 21 minutes 23 seconds (1,283 seconds, step 10).
+It includes the comprehensive destroy workflow plus manual snapshot handling
+and emptying/deleting the versioned backup bucket, so it is broader than
+Terraform destruction alone. An earlier resumed final-cleanup sample measured
+24 minutes 53 seconds.
+
+**Historical Terraform destruction time:** 13-16 minutes
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -249,29 +324,31 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Complete Backup/Restore Test
 
-**Total Time:** 211-217 minutes (~3.5-3.6 hours)
+**Current OpenEMR 8.2.0 full-suite baseline:** 10,149 seconds (169 minutes
+9 seconds, August 1, 2026).
 
-| Phase | Duration | Steps |
-|-------|----------|-------|
-| **1. Initial Deploy** | 24-25 min | Infrastructure deployment |
-| **2. OpenEMR Deploy** | 22-23 min | Application deployment |
-| **3. Test Data** | 74-75 sec | Create proof file |
-| **4. Backup** | 34-35 sec | Full backup creation |
-| **5. Monitoring Test** | 27-28 min | Install/uninstall monitoring stack |
-| **6. Deletion** | 16-17 min | Destroy all infrastructure |
-| **7. OpenEMR Deploy (Restore)** | 22-26 min | Application deployment after infrastructure recreation |
-| **8. Recreation** | 45-49 min | Redeploy infrastructure |
-| **9. Restore** | 53-55 min | Full restore (clean + deploy + restore data) |
-| **10. Verification** | 43 sec | Verify restored data |
-| **11. Final Cleanup** | 18-18.5 min | Clean up all resources |
+| E2E phase | OpenEMR 8.2.0 | Historical OpenEMR 8.0.x |
+|-----------|---------------|--------------------------|
+| **1. Infrastructure** | 23m 52s | 24-25 min |
+| **2. OpenEMR Deploy** | 17m 30s | 22-23 min |
+| **3. Test Data** | 5m 14s | 74-75 sec |
+| **4. Backup** | 40 sec | 34-35 sec |
+| **5. Monitoring Test** | 18m 15s | 27-28 min |
+| **6. Deletion** | 21m 30s | 16-17 min |
+| **7. Recreation** | 26m 15s | 45-49 min |
+| **8. Restore** | 33m 33s | 53-55 min |
+| **9. Verification** | 51 sec | 43 sec |
+| **10. Final Cleanup** | 21m 23s | 18-18.5 min |
 
-**Total Measured Duration:**
+**Historical December 2025 full-suite totals:**
 - **Test Run 1 (Dec 10, 2025):** 13,025 seconds (217.1 minutes / 3.62 hours)
 - **Test Run 2 (Dec 10, 2025):** 12,673 seconds (211.2 minutes / 3.52 hours)
 - **Average:** 211-217 minutes (3.5-3.6 hours)
 - **Range:** 211-217 minutes across December 2025 test runs
 
-**Updated December 2025:** Monitoring stack installation now takes 27-28 minutes (includes full install and uninstall cycle). Infrastructure recreation takes 45-49 minutes. Backup restoration takes 53-55 minutes.
+**Historical December 2025 note:** Monitoring stack installation took 27-28
+minutes, infrastructure recreation took 45-49 minutes, and backup restoration
+took 53-55 minutes under that version of the workflow.
 
 ---
 
@@ -279,7 +356,10 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ### Prometheus/Grafana/Loki Installation
 
-**Total Time:** 27-28 minutes (updated December 2025 - includes full install/uninstall cycle)
+**Current OpenEMR 8.2.0 install/verify/uninstall cycle:** 18 minutes
+15 seconds (1,095 seconds, August 1, 2026).
+
+**Historical December 2025 cycle:** 27-28 minutes.
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -346,23 +426,32 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 ## 📈 Performance Insights
 
-### Consistent Metrics (Low Variability)
+### Current Samples and Historical Variability
 
-These operations have very predictable timing:
+The OpenEMR 8.2.0 full run provides these current samples:
 
-- **Infrastructure Deployment:** ±1% variation (30-32 min)
-- **Backup Creation:** ±15% variation (30-35 sec)
-- **Test Data Creation:** ±10% variation (7-8 sec)
-- **Monitoring Stack:** ±5% variation (7-8 min)
-- **Restore Operations:** ±6% variation (38-43 min)
-  - Fast: 38 min
-  - Normal: 40-43 min
-  - Very consistent due to comprehensive process
-  - Recommendation: Plan for 45 min to be safe
+- **Infrastructure Deployment:** 23m 52s
+- **Backup Creation:** 40s
+- **Test Data Creation:** 5m 14s
+- **Monitoring Stack Test:** 18m 15s
+- **Restore:** 33m 33s
+
+One full run does not establish a variability range. Historical measurements
+that did establish ranges include:
+
+- **Infrastructure Deployment (December 2025):** ±1% variation (24-25 min)
+- **Backup Creation (December 2025):** approximately 30-35 sec
+- **Restore Operations (OpenEMR 8.0.x, December 2025):** ±2.5% variation
+  (52.8-55.4 min)
+  - Average: ~54 min
+  - Current 8.2.0 measurement: 33m 33s
 
 ### Variable Metrics (High Variability)
 
 These operations can vary significantly:
+
+- **OpenEMR Deployment (8.2.0):** One full-run sample measured 17m 30s
+  - Recommendation: plan for 20-25 min until additional 8.2.x runs establish a range
 
 - **OpenEMR Deployment (8.1.x):** ±50% variation (3-10 min)
   - Normal: 3-6 min to HTTP ready
@@ -405,12 +494,18 @@ These operations can vary significantly:
 - **Application update:** 20 minutes (includes rollback time)
 - **Credential rotation:** 10 minutes (includes validation and rolling restart)
 - **Backup operation:** 2 minutes (includes verification)
-- **Restore operation:** 45 minutes (full restore with verification)
+- **Restore operation:** At least 45 minutes (8.2.0 measured 33m 33s)
 - **Infrastructure teardown:** 25 minutes (includes verification)
 
 ### For Development/Testing
 
-**Typical Time Budgets (OpenEMR 8.1.x, July 2026):**
+**Current OpenEMR 8.2.0 time budgets (August 2026):**
+- **Application deployment:** 20-25 min (measured 17m 30s)
+- **Cold deploy chunk (steps 1-3):** 50-55 min (measured 46m 36s)
+- **Complete E2E test:** 180 min (measured 169m 9s)
+- **Daily E2E run:** 190 min (includes reporting and operational buffer)
+
+**Historical OpenEMR 8.1.x budgets (July 2026):**
 - **Quick iteration:** 8-12 min (app changes only; pod ready ~3-6 min)
 - **Full infrastructure test:** 35-45 min (single cold deployment)
 - **Complete E2E test:** 150-160 min (~2.5 hours)
@@ -424,7 +519,15 @@ These operations can vary significantly:
 
 ### For Disaster Recovery Planning
 
-**RTO (Recovery Time Objective) Estimates (updated December 2025):**
+**Current OpenEMR 8.2.0 RTO evidence (August 2026):**
+- **Infrastructure recreation:** 26m 15s
+- **Full restore process:** 33m 33s
+- **Recreation plus restore:** 59m 48s
+- **DNS propagation:** 5-60 min (not measured; varies by DNS provider)
+- **Planning window from destroyed infrastructure:** 65-120 min including DNS
+- **Planning window with infrastructure intact:** 40-95 min including DNS
+
+**Historical December 2025 estimates:**
 - **Infrastructure recreation:** 45-49 minutes (if infrastructure was destroyed)
 - **Full restore process:** 53-55 minutes (includes all restore steps)
 - **Total restore (including infrastructure recreation):** 98-104 minutes (if starting from scratch)
@@ -443,18 +546,19 @@ These operations can vary significantly:
 
 ### By Operation Type
 
-| Operation | Quick (Best Case) | Typical | Slow (Worst Case) | Notes |
-|-----------|-------------------|---------|-------------------|-------|
-| **Infrastructure Deploy** | 24.6 min | 25 min | 25.3 min | Very consistent (Dec 2025) |
-| **App Deploy (8.1.x)** | 3 min | 5 min | 10 min | OpenEMR 8.1.x (July 2026) |
-| **App Deploy (8.0.x)** | 22 min | 23 min | 25.5 min | Historical (Dec 2025) |
-| **Backup** | 34 sec | 34.5 sec | 35 sec | Very consistent |
-| **Restore** | 52.8 min | 54 min | 55.4 min | Very consistent (Dec 2025) |
-| **Infrastructure Delete** | 16.4 min | 16.5 min | 17.4 min | Very consistent (Dec 2025) |
-| **Infrastructure Recreation** | 45.2 min | 47 min | 49.3 min | Very consistent (Dec 2025) |
-| **Monitoring Stack (install/uninstall)** | 27 min | 27.5 min | 28 min | Very consistent (Dec 2025) |
-| **Full E2E Test (8.1.x)** | 145 min | 155 min | 165 min | OpenEMR 8.1.x (July 2026 est.) |
-| **Full E2E Test (8.0.x)** | 211 min | 214 min | 217 min | Historical (Dec 2025) |
+| Operation | Current 8.2.0 sample | Historical comparison | Notes |
+|-----------|----------------------|-----------------------|-------|
+| **Infrastructure Deploy** | 23m 52s | 24-25 min (8.0.x) | Full-run step 1 |
+| **App Deploy** | 17m 30s | 3-10 min (8.1.x) | Full-run step 2 |
+| **Test Data** | 5m 14s | 74-75 sec (8.0.x) | Full-run step 3 |
+| **Backup** | 40 sec | 34-35 sec (8.0.x) | Full-run step 4 |
+| **Monitoring Cycle** | 18m 15s | 27-28 min (8.0.x) | Install, verify, uninstall |
+| **Infrastructure Delete** | 21m 30s | 16-17 min (8.0.x) | Full-run step 6 |
+| **Infrastructure Recreation** | 26m 15s | 45-49 min (8.0.x) | RDS deferred |
+| **Restore** | 33m 33s | 53-55 min (8.0.x) | Includes observation window |
+| **Verification** | 51 sec | 43 sec (8.0.x) | Full-run step 9 |
+| **Final Cleanup** | 21m 23s | 18-18.5 min (8.0.x) | Includes backup cleanup |
+| **Full E2E Test** | 169m 9s | 211-217 min (8.0.x) | Complete 10-step suite |
 
 ---
 
@@ -484,17 +588,24 @@ These operations can vary significantly:
 
 ## 📝 Data Sources
 
-This timing data is based on multiple complete end-to-end test runs performed in October 2025 and December 2025.
+This timing data combines the current OpenEMR 8.2.0 full-suite baseline with
+historical complete runs from October and December 2025.
 
-**Latest Test Runs (December 2025):**
+**Latest full run:**
+- **August 1, 2026:** OpenEMR 8.2.0, run `20260801-092706`
+- **Duration:** 10,149 seconds (169m 9s)
+- **Result:** All 10 phases passed, including final resource cleanup
+
+**Historical December 2025 runs:**
 - **Test Run 1:** December 10, 2025 - 13,025 seconds (3.62 hours)
 - **Test Run 2:** December 10, 2025 - 12,673 seconds (3.52 hours)
 - Both tests completed successfully with all phases verified
 
 **Test Environment:**
 - AWS Region: us-west-2
-- EKS Version: 1.35
-- OpenEMR Version: 8.0.0
+- EKS Version: 1.36
+- Current OpenEMR Version: 8.2.0
+- Historical OpenEMR Version: 8.0.0
 - Aurora: Serverless v2 (0.5-16 ACU)
 - ElastiCache: Serverless (Valkey 8.0)
 
@@ -538,7 +649,8 @@ This timing data is based on multiple complete end-to-end test runs performed in
 2. Check RDS cluster restore timing (should be ~11-13 min)
 3. Check EFS wipe job completion (should complete in <5 min)
 4. Verify crypto key cleanup and pod restart (should be ~40 sec)
-5. Review verification retry attempts (max 3 attempts of 5 min each)
+5. Review verification retry attempts (default maximum: 6 attempts with a
+   5-minute poll window each)
 
 ---
 

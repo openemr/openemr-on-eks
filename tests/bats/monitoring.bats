@@ -12,6 +12,9 @@ load test_helper
 setup() { cd "$PROJECT_ROOT"; }
 
 MONITORING_SCRIPT="${PROJECT_ROOT}/monitoring/install-monitoring.sh"
+MONITORING_CONFIG="${PROJECT_ROOT}/monitoring/openemr-monitoring.conf.example"
+PROMETHEUS_VALUES="${PROJECT_ROOT}/monitoring/prometheus-values.yaml"
+VERSIONS_FILE="${PROJECT_ROOT}/versions.yaml"
 
 # -- Executable & syntax ------------------------------------------------------
 
@@ -92,6 +95,163 @@ MONITORING_SCRIPT="${PROJECT_ROOT}/monitoring/install-monitoring.sh"
 @test "script defines Helm chart version for Mimir" {
   run grep 'CHART_MIMIR_VERSION' "$MONITORING_SCRIPT"
   [ "$status" -eq 0 ]
+}
+
+@test "configuration file overrides are loaded before readonly defaults" {
+  local config_file
+  config_file=$(mktemp)
+  cat > "$config_file" <<'EOF'
+MONITORING_NAMESPACE="custom-monitoring"
+CHART_KPS_VERSION="99.1.2"
+EOF
+
+  run env \
+    CONFIG_FILE="$config_file" \
+    OPENEMR_MONITORING_LIBRARY_ONLY=1 \
+    AWS_REGION=us-east-1 \
+    CLUSTER_NAME=test-cluster \
+    bash -c 'source "$1"; printf "%s|%s\n" "$MONITORING_NAMESPACE" "$CHART_KPS_VERSION"' _ "$MONITORING_SCRIPT"
+
+  assert_success
+  [[ "$output" =~ "custom-monitoring|99.1.2" ]]
+  rm -f "$config_file"
+}
+
+@test "generated Prometheus values default to a temporary runtime file" {
+  run env \
+    CONFIG_FILE=/does/not/exist \
+    OPENEMR_MONITORING_LIBRARY_ONLY=1 \
+    AWS_REGION=us-east-1 \
+    CLUSTER_NAME=test-cluster \
+    bash -c 'source "$1"; printf "%s|%s\n" "$VALUES_FILE_IS_TEMP" "$VALUES_FILE"' _ "$MONITORING_SCRIPT"
+
+  assert_success
+  [[ "$output" =~ ^1\| ]]
+  [[ ! "$output" =~ "/monitoring/prometheus-values.yaml" ]]
+}
+
+@test "distributed chart values use supported storage and autoscaling keys" {
+  grep -q -- '--set write.persistence.storageClass=' "$MONITORING_SCRIPT"
+  grep -q -- '--set backend.persistence.storageClass=' "$MONITORING_SCRIPT"
+  grep -q -- '--set store_gateway.persistentVolume.storageClass=' "$MONITORING_SCRIPT"
+  grep -q '^store_gateway:' "$MONITORING_SCRIPT"
+  ! grep -q '^store-gateway:' "$MONITORING_SCRIPT"
+  ! grep -q '^autoscaling:' "$MONITORING_SCRIPT"
+  ! grep -Eq 'kubectl patch (pvc|"\$pvc")' "$MONITORING_SCRIPT"
+
+  local tempo_distributor
+  tempo_distributor=$(awk '
+    /# Component replicas and resources/{values=1; next}
+    values && /^distributor:/{capture=1}
+    values && /^ingester:/{if (capture) exit}
+    capture
+  ' "$MONITORING_SCRIPT")
+  [[ "$tempo_distributor" =~ "autoscaling:" ]]
+  [[ "$tempo_distributor" =~ "targetCPUUtilizationPercentage:" ]]
+}
+
+@test "Prometheus Alertmanager configuration is PVC-backed valid YAML" {
+  ! grep -q 'am_s3_config' "$MONITORING_SCRIPT"
+  ! grep -q 'routes:.*storage:' "$MONITORING_SCRIPT"
+  grep -q '^    externalUrl: http://alertmanager-' "$MONITORING_SCRIPT"
+  grep -q 'Slack with PVC-backed state' "$MONITORING_SCRIPT"
+}
+
+@test "CONTRACT: kube-prometheus-stack defaults match versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver script_ver config_ver
+  yaml_ver=$(yq eval '.monitoring.prometheus_operator.current' "$VERSIONS_FILE")
+  script_ver=$(awk -F ':-|}' '/^readonly CHART_KPS_VERSION=/{print $2; exit}' "$MONITORING_SCRIPT")
+  config_ver=$(awk -F '"' '/^CHART_KPS_VERSION=/{print $2; exit}' "$MONITORING_CONFIG")
+
+  [ "$script_ver" = "$yaml_ver" ]
+  [ "$config_ver" = "$yaml_ver" ]
+}
+
+@test "CONTRACT: cert-manager defaults match versions.yaml including v prefix" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver script_ver config_ver
+  yaml_ver=$(yq eval '.monitoring.cert_manager.current' "$VERSIONS_FILE")
+  script_ver=$(awk -F ':-|}' '/^readonly CERT_MANAGER_VERSION=/{print $2; exit}' "$MONITORING_SCRIPT")
+  config_ver=$(awk -F '"' '/^CERT_MANAGER_VERSION=/{print $2; exit}' "$MONITORING_CONFIG")
+
+  [ "$script_ver" = "$yaml_ver" ]
+  [ "$config_ver" = "$yaml_ver" ]
+}
+
+@test "UNIT: cert-manager installed version is read from controller image" {
+  FUNC_FILE=$(extract_function "$MONITORING_SCRIPT" "cert_manager_installed_version")
+  run bash -c "
+    kubectl() { echo 'quay.io/jetstack/cert-manager-controller:v1.20.2'; }
+    source '$FUNC_FILE'
+    cert_manager_installed_version
+  "
+  assert_success
+  [ "$output" = "v1.20.2" ]
+  rm -f "$FUNC_FILE"
+}
+
+@test "cert-manager installer compares installed and target versions before returning" {
+  run grep -F 'if [[ "$installed_version" == "$CERT_MANAGER_VERSION" ]]' "$MONITORING_SCRIPT"
+  [ "$status" -eq 0 ]
+  run grep -F 'Upgrading cert-manager from ${installed_version:-unknown}' "$MONITORING_SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "Prometheus Helm upgrades enable the chart CRD upgrade job" {
+  run grep -F -- '--set crds.upgradeJob.enabled=true' "$MONITORING_SCRIPT"
+  [ "$status" -eq 0 ]
+}
+
+@test "generated Prometheus values keep stateful dashboards on supported scaling settings" {
+  FUNC_FILE=$(extract_function "$MONITORING_SCRIPT" "create_values_file")
+  grep -Fq 'deploymentStrategy:' "$FUNC_FILE"
+  grep -Fq 'replicas: 1' "$FUNC_FILE"
+  ! grep -Fq 'targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}' "$FUNC_FILE"
+  ! grep -Fq 'targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}' "$FUNC_FILE"
+  ! grep -Eq '^[[:space:]]+tracing:' "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+}
+
+@test "checked-in Prometheus values omit unsupported Grafana and Prometheus HPAs" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  [ "$(yq eval '.grafana.replicas' "$PROMETHEUS_VALUES")" = "1" ]
+  [ "$(yq eval '.grafana.deploymentStrategy.type' "$PROMETHEUS_VALUES")" = "Recreate" ]
+  [ "$(yq eval '.grafana.autoscaling' "$PROMETHEUS_VALUES")" = "null" ]
+  [ "$(yq eval '.prometheus.prometheusSpec.autoscaling' "$PROMETHEUS_VALUES")" = "null" ]
+  [ "$(yq eval '.grafana."grafana.ini".tracing' "$PROMETHEUS_VALUES")" = "null" ]
+}
+
+@test "monitoring pod counters cannot emit duplicate zero values" {
+  FUNC_FILE=$(extract_function "$MONITORING_SCRIPT" "verify_installation")
+  ! grep -Eq 'grep -c[^|]*\|\| echo 0' "$FUNC_FILE"
+  ! grep -Eq 'grep -cv[^|]*\|\| echo 0' "$FUNC_FILE"
+  grep -Fq 'hpa_pending="${hpa_pending:-0}"' "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+}
+
+@test "UNIT: cluster resource summary prints compact node counts" {
+  FUNC_FILE=$(extract_function "$MONITORING_SCRIPT" "check_cluster_resources")
+  run bash -c '
+    kubectl() {
+      printf "%s\n" "{\"items\":[
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"3\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"3\",\"memory\":\"5242880Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}}
+      ]}"
+    }
+    log_step() { :; }
+    log_warn() { printf "WARN: %s\n" "$*"; }
+    log_info() { printf "%s\n" "$*"; }
+    source "$1"
+    check_cluster_resources
+  ' _ "$FUNC_FILE"
+  assert_success
+  [ "$output" = "Nodes ready: 6/6 | Capacity: 14 CPU, 45 GiB" ]
+  rm -f "$FUNC_FILE"
 }
 
 @test "default MAX_RETRIES is 3" {
@@ -192,7 +352,7 @@ MONITORING_SCRIPT="${PROJECT_ROOT}/monitoring/install-monitoring.sh"
 
 @test "UNIT: alertmanager_enabled returns true with valid slack config" {
   run bash -c '
-    SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00/B00/xxx"
+    SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00/B00/xxx" # checkov:skip=CKV_SECRET_14:Synthetic URL used only to test prefix validation.
     SLACK_CHANNEL="#alerts"
     alertmanager_enabled() { [[ -n "$SLACK_WEBHOOK_URL" && -n "$SLACK_CHANNEL" && "$SLACK_WEBHOOK_URL" =~ ^https://hooks\.slack\.com/ ]]; }
     alertmanager_enabled && echo "ENABLED" || echo "DISABLED"

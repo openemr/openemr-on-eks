@@ -8,7 +8,7 @@
 set -euo pipefail
 
 NAMESPACE="${NAMESPACE:-openemr}"
-OPENEMR_VERSION="${OPENEMR_VERSION:-8.1.1}"
+OPENEMR_VERSION="${OPENEMR_VERSION:-8.2.0}"
 SSL_CERT_BOOTSTRAP_TIMEOUT="${SSL_CERT_BOOTSTRAP_TIMEOUT:-300}"
 
 if ! kubectl cluster-info >/dev/null 2>&1; then

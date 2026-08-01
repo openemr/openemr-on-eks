@@ -113,6 +113,11 @@ output "vpc_id" {
   value       = module.vpc.vpc_id
 }
 
+output "vpc_cidr" {
+  description = "CIDR block used to restrict VPC-originated Kubernetes traffic"
+  value       = var.vpc_cidr
+}
+
 output "private_subnets" {
   description = "List of IDs of private subnets"
   value       = module.vpc.private_subnets
@@ -222,18 +227,13 @@ output "mimir_s3_role_arn" {
 }
 
 output "alertmanager_s3_bucket_name" {
-  description = "Name of the S3 bucket for AlertManager state storage"
+  description = "Name of the S3 bucket for Mimir's embedded Alertmanager state"
   value       = aws_s3_bucket.alertmanager_storage.bucket
 }
 
 output "alertmanager_s3_bucket_arn" {
-  description = "ARN of the S3 bucket for AlertManager state storage"
+  description = "ARN of the S3 bucket for Mimir's embedded Alertmanager state"
   value       = aws_s3_bucket.alertmanager_storage.arn
-}
-
-output "alertmanager_s3_role_arn" {
-  description = "ARN of the AlertManager IAM role for S3 storage access"
-  value       = aws_iam_role.alertmanager_s3.arn
 }
 
 # CloudWatch Logging Outputs
@@ -242,7 +242,7 @@ output "alertmanager_s3_role_arn" {
 # and monitoring capabilities.
 
 output "cloudwatch_log_groups" {
-  description = "CloudWatch log group names for OpenEMR 8.1.1"
+  description = "CloudWatch log group names for OpenEMR 8.2.0"
   value = {
     application    = aws_cloudwatch_log_group.openemr_app.name
     access         = aws_cloudwatch_log_group.openemr_access.name

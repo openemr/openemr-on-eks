@@ -254,6 +254,182 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
   assert_success
 }
 
+# ── UNIT: stable upstream version selection ────────────────────────────────
+
+@test "UNIT: Docker stable lookup returns newest clean semantic version" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"results":[{"name":"8.1.1"},{"name":"8.2.0"},{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
+    }
+    source "$1"
+    get_latest_docker_version "fluent/fluent-bit"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "8.2.0" ]
+}
+
+@test "UNIT: Docker stable lookup does not reinterpret prerelease tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"results":[{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
+    }
+    source "$1"
+    get_latest_docker_version "fluent/fluent-bit"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_failure
+  [ -z "$output" ]
+}
+
+@test "UNIT: OpenEMR lookup trusts official releases instead of newer Docker tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_openemr_release_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"tag_name":"v8_2_0","draft":false,"prerelease":false}'"'"'
+    }
+    source "$1"
+    get_latest_openemr_release_version
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "8.2.0" ]
+  grep -Fq 'run_version_lookup openemr_latest' "$SCRIPT"
+}
+
+@test "UNIT: Helm lookup excludes weekly prereleases" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_helm_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      cat <<'"'"'YAML'"'"'
+entries:
+  mimir-distributed:
+    - version: 6.2.0-weekly.402
+    - version: 6.1.0
+    - version: 6.0.6
+YAML
+    }
+    source "$1"
+    get_latest_helm_version "mimir-distributed"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "6.1.0" ]
+}
+
+@test "UNIT: cert-manager Helm lookup restores release-tag v prefix" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_helm_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      cat <<'"'"'YAML'"'"'
+entries:
+  cert-manager:
+    - version: 1.21.1
+    - version: 1.21.0-alpha.1
+YAML
+    }
+    source "$1"
+    get_latest_helm_version "cert-manager"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v1.21.1" ]
+}
+
+@test "UNIT: Go lookup uses official feed and preserves patch version" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_go_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      [[ "$*" == *"https://go.dev/dl/?mode=json"* ]] || return 1
+      printf "%s\n" '"'"'[{"version":"go1.25.12","stable":true},{"version":"go1.26rc1","stable":false}]'"'"'
+    }
+    source "$1"
+    get_latest_go_version
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "1.25.12" ]
+}
+
+@test "UNIT: Terraform provider lookup reads registry metadata" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_terraform_provider_version")
+  run bash -c '
+    log() { :; }
+    curl() { printf "%s\n" '"'"'{"version":"6.52.0"}'"'"'; }
+    source "$1"
+    get_latest_terraform_provider_version "hashicorp/aws"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "6.52.0" ]
+}
+
+@test "UNIT: GitHub Action lookup ignores aliases and prereleases" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_github_action_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'[{"name":"v7"},{"name":"v7.0.1"},{"name":"v8.0.0-beta.1"}]'"'"'
+    }
+    source "$1"
+    get_latest_github_action_version "actions/checkout"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v7.0.1" ]
+}
+
+@test "UNIT: failed lookup marks the overall version check incomplete" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "run_version_lookup")
+  local tmpdir
+  tmpdir=$(make_temp_dir)
+  run bash -c '
+    log() { :; }
+    failing_lookup() { return 1; }
+    source "$1"
+    checks_failed=0
+    update_report="$2/report.md"
+    result=""
+    run_version_lookup result "test component" "1.0.0" failing_lookup
+    [ "$checks_failed" -eq 1 ]
+    [ "$result" = "1.0.0" ]
+    grep -q "Version check incomplete" "$update_report"
+  ' _ "$FUNC_FILE" "$tmpdir"
+  rm -f "$FUNC_FILE"
+  rm -rf "$tmpdir"
+  assert_success
+}
+
+@test "version checks are metadata-driven for providers and actions and include Ruff" {
+  grep -Fq '.value.kind == "provider"' "$SCRIPT"
+  grep -Fq '.value.repository != null' "$SCRIPT"
+  grep -Fq '"ruff:ruff"' "$SCRIPT"
+}
+
+@test "Tempo 3.x and Loki community upgrades require explicit migration" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  [ "$(yq eval '.monitoring.loki.update_policy' "$PROJECT_ROOT/versions.yaml")" = "manual-migration" ]
+  [ "$(yq eval '.monitoring.tempo.update_policy' "$PROJECT_ROOT/versions.yaml")" = "manual-migration" ]
+  grep -Fq '.monitoring.loki.update_policy' "$SCRIPT"
+  grep -Fq '.monitoring.tempo.update_policy' "$SCRIPT"
+}
+
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
 
 @test "UNIT: show_help prints usage and all component types" {

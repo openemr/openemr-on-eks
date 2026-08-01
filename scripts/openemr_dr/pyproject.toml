@@ -10,7 +10,7 @@ dev = [
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",
     "ruff>=0.11.0",
-    "mypy>=1.15.0",
+    "mypy>=2.3.0",
     "bandit[toml]>=1.8.0",
 ]
 
@@ -59,6 +59,7 @@ exclude = ["tests/"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["SIM117"]
+"scripts/openemr_dr/tests/**" = ["SIM117"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]

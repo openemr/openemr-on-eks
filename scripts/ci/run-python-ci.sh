@@ -57,7 +57,7 @@ case "${PROJECT}" in
     echo "=== flake8 ==="
     flake8 warp/ tests/ --max-line-length=127 --extend-ignore=E203 --count --statistics
     echo "=== mypy ==="
-    mypy warp/ --ignore-missing-imports || echo "Type checking completed with warnings"
+    mypy warp/ --ignore-missing-imports
     echo "=== bandit ==="
     bandit -r warp/ -q -x '**/tests/**'
     ;;

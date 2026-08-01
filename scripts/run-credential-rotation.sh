@@ -88,9 +88,13 @@ echo "=== Launching credential rotation Job ==="
 
 # Determine health check URL (best effort)
 OPENEMR_HEALTHCHECK_URL=""
-LB_HOST=$(kubectl get svc openemr-service -n "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+LB_HOST=$(kubectl get ingress openemr-ingress -n "$K8S_NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
 if [[ -n "$LB_HOST" ]]; then
-    OPENEMR_HEALTHCHECK_URL="https://${LB_HOST}/interface/login/login.php"
+    LB_SCHEME="http"
+    if kubectl get ingressclassparams openemr-alb -o jsonpath='{.spec.certificateARNs[0]}' 2>/dev/null | grep -q .; then
+        LB_SCHEME="https"
+    fi
+    OPENEMR_HEALTHCHECK_URL="${LB_SCHEME}://${LB_HOST}/interface/login/login.php"
 fi
 
 export AWS_REGION RDS_SLOT_SECRET_ARN RDS_ADMIN_SECRET_ARN

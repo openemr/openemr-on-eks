@@ -1,6 +1,9 @@
-# GitHub Directory
+# GitHub Actions Workflows
 
-This directory contains GitHub Actions workflows and configuration for the OpenEMR on EKS deployment project. The workflows provide automated testing, security scanning, and release management capabilities.
+This directory contains the six GitHub Actions workflows used for testing,
+security scanning, release management, console builds, contract validation, and
+monthly version awareness. Workflow YAML is the source of truth; version pins
+are synchronized with [`../../versions.yaml`](../../versions.yaml).
 
 ## 📋 Table of Contents
 
@@ -44,13 +47,12 @@ This directory contains GitHub Actions workflows and configuration for the OpenE
   - [Permissions](#permissions-1)
 
 ### **Version Awareness Pipeline**
-- [Version Check Pipeline (`version-check.yml`)](#version-check-pipeline-version-checkyml)
+- [Version Check Pipeline (`monthly-version-check.yml`)](#version-check-pipeline-monthly-version-checkyml)
   - [Purpose](#purpose-2)
   - [Triggers](#triggers-2)
   - [Key Features](#key-features-2)
   - [Jobs and Dependencies](#jobs-and-dependencies-2)
     - [Version Check](#1-version-check-version-check)
-    - [Create Issues](#2-create-issues-create-issues)
   - [Environment Configuration](#environment-configuration-2)
   - [Permissions](#permissions-2)
   - [Configuration Dependencies](#configuration-dependencies)
@@ -82,9 +84,17 @@ This directory contains GitHub Actions workflows and configuration for the OpenE
 
 ### Workflow Files
 
-- **`workflows/ci-cd-tests.yml`** - Comprehensive CI/CD testing and validation pipeline
-- **`workflows/manual-releases.yml`** - Manual release management and version control
-- **`workflows/version-check.yml`** - Automated version awareness checking and GitHub issue creation
+- **`ci-cd-tests.yml`** - Main test matrix, validation, Trivy scan, and
+  path-filtered Python project CI
+- **`ci-contract-tests.yml`** - BATS contracts, version consistency, Terraform,
+  kubeconform, TFLint, and full BATS validation
+- **`security-comprehensive.yml`** - Trivy, Checkov, KICS, Bandit, gosec, and
+  ShellCheck with zero tolerated unexempted findings
+- **`console-ci.yml`** - Go lint, test, cross-platform builds, and console
+  security scanning
+- **`manual-releases.yml`** - Manually authorized semantic releases
+- **`monthly-version-check.yml`** - Monthly dependency awareness and optional
+  GitHub issue creation
 
 ## Workflow Dependency Graph
 
@@ -103,9 +113,13 @@ graph TD
     I --> L[Create Release]
     I --> M[Notify Completion]
 
-    N[Monthly Schedule] --> O[version-check.yml]
+    N[Monthly Schedule] --> O[monthly-version-check.yml]
     O --> P[Version Check]
     P --> Q[GitHub Issues]
+
+    A --> X[ci-contract-tests.yml]
+    A --> Y[security-comprehensive.yml]
+    Z[Console Change] --> AA[console-ci.yml]
 
     R[VERSION] --> I
     S[versions.yaml] --> O
@@ -220,10 +234,14 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 - **Dependencies**: `scripts/run-test-suite.sh`, `scripts/test-config.yaml`
 - **Outputs**: Test results artifacts for each suite
 
+The workflow also detects changed paths and runs dedicated CI for
+`scripts/openemr_dr`, Warp, credential rotation, and the knowledge MCP package.
+Python requirement pins are validated when their source files or
+`versions.yaml` change.
+
 ##### 2. **Lint and Validate** (`lint-and-validate`)
 
 - **Purpose**: Additional validation and linting beyond test matrix
-- **Dependencies**: `test` job completion
 - **Validations**:
   - Terraform configuration validation
   - Kubernetes manifest YAML syntax validation
@@ -234,7 +252,6 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 ##### 3. **Security Scan** (`security-scan`)
 
 - **Purpose**: Comprehensive security vulnerability scanning
-- **Dependencies**: `test` job completion
 - **Scanners**:
   - **Vulnerability Scanner**: Detects known vulnerabilities in dependencies
   - **Secret Scanner**: Identifies hardcoded secrets and credentials
@@ -245,7 +262,6 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 ##### 4. **Code Quality** (`code-quality`)
 
 - **Purpose**: Additional code quality checks and common issue detection
-- **Dependencies**: `test` job completion
 - **Checks**:
   - Hardcoded secrets detection
   - TODO/FIXME comment identification
@@ -267,9 +283,9 @@ Comprehensive automated testing and validation pipeline that runs on every push 
 #### **Environment Configuration**
 
 - **Python**: 3.14.6
-- **Terraform**: 1.14.6
-- **Kubectl**: v1.34.2
-- **Operating System**: Ubuntu 24.04
+- **Terraform**: 1.15.8
+- **Kubectl**: v1.36.3
+- **Operating System**: `ubuntu-26.04`
 
 #### **Permissions**
 
@@ -350,7 +366,7 @@ Controlled release management system that allows manual version bumping and rele
 
 - **Python**: 3.14.6
 - **Semver Package**: 3.0.4
-- **Operating System**: Ubuntu 24.04
+- **Operating System**: `ubuntu-26.04`
 
 #### **Permissions**
 
@@ -358,7 +374,7 @@ Controlled release management system that allows manual version bumping and rele
 - `pull-requests: write` - Update pull request information
 - `issues: write` - Create issues if needed
 
-### Version Check Pipeline (`version-check.yml`)
+### Version Check Pipeline (`monthly-version-check.yml`)
 
 #### **Purpose**
 
@@ -366,9 +382,8 @@ Automated version awareness system that monitors all project dependencies and cr
 
 #### **Triggers**
 
-- **monthly schedule** - Runs every 30 days at 9:00 AM UTC
+- **Monthly schedule** - Runs on the first day of every month at 9:00 AM UTC
 - **Manual dispatch** - Can be triggered manually for immediate checks
-- **Workflow dispatch** - Can be triggered by other workflows
 
 #### **Key Features**
 
@@ -391,26 +406,19 @@ Automated version awareness system that monitors all project dependencies and cr
   - Monitors GitHub Actions and pre-commit hook versions
   - Checks semver packages (Python, Terraform CLI, kubectl)
   - Validates AWS service versions (RDS, ElastiCache)
-  - Monitors monitoring stack versions (Prometheus, Loki, Jaeger)
+  - Monitors the observability stack (Prometheus Operator, Loki, Tempo, Mimir,
+    OTeBPF, and cert-manager)
 - **Outputs**: Update information for all components
 
-##### 2. **Create Issues** (`create-issues`)
-
-- **Purpose**: Create GitHub issues for available updates
-- **Dependencies**: `version-check` job completion
-- **Features**:
-  - Groups updates by component type
-  - Creates detailed issue descriptions with current and latest versions
-  - Applies appropriate labels (`version-update`, `maintenance`, `dependencies`)
-  - Includes priority information based on update type
-  - Provides clear action items for maintainers
-- **Dependencies**: GitHub API, issue creation permissions
+Issue creation is a step in the `version-check` job, not a separate job. When
+enabled, it creates a report issue with the configured labels. The
+`notification` job records the final result in the workflow summary.
 
 #### **Environment Configuration**
 
-- **Terraform**: 1.14.6
-- **Kubectl**: v1.33.0
-- **Operating System**: Ubuntu 24.04
+- **Terraform**: 1.15.8
+- **Kubectl**: v1.36.3
+- **Operating System**: `ubuntu-26.04`
 - **Tools**: `yq`, `jq`, `curl` for API interactions
 
 #### **Permissions**
@@ -425,6 +433,32 @@ Automated version awareness system that monitors all project dependencies and cr
 - **`versions.yaml`** - Central configuration for all tracked versions
 - **`scripts/version-manager.sh`** - Core version checking logic
 - **`docs/VERSION_MANAGEMENT.md`** - Documentation for the system
+
+### Contract and Consistency Pipeline (`ci-contract-tests.yml`)
+
+Runs on pushes and pull requests targeting `main` or `develop`. It validates:
+
+- BATS repository contracts and `versions.yaml` consistency
+- Terraform formatting and offline validation with the lock file in read-only mode
+- rendered Kubernetes manifests with kubeconform
+- TFLint rules
+- the complete BATS suite
+
+### Comprehensive Security Pipeline (`security-comprehensive.yml`)
+
+Runs on pushes and pull requests targeting `main` or `develop`, every Monday at
+02:00 UTC, and by manual scanner selection. It runs Trivy, Checkov, KICS,
+Bandit, gosec, and ShellCheck. Any non-exempt finding fails its scanner job and
+the final enforcement job.
+
+See [`../../docs/SECURITY_SCANNING.md`](../../docs/SECURITY_SCANNING.md) for
+scope, pinning, and exception policy.
+
+### Console Pipeline (`console-ci.yml`)
+
+Runs when console or Go module files change, or by manual dispatch. It performs
+Go formatting, vetting, static analysis, unit tests, macOS/Linux build-matrix
+validation, and a zero-tolerance Trivy scan.
 
 ## Maintenance Guidelines
 

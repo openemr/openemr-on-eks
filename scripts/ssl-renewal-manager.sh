@@ -200,10 +200,18 @@ check_status() {
         echo -e "${GREEN}SSL PVC exists${NC}"
 
         # Get certificate info by running a temporary pod
-        echo -e "${BLUE}Checking certificate validity...${NC}"
-        kubectl run ssl-check --rm -i --restart=Never --image=openemr/openemr:8.1.1 -n "$NAMESPACE" \
-            --overrides='{"spec":{"containers":[{"name":"ssl-check","image":"openemr/openemr:8.1.1","command":["/bin/sh","-c","if [ -f /etc/ssl/certs/selfsigned.cert.pem ]; then echo \"Certificate found:\"; openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem -noout -dates -subject; else echo \"No certificate found\"; fi"],"volumeMounts":[{"name":"ssl-vol","mountPath":"/etc/ssl"}]}],"volumes":[{"name":"ssl-vol","persistentVolumeClaim":{"claimName":"openemr-ssl-pvc"}}],"serviceAccountName":"openemr-sa"}}' \
-            2>/dev/null || echo -e "${YELLOW}Could not check certificate (pod may still be starting)${NC}"
+        local openemr_image
+        openemr_image=$(kubectl get deployment openemr -n "$NAMESPACE" \
+            -o jsonpath='{.spec.template.spec.containers[?(@.name=="openemr")].image}' \
+            2>/dev/null || echo "")
+        if [[ -n "$openemr_image" ]]; then
+            echo -e "${BLUE}Checking certificate validity with ${openemr_image}...${NC}"
+            kubectl run ssl-check --rm -i --restart=Never --image="$openemr_image" -n "$NAMESPACE" \
+                --overrides="{\"spec\":{\"containers\":[{\"name\":\"ssl-check\",\"image\":\"${openemr_image}\",\"command\":[\"/bin/sh\",\"-c\",\"if [ -f /etc/ssl/certs/selfsigned.cert.pem ]; then echo \\\"Certificate found:\\\"; openssl x509 -in /etc/ssl/certs/selfsigned.cert.pem -noout -dates -subject; else echo \\\"No certificate found\\\"; fi\"],\"volumeMounts\":[{\"name\":\"ssl-vol\",\"mountPath\":\"/etc/ssl\"}]}],\"volumes\":[{\"name\":\"ssl-vol\",\"persistentVolumeClaim\":{\"claimName\":\"openemr-ssl-pvc\"}}],\"serviceAccountName\":\"openemr-sa\"}}" \
+                2>/dev/null || echo -e "${YELLOW}Could not check certificate (pod may still be starting)${NC}"
+        else
+            echo -e "${YELLOW}Could not determine the deployed OpenEMR image; skipping certificate inspection${NC}"
+        fi
     else
         echo -e "${RED}SSL PVC does not exist${NC}"
     fi

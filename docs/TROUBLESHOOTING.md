@@ -34,7 +34,7 @@ This comprehensive guide helps diagnose and resolve issues with OpenEMR on EKS A
 ### **🔍 Advanced Debugging**
 
 - [Security Incident Response](#-security-incident-response)
-- [Best Practices for Error Prevention](#️-best-practices-for-error-prevention)
+- [Best Practices for Error Prevention](#best-practices-for-error-prevention)
 
 ### **📞 Getting Help**
 
@@ -120,7 +120,7 @@ See comprehensive documentation on the backup and restore system [here](../docs/
 ./backup.sh
 
 # Restore from backup (disaster recovery)
-./restore.sh <backup-bucket> <snapshot-id> <backup-region>
+./restore.sh <backup-bucket> <snapshot-id> --region <aws-region>
 ```
 
 ### Script-Based Troubleshooting Workflow
@@ -178,7 +178,10 @@ cd scripts
 ./restore-defaults.sh --backup
 
 # Restore from backup if needed:
-./restore.sh <backup-bucket> <snapshot-id> <backup-region>
+./restore.sh <backup-bucket> <snapshot-id> --region <aws-region>
+
+# If manually destroying a paused E2E environment, preserve its restore snapshot:
+PRESERVE_BACKUP_SNAPSHOTS=true ./destroy.sh --force
 ```
 
 ### Auto Mode Health Check
@@ -945,8 +948,8 @@ kubectl logs -n openemr $POD_NAME --container=fluent-bit-sidecar --tail=20 | gre
 
 1. Generate HTTP traffic to OpenEMR:
 ```bash
-# Get OpenEMR LoadBalancer URL
-LB_URL=$(kubectl get svc openemr-service -n openemr -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+# Get the EKS Auto Mode ALB URL
+LB_URL=$(kubectl get ingress openemr-ingress -n openemr -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
 # Make a request
 curl -k https://$LB_URL
@@ -975,11 +978,12 @@ OpenEMR logs not being captured
 **Diagnosis:**
 
 ```bash
-# Check Fluent Bit pod status
-kubectl get pods -n openemr -l app=fluent-bit
+# Fluent Bit is a sidecar in each OpenEMR pod
+kubectl get pods -n openemr -l app=openemr
 
-# Check Fluent Bit logs
-kubectl logs -n openemr -l app=fluent-bit
+# Check sidecar logs
+kubectl logs -n openemr -l app=openemr \
+  --container=fluent-bit-sidecar --tail=100
 
 # Verify log groups exist
 aws logs describe-log-groups \
@@ -987,7 +991,7 @@ aws logs describe-log-groups \
   --region us-west-2
 
 # Check Fluent Bit configuration
-kubectl get configmap fluent-bit-config -n openemr -o yaml
+kubectl get configmap fluent-bit-sidecar-config -n openemr -o yaml
 ```
 
 **Solutions:**
@@ -995,11 +999,11 @@ kubectl get configmap fluent-bit-config -n openemr -o yaml
 **1. Restart Fluent Bit:**
 
 ```bash
-# Restart Fluent Bit daemonset
-kubectl rollout restart daemonset fluent-bit -n openemr
+# Restart OpenEMR pods, including their Fluent Bit sidecars
+kubectl rollout restart deployment/openemr -n openemr
 
 # Wait for pods to be ready
-kubectl wait --for=condition=ready pod -l app=fluent-bit -n openemr --timeout=300s
+kubectl rollout status deployment/openemr -n openemr --timeout=300s
 ```
 
 **2. Verify Log Directory Permissions:**
@@ -1016,11 +1020,12 @@ kubectl exec -n openemr deployment/openemr -- chmod 755 /var/log/openemr/
 **3. Check CloudWatch IAM Permissions:**
 
 ```bash
-# Verify Fluent Bit service account has proper permissions
-kubectl get serviceaccount fluent-bit -n openemr -o yaml
+# The sidecar shares the OpenEMR pod service account
+kubectl get serviceaccount openemr-sa -n openemr -o yaml
 
 # Check if IAM role is attached
-kubectl get serviceaccount fluent-bit -n openemr -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
+kubectl get serviceaccount openemr-sa -n openemr \
+  -o jsonpath='{.metadata.annotations.eks\.amazonaws\.com/role-arn}'
 ```
 
 #### Issue: OpenEMR Logging Configuration Missing
@@ -1048,34 +1053,18 @@ kubectl exec -n openemr deployment/openemr -- tail -f /var/log/openemr/error.log
 
 **Solutions:**
 
-**1. Reconfigure Logging During Restore:**
+**1. Reapply the Current Logging Configuration:**
 
 ```bash
-# Enable logging configuration during restore
-CONFIGURE_LOGGING=true ./restore.sh <backup-bucket> <snapshot-id>
-
-# Or manually configure logging
-kubectl exec -n openemr deployment/openemr -- bash -c '
-mkdir -p /var/log/openemr /var/log/apache2
-chown -R www-data:www-data /var/log/openemr /var/log/apache2
-touch /var/log/openemr/error.log /var/log/openemr/access.log /var/log/openemr/system.log
-chmod 644 /var/log/openemr/*.log
-'
+# The restore CLI has no CONFIGURE_LOGGING switch. Logging is deployed with
+# the normal manifests.
+cd k8s
+./deploy.sh
 ```
 
-**2. Update OpenEMR Configuration:**
-
-```bash
-# Add logging configuration to sqlconf.php
-kubectl exec -n openemr deployment/openemr -- bash -c '
-echo "" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "// OpenEMR 8.0.0 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "\$sqlconf[\"log_dir\"] = \"/var/log/openemr\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "\$sqlconf[\"error_log\"] = \"/var/log/openemr/error.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "\$sqlconf[\"access_log\"] = \"/var/log/openemr/access.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "\$sqlconf[\"system_log\"] = \"/var/log/openemr/system.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-'
-```
+Then follow the sidecar checks in the
+[Logging Guide](LOGGING_GUIDE.md). Avoid hand-editing `sqlconf.php` unless a
+reviewed recovery procedure specifically requires it.
 
 #### Issue: High Log Volume or Performance Impact
 
@@ -1095,8 +1084,8 @@ aws logs describe-log-streams \
   --log-group-name "/aws/eks/openemr-eks/openemr/application" \
   --region us-west-2
 
-# Check Fluent Bit resource usage
-kubectl top pods -n openemr -l app=fluent-bit
+# Check the sidecar's resource usage
+kubectl top pods -n openemr -l app=openemr --containers
 
 # Review log retention settings
 aws logs describe-log-groups \
@@ -1110,28 +1099,19 @@ aws logs describe-log-groups \
 **1. Adjust Log Retention:**
 
 ```bash
-# Reduce retention for non-critical logs
-aws logs put-retention-policy \
-  --log-group-name "/aws/eks/openemr-eks/openemr/access" \
-  --retention-in-days 7
-
-aws logs put-retention-policy \
-  --log-group-name "/aws/eks/openemr-eks/openemr/error" \
-  --retention-in-days 14
+# Update app_logs_retention_days in terraform.tfvars, then apply Terraform.
+# Keep audit_logs_retention_days at the required compliance value.
+terraform -chdir=terraform plan
+terraform -chdir=terraform apply
 ```
 
 **2. Optimize Fluent Bit Configuration:**
 
 ```bash
-# Update Fluent Bit config to reduce buffer sizes
-kubectl patch configmap fluent-bit-config -n openemr -p '{
-  "data": {
-    "fluent-bit.conf": "..."  # Reduce Mem_Buf_Limit and Buffer_Chunk_Size
-  }
-}'
-
-# Restart Fluent Bit to apply changes
-kubectl rollout restart daemonset fluent-bit -n openemr
+# Review and update Mem_Buf_Limit/Buffer_Chunk_Size in k8s/logging.yaml,
+# then redeploy the manifest through the normal deployment workflow.
+./k8s/deploy.sh
+kubectl rollout restart deployment/openemr -n openemr
 ```
 
 **3. Filter Unnecessary Logs:**
@@ -1295,7 +1275,7 @@ aws ec2 revoke-security-group-egress \
 # 6. Notify compliance officer
 ```
 
-## 🎯 Best Practices for Error Prevention
+## Best Practices for Error Prevention
 
 ### 🔒 **MANDATORY: End-to-End Testing Before Any Changes**
 
@@ -1304,8 +1284,9 @@ aws ec2 revoke-security-group-egress \
 #### **Testing Process**
 
 ```bash
-# Run the complete end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Run the complete end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # Expected outcome: All 10 test steps must pass
 # ✅ Infrastructure deployment
@@ -1382,7 +1363,7 @@ kubectl logs -n openemr -l app=openemr --since=1h | grep ERROR | tail -5
 # 2. Review and optimize HPA settings
 
 # 3. Check for security updates
-aws eks describe-addon-versions --kubernetes-version 1.35 \
+aws eks describe-addon-versions --kubernetes-version 1.36 \
   --query 'addons[].{AddonName:addonName,LatestVersion:addonVersions[0].addonVersion}'
 ```
 
@@ -1408,4 +1389,5 @@ aws eks describe-addon-versions --kubernetes-version 1.35 \
 
 - **[OpenEMR Community Support Section:](https://community.open-emr.org/c/support/16)** For OpenEMR specific support questions.
 - **[AWS Support:](https://aws.amazon.com/contact-us/)** For AWS specific support questions.
-- **[GitHub Issues for This Project:](../../../issues)** For issues specific to this deployment/project.
+- **[GitHub Issues for This Project:](https://github.com/openemr/openemr-on-eks/issues)**
+  For issues specific to this deployment/project.

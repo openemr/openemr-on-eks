@@ -1,6 +1,6 @@
 .DS_Store
 terraform/.terraform/*
-terraform/.terraform.lock.hcl
+oidc_provider/.terraform/*
 terraform/terraform.tfstate
 terraform/.terraform.tfstate.lock.info
 terraform/terraform.tfstate.backup
@@ -30,6 +30,7 @@ warp/.test-venv/
 warp/htmlcov/
 tools/credential-rotation/.test-venv/
 tools/credential-rotation/htmlcov/
+.coverage
 
 # Local deployment credentials (never commit)
 k8s/openemr-credentials.txt
@@ -49,6 +50,7 @@ __pycache__/
 # Security tool caches and outputs
 .trivycache/
 results.sarif
+.external_modules/
 terraform/.external_modules/
 
 # Console binary

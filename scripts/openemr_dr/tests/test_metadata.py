@@ -20,7 +20,7 @@ class TestMetadata(unittest.TestCase):
             "manifest_version": 2,
             "backup_bucket": "b",
             "aurora_snapshot_id": "snap-backup-20260702-213048",
-            "restore_plan": {"app_data_key": "application-data/x.tar.gz", "openemr_version": "8.1.1"},
+            "restore_plan": {"app_data_key": "application-data/x.tar.gz", "openemr_version": "8.2.0"},
         }
         plan = from_metadata_dict(data, "uri")
         self.assertEqual(plan.manifest_version, 2)

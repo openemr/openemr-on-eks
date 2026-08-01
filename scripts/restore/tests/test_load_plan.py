@@ -19,7 +19,7 @@ class TestLoadPlanCli(unittest.TestCase):
             "timestamp": "20260703-120000",
             "restore_plan": {
                 "app_data_key": "application-data/app-data-backup-20260703-120000.tar.gz",
-                "openemr_version": "8.1.1",
+                "openemr_version": "8.2.0",
                 "backup_region": "us-west-2",
             },
         }

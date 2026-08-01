@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import json
+import tempfile
 import time
+from pathlib import Path
 
 from openemr_dr import config
 from openemr_dr.common import log
-from openemr_dr.common.paths import K8S_DIR
+from openemr_dr.common.paths import K8S_DIR, TERRAFORM_DIR
 from openemr_dr.common.shell import run as run_cmd
 from openemr_dr.errors import PhaseError
 from openemr_dr.models.restore import RestoreContext
 
+HPA_NAME = "openemr-hpa"
 CRYPTO_KEY_PATH = (
     "/var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/methods/"
 )
@@ -126,7 +130,10 @@ def openemr_pod_is_healthy(namespace: str) -> bool:
 def prepare_single_replica(ctx: RestoreContext) -> None:
     """Scale to one replica and remove HPA for stable verification."""
     log.step("Preparing single-replica verification mode")
-    run_cmd(["kubectl", "delete", "hpa", "openemr", "-n", ctx.namespace, "--ignore-not-found"], check=False)
+    run_cmd(
+        ["kubectl", "delete", "hpa", HPA_NAME, "-n", ctx.namespace, "--ignore-not-found"],
+        check=False,
+    )
     exists = run_cmd(
         ["kubectl", "get", "deployment", "openemr", "-n", ctx.namespace],
         check=False,
@@ -149,16 +156,73 @@ def prepare_single_replica(ctx: RestoreContext) -> None:
 
 
 def restore_autoscaling(ctx: RestoreContext) -> None:
+    """Render the pristine HPA template and apply it after verification."""
     hpa_file = K8S_DIR / "hpa.yaml"
     if not hpa_file.exists():
-        log.warning("hpa.yaml missing — skipping HPA restore")
-        return
-    content = hpa_file.read_text(encoding="utf-8")
-    if "${OPENEMR_MIN_REPLICAS}" in content:
-        log.warning("hpa.yaml still has placeholders — skipping HPA restore")
-        return
+        raise PhaseError("verify", f"HPA template missing: {hpa_file}")
+
+    config_result = run_cmd(
+        ["terraform", "output", "-json", "openemr_autoscaling_config"],
+        cwd=str(TERRAFORM_DIR),
+        capture=True,
+        check=False,
+    )
+    if config_result.returncode != 0:
+        raise PhaseError("verify", "Unable to read Terraform autoscaling configuration")
+    try:
+        autoscaling = json.loads(config_result.stdout or "")
+    except json.JSONDecodeError as exc:
+        raise PhaseError("verify", "Terraform autoscaling configuration is invalid JSON") from exc
+    if not isinstance(autoscaling, dict):
+        raise PhaseError("verify", "Terraform autoscaling configuration is not an object")
+
+    replacements = {
+        "${OPENEMR_MIN_REPLICAS}": autoscaling.get("min_replicas"),
+        "${OPENEMR_MAX_REPLICAS}": autoscaling.get("max_replicas"),
+        "${OPENEMR_CPU_THRESHOLD}": autoscaling.get("cpu_utilization_threshold"),
+        "${OPENEMR_MEMORY_THRESHOLD}": autoscaling.get("memory_utilization_threshold"),
+        "${OPENEMR_SCALE_DOWN_STABILIZATION}": autoscaling.get(
+            "scale_down_stabilization_seconds"
+        ),
+        "${OPENEMR_SCALE_UP_STABILIZATION}": autoscaling.get(
+            "scale_up_stabilization_seconds"
+        ),
+    }
+    missing = [placeholder for placeholder, value in replacements.items() if value is None]
+    if missing:
+        raise PhaseError(
+            "verify",
+            f"Terraform autoscaling configuration is missing values for: {', '.join(missing)}",
+        )
+
+    rendered = hpa_file.read_text(encoding="utf-8")
+    rendered = rendered.replace("  namespace: openemr", f"  namespace: {ctx.namespace}")
+    for placeholder, value in replacements.items():
+        rendered = rendered.replace(placeholder, str(value))
+    if "${OPENEMR_" in rendered:
+        raise PhaseError("verify", "Rendered HPA manifest still contains placeholders")
+
     log.info("Re-applying HPA")
-    run_cmd(["kubectl", "apply", "-f", str(hpa_file)], check=False)
+    rendered_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w",
+            encoding="utf-8",
+            suffix=".yaml",
+            prefix="openemr-hpa.",
+            delete=False,
+        ) as stream:
+            stream.write(rendered)
+            rendered_path = Path(stream.name)
+        apply_result = run_cmd(
+            ["kubectl", "apply", "-f", str(rendered_path)],
+            check=False,
+        )
+    finally:
+        if rendered_path is not None:
+            rendered_path.unlink(missing_ok=True)
+    if apply_result.returncode != 0:
+        raise PhaseError("verify", "Failed to restore HPA after verification")
     log.success("HPA restored")
 
 

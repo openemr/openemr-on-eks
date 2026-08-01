@@ -18,6 +18,16 @@ kind: Deployment
 metadata:
   name: openemr      # Deployment name - must match selector labels
   namespace: openemr # Target namespace for deployment
+  annotations:
+    checkov.io/skip1: "CKV_K8S_15=Pinned version tags are rendered from versions.yaml; IfNotPresent prevents unnecessary pulls."
+    checkov.io/skip2: "CKV_K8S_20=The upstream OpenEMR entrypoint needs SETUID/SETGID for Apache; capabilities are explicitly minimized."
+    checkov.io/skip3: "CKV_K8S_22=OpenEMR and Fluent Bit require writable runtime paths; persistent data is isolated on EFS."
+    checkov.io/skip4: "CKV_K8S_23=The upstream OpenEMR image and Fluent Bit host-log reader require UID 0."
+    checkov.io/skip5: "CKV_K8S_25=Only the documented OpenEMR and Fluent Bit capabilities are added after dropping ALL."
+    checkov.io/skip6: "CKV_K8S_35=The upstream OpenEMR image consumes credentials through environment variables; Secrets are KMS-encrypted and RBAC-scoped."
+    checkov.io/skip7: "CKV_K8S_38=The projected service-account token is required for Fluent Bit IRSA authentication."
+    checkov.io/skip8: "CKV_K8S_40=The upstream containers require root; seccomp, minimized capabilities, RBAC, and NetworkPolicy provide isolation."
+    checkov.io/skip9: "CKV_K8S_43=Central version management uses immutable release tags and validates them across deployment consumers."
   labels:
     app: openemr # Primary application label for service discovery
     version: v1  # Version tracking for deployment management
@@ -45,12 +55,6 @@ spec:
       labels:
         app: openemr # Primary label for service discovery and HPA targeting
         version: v1  # Version label for tracking and rollback capabilities
-      annotations:
-        # Prometheus scraping configuration for metrics collection
-        prometheus.io/scrape: "true" # Enable metrics scraping by Prometheus
-        prometheus.io/port: "9090"   # Metrics endpoint port (if available)
-        # Distributed tracing: OTeBPF auto-instruments pods with label app=openemr
-        # Traces are automatically sent to Tempo via eBPF-based instrumentation
     spec:
       serviceAccountName: openemr-sa    # Service account for AWS IAM role binding (IRSA)
       restartPolicy: Always             # Always restart failed containers
@@ -277,7 +281,7 @@ spec:
 
       # Fluent Bit sidecar container for log aggregation and forwarding to CloudWatch
       - name: fluent-bit-sidecar
-        image: fluent/fluent-bit:5.0.6                                        # Fluent Bit log processor and forwarder
+        image: fluent/fluent-bit:5.0.9                                        # Fluent Bit log processor and forwarder
 
         # Container-level security context for Fluent Bit
         # trivy:ignore:AVD-KSV-0012 Fluent Bit needs root to read log files
@@ -339,7 +343,7 @@ spec:
         # Liveness probe for Fluent Bit sidecar
         livenessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.6)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.9)
             port: 2020            # Fluent Bit HTTP monitoring endpoint
           initialDelaySeconds: 30 # Fluent Bit starts quickly
           periodSeconds: 30       # Check every 30 seconds
@@ -348,7 +352,7 @@ spec:
         # Readiness probe for Fluent Bit sidecar
         readinessProbe:
           httpGet:
-            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.6)
+            path: /api/v1/health  # Fluent Bit health check endpoint (Fluent Bit 5.0.9)
             port: 2020            # Fluent Bit HTTP monitoring port
           initialDelaySeconds: 15 # Fluent Bit starts quickly
           periodSeconds: 15       # Check every 15 seconds

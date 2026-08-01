@@ -26,6 +26,7 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
   - [logging.yaml](#loggingyaml)
   - [ssl-renewal.yaml](#ssl-renewalyaml)
   - [credential-rotation-*.yaml](#credential-rotation-manifests)
+  - [Data Restore Job](#data-restore-job)
 
 ### **🚀 Deployment & Operations**
 - [Deployment Workflow](#deployment-workflow)
@@ -48,8 +49,8 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
 - **`secrets.yaml`** - Secret templates for database and application credentials
 - **`storage.yaml`** - EFS storage classes and persistent volume claims
 - **`deployment.yaml`** - OpenEMR application deployment with sidecar logging
-- **`service.yaml`** - LoadBalancer service for external access
-- **`ingress.yaml`** - ALB ingress with WAF integration
+- **`service.yaml`** - Internal ClusterIP backend for OpenEMR
+- **`ingress.yaml`** - EKS Auto Mode ALB resources with WAF integration
 - **`hpa.yaml`** - Horizontal Pod Autoscaler and Pod Disruption Budget
 - **`security.yaml`** - ServiceAccount, RBAC, and IRSA configuration
 - **`network-policies.yaml`** - Network security policies
@@ -59,6 +60,11 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
 - **`credential-rotation-rbac.yaml`** - RBAC Role/RoleBinding for credential rotation Job
 - **`credential-rotation-job.yaml`** - One-off credential rotation Job manifest
 - **`credential-rotation-cronjob.yaml`** - Scheduled monthly credential rotation CronJob
+- **`restore-bootstrap.sh`** - Minimal namespace, EFS PVC, and IRSA bootstrap
+  used before the application exists
+- **`jobs/data-restore-job.yaml`** - Template for the short-lived EFS restore Job
+- **`jobs/data-restore-script.sh`** - S3 download, extraction, and OpenEMR
+  configuration logic used by the restore Job
 
 ## Kubernetes Manifest Dependency Graph
 
@@ -192,25 +198,22 @@ graph TD
 
 #### `service.yaml`
 
-- **Purpose**: LoadBalancer service for external access
+- **Purpose**: Internal backend service for the EKS Auto Mode ALB
 - **Key Components**:
-  - NLB configuration
-  - SSL termination options
+  - ClusterIP exposure for ALB IP targets
+  - HTTP and HTTPS backend ports
   - Session affinity configuration
-  - Backend protocol selection
 - **Dependencies**: `deployment.yaml`
 - **Maintenance Notes**:
-  - Update SSL certificate ARN references
-  - Modify load balancer attributes
   - Adjust session affinity settings
   - Add new ports for additional services
 
 #### `ingress.yaml`
 
-- **Purpose**: ALB ingress with WAF integration
+- **Purpose**: EKS Auto Mode ALB ingress with WAF integration
 - **Key Components**:
-  - ALB ingress controller configuration
-  - SSL certificate management
+  - `IngressClassParams` and `IngressClass` for `eks.amazonaws.com/alb`
+  - ACM certificate management
   - WAF integration
   - Access logging to S3
   - Health check configuration
@@ -273,10 +276,12 @@ graph TD
 
 - **Purpose**: Network security policies
 - **Key Components**:
-  - Ingress rules for OpenEMR access
-  - Egress rules for database and external services
-  - Namespace-based access control
-  - Port-specific restrictions
+  - `openemr-base-access` for Auto Mode ALB ingress through `${VPC_CIDR}` and
+    required database, Valkey, DNS, and HTTPS egress
+  - Monitoring and inter-namespace access policies
+  - `credential-rotation-egress` and `warp-import-egress` for job-specific
+    outbound access with no inbound access
+  - `ssl-renewal-deny-network` for complete ingress/egress isolation
 - **Dependencies**: `deployment.yaml`
 - **Maintenance Notes**:
   - Add new network policies for additional services
@@ -330,6 +335,22 @@ graph TD
   - Adjust CronJob schedule for organization-specific rotation frequency
 
 > **See also:** [Credential Rotation Guide](../docs/CREDENTIAL_ROTATION_GUIDE.md) for the full architecture and runbook.
+
+#### Data Restore Job
+
+The default Python restore flow applies `restore-bootstrap.sh`, restores Aurora,
+and then renders `jobs/data-restore-job.yaml` before deploying OpenEMR. The Job:
+
+- mounts the restored EFS access point;
+- downloads the selected application-data archive from S3 using IRSA;
+- runs as UID 0 for the short-lived EFS restore work but disables privilege
+  escalation, uses `RuntimeDefault` seccomp, and drops all Linux capabilities;
+- extracts with `tar --no-same-owner`, preserving EFS access-point ownership
+  without requiring `CAP_CHOWN`;
+- updates `sqlconf.php` for the restored database endpoint.
+
+This Job is an operational restore component and is not part of the normal
+`deploy.sh` manifest sequence.
 
 ## Deployment Workflow
 

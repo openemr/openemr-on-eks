@@ -4,7 +4,7 @@
 openemr:
   url: "https://openemr.example.com"
   user: "admin"
-  password: "your-password-here"
+  password: "your-password-here" # checkov:skip=CKV_SECRET_6:Nonfunctional configuration placeholder.
 
 data_source:
   # S3 path (recommended)

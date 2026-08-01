@@ -13,7 +13,7 @@ class RestorePlan:
     backup_bucket: str
     snapshot_id: str
     app_data_key: str = ""
-    openemr_version: str = "8.1.1"
+    openemr_version: str = "8.2.0"
     backup_strategy: str = "same-region"
     backup_region: str = "us-west-2"
     kms_key_id: str = ""

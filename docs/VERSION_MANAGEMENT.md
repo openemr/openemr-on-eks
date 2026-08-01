@@ -38,7 +38,7 @@ This document describes the comprehensive version awareness and notification sys
 - [Flexible Reporting](#flexible-reporting)
 
 ### **🛡️ Safety & Monitoring**
-- [Safety Features](#%EF%B8%8F-safety-features)
+- [Safety Features](#safety-features)
   - [Awareness and Notifications](#awareness-and-notifications)
   - [Monitoring](#monitoring)
 - [Monitoring and Reporting](#-monitoring-and-reporting)
@@ -96,9 +96,13 @@ The `versions.yaml` file serves as the single source of truth for all version in
 # Core Application Versions
 applications:
   openemr:
-    current: "8.0.0"
+    current: "8.2.0"
     registry: "openemr/openemr"
 ```
+
+Selected current project pins include OpenEMR 8.2.0, EKS 1.36, Terraform
+1.15.8, CI Python 3.14.6, kubectl v1.36.3, and the `ubuntu-26.04` GitHub runner.
+Always read `versions.yaml` rather than copying this summary into automation.
 
 ### 2. Version Manager Script (`scripts/version-manager.sh`)
 
@@ -109,7 +113,7 @@ For a quick human-readable summary, use the dashboard wrapper:
 ./scripts/version-dashboard.sh check    # Check for available updates
 ```
 
-The main script for checking and updating versions:
+The main read-only script for checking recorded and available versions:
 
 ```bash
 # Check for available updates
@@ -138,7 +142,7 @@ Automated CI/CD integration with dual run support:
 - **Component selection**: Choose specific component types for manual runs if desired or use the default of "all"
 - **Flexible reporting**: Option to run checks without creating issues
 - **Timestamped issues**: Manual runs create unique timestamped issues
-- **Duplicate prevention**: Monthly runs check for existing issues
+- **Issue behavior**: Each enabled scheduled run creates a new monthly report issue
 - **Comprehensive search**: Includes codebase search for version locations
 - **Artifact storage**: Version check logs and reports
 - **Notification system**: Success/failure notifications
@@ -174,6 +178,11 @@ chmod +x scripts/version-manager.sh
 ./scripts/version-manager.sh check --components github_workflows
 ./scripts/version-manager.sh check --components monitoring
 ./scripts/version-manager.sh check --components eks_addons
+./scripts/version-manager.sh check --components pre_commit_hooks
+./scripts/version-manager.sh check --components semver_packages
+./scripts/version-manager.sh check --components go_packages
+./scripts/version-manager.sh check --components python_packages
+./scripts/version-manager.sh check --components security_tools
 ```
 
 
@@ -199,8 +208,9 @@ chmod +x scripts/version-manager.sh
 ### Kubernetes Version
 
 **Version Source:** AWS EKS supported versions
-**Current Version:** 1.35 (Latest stable)
-**Release Notes:** [Kubernetes v1.35 "Timbernetes (The World Tree Release)" Release Blog](https://kubernetes.io/blog/2025/12/17/kubernetes-v1-35-release/)
+**Current Project Version:** 1.36
+**Supported Inventory:** See `infrastructure.eks.aws_supported_versions` in
+`versions.yaml` and confirm regional EKS support before an upgrade.
 
 
 **Files Updated:**
@@ -216,7 +226,7 @@ chmod +x scripts/version-manager.sh
 **Components:**
 - Prometheus Operator (Helm chart: kube-prometheus-stack)
 - Loki (Helm chart: loki, repository: grafana)
-- Tempo (Helm chart: tempo, repository: grafana, replaces Jaeger)
+- Tempo (Helm chart: tempo-distributed, repository: grafana-community, replaces Jaeger)
 - Mimir (Helm chart: mimir-distributed, repository: grafana)
 - OTeBPF (DaemonSet deployment, not a Helm chart)
 
@@ -471,7 +481,7 @@ The version checker supports two distinct run modes:
 - **Schedule**: 1st of every month at 9:00 AM UTC
 - **Issue Title**: "Version Check Report for Month of [Month Year]"
 - **Labels**: `version-check`, `automated`, `monthly`, `maintenance`, `dependencies`, `awareness`
-- **Behavior**: Checks for existing monthly issues to prevent duplicates
+- **Behavior**: Creates a new monthly report issue when issue creation is enabled
 - **Purpose**: Regular awareness and maintenance planning
 
 #### **Manual On-Demand Runs**
@@ -514,7 +524,9 @@ update.sh:        check_version "1.2.3"
 
 ### Component Selection
 
-Manual runs support targeted component checking:
+The CLI supports all component categories below. GitHub's manual workflow
+dispatch exposes a smaller fixed choice list; select `all` there to check every
+category.
 
 #### **Available Component Types**
 - `all` - Check all components (default)
@@ -524,6 +536,11 @@ Manual runs support targeted component checking:
 - `github_workflows` - GitHub Actions dependencies
 - `monitoring` - Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - `eks_addons` - EFS CSI Driver, Metrics Server
+- `pre_commit_hooks` - Pre-commit quality and security hook versions
+- `semver_packages` - CI Python, Terraform, kubectl, and semver pins
+- `go_packages` - Go toolchain and console TUI dependencies
+- `python_packages` - Runtime, test, and knowledge MCP Python packages
+- `security_tools` - Trivy, Checkov, KICS, and gosec
 
 #### **Use Cases**
 - **Targeted updates**: Check only specific component types
@@ -548,7 +565,7 @@ The system provides multiple reporting options:
 - **Log Files**: Detailed logs for debugging and analysis
 - **Artifacts**: Downloadable reports from GitHub Actions
 
-## 🛡️ Safety Features
+## Safety Features
 
 ### Awareness and Notifications
 

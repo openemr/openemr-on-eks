@@ -191,13 +191,13 @@ deploy_terraform() {
     cd "$PROJECT_ROOT/terraform" || exit 1
     
     log_step "Initializing Terraform..."
-    terraform init -upgrade -no-color
+    terraform init -lockfile=readonly -no-color
     
     log_step "Planning Terraform deployment..."
     terraform plan -out=tfplan -no-color
     
     log_step "Applying Terraform configuration..."
-    log_info "This may take 30-45 minutes..."
+    log_info "OpenEMR 8.2.0 infrastructure measured 23m 52s; allow up to 45 minutes..."
     terraform apply tfplan -no-color
     
     log_success "Terraform infrastructure deployed successfully"
@@ -215,7 +215,7 @@ deploy_openemr() {
     cd "$PROJECT_ROOT/k8s" || exit 1
     
     log_step "Running OpenEMR deployment script..."
-    log_info "This may take 3-6 minutes for OpenEMR 8.1.x to initialize..."
+    log_info "OpenEMR 8.2.0 full deployment step measured 17m 30s..."
     ./deploy.sh --cluster-name "$CLUSTER_NAME" --aws-region "$AWS_REGION" --namespace "$NAMESPACE"
     
     log_success "OpenEMR deployed successfully"
@@ -324,7 +324,7 @@ spec:
           apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
           
           echo "Installing Python dependencies..."
-          pip install --no-cache-dir pymysql==1.1.0 boto3==1.28.0
+          pip install --no-cache-dir pymysql==1.2.0 boto3==1.43.62
           
           echo "Extracting warp code from ConfigMap..."
           cd /app
@@ -401,8 +401,12 @@ EOF
 print_credentials() {
     log_header "Step 5: Deployment Information"
     
-    # Get LoadBalancer URL
-    LB_URL=$(kubectl get svc openemr-service -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+    # Get the EKS Auto Mode ALB URL.
+    LB_URL=$(kubectl get ingress openemr-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "")
+    LB_SCHEME="http"
+    if kubectl get ingressclassparams openemr-alb -o jsonpath='{.spec.certificateARNs[0]}' 2>/dev/null | grep -q .; then
+        LB_SCHEME="https"
+    fi
     
     # Get credentials from secret or credentials file
     ADMIN_USER="admin"
@@ -427,17 +431,17 @@ print_credentials() {
     echo ""
     
     if [ -n "$LB_URL" ]; then
-        echo -e "  ${BLUE}Login URL:${NC}     https://$LB_URL"
+        echo -e "  ${BLUE}Login URL:${NC}     ${LB_SCHEME}://$LB_URL"
     else
         echo -e "  ${YELLOW}Login URL:${NC}     LoadBalancer URL not yet available"
-        echo -e "  ${YELLOW}              Run: kubectl get svc openemr-service -n $NAMESPACE${NC}"
+        echo -e "  ${YELLOW}              Run: kubectl get ingress openemr-ingress -n $NAMESPACE${NC}"
     fi
     
     echo ""
     echo -e "  ${BLUE}Username:${NC}       $ADMIN_USER"
     
     if [ -n "$ADMIN_PASSWORD" ]; then
-        echo -e "  ${BLUE}Password:${NC}       $ADMIN_PASSWORD"
+        echo -e "  ${BLUE}Password:${NC}       Available in the protected credentials file or Kubernetes Secret (not printed)"
     else
         echo -e "  ${YELLOW}Password:${NC}       Unable to retrieve password"
         echo -e "  ${YELLOW}              Check: kubectl get secret openemr-app-credentials -n $NAMESPACE${NC}"

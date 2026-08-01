@@ -1,6 +1,6 @@
 # OpenEMR on EKS Logging Guide
 
-This comprehensive guide covers the enhanced logging configuration for OpenEMR 8.0.0 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
+This comprehensive guide covers the enhanced logging configuration for OpenEMR 8.2.0 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
 
 ## 📋 Table of Contents
 
@@ -18,7 +18,7 @@ This comprehensive guide covers the enhanced logging configuration for OpenEMR 8
 
 ## Overview
 
-OpenEMR 8.0.0 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
+OpenEMR 8.2.0 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
 
 - **Multi-layer logging**: Application, system, audit, and infrastructure logs
 - **Real-time processing**: Fluent Bit with 5-second refresh intervals
@@ -94,15 +94,29 @@ graph TB
 | `/aws/eks/${CLUSTER_NAME}/openemr/audit` | Basic audit trail | 365 days | KMS | 🔄 Monitoring |
 | `/aws/eks/${CLUSTER_NAME}/openemr/php_error` | PHP application errors | 30 days | KMS | 🔄 Monitoring |
 | `/aws/eks/${CLUSTER_NAME}/fluent-bit/metrics` | Fluent Bit operational metrics | 30 days | KMS | ✅ Working |
+| `/aws/cloudtrail/${CLUSTER_NAME}` | CloudTrail management events (direct AWS delivery, not Fluent Bit) | 365 days | KMS | Provisioned |
 
 **Status Legend:**
 
 - ✅ **Working**: Logs are actively flowing to CloudWatch
 - 🔄 **Monitoring**: Paths are monitored, waiting for log files to be generated
 
+Terraform also provisions
+`/aws/eks/${CLUSTER_NAME}/openemr/access`,
+`/aws/eks/${CLUSTER_NAME}/openemr/error`, and
+`/aws/eks/${CLUSTER_NAME}/openemr/audit_detailed`, but the current Fluent Bit
+outputs do not route records to those names. Apache access and error records
+are combined in `/aws/eks/${CLUSTER_NAME}/openemr/apache`; file-based audit
+records route to `/aws/eks/${CLUSTER_NAME}/openemr/audit`.
+OpenEMR's database-backed audit trail remains separate from this file stream.
+
 ### Log Group Features
 
-- **Auto-creation**: `auto_create_group: true` allows Fluent Bit to create log groups automatically
+- **Provisioning first**: Terraform pre-creates the expected KMS-encrypted log
+  groups and retention policies
+- **Auto-creation fallback**: Fluent Bit has `auto_create_group: true`, but a
+  fallback-created group does not inherit Terraform's KMS/retention settings;
+  investigate and import/recreate it through Terraform
 - **Dynamic naming**: Uses environment variables for cluster-specific naming
 - **IRSA integration**: Role-based authentication for secure access
 - **Retry handling**: Configurable retry limits for reliable log delivery
@@ -333,7 +347,7 @@ The configuration includes a record modifier filter that adds metadata to all lo
     Match               *
     Record              cluster_name ${CLUSTER_NAME}
     Record              region ${AWS_REGION}
-    Record              openemr_version 8.0.0
+    Record              openemr_version 8.2.0
     Record              pod_name ${HOSTNAME}
 ```
 
@@ -381,7 +395,7 @@ Fluent Bit is deployed as a sidecar container within each OpenEMR pod, providing
 
 ```yaml
 - name: fluent-bit-sidecar
-  image: fluent/fluent-bit:4.2.3
+  image: fluent/fluent-bit:5.0.9
   ports:
   - containerPort: 2020
     name: fluent-bit-http

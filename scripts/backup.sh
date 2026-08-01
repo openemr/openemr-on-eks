@@ -1121,7 +1121,7 @@ if [ -n "$AURORA_CLUSTER_ID" ]; then
 fi
 
 METADATA_FILE="backup-metadata-${TIMESTAMP}.json"
-OPENEMR_VERSION=$(cd "$TERRAFORM_DIR" && terraform output -json 2>/dev/null | jq -r '.openemr_app_config.value.version // "8.1.1"' 2>/dev/null || echo "8.1.1")
+OPENEMR_VERSION=$(cd "$TERRAFORM_DIR" && terraform output -json 2>/dev/null | jq -r '.openemr_app_config.value.version // "8.2.0"' 2>/dev/null || echo "8.2.0")
 cat > "$METADATA_FILE" << EOF
 {
     "manifest_version": 2,

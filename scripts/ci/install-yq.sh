@@ -14,7 +14,8 @@ case "${ARCH}" in
   aarch64|arm64) ARCH="arm64" ;;
 esac
 
-URL="https://github.com/mikefarah/yq/releases/latest/download/yq_${OS}_${ARCH}"
+YQ_VERSION="${YQ_VERSION:-v4.53.3}"
+URL="https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_${OS}_${ARCH}"
 TARGET="/usr/local/bin/yq"
 
 if [[ -w "$(dirname "${TARGET}")" ]]; then

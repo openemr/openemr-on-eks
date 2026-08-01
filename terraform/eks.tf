@@ -9,7 +9,7 @@
 module "eks" {
   # Source module for EKS cluster creation with Auto Mode support
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.24.0" # Latest stable version with Auto Mode support
+  version = "21.24.1" # Latest stable version with Auto Mode support
 
   # Cluster identification and version configuration
   name               = var.cluster_name       # EKS cluster name
@@ -122,10 +122,10 @@ resource "time_sleep" "wait_for_compute" {
 # Metrics Server provides resource utilization metrics for HPA (Horizontal Pod Autoscaler)
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
-  addon_name                  = "metrics-server"     # Essential for autoscaling
-  addon_version               = "v0.8.1-eksbuild.11" # Latest stable version for Kubernetes 1.36
-  resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
-  resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
+  addon_name                  = "metrics-server"    # Essential for autoscaling
+  addon_version               = "v0.9.0-eksbuild.4" # Latest stable version for Kubernetes 1.36
+  resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
+  resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
 
   # Wait for compute infrastructure to be ready
   # Metrics Server needs compute nodes to collect metrics from
@@ -147,7 +147,7 @@ resource "aws_eks_addon" "metrics_server" {
 resource "aws_eks_addon" "efs_csi_driver" {
   cluster_name                = module.eks.cluster_name
   addon_name                  = "aws-efs-csi-driver" # CSI driver for EFS integration
-  addon_version               = "v3.3.0-eksbuild.1"  # Latest stable version for Kubernetes 1.36
+  addon_version               = "v3.4.1-eksbuild.1"  # Latest stable version for Kubernetes 1.36
   resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
   resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
 
@@ -184,7 +184,7 @@ resource "aws_eks_addon" "efs_csi_driver" {
 module "aws_efs_csi_pod_identity" {
   # Source module for Pod Identity configuration
   source  = "terraform-aws-modules/eks-pod-identity/aws"
-  version = "2.8.1"
+  version = "2.8.2"
 
   name = "aws-efs-csi" # Name for the Pod Identity configuration
 

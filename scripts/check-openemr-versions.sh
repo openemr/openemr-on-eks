@@ -24,15 +24,14 @@
 #
 # Options:
 #   --count N          Show N most recent versions (default: 10)
-#   --all              Show all available versions
-#   --stable-only      Show only stable release versions
-#   --latest-only      Show only latest/development versions
-#   --check-current    Check current deployment version
+#   --search PATTERN   Filter image tags by version text
+#   --latest           Show the reviewed project pin and newest image candidate
 #   --help             Show this help message
 #
 # Dependencies:
 #   - curl (for API calls to Docker Hub)
 #   - jq (for JSON parsing and formatting)
+#   - yq (for the reviewed version in versions.yaml)
 #
 # Examples:
 #   ./check-openemr-versions.sh
@@ -54,6 +53,9 @@ NC='\033[0m'        # Reset color to default
 # Configuration variables
 DOCKER_REGISTRY="openemr/openemr" # Docker Hub repository for OpenEMR images
 DEFAULT_TAGS_TO_SHOW=10           # Default number of versions to display when no specific count is requested
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+VERSIONS_FILE="$PROJECT_ROOT/versions.yaml"
 
 # Help function - displays usage information and examples
 # This function provides comprehensive documentation for script usage,
@@ -127,6 +129,15 @@ if ! command -v jq >/dev/null 2>&1; then
     echo -e "${YELLOW}Install with: brew install jq (macOS) or apt-get install jq (Ubuntu)${NC}" >&2
     exit 1
 fi
+if ! command -v yq >/dev/null 2>&1; then
+    echo -e "${RED}Error: yq is required to read the authoritative versions.yaml file.${NC}" >&2
+    exit 1
+fi
+RECOMMENDED_VERSION=$(yq eval '.applications.openemr.current' "$VERSIONS_FILE")
+if [[ ! "$RECOMMENDED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo -e "${RED}Error: versions.yaml does not contain a valid OpenEMR version.${NC}" >&2
+    exit 1
+fi
 
 # Function to fetch Docker Hub tags via API
 # This function queries Docker Hub's REST API v2 to retrieve all available tags
@@ -160,7 +171,7 @@ sort_versions() {
 
 # Function to filter and process version tags
 # This function applies semantic versioning filters and search patterns to the raw tag list.
-# It implements OpenEMR's versioning strategy where the second-to-latest version is considered stable.
+# Production recommendations come from versions.yaml, not tag ordering.
 filter_versions() {
     local search_pattern="$1" # Pattern to match (e.g., "7.0" for 7.0.x versions)
     local latest_only="$2"    # Boolean flag to return only the recommended stable version
@@ -179,15 +190,9 @@ filter_versions() {
     fi
 
     if [ "$latest_only" = true ]; then
-        # OpenEMR versioning strategy: second-to-latest is typically the stable release
-        # This is because the latest version may be a development/pre-release version
-        local stable_version=$(echo "$filtered_tags" | sed -n '2p')
-        if [ -n "$stable_version" ]; then
-            echo "$stable_version"  # Return the stable version
-        else
-            # Fallback to latest if only one version is available
-            echo "$filtered_tags" | head -n 1
-        fi
+        # Return the newest clean image tag as an update candidate. It is not
+        # automatically a production recommendation.
+        echo "$filtered_tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -n 1
     else
         echo "$filtered_tags"  # Return all filtered versions
     fi
@@ -205,38 +210,17 @@ fi
 
 # Display logic - branch based on user's display preference
 if [ "$LATEST_ONLY" = true ]; then
-    # Latest-only mode: Display only the recommended stable version with deployment guidance
-    echo -e "${BLUE}Recommended OpenEMR version (stable):${NC}"
+    # Latest-only mode: distinguish the reviewed project pin from raw image tags.
+    echo -e "${BLUE}Reviewed OpenEMR version (from versions.yaml):${NC}"
     
-    # Extract latest and stable versions using semantic versioning regex
-    # Sort versions properly by semantic versioning (newest first)
-    # Latest version is the first after sorting, stable is typically the second (more mature)
-    sorted_versions=$(echo "$tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sort_versions)
-    latest_version=$(echo "$sorted_versions" | head -n 1)
-    stable_version=$(echo "$sorted_versions" | sed -n '2p')
-
-    if [ -n "$stable_version" ]; then
-        # Display stable version as recommended for production use
-        echo -e "${GREEN}  $stable_version${NC} (stable - recommended for production)"
-        
-        # Show latest version for comparison if it differs from stable
-        if [ -n "$latest_version" ] && [ "$stable_version" != "$latest_version" ]; then
-            echo -e "${YELLOW}  $latest_version${NC} (latest - may be development version)"
-        fi
-        
-        echo ""
-        echo -e "${BLUE}To use the stable version in your deployment:${NC}"
-        echo -e "${YELLOW}  openemr_version = \"$stable_version\"${NC}"
-    elif [ -n "$latest_version" ]; then
-        # Fallback: if no stable version found, show latest with warning
-        echo -e "${YELLOW}  $latest_version${NC} (only version available)"
-        echo ""
-        echo -e "${BLUE}To use this version in your deployment:${NC}"
-        echo -e "${YELLOW}  openemr_version = \"$latest_version\"${NC}"
-    else
-        # Error case: no valid versions found
-        echo -e "${RED}No matching versions found${NC}"
+    latest_version=$(echo "$tags" | filter_versions "" true "$TAGS_TO_SHOW")
+    echo -e "${GREEN}  $RECOMMENDED_VERSION${NC} (reviewed - recommended for production)"
+    if [ -n "$latest_version" ] && [ "$RECOMMENDED_VERSION" != "$latest_version" ]; then
+        echo -e "${YELLOW}  $latest_version${NC} (newest clean Docker tag - verify official release notes)"
     fi
+    echo ""
+    echo -e "${BLUE}To use the reviewed version in your deployment:${NC}"
+    echo -e "${YELLOW}  openemr_version = \"$RECOMMENDED_VERSION\"${NC}"
 else
     if [ -n "$SEARCH_PATTERN" ]; then
         echo -e "${BLUE}OpenEMR versions matching '$SEARCH_PATTERN' (showing up to $TAGS_TO_SHOW):${NC}"
@@ -247,17 +231,11 @@ else
     versions=$(echo "$tags" | filter_versions "$SEARCH_PATTERN" false "$TAGS_TO_SHOW")
 
     if [ -n "$versions" ]; then
-        version_count=0
         echo "$versions" | while read -r version; do
-            version_count=$((version_count + 1))
-            if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-                if [ $version_count -eq 1 ]; then
-                    echo -e "${YELLOW}  $version${NC} (latest - may be development)"
-                elif [ $version_count -eq 2 ]; then
-                    echo -e "${GREEN}  $version${NC} (stable - recommended)"
-                else
-                    echo -e "${GREEN}  $version${NC} (stable)"
-                fi
+            if [ "$version" = "$RECOMMENDED_VERSION" ]; then
+                echo -e "${GREEN}  $version${NC} (reviewed - recommended)"
+            elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                echo -e "${YELLOW}  $version${NC} (clean image tag - verify release status)"
             else
                 echo -e "${YELLOW}  $version${NC} (pre-release)"
             fi
@@ -265,17 +243,12 @@ else
 
         echo ""
         echo -e "${BLUE}To use a specific version in your deployment:${NC}"
-        echo -e "${YELLOW}  # In terraform.tfvars (recommended stable version)${NC}"
-        stable_version=$(echo "$versions" | sed -n '2p')
-        if [ -n "$stable_version" ]; then
-            echo -e "${YELLOW}  openemr_version = \"$stable_version\"${NC}"
-        else
-            echo -e "${YELLOW}  openemr_version = \"$(echo "$versions" | head -n 1)\"${NC}"
-        fi
+        echo -e "${YELLOW}  # In terraform.tfvars (reviewed version)${NC}"
+        echo -e "${YELLOW}  openemr_version = \"$RECOMMENDED_VERSION\"${NC}"
         echo ""
         echo -e "${BLUE}Current deployment version:${NC}"
-        if [ -f "../terraform/terraform.tfvars" ]; then
-            current_version=$(grep "openemr_version" ../terraform/terraform.tfvars 2>/dev/null | cut -d'"' -f2 || echo "not set")
+        if [ -f "$PROJECT_ROOT/terraform/terraform.tfvars" ]; then
+            current_version=$(grep "openemr_version" "$PROJECT_ROOT/terraform/terraform.tfvars" 2>/dev/null | cut -d'"' -f2 || echo "not set")
             echo -e "${GREEN}  $current_version${NC}"
         else
             echo -e "${YELLOW}  terraform.tfvars not found${NC}"
@@ -291,11 +264,11 @@ fi
 # Display helpful tips and resources for version management
 echo ""
 echo -e "${BLUE}💡 Tips:${NC}"
-echo -e "${BLUE}  • OpenEMR stable versions are typically the second-to-latest release${NC}"
+echo -e "${BLUE}  • Docker tag order alone does not establish production stability${NC}"
 echo -e "${BLUE}  • Use stable versions for production deployments${NC}"
 echo -e "${BLUE}  • Test version upgrades in a development environment first${NC}"
 echo -e "${BLUE}  • Check OpenEMR release notes before upgrading${NC}"
-echo -e "${BLUE}  • Current recommended version: 8.0.0 (stable)${NC}"
+echo -e "${BLUE}  • Current reviewed version: $RECOMMENDED_VERSION${NC}"
 echo ""
 echo -e "${BLUE}🔗 Resources:${NC}"
 echo -e "${BLUE}  • OpenEMR Releases: https://github.com/openemr/openemr/tags${NC}"

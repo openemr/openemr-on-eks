@@ -1224,12 +1224,17 @@ cleanup_aws_backup_resources() {
                         local disassociate_output
                         local disassociate_exit_code=0
                         if command -v timeout >/dev/null 2>&1; then
-                            disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \
-                                --backup-vault-name "$backup_vault_name" \
-                                --recovery-point-arn "$recovery_point_arn" \
-                                --region "$AWS_REGION" \
-                                --no-cli-pager 2>&1)
-                            disassociate_exit_code=$?
+                            if disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \
+                                    --backup-vault-name "$backup_vault_name" \
+                                    --recovery-point-arn "$recovery_point_arn" \
+                                    --region "$AWS_REGION" \
+                                    --no-cli-pager 2>&1); then
+                                disassociate_exit_code=0
+                            else
+                                # Capture expected API/timeout failures without
+                                # allowing the script's errexit mode to abort.
+                                disassociate_exit_code=$?
+                            fi
                             # Timeout returns 124 on timeout
                             if [ $disassociate_exit_code -eq 124 ]; then
                                 disassociate_output="Command timed out after 30 seconds"
@@ -1710,7 +1715,7 @@ terraform_destroy() {
     fi
     
     # Initialize Terraform
-    if ! terraform init -upgrade -no-color; then
+    if ! terraform init -lockfile=readonly -no-color; then
         log_error "Terraform init failed"
         cd - >/dev/null
         return 1
@@ -1735,10 +1740,12 @@ terraform_destroy() {
         if terraform destroy "${destroy_args[@]}"; then
             log_success "Terraform destroy completed successfully"
             
-            # Only clean up state files if destroy succeeded
-            log_info "Cleaning up Terraform state files..."
-            rm -f terraform.tfstate* .terraform.lock.hcl
-            log_info "Terraform state files cleaned up - random IDs will regenerate on next run"
+            # Only clean up transient state/plan files if destroy succeeded.
+            # The committed dependency lock file must survive destroy so the
+            # next init can enforce the repository's provider selections.
+            log_info "Cleaning up transient Terraform files..."
+            rm -f terraform.tfstate* tfplan
+            log_info "Terraform state and plan files cleaned up; dependency lock file preserved"
             
             cd - >/dev/null
             return 0

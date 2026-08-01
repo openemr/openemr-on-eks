@@ -56,6 +56,7 @@ locals {
 }
 
 resource "aws_rds_cluster" "openemr" {
+  # checkov:skip=CKV2_AWS_8: Three aws_backup_selection resources include this conditional cluster in daily, weekly, and monthly plans.
   count = var.skip_rds_creation ? 0 : 1
 
   # Unique cluster identifier with random suffix to prevent naming conflicts

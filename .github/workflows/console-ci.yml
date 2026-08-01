@@ -50,7 +50,8 @@ permissions:
 
 # Environment variables
 env:
-  GO_VERSION: '1.25'      # Go version required by console
+  GO_VERSION: '1.25.12'    # Go version required by console and gosec
+  TRIVY_VERSION: '0.72.0'  # Trivy engine version (synced with versions.yaml)
   BINARY_NAME: 'openemr-eks-console'
   MODULE_PATH: 'console'
 
@@ -61,10 +62,10 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -88,7 +89,7 @@ jobs:
         run: go vet ./...
 
       - name: Install staticcheck
-        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+        run: go install honnef.co/go/tools/cmd/staticcheck@2026.1
 
       - name: Run staticcheck
         working-directory: ${{ env.MODULE_PATH }}
@@ -100,10 +101,10 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -121,7 +122,7 @@ jobs:
           go tool cover -func=coverage.out | tail -1
 
       - name: Upload coverage artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: console-coverage
@@ -152,10 +153,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -201,7 +202,7 @@ jobs:
           fi
 
       - name: Upload build artifact (for debugging)
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: ${{ env.BINARY_NAME }}-${{ matrix.artifact_name }}-debug
@@ -214,10 +215,10 @@ jobs:
     runs-on: ubuntu-26.04
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -228,8 +229,9 @@ jobs:
 
       # Run Trivy with table format first for readable output
       - name: Run Trivy vulnerability scanner (Table format - STRICT)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: '${{ env.MODULE_PATH }}'
           format: 'table'
@@ -241,9 +243,10 @@ jobs:
 
       # Run Trivy in SARIF format for GitHub Security tab
       - name: Run Trivy vulnerability scanner (SARIF format)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: success()
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: '${{ env.MODULE_PATH }}'
           format: 'sarif'
@@ -267,7 +270,7 @@ jobs:
           echo "============================================================="
 
       - name: Upload Trivy results to GitHub Security
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         if: always()
         continue-on-error: true  # Don't fail if GitHub Advanced Security is not enabled
         with:
@@ -278,4 +281,3 @@ jobs:
         run: |
           echo "✅ Security scan PASSED - No findings detected"
           echo "🔒 Zero-tolerance policy enforced for Console"
-

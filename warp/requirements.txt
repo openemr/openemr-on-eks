@@ -5,7 +5,7 @@
 pymysql==1.2.0
 
 # AWS SDK - for S3 data access
-boto3==1.43.38
+boto3==1.43.62
 
 # Transitive dependency pin - CVE-2025-66418, CVE-2025-66471, CVE-2026-21441
 urllib3>=2.6.3

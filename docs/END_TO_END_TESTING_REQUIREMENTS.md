@@ -4,7 +4,16 @@
 
 **Before any changes are made to the OpenEMR on EKS repository, the end-to-end backup/restore test script MUST pass successfully.** This is a core requirement that ensures disaster recovery capabilities remain intact.
 
-> **⚠️ AWS Resource Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete resources in AWS, including backup buckets and RDS snapshots created as part of other tests that may not have finished. As a result, it should only be run in a development AWS account and **NOT** in an AWS account that runs production workloads.
+This is a maintainer process requirement. The current GitHub Actions and manual
+release workflows do not automatically launch or verify the destructive AWS
+E2E run; the operator must record and review the result before release.
+
+> **⚠️ AWS Resource Warning**: The recommended
+> `scripts/run-e2e-full-test.sh` wrapper and its inner
+> `scripts/test-end-to-end-backup-restore.sh` script create and delete AWS
+> resources, including backup buckets and RDS snapshots created by unfinished
+> tests. Run them only in a development AWS account and **never** in an account
+> that hosts production workloads.
 
 ## 📋 Table of Contents
 
@@ -68,19 +77,54 @@ This comprehensive test ensures that any changes to the repository don't break t
 # Navigate to project root
 cd /path/to/openemr-on-eks
 
-# Run the complete end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Recommended terminal wrapper: uses the selected AWS profile and appends all
+# output to the gitignored e2e-full-test.log
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test \
+  --aws-region us-west-2
 
-# Custom test configuration
+# Direct invocation (does not create the persistent wrapper log)
 ./scripts/test-end-to-end-backup-restore.sh \
   --cluster-name openemr-eks-test \
   --aws-region us-west-2 \
   --namespace openemr
 ```
 
+When invoked with no forwarded arguments, the wrapper supplies cluster
+`openemr-eks-test` and region `us-west-2`. It uses `AWS_PROFILE_NAME` when
+provided, otherwise honors `AWS_PROFILE` or the standard AWS credential
+provider chain; it has no account-specific profile default. Verify the account
+printed at startup before allowing the destructive test to continue. If you
+pass any E2E option, also pass `--cluster-name` and `--aws-region`; otherwise
+the inner script uses its Terraform auto-detection/fallback behavior.
+
+Follow the persistent log from another terminal:
+
+```bash
+tail -f e2e-full-test.log
+```
+
+The log is intentionally ignored by Git so it can remain available for local
+review without being committed.
+
+After any successful full or chunked run, the script replaces the bounded
+"Latest Automated E2E Timing Report" section in
+[`DEPLOYMENT_TIMINGS.md`](DEPLOYMENT_TIMINGS.md). Resource identifiers and
+backup details are excluded. Use `--no-timing-report` to opt out or
+`--timing-report PATH` to write the generated section to another prepared
+report file.
+
+> **Chunk timing caveat:** A successful partial run replaces that automated
+> section with partial timing data. Pass `--no-timing-report` for development
+> chunks and reserve the default report update for complete baseline runs.
+
 ### **Chunked Execution (Development Iteration)**
 
-The full E2E test takes ~2.5 hours on OpenEMR 8.1.x (~150-160 min). For faster iteration while developing, run **step groups** or **individual steps**. State (backup bucket, snapshot ID, test timestamp) is persisted to `.e2e-test-state` between runs.
+The OpenEMR 8.2.0 full-run baseline is 169 minutes 9 seconds (August 1, 2026).
+The historical OpenEMR 8.1.x benchmark was ~150-160 minutes. For faster
+development iteration, run **step groups** or **individual steps**. State
+(backup bucket, snapshot ID, test timestamp) is persisted to
+`.e2e-test-state` between runs.
 
 ```bash
 # List all steps and predefined groups
@@ -88,31 +132,53 @@ The full E2E test takes ~2.5 hours on OpenEMR 8.1.x (~150-160 min). For faster i
 ./scripts/test-end-to-end-backup-restore.sh --list-groups
 
 # Common development workflows
-./scripts/test-end-to-end-backup-restore.sh --group deploy          # Steps 1-3 (~35-40 min cold; ~10-15 min warm)
-./scripts/test-end-to-end-backup-restore.sh --group backup          # Step 4 only
-./scripts/test-end-to-end-backup-restore.sh --step 5                # Monitoring stack only
-./scripts/test-end-to-end-backup-restore.sh --group backup-restore  # Steps 4-9
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group deploy --no-timing-report
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group backup --no-timing-report
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --step 5 --no-timing-report
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group backup-restore --no-timing-report
 
 # Resume after a completed chunk (state file carries backup bucket + snapshot ID)
-./scripts/test-end-to-end-backup-restore.sh --from-step 6 --state-file .e2e-test-state
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --from-step 6 --state-file .e2e-test-state --no-timing-report
 
 # On failure, keep AWS resources for debugging instead of emergency cleanup
-./scripts/test-end-to-end-backup-restore.sh --group restore --no-emergency-cleanup
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group restore --no-emergency-cleanup --no-timing-report
 
 # Skip k8s manifest reset when resuming mid-test
-./scripts/test-end-to-end-backup-restore.sh --from-step 8 --skip-restore-defaults
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --from-step 8 --skip-restore-defaults --no-timing-report
 ```
 
 | Group | Steps | Use when |
 |-------|-------|----------|
-| `deploy` | 1–3 | Infrastructure + OpenEMR + test data (~35-40 min cold; ~10-15 min warm) |
+| `deploy` | 1–3 | Infrastructure + OpenEMR + test data (8.2.0: ~47 min cold; steps 2-3 ~23 min) |
 | `backup` | 4 | Testing backup script in isolation |
 | `monitoring` | 5 | Testing monitoring install/uninstall |
 | `destroy` / `recreate` | 6 / 7 | Testing infrastructure teardown/rebuild |
 | `restore` | 8–9 | Testing restore + verification (requires prior backup) |
 | `cleanup` | 10 | Manual cleanup after debugging |
+| `backup-restore` | 4–9 | Backup through verification, including monitoring, destroy, and recreate |
+| `backup-restore-inplace` | 4, 8–9 | In-place restore after steps 1–3; skips monitoring, destroy, and recreate |
 
-**Note:** Steps 8+ require a state file from a prior run that completed step 4 (backup). The mandatory pre-release requirement remains the **full 10-step test**.
+**Note:** Steps 8+ require a state file from a prior run that completed step 4
+(backup). The mandatory pre-release requirement remains the **full 10-step
+test**.
+
+When invoking the inner script directly, always pass the intended test cluster.
+Its implementation auto-detects the Terraform output and otherwise falls back
+to `openemr-eks`, even though the help text names `openemr-eks-test`.
 
 ### **Expected Test Flow**
 
@@ -163,7 +229,7 @@ graph TD
 | **4. Backup Creation** | Runs complete backup process | Backup is created successfully |
 | **5. Monitoring Stack Test** | Installs and uninstalls monitoring stack | Monitoring components work correctly |
 | **6. Infrastructure Destruction** | Removes all AWS resources | All resources are destroyed |
-| **7. Infrastructure Recreation** | Rebuilds infrastructure | New infrastructure is ready |
+| **7. Infrastructure Recreation** | Rebuilds with `skip_rds_creation=true` | Infrastructure is ready; RDS is deferred to step 8 |
 | **8. Backup Restoration** | Restores from backup | Application is restored |
 | **9. Verification** | Confirms data integrity | Proof file exists and DB connects |
 | **10. Final Cleanup** | Removes test resources | No orphaned resources remain |
@@ -193,7 +259,10 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 
 ### **Performance Requirements**
 
-- **Test duration**: 2-4 hours depending on infrastructure size
+- **Test duration**: The successful OpenEMR 8.2.0 full 10-step baseline is
+  169 minutes 9 seconds (August 1, 2026). Historical planning data is
+  ~150–160 minutes for 8.1.x and ~211–217 minutes for the December 2025
+  8.0.x runs.
 - **Resource usage**: AWS resources will be created and destroyed during testing
 - **Cleanup verification**: No orphaned AWS resources after test completion
 
@@ -211,8 +280,9 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 ### **Before Any Changes**
 
 ```bash
-# 1. Run end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# 1. Run end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # 2. Verify all steps pass
 # 3. Proceed with changes only if test is successful
@@ -222,8 +292,9 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 
 ```bash
 # Manual release workflow
-# 1. Run end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# 1. Run end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # 2. Verify test passes
 # 3. Create GitHub release
@@ -238,7 +309,21 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 - **Issue investigation**: Identify and document the root cause
 - **Fix implementation**: Apply necessary fixes to resolve the issue
 - **Re-test required**: Run complete test again after fixes
-- **No exceptions**: This testing is mandatory for all workflows
+- **Process gate**: Maintainers must enforce this requirement; GitHub Actions
+  does not automatically run the destructive E2E test
+
+### **Manual Destroy During a Paused Test**
+
+The E2E script sets `PRESERVE_BACKUP_SNAPSHOTS=true` during step 6 and emergency
+cleanup so the step-4 RDS snapshot remains available for restore. If you invoke
+the destroy script yourself while debugging steps 6–10, preserve it explicitly:
+
+```bash
+PRESERVE_BACKUP_SNAPSHOTS=true ./scripts/destroy.sh --force
+```
+
+Running a manual destroy without this variable can delete the snapshot and make
+step 8 unrecoverable without rerunning steps 1–4.
 
 ### **Common Failure Scenarios**
 
@@ -276,22 +361,22 @@ All changes must include:
 ```markdown
 ## End-to-End Test Results
 
-**Test Date**: 2025-10-26
+**Test Date**: 2026-08-01
 **Test Environment**: openemr-eks-test
-**Test Duration**: 2 hours 30 minutes (150-160 minutes on OpenEMR 8.1.x)
+**Test Duration**: 2 hours 49 minutes 9 seconds (OpenEMR 8.2.0)
 **Resources Used**: AWS resources created and destroyed
 
 ### Test Results
-- ✅ Infrastructure Deployment: PASS (31 minutes)
-- ✅ OpenEMR Installation: PASS (5 minutes)
-- ✅ Test Data Creation: PASS (8 seconds)
-- ✅ Backup Creation: PASS (32 seconds)
-- ✅ Monitoring Stack Test: PASS (8 minutes)
-- ✅ Infrastructure Destruction: PASS (16 minutes)
-- ✅ Infrastructure Recreation: PASS (35 minutes)
-- ✅ Backup Restoration: PASS (35 minutes)
-- ✅ Verification: PASS (10 seconds)
-- ✅ Final Cleanup: PASS (14 minutes)
+- ✅ Infrastructure Deployment: PASS (23m 52s)
+- ✅ OpenEMR Installation: PASS (17m 30s)
+- ✅ Test Data Creation: PASS (5m 14s)
+- ✅ Backup Creation: PASS (40s)
+- ✅ Monitoring Stack Test: PASS (18m 15s)
+- ✅ Infrastructure Destruction: PASS (21m 30s)
+- ✅ Infrastructure Recreation: PASS (26m 15s)
+- ✅ Backup Restoration: PASS (33m 33s)
+- ✅ Verification: PASS (51s)
+- ✅ Final Cleanup: PASS (21m 23s)
 
 **Overall Status**: PASS
 ```
@@ -350,10 +435,10 @@ aws sts get-caller-identity
 # 2. Navigate to project directory
 cd /path/to/openemr-on-eks
 
-# 3. Run your first end-to-end test
-./scripts/test-end-to-end-backup-restore.sh
+# 3. Run your first end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh
 
-# 4. Document your results
+# 4. Review the automatically updated docs/DEPLOYMENT_TIMINGS.md report
 # 5. Proceed with development only after successful test
 ```
 

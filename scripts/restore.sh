@@ -82,7 +82,7 @@ readonly TEMP_POD_STORAGE_LIMIT=${TEMP_POD_STORAGE_LIMIT:-5Gi}     # Storage lim
 # Default configuration values
 readonly DEFAULT_NAMESPACE="openemr"
 readonly DEFAULT_AWS_REGION="us-west-2"
-readonly DEFAULT_OPENEMR_VERSION="8.1.1"
+readonly DEFAULT_OPENEMR_VERSION="8.2.0"
 
 # Script directories
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1333,7 +1333,7 @@ main_legacy() {
     prepare_single_replica_for_verification
     cleanup_crypto_keys || true
     verify_restore_success || return 1
-    restore_autoscaling
+    restore_autoscaling || return 1
     return 0
 }
 
@@ -1351,7 +1351,7 @@ main_inverted() {
     prepare_single_replica_for_verification
     cleanup_crypto_keys || true
     verify_restore_success || return 1
-    restore_autoscaling
+    restore_autoscaling || return 1
     return 0
 }
 
@@ -1985,9 +1985,9 @@ _normalize_replica_count() {
 prepare_single_replica_for_verification() {
     echo -e "${YELLOW}📉 Preparing single-replica mode for restore verification...${NC}"
 
-    if kubectl get hpa openemr -n "$NAMESPACE" >/dev/null 2>&1; then
+    if kubectl get hpa openemr-hpa -n "$NAMESPACE" >/dev/null 2>&1; then
         echo -e "${BLUE}   Removing HPA so verification runs with one leader pod...${NC}"
-        kubectl delete hpa openemr -n "$NAMESPACE" --ignore-not-found
+        kubectl delete hpa openemr-hpa -n "$NAMESPACE" --ignore-not-found
     fi
 
     if kubectl get deployment openemr -n "$NAMESPACE" >/dev/null 2>&1; then
@@ -2000,17 +2000,77 @@ prepare_single_replica_for_verification() {
     echo -e "${GREEN}✅ Single-replica verification mode ready${NC}"
 }
 
-# Re-apply HPA after restore verification (hpa.yaml is already substituted by deploy.sh)
+# Render the pristine HPA template and re-apply it after restore verification.
 restore_autoscaling() {
-    local hpa_file="$PROJECT_ROOT/k8s/hpa.yaml"
-    # shellcheck disable=SC2016
-    if [ -f "$hpa_file" ] && ! grep -q '\${OPENEMR_MIN_REPLICAS}' "$hpa_file" 2>/dev/null; then
-        echo -e "${BLUE}   Re-applying HPA after successful restore verification...${NC}"
-        kubectl apply -f "$hpa_file"
-        echo -e "${GREEN}✅ HPA restored${NC}"
-    else
-        echo -e "${YELLOW}⚠️  Skipping HPA re-apply (hpa.yaml missing or still has placeholders)${NC}"
+    local hpa_template="$PROJECT_ROOT/k8s/hpa.yaml"
+    if [ ! -f "$hpa_template" ]; then
+        echo -e "${RED}❌ HPA template is missing: $hpa_template${NC}" >&2
+        return 1
     fi
+
+    local autoscaling_json autoscaling_values
+    if ! autoscaling_json=$(cd "$TERRAFORM_DIR" && terraform output -json openemr_autoscaling_config); then
+        echo -e "${RED}❌ Unable to read Terraform autoscaling configuration${NC}" >&2
+        return 1
+    fi
+    if ! autoscaling_values=$(jq -er '[
+        .min_replicas,
+        .max_replicas,
+        .cpu_utilization_threshold,
+        .memory_utilization_threshold,
+        .scale_down_stabilization_seconds,
+        .scale_up_stabilization_seconds
+    ] | @tsv' <<<"$autoscaling_json"); then
+        echo -e "${RED}❌ Terraform autoscaling configuration is incomplete${NC}" >&2
+        return 1
+    fi
+
+    local min_replicas max_replicas cpu_threshold memory_threshold scale_down scale_up
+    IFS=$'\t' read -r min_replicas max_replicas cpu_threshold memory_threshold scale_down scale_up \
+        <<<"$autoscaling_values"
+
+    local hpa_dir hpa_file
+    if ! hpa_dir=$(mktemp -d "${TMPDIR:-/tmp}/openemr-hpa.XXXXXX"); then
+        echo -e "${RED}❌ Unable to create temporary HPA directory${NC}" >&2
+        return 1
+    fi
+    hpa_file="$hpa_dir/hpa.yaml"
+    if ! cp "$hpa_template" "$hpa_file"; then
+        echo -e "${RED}❌ Unable to stage the HPA template${NC}" >&2
+        rm -rf "$hpa_dir"
+        return 1
+    fi
+    if ! sed -i.bak \
+        -e "s/\${OPENEMR_MIN_REPLICAS}/$min_replicas/g" \
+        -e "s/\${OPENEMR_MAX_REPLICAS}/$max_replicas/g" \
+        -e "s/\${OPENEMR_CPU_THRESHOLD}/$cpu_threshold/g" \
+        -e "s/\${OPENEMR_MEMORY_THRESHOLD}/$memory_threshold/g" \
+        -e "s/\${OPENEMR_SCALE_DOWN_STABILIZATION}/$scale_down/g" \
+        -e "s/\${OPENEMR_SCALE_UP_STABILIZATION}/$scale_up/g" \
+        -e "s/namespace: openemr/namespace: $NAMESPACE/g" \
+        "$hpa_file"; then
+        echo -e "${RED}❌ Unable to render the HPA template${NC}" >&2
+        rm -rf "$hpa_dir"
+        return 1
+    fi
+    rm -f "$hpa_file.bak"
+
+    local placeholder_prefix
+    placeholder_prefix=$(printf '\044\173OPENEMR_')
+    if grep -Fq "$placeholder_prefix" "$hpa_file"; then
+        echo -e "${RED}❌ Rendered HPA manifest still contains placeholders${NC}" >&2
+        rm -rf "$hpa_dir"
+        return 1
+    fi
+
+    echo -e "${BLUE}   Re-applying HPA after successful restore verification...${NC}"
+    if ! kubectl apply -f "$hpa_file"; then
+        echo -e "${RED}❌ Failed to restore HPA${NC}" >&2
+        rm -rf "$hpa_dir"
+        return 1
+    fi
+    rm -rf "$hpa_dir"
+    echo -e "${GREEN}✅ HPA restored${NC}"
 }
 
 # Return 0 when at least one OpenEMR pod is Ready and serving HTTP

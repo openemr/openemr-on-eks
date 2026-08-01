@@ -24,6 +24,7 @@
 name: CI/CD Tests
 
 # Workflow triggers - runs on code changes and manual dispatch
+# checkov:skip=CKV_GHA_7: The constrained choice selects one fixed test suite and cannot alter build commands or artifacts.
 on:
   # Automatic triggers on main and develop branches
   push:
@@ -47,6 +48,7 @@ on:
         - warp
         - credential_rotation
         - openemr_dr
+        - knowledge_mcp
 
 # Cancel in-progress runs when a new commit is pushed to the same branch/PR
 concurrency:
@@ -62,9 +64,12 @@ permissions:
 # Environment variables for consistent tool versions across all jobs
 env:
   PYTHON_VERSION: '3.14.6'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.15.7' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.36.2'  # kubectl version for Kubernetes manifest validation
+  TERRAFORM_VERSION: '1.15.8' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.36.3'  # kubectl version for Kubernetes manifest validation
+  UV_VERSION: '0.11.26'       # uv version for the knowledge MCP package
+  TRIVY_VERSION: '0.72.0'     # Trivy engine version (synced with versions.yaml)
 
+# Checkout/setup v7 actions require Node 24; the GitHub-hosted runners below provide it.
 jobs:
   # Detect which Python projects / requirement files changed (skip unrelated CI on push/PR)
   changes:
@@ -74,13 +79,14 @@ jobs:
       openemr_dr: ${{ steps.filter.outputs.openemr_dr }}
       warp: ${{ steps.filter.outputs.warp }}
       credential_rotation: ${{ steps.filter.outputs.credential_rotation }}
+      knowledge_mcp: ${{ steps.filter.outputs.knowledge_mcp }}
       python_requirements: ${{ steps.filter.outputs.python_requirements }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Detect path changes
-        uses: dorny/paths-filter@v3
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
         id: filter
         with:
           filters: |
@@ -110,6 +116,11 @@ jobs:
               - 'scripts/install-python-dev.sh'
               - 'scripts/validate-python-requirements.sh'
               - 'versions.yaml'
+            knowledge_mcp:
+              - 'tools/codebase-mcp/**'
+              - 'docs/KNOWLEDGE_MCP.md'
+              - '.github/workflows/ci-cd-tests.yml'
+              - 'versions.yaml'
             python_requirements:
               - 'versions.yaml'
               - 'scripts/requirements/**'
@@ -133,7 +144,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install yq
         run: |
@@ -169,11 +180,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code for testing
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Step 2: Set up Python environment for YAML validation and dependencies
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -185,13 +196,13 @@ jobs:
 
       # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v5.1.0
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -204,8 +215,8 @@ jobs:
       # Step 6b: Install BATS (Bash Automated Testing System) for script behavior tests
       - name: Set up BATS
         run: |
-          sudo apt-get install -y bats || true
-          bats --version 2>/dev/null || echo "BATS not available (optional)"
+          sudo apt-get install -y bats
+          bats --version
 
       # Step 6c: Install yq for Python requirement pin validation in script_validation suite
       - name: Install yq
@@ -257,7 +268,7 @@ jobs:
       # Step 9: Upload test results as artifacts for analysis and reporting
       # Results are retained for 7 days and uploaded regardless of test outcome
       - name: Upload test results
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()  # Upload artifacts even if tests fail
         with:
           name: test-results-${{ matrix.test_suite }}
@@ -274,11 +285,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code for validation
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Step 2: Set up Python environment for YAML validation
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -290,13 +301,13 @@ jobs:
 
       # Step 4: Set up Terraform for infrastructure validation
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
       # Step 5: Set up kubectl for Kubernetes manifest validation
       - name: Set up kubectl
-        uses: azure/setup-kubectl@v5.1.0
+        uses: azure/setup-kubectl@829323503d1be3d00ca8346e5391ca0b07a9ab0d # v5.1.0
         with:
           version: ${{ env.KUBECTL_VERSION }}
 
@@ -304,7 +315,7 @@ jobs:
       - name: Validate Terraform configuration
         run: |
           cd terraform
-          terraform init -backend=false # Initialize without backend for validation only
+          terraform init -backend=false -lockfile=readonly # Validate the reviewed provider set
           terraform validate            # Validate Terraform configuration syntax
 
       # Step 7: Validate Kubernetes manifest YAML syntax
@@ -368,13 +379,14 @@ jobs:
     steps:
       # Step 1: Checkout repository code for security scanning
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Step 2: Run Trivy vulnerability scanner in table format (STRICT MODE)
       # This scan produces human-readable output and FAILS on ANY finding
       - name: Run Trivy vulnerability scanner (Table format - STRICT)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'                      # File system scan of entire repository
           scan-ref: '.'                        # Scan current directory
           format: 'table'                      # Use table format for better readability in logs
@@ -388,9 +400,10 @@ jobs:
       # Step 3: Run Trivy vulnerability scanner in SARIF format for GitHub Security tab
       # This runs only if table scan passes (no findings)
       - name: Run Trivy vulnerability scanner (SARIF format)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: success()
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'                      # File system scan of entire repository
           scan-ref: '.'                        # Scan current directory
           format: 'sarif'                      # SARIF format for GitHub Security tab
@@ -430,7 +443,7 @@ jobs:
 
       # Step 5: Upload SARIF results to GitHub Security tab
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v4
+        uses: github/codeql-action/upload-sarif@f205ea1c3313d32999d8d6a48b4f6530d4437b38 # v4.37.4
         if: always()
         continue-on-error: true  # Don't fail if GitHub Advanced Security is not enabled
         with:
@@ -455,11 +468,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code for quality analysis
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Step 2: Set up Python environment for quality checks
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -504,6 +517,9 @@ jobs:
     name: Warp CI/CD
     runs-on: ubuntu-26.04
     needs: changes
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.14.6']
     if: |
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'warp')) ||
@@ -511,12 +527,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
 
       - name: Install yq
         run: |
@@ -530,17 +546,19 @@ jobs:
         run: ./scripts/ci/run-python-ci.sh warp
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: warp-coverage-report
+          name: warp-coverage-report-${{ matrix.python-version }}
           path: warp/htmlcov/
           retention-days: 7
           if-no-files-found: ignore
 
       - name: Run Trivy security scan (Zero-Tolerance)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        if: matrix.python-version == env.PYTHON_VERSION
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: 'warp'
           format: 'table'
@@ -551,7 +569,7 @@ jobs:
           trivyignores: '.trivyignore'
 
       - name: Display Trivy results
-        if: always()
+        if: always() && matrix.python-version == env.PYTHON_VERSION
         run: |
           echo "Trivy Security Scan Results for Warp (ZERO-TOLERANCE):"
           echo "=========================================================="
@@ -574,10 +592,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -587,7 +605,7 @@ jobs:
           ./scripts/ci/install-yq.sh
 
       - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v4.0.1
+        uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
 
@@ -598,7 +616,7 @@ jobs:
         run: ./scripts/ci/run-python-ci.sh openemr_dr
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: openemr-dr-coverage-report
@@ -618,10 +636,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -637,7 +655,7 @@ jobs:
         run: ./scripts/ci/run-python-ci.sh credential_rotation
 
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
           name: credential-rotation-coverage-report
@@ -646,8 +664,9 @@ jobs:
           if-no-files-found: ignore
 
       - name: Run Trivy security scan (Zero-Tolerance)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: 'tools/credential-rotation'
           format: 'table'
@@ -669,6 +688,53 @@ jobs:
           fi
           echo "====================================================================="
 
+  # Local read-only codebase knowledge MCP package
+  knowledge-mcp-ci:
+    name: Knowledge MCP Python CI
+    runs-on: ubuntu-26.04
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'knowledge_mcp')) ||
+      (github.event_name != 'workflow_dispatch' && needs.changes.outputs.knowledge_mcp == 'true')
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install pinned uv
+        run: python -m pip install "uv==${UV_VERSION}"
+
+      - name: Sync locked development environment
+        run: uv sync --project tools/codebase-mcp --frozen --extra dev
+
+      - name: Run quality and security checks
+        run: |
+          uv run --project tools/codebase-mcp ruff check \
+            --config tools/codebase-mcp/pyproject.toml tools/codebase-mcp
+          uv run --project tools/codebase-mcp ruff format --check \
+            --config tools/codebase-mcp/pyproject.toml tools/codebase-mcp
+          uv run --project tools/codebase-mcp mypy \
+            --config-file tools/codebase-mcp/pyproject.toml tools/codebase-mcp/src
+          uv run --project tools/codebase-mcp bandit \
+            -c tools/codebase-mcp/pyproject.toml -q -r tools/codebase-mcp/src
+
+      - name: Run offline-capable MCP tests
+        run: uv run --project tools/codebase-mcp pytest tools/codebase-mcp/tests
+
+      - name: Build and verify uvx entry point
+        run: |
+          uv build --project tools/codebase-mcp
+          uvx --from ./tools/codebase-mcp \
+            openemr-eks-mcp --repo-root . --check
+          uv run --project tools/codebase-mcp --frozen --offline \
+            openemr-eks-mcp --repo-root . --check
+
   # Summary job - generates comprehensive test results summary
   # This job collects results from all previous jobs and provides a unified
   # overview of the entire CI/CD pipeline execution
@@ -685,16 +751,17 @@ jobs:
       - warp-ci
       - openemr-dr-ci
       - credential-rotation-ci
+      - knowledge-mcp-ci
     if: always()
 
     steps:
       # Step 1: Checkout repository code for summary generation
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Step 2: Download all test result artifacts from previous jobs
       - name: Download all test results
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           path: test-results/
 
@@ -711,7 +778,7 @@ jobs:
 
           for result_file in test-results/*/test-report-*.txt; do
             if [ -f "$result_file" ]; then
-              suite_name=$(basename $(dirname "$result_file"))
+              suite_name=$(basename "$(dirname "$result_file")")
               echo "**$suite_name**:"
               # Show just the summary line from the report
               if grep -q "Test Results Summary" "$result_file"; then
@@ -753,6 +820,16 @@ jobs:
           fi
           echo ""
 
+          echo "## 🧠 Knowledge MCP Python CI Status"
+          if [ "${{ needs.knowledge-mcp-ci.result }}" == "success" ]; then
+            echo "✅ **Knowledge MCP tests and uvx verification passed successfully!**"
+          elif [ "${{ needs.knowledge-mcp-ci.result }}" == "skipped" ]; then
+            echo "⏭️ **Knowledge MCP tests skipped** (no knowledge MCP files changed or not selected)"
+          else
+            echo "❌ **Knowledge MCP tests failed** - Check the knowledge-mcp-ci job logs"
+          fi
+          echo ""
+
           echo "## 📦 Python Requirements Validation"
           if [ "${{ needs.python-requirements-validate.result }}" == "success" ]; then
             echo "✅ **All Python requirement pins match versions.yaml**"
@@ -766,14 +843,17 @@ jobs:
           echo "## 📊 Overall Status"
           OVERALL_OK=true
           for job_result in \
+            "${{ needs.changes.result }}" \
             "${{ needs.test.result }}" \
             "${{ needs.lint-and-validate.result }}" \
             "${{ needs.security-scan.result }}" \
+            "${{ needs.code-quality.result }}" \
             "${{ needs.python-requirements-validate.result }}" \
             "${{ needs.warp-ci.result }}" \
             "${{ needs.openemr-dr-ci.result }}" \
-            "${{ needs.credential-rotation-ci.result }}"; do
-            if [ "$job_result" == "failure" ]; then
+            "${{ needs.credential-rotation-ci.result }}" \
+            "${{ needs.knowledge-mcp-ci.result }}"; do
+            if [ "$job_result" != "success" ] && [ "$job_result" != "skipped" ]; then
               OVERALL_OK=false
               break
             fi
@@ -791,8 +871,14 @@ jobs:
             echo "- Zero-tolerance policy enforced: All severity levels checked (CRITICAL, HIGH, MEDIUM, LOW)"
             echo "- Scanners: Vulnerability, Secret Detection, Configuration"
             echo "- If GitHub Advanced Security is enabled, results are also available in the Security tab"
+          elif [ "${{ needs.security-scan.result }}" == "skipped" ]; then
+            echo "⏭️ **Security scan skipped** (not selected for this run)"
           else
             echo "❌ **Security scan FAILED - Findings detected**"
             echo "- Check the security-scan job logs for detailed vulnerability results"
             echo "- ALL findings must be remediated before merging (zero-tolerance policy)"
+          fi
+
+          if [ "$OVERALL_OK" != true ]; then
+            exit 1
           fi

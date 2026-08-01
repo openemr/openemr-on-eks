@@ -20,6 +20,12 @@ kind: CronJob
 metadata:
   name: ssl-cert-renewal
   namespace: openemr
+  annotations:
+    checkov.io/skip1: "CKV_K8S_15=The image uses the pinned OpenEMR release rendered from versions.yaml."
+    checkov.io/skip2: "CKV_K8S_23=UID 0 is required to replace and chown certificate material on the shared EFS volume."
+    checkov.io/skip3: "CKV_K8S_25=Only CHOWN, FOWNER, and DAC_OVERRIDE are restored after dropping ALL capabilities."
+    checkov.io/skip4: "CKV_K8S_40=The root renewal process is short-lived, read-only-root, seccomp-confined, and denied network access."
+    checkov.io/skip5: "CKV_K8S_43=Central version management uses a validated immutable OpenEMR release tag."
   labels:
     app: ssl-cert-renewal
     component: automation
@@ -39,6 +45,7 @@ spec:
             app: ssl-cert-renewal
         spec:
           restartPolicy: OnFailure
+          automountServiceAccountToken: false
           securityContext:
             runAsNonRoot: false
             runAsUser: 0
@@ -55,7 +62,7 @@ spec:
             imagePullPolicy: IfNotPresent
             securityContext:
               allowPrivilegeEscalation: false # Security: prevent privilege escalation
-              readOnlyRootFilesystem: false   # Allow writing to SSL directories
+              readOnlyRootFilesystem: true    # Runtime writes are limited to EFS and /tmp
               runAsNonRoot: false             # Required for SSL certificate operations
               runAsUser: 0                    # Run as root for certificate management
               capabilities:
@@ -63,8 +70,6 @@ spec:
                 - ALL                          # Drop all capabilities by default
                 add:
                 - CHOWN        # Required for changing file ownership
-                - SETUID       # Required for user ID operations
-                - SETGID       # Required for group ID operations
                 - FOWNER       # Required for file ownership changes
                 - DAC_OVERRIDE # Required for permission overrides
             command: ["/bin/sh", "-c"]
@@ -139,10 +144,14 @@ spec:
             volumeMounts:
             - name: openemr-ssl
               mountPath: /mnt/ssl-efs
+            - name: tmp
+              mountPath: /tmp
           volumes:
           - name: openemr-ssl
             persistentVolumeClaim:
               claimName: openemr-ssl-pvc
+          - name: tmp
+            emptyDir: {}
           # EKS Auto Mode handles node selection automatically
           tolerations:
           - key: "CriticalAddonsOnly"
@@ -159,6 +168,9 @@ kind: Job
 metadata:
   name: ssl-cert-renewal-test
   namespace: openemr
+  annotations:
+    checkov.io/skip1: "CKV_K8S_15=The image uses the pinned OpenEMR release rendered from versions.yaml."
+    checkov.io/skip2: "CKV_K8S_43=Central version management uses a validated immutable OpenEMR release tag."
   labels:
     app: ssl-cert-renewal-test
 spec:
@@ -168,10 +180,11 @@ spec:
         app: ssl-cert-renewal-test
     spec:
       restartPolicy: Never
+      automountServiceAccountToken: false
       securityContext:
-        runAsNonRoot: false
-        runAsUser: 0
-        runAsGroup: 0
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
         fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
@@ -182,16 +195,13 @@ spec:
         imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
-          runAsNonRoot: false
-          runAsUser: 0
+          readOnlyRootFilesystem: true
+          runAsNonRoot: true
+          runAsUser: 10001
+          runAsGroup: 10001
           capabilities:
             drop:
             - ALL
-            add:
-            - CHOWN
-            - SETUID
-            - SETGID
         command: ["/bin/sh", "-c"]
         args:
         - |
@@ -216,10 +226,15 @@ spec:
         volumeMounts:
         - name: openemr-ssl
           mountPath: /mnt/ssl-efs
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
       volumes:
       - name: openemr-ssl
         persistentVolumeClaim:
           claimName: openemr-ssl-pvc
+      - name: tmp
+        emptyDir: {}
       tolerations:
       - key: "CriticalAddonsOnly"
         operator: "Exists"

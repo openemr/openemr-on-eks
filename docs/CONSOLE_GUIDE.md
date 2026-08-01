@@ -20,12 +20,13 @@
     - [2. Quick Deploy](#2-quick-deploy)
     - [3. Check Deployment Health](#3-check-deployment-health)
     - [4. Backup Deployment](#4-backup-deployment)
-    - [5. Clean Deployment](#5-clean-deployment)
-    - [6. Destroy Infrastructure](#6-destroy-infrastructure)
-    - [7. Check Component Versions](#7-check-component-versions)
-    - [8. Check OpenEMR Versions](#8-check-openemr-versions)
-    - [9. Search Codebase](#9-search-codebase)
-    - [10. Deploy Training Setup](#10-deploy-training-setup)
+    - [5. Restore from Backup](#5-restore-from-backup)
+    - [6. Clean Deployment](#6-clean-deployment)
+    - [7. Destroy Infrastructure](#7-destroy-infrastructure)
+    - [8. Check Component Versions](#8-check-component-versions)
+    - [9. Check OpenEMR Versions](#9-check-openemr-versions)
+    - [10. Search Codebase](#10-search-codebase)
+    - [11. Deploy Training Setup](#11-deploy-training-setup)
   - [Command Execution](#command-execution)
 - [Troubleshooting](#troubleshooting)
   - [Console Won't Start](#console-wont-start)
@@ -91,7 +92,8 @@ The launcher script will:
 1. Check for Go installation
 2. Navigate to the console directory
 3. Download dependencies (if needed)
-4. Build a static binary called `openemr-eks-console.exe` in the `console/` directory
+4. Build `openemr-eks-console` on macOS or
+   `openemr-eks-console.exe` on Windows in the `console/` directory
 5. Launch the TUI
 
 **Windows Binary**: After the first run, a static binary `openemr-eks-console.exe` is created in the `console/` directory. This binary can be launched anytime by double-clicking it, and it will open the console interface for deploying, managing, and monitoring your OpenEMR on EKS infrastructure. The binary is self-contained and includes the embedded project root path, so it will automatically find your project scripts and configuration.
@@ -184,7 +186,10 @@ The console provides access to 11 essential operations organized into three cate
 
 **When to use**: For fresh deployments or when you want to deploy everything in one go
 
-**Note:** This is a long-running operation (35-42 minutes total on OpenEMR 8.1.x)
+**Note:** This is a long-running operation. Budget up to 60 minutes:
+infrastructure plus OpenEMR measured 41 minutes 22 seconds in the OpenEMR
+8.2.0 full-run baseline, and the monitoring install/verify/uninstall cycle
+measured 18 minutes 15 seconds.
 
 #### 3. Check Deployment Health
 **Script**: [`../scripts/validate-deployment.sh`](../scripts/validate-deployment.sh)
@@ -222,12 +227,16 @@ The console provides access to 11 essential operations organized into three cate
 
 **Input prompts**:
 - **Backup Bucket** (required): The S3 bucket name containing the backup
-- **Snapshot ID** (optional): Specific snapshot to restore; leave empty to use `--latest-snapshot`
+- **Snapshot ID**: Supply an explicit snapshot for the default Python
+  orchestrator. The console currently emits the legacy-only
+  `--latest-snapshot` flag when this field is empty, which the default
+  orchestrator does not accept.
 
 **What it does**:
 - Restores RDS Aurora cluster from snapshot
-- Restores Kubernetes namespace resources from S3 backup
-- Restores application data from EFS backup
+- Bootstraps the namespace, EFS PVC, and IRSA prerequisites
+- Restores the S3 application-data archive to EFS with a hardened Kubernetes Job
+- Deploys the current reviewed Kubernetes manifests against the restored data
 - Validates data integrity after restoration
 - Provides detailed restore status and reporting
 

@@ -31,12 +31,12 @@ scripts/openemr_dr/
 
 | Phase | Implementation | What it does |
 |-------|----------------|--------------|
-| `preflight` | Python | Validate bucket, snapshot, Terraform state |
+| `preflight` | Python | Validate Terraform state, S3 application data, snapshot availability, and AWS identity |
 | `bootstrap` | Python → `k8s/restore-bootstrap.sh` | Namespace, EFS PVC, IRSA |
 | `rds` | Python | Destroy empty cluster, restore from snapshot / AWS Backup |
-| `data` | Python | Apply `k8s/jobs/data-restore-job.yaml` |
-| `deploy` | Python → shell scripts | `restore-defaults.sh` + `k8s/deploy.sh` |
-| `verify` | Python | Health check, crypto cleanup, re-apply HPA |
+| `data` | Python | Apply `k8s/jobs/data-restore-job.yaml`; Job drops all capabilities and extracts with `tar --no-same-owner` |
+| `deploy` | Python → shell scripts | Restore defaults, ensure EFS CSI, deploy, remove `openemr-hpa`, prepare one replica, clean crypto keys |
+| `verify` | Python | Poll pod/HTTP health, clean crypto keys between retries, render pristine `hpa.yaml` from Terraform outputs, and re-apply the HPA |
 | `legacy` | Bash bridge | Old restore order only |
 
 ## Usage
@@ -51,30 +51,41 @@ scripts/openemr_dr/
 ./scripts/restore.sh --from-metadata s3://BUCKET/metadata/backup-metadata-TIMESTAMP.json
 
 # Direct Python CLI
-cd scripts && python3 -m openemr_dr restore BACKUP_BUCKET SNAPSHOT_ID --region us-west-2
+PYTHONPATH=scripts python3 -m openemr_dr restore \
+  BACKUP_BUCKET SNAPSHOT_ID --region us-west-2
 
 # Single phase (for debugging)
-python3 -m openemr_dr restore BUCKET SNAP --phase preflight --dry-run
+PYTHONPATH=scripts python3 -m openemr_dr restore \
+  BUCKET SNAP --phase preflight --dry-run
 
 # Resume after failure
-python3 -m openemr_dr restore BUCKET SNAP --from-phase data --state-file .restore-state
+PYTHONPATH=scripts python3 -m openemr_dr restore \
+  BUCKET SNAP --from-phase data --state-file .restore-state
 
-# Legacy order (old clean→deploy→RDS→data)
-python3 -m openemr_dr restore BUCKET SNAP --legacy-order --bash-only
+# Legacy order through the Python orchestrator's Bash bridge
+PYTHONPATH=scripts python3 -m openemr_dr restore BUCKET SNAP --legacy-order
+
+# Bypass Python and force the Bash implementation
+./scripts/restore.sh BUCKET SNAP --legacy-order --bash-only
 ```
 
 ### E2E tests
 
 ```bash
-# Python driver (wraps bash E2E script; same behavior today)
-cd scripts && python3 -m openemr_dr e2e --group full --cluster-name openemr-eks-test
+# Python driver for the full contiguous E2E range
+(cd scripts && python3 -m openemr_dr e2e \
+  --group full --cluster-name openemr-eks-test --aws-region us-west-2)
 
-# Fast in-place restore tier (~45–60 min after steps 1–3)
-python3 -m openemr_dr e2e --group backup-restore-inplace
+# Fast in-place restore tier (steps 4 and 8-9) currently requires the bash
+# group so that steps 5-7 remain skipped
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group backup-restore-inplace --state-file .e2e-test-state \
+  --no-timing-report
 
 # List steps / groups
-python3 -m openemr_dr e2e --list-steps
-python3 -m openemr_dr e2e --list-groups
+(cd scripts && python3 -m openemr_dr e2e --list-steps)
+(cd scripts && python3 -m openemr_dr e2e --list-groups)
 ```
 
 ### Unit tests and CI (no AWS)
@@ -89,7 +100,12 @@ python3 -m openemr_dr e2e --list-groups
 ./scripts/ci/run-python-ci.sh openemr_dr
 ```
 
-CI jobs **`openemr-dr-ci`**, **`warp-ci`**, and **`credential-rotation-ci`** use path filters (`dorny/paths-filter`) so they only run when relevant files change. All three share `scripts/ci/run-python-ci.sh` and `scripts/install-python-dev.sh`. A dedicated **`python-requirements-validate`** job runs when `versions.yaml` or `scripts/requirements/` change.
+CI jobs **`openemr-dr-ci`**, **`warp-ci`**, **`credential-rotation-ci`**,
+and **`knowledge-mcp-ci`** use path filters so they run only when relevant
+files change. The first three share `scripts/ci/run-python-ci.sh` and
+`scripts/install-python-dev.sh`; the knowledge MCP uses its locked `uv`
+project. A dedicated **`python-requirements-validate`** job runs when
+`versions.yaml` or `scripts/requirements/` change.
 
 Shared libraries: `scripts/lib/versions-yq.sh`, `scripts/lib/python-venv.sh`.
 
@@ -108,7 +124,9 @@ cd scripts && python3 -m openemr_dr backup --cluster-name openemr-eks-test
 
 ## Migration roadmap
 
-Phases marked **native** are implemented in Python. Others use **bash bridge** (`RESTORE_INTERNAL=1 restore.sh --bash-only`) until ported.
+The default `preflight` through `verify` phases are native Python. Only the
+explicit `legacy` phase uses the Bash bridge
+(`RESTORE_INTERNAL=1 restore.sh --bash-only`).
 
 | Component | Status | Next step |
 |-----------|--------|-----------|
@@ -128,7 +146,10 @@ Phases marked **native** are implemented in Python. Others use **bash bridge** (
 
 ## Terraform restore mode
 
-E2E step 7 applies `-var=skip_rds_creation=true` so RDS is created from snapshot in step 8, not as an empty cluster.
+E2E step 7 applies `-var=skip_rds_creation=true` so RDS is created from the
+snapshot in step 8, not as an empty cluster. Step 8 clears `.restore-state`
+before invoking the restore so a checkpoint from an earlier environment cannot
+skip the RDS phase.
 
 ## Related docs
 
