@@ -374,8 +374,7 @@ parse_config() {
 # Function to get the latest Docker image version from Docker Hub
 # This function queries Docker Hub's API to retrieve the latest available version
 get_latest_docker_version() {
-    local registry="$1"   # Docker registry name (e.g., "openemr/openemr")
-    local use_stable="$2" # Set to "true" for OpenEMR (second-to-latest), "false" for others (latest)
+    local registry="$1" # Docker registry name (e.g., "fluent/fluent-bit")
 
     log "INFO" "Checking latest version for $registry..."
 
@@ -402,19 +401,48 @@ get_latest_docker_version() {
     if [ -z "$versions" ]; then
         # If no clean versions found, try to extract base versions from architecture-specific tags
         # This handles cases where tags include architecture suffixes (e.g., "7.0.4-amd64")
-        local arch_versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$' | sed 's/-[a-zA-Z0-9]*$//' | sort -V -r | uniq)
+        local arch_versions
+        arch_versions=$(echo "$response" \
+            | jq -r '.results[].name' \
+            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-(amd64|arm64|aarch64|x86_64)$' \
+            | sed -E 's/-(amd64|arm64|aarch64|x86_64)$//' \
+            | sort -V -r \
+            | uniq) || arch_versions=""
         versions="$arch_versions"
     fi
 
-    # Return appropriate version based on component type
-    if [ "$use_stable" = "true" ]; then
-        # For OpenEMR, return the second-to-latest version (stable production)
-        # This is because the latest version may be a development/pre-release version
-        echo "$versions" | sed -n '2p'
-    else
-        # For all other dependencies, return the latest version
-        echo "$versions" | head -n 1
+    if [ -z "$versions" ]; then
+        log "ERROR" "No stable semantic-version tags found for $registry"
+        return 1
     fi
+
+    echo "$versions" | head -n 1
+}
+
+# Return the latest official non-draft, non-prerelease OpenEMR release.
+# Docker Hub can contain clean semantic tags before an upstream release is
+# declared production-ready, so it is not authoritative for this decision.
+get_latest_openemr_release_version() {
+    local url="https://api.github.com/repos/openemr/openemr/releases/latest"
+    local response
+    if ! response=$(curl -s "$url"); then
+        log "ERROR" "Failed to fetch the latest OpenEMR release"
+        return 1
+    fi
+    if ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Invalid JSON response from the OpenEMR releases API"
+        return 1
+    fi
+
+    local release_tag
+    release_tag=$(echo "$response" | jq -r \
+        'select(.draft == false and .prerelease == false) | .tag_name // empty' 2>/dev/null)
+    release_tag=$(echo "$release_tag" | sed -E 's/^[vV]//' | tr '_' '.')
+    if [[ ! "$release_tag" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        log "ERROR" "No stable semantic OpenEMR release found"
+        return 1
+    fi
+    echo "$release_tag"
 }
 
 # Function to get the latest Helm chart version from repository index
@@ -464,15 +492,25 @@ get_latest_helm_version() {
         return 1
     fi
     
-    # Extract version from repository index (get the first version entry, not dependencies)
-    # The repository index contains chart entries with version information
-    local version=$(echo "$index_content" | grep -A 100 "^  $chart:" | grep -E "^    version:" | head -1 | awk '{print $2}')
+    # Parse all chart entries, exclude prereleases (for example Mimir weekly
+    # builds), and select the highest stable semantic version deterministically.
+    local version
+    version=$(printf '%s' "$index_content" \
+        | yq eval -r ".entries[\"${chart}\"][].version" - 2>/dev/null \
+        | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sort -V \
+        | tail -1) || version=""
     
     # Validate that version was successfully extracted
     if [ -z "$version" ] || [ "$version" = "null" ]; then
         log "ERROR" "Failed to parse version for $chart"
-        echo "❌ Error"
         return 1
+    fi
+
+    # cert-manager is installed from its GitHub release manifest, whose tag
+    # includes a leading "v", rather than from the Helm chart directly.
+    if [ "$chart" = "cert-manager" ]; then
+        version="v${version#v}"
     fi
     
     log "INFO" "Latest version for $chart: $version"
@@ -973,9 +1011,6 @@ get_latest_go_version() {
         return 1
     fi
 
-    # Extract major.minor version (e.g., "1.25.0" -> "1.25")
-    version=$(echo "$version" | cut -d. -f1,2)
-    
     log "INFO" "Latest Go version: $version"
     echo "$version"
 }
@@ -1081,8 +1116,9 @@ EOF
     if [ "$components" = "all" ] || [ "$components" = "applications" ]; then
         # Check OpenEMR version
         log "INFO" "Checking OpenEMR version..."
-        local openemr_latest=$(get_latest_docker_version "$OPENEMR_REGISTRY" "true")
-        if [ "$openemr_latest" != "$OPENEMR_CURRENT" ]; then
+        local openemr_latest
+        openemr_latest=$(get_latest_openemr_release_version) || openemr_latest=""
+        if [ -n "$openemr_latest" ] && [ "$openemr_latest" != "$OPENEMR_CURRENT" ]; then
             log "INFO" "OpenEMR update available: $OPENEMR_CURRENT -> $openemr_latest"
             echo "- **OpenEMR**: $OPENEMR_CURRENT → $openemr_latest" >> "$update_report"
             search_version_in_codebase "OpenEMR" "$OPENEMR_CURRENT" "$openemr_latest"
@@ -1093,8 +1129,9 @@ EOF
 
         # Check Fluent Bit version
         log "INFO" "Checking Fluent Bit version..."
-        local fluent_bit_latest=$(get_latest_docker_version "$FLUENT_BIT_REGISTRY" "false")
-        if [ "$fluent_bit_latest" != "$FLUENT_BIT_CURRENT" ]; then
+        local fluent_bit_latest
+        fluent_bit_latest=$(get_latest_docker_version "$FLUENT_BIT_REGISTRY") || fluent_bit_latest=""
+        if [ -n "$fluent_bit_latest" ] && [ "$fluent_bit_latest" != "$FLUENT_BIT_CURRENT" ]; then
             log "INFO" "Fluent Bit update available: $FLUENT_BIT_CURRENT -> $fluent_bit_latest"
             echo "- **Fluent Bit**: $FLUENT_BIT_CURRENT → $fluent_bit_latest" >> "$update_report"
             search_version_in_codebase "Fluent Bit" "$FLUENT_BIT_CURRENT" "$fluent_bit_latest"
@@ -1270,6 +1307,19 @@ EOF
             log "INFO" "azure/setup-kubectl update available: $kubectl_action_current -> $kubectl_action_latest"
             echo "- **azure/setup-kubectl**: $kubectl_action_current → $kubectl_action_latest" >> "$update_report"
             search_version_in_codebase "azure/setup-kubectl" "$kubectl_action_current" "$kubectl_action_latest"
+            updates_found=1
+        fi
+
+        # Check aquasecurity/trivy-action
+        local trivy_action_current
+        trivy_action_current=$(yq eval '.github_workflows.trivy_action.current' "$VERSIONS_FILE")
+        local trivy_action_latest
+        trivy_action_latest=$(get_latest_github_action_version "aquasecurity/trivy-action")
+
+        if [ "$trivy_action_latest" != "❌ Error" ] && ! compare_versions "$trivy_action_current" "$trivy_action_latest"; then
+            log "INFO" "aquasecurity/trivy-action update available: $trivy_action_current -> $trivy_action_latest"
+            echo "- **aquasecurity/trivy-action**: $trivy_action_current → $trivy_action_latest" >> "$update_report"
+            search_version_in_codebase "aquasecurity/trivy-action" "$trivy_action_current" "$trivy_action_latest"
             updates_found=1
         fi
 
@@ -1493,35 +1543,54 @@ EOF
         log "INFO" "Checking monitoring stack versions..."
 
         # Prometheus Operator
-        local prometheus_latest=$(get_latest_helm_version "kube-prometheus-stack")
-        if [ "$prometheus_latest" != "$PROMETHEUS_CURRENT" ]; then
+        local prometheus_latest
+        prometheus_latest=$(get_latest_helm_version "kube-prometheus-stack") || prometheus_latest=""
+        if [ -n "$prometheus_latest" ] && [ "$prometheus_latest" != "$PROMETHEUS_CURRENT" ]; then
             log "INFO" "Prometheus Operator update available: $PROMETHEUS_CURRENT -> $prometheus_latest"
             echo "- **Prometheus Operator**: $PROMETHEUS_CURRENT → $prometheus_latest" >> "$update_report"
             search_version_in_codebase "Prometheus Operator" "$PROMETHEUS_CURRENT" "$prometheus_latest"
             updates_found=1
         fi
 
-        # Loki
-        local loki_latest=$(get_latest_helm_version "loki")
-        if [ "$loki_latest" != "$LOKI_CURRENT" ]; then
-            log "INFO" "Loki update available: $LOKI_CURRENT -> $loki_latest"
-            echo "- **Loki**: $LOKI_CURRENT → $loki_latest" >> "$update_report"
-            search_version_in_codebase "Loki" "$LOKI_CURRENT" "$loki_latest"
-            updates_found=1
+        # Loki's original chart repository is now the Grafana Enterprise Logs
+        # maintenance track. OSS migration to grafana-community spans breaking
+        # chart releases and must be reviewed as a dedicated change.
+        local loki_update_policy
+        loki_update_policy=$(yq eval '.monitoring.loki.update_policy // "automatic"' "$VERSIONS_FILE")
+        if [ "$loki_update_policy" = "manual-migration" ]; then
+            log "WARN" "Skipping automatic Loki comparison; OSS chart migration requires manual review"
+        else
+            local loki_latest
+            loki_latest=$(get_latest_helm_version "loki") || loki_latest=""
+            if [ -n "$loki_latest" ] && [ "$loki_latest" != "$LOKI_CURRENT" ]; then
+                log "INFO" "Loki update available: $LOKI_CURRENT -> $loki_latest"
+                echo "- **Loki**: $LOKI_CURRENT → $loki_latest" >> "$update_report"
+                search_version_in_codebase "Loki" "$LOKI_CURRENT" "$loki_latest"
+                updates_found=1
+            fi
         fi
 
-        # Tempo (using tempo-distributed chart)
-        local tempo_latest=$(get_latest_helm_version "tempo-distributed")
-        if [ "$tempo_latest" != "$TEMPO_CURRENT" ]; then
-            log "INFO" "Tempo update available: $TEMPO_CURRENT -> $tempo_latest"
-            echo "- **Tempo**: $TEMPO_CURRENT → $tempo_latest" >> "$update_report"
-            search_version_in_codebase "Tempo" "$TEMPO_CURRENT" "$tempo_latest"
-            updates_found=1
+        # Tempo chart 3.x replaces ingesters/compactors with a Kafka-backed
+        # architecture, so it cannot be treated as a drop-in chart update.
+        local tempo_update_policy
+        tempo_update_policy=$(yq eval '.monitoring.tempo.update_policy // "automatic"' "$VERSIONS_FILE")
+        if [ "$tempo_update_policy" = "manual-migration" ]; then
+            log "WARN" "Skipping automatic Tempo comparison; chart 3.x requires an architecture migration"
+        else
+            local tempo_latest
+            tempo_latest=$(get_latest_helm_version "tempo-distributed") || tempo_latest=""
+            if [ -n "$tempo_latest" ] && [ "$tempo_latest" != "$TEMPO_CURRENT" ]; then
+                log "INFO" "Tempo update available: $TEMPO_CURRENT -> $tempo_latest"
+                echo "- **Tempo**: $TEMPO_CURRENT → $tempo_latest" >> "$update_report"
+                search_version_in_codebase "Tempo" "$TEMPO_CURRENT" "$tempo_latest"
+                updates_found=1
+            fi
         fi
 
         # Mimir
-        local mimir_latest=$(get_latest_helm_version "mimir-distributed")
-        if [ "$mimir_latest" != "$MIMIR_CURRENT" ]; then
+        local mimir_latest
+        mimir_latest=$(get_latest_helm_version "mimir-distributed") || mimir_latest=""
+        if [ -n "$mimir_latest" ] && [ "$mimir_latest" != "$MIMIR_CURRENT" ]; then
             log "INFO" "Mimir update available: $MIMIR_CURRENT -> $mimir_latest"
             echo "- **Mimir**: $MIMIR_CURRENT → $mimir_latest" >> "$update_report"
             search_version_in_codebase "Mimir" "$MIMIR_CURRENT" "$mimir_latest"
@@ -1529,9 +1598,11 @@ EOF
         fi
 
         # OTeBPF (check Docker image version since it's not a Helm chart)
-        local otebpf_repo=$(yq eval '.monitoring.otebpf.repository' "$VERSIONS_FILE" 2>/dev/null || echo "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation")
-        local otebpf_latest=$(get_latest_docker_version "$otebpf_repo" "false")
-        if [ "$otebpf_latest" != "$OTEBPF_CURRENT" ]; then
+        local otebpf_repo
+        otebpf_repo=$(yq eval '.monitoring.otebpf.repository' "$VERSIONS_FILE" 2>/dev/null || echo "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation")
+        local otebpf_latest
+        otebpf_latest=$(get_latest_docker_version "$otebpf_repo") || otebpf_latest=""
+        if [ -n "$otebpf_latest" ] && [ "$otebpf_latest" != "$OTEBPF_CURRENT" ]; then
             log "INFO" "OTeBPF update available: $OTEBPF_CURRENT -> $otebpf_latest"
             echo "- **OTeBPF**: $OTEBPF_CURRENT → $otebpf_latest" >> "$update_report"
             search_version_in_codebase "OTeBPF" "$OTEBPF_CURRENT" "$otebpf_latest"
@@ -1541,9 +1612,11 @@ EOF
 
 
         # cert-manager
-        local cert_manager_current=$(yq eval '.monitoring.cert_manager.current' "$VERSIONS_FILE")
-        local cert_manager_latest=$(get_latest_helm_version "cert-manager")
-        if [ "$cert_manager_latest" != "$cert_manager_current" ]; then
+        local cert_manager_current
+        cert_manager_current=$(yq eval '.monitoring.cert_manager.current' "$VERSIONS_FILE")
+        local cert_manager_latest
+        cert_manager_latest=$(get_latest_helm_version "cert-manager") || cert_manager_latest=""
+        if [ -n "$cert_manager_latest" ] && [ "$cert_manager_latest" != "$cert_manager_current" ]; then
             log "INFO" "cert-manager update available: $cert_manager_current -> $cert_manager_latest"
             echo "- **cert-manager**: $cert_manager_current → $cert_manager_latest" >> "$update_report"
             search_version_in_codebase "cert-manager" "$cert_manager_current" "$cert_manager_latest"
@@ -1587,7 +1660,7 @@ EOF
         # Check KICS version
         local kics_current=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$kics_current" ]; then
-            local kics_latest=$(get_latest_go_package_version "Checkmarx/kics")
+            local kics_latest=$(get_latest_go_package_version "Checkmarx/kics-github-action")
             if [ "$kics_latest" != "❌ Error" ] && [ "$kics_latest" != "❌ Unable to determine" ] && [ "$kics_latest" != "$kics_current" ]; then
                 log "INFO" "KICS update available: $kics_current -> $kics_latest"
                 echo "- **KICS**: $kics_current → $kics_latest" >> "$update_report"
@@ -1613,7 +1686,20 @@ EOF
     if [ "$components" = "all" ] || [ "$components" = "python_packages" ]; then
         log "INFO" "Checking Python package versions..."
 
-        local pypi_packages=("pymysql:PyMySQL" "boto3:boto3" "requests:requests" "kubernetes:kubernetes" "pytest:pytest" "pytest_cov:pytest-cov" "flake8:flake8" "black:black" "mypy:mypy")
+        local pypi_packages=(
+            "pymysql:PyMySQL"
+            "boto3:boto3"
+            "requests:requests"
+            "kubernetes:kubernetes"
+            "pytest:pytest"
+            "pytest_cov:pytest-cov"
+            "flake8:flake8"
+            "black:black"
+            "mypy:mypy"
+            "fastmcp:fastmcp"
+            "pyyaml:PyYAML"
+            "uv:uv"
+        )
         for entry in "${pypi_packages[@]}"; do
             local yaml_key="${entry%%:*}"
             local pypi_name="${entry##*:}"
@@ -1722,7 +1808,7 @@ Component Types:
   pre_commit_hooks        Pre-commit hook versions
   semver_packages         Python, Terraform, kubectl versions
   go_packages             Go version, bubbletea, lipgloss
-  python_packages         pymysql, boto3, requests, kubernetes, pytest, black, flake8, mypy
+  python_packages         Python runtime, testing, and knowledge MCP packages
   monitoring              Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
   eks_addons              EFS CSI Driver, Metrics Server
   security_tools          Trivy, Checkov, KICS, gosec
@@ -1781,6 +1867,9 @@ show_status() {
         local pytest_version=$(yq eval '.python_packages.pytest.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local black_version=$(yq eval '.python_packages.black.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local mypy_version=$(yq eval '.python_packages.mypy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local fastmcp_version=$(yq eval '.python_packages.fastmcp.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local pyyaml_version=$(yq eval '.python_packages.pyyaml.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local uv_version=$(yq eval '.python_packages.uv.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
 
         echo -e "${BLUE}Python Packages:${NC}"
         [ -n "$pymysql_version" ] && echo -e "  PyMySQL: ${GREEN}$pymysql_version${NC}"
@@ -1790,6 +1879,9 @@ show_status() {
         [ -n "$pytest_version" ] && echo -e "  pytest: ${GREEN}$pytest_version${NC}"
         [ -n "$black_version" ] && echo -e "  black: ${GREEN}$black_version${NC}"
         [ -n "$mypy_version" ] && echo -e "  mypy: ${GREEN}$mypy_version${NC}"
+        [ -n "$fastmcp_version" ] && echo -e "  FastMCP: ${GREEN}$fastmcp_version${NC}"
+        [ -n "$pyyaml_version" ] && echo -e "  PyYAML: ${GREEN}$pyyaml_version${NC}"
+        [ -n "$uv_version" ] && echo -e "  uv: ${GREEN}$uv_version${NC}"
         echo ""
     fi
 

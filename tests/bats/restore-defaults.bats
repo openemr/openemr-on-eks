@@ -228,10 +228,11 @@ SCRIPT="${SCRIPTS_DIR}/restore-defaults.sh"
   run bash -c "
     GREEN='' YELLOW='' NC=''
     PROJECT_ROOT='$PROJECT_ROOT'
+    git() { printf 'git %s\n' \"\$*\"; }
     source '$FUNC_FILE'
     restore_deployment_yaml 2>&1
   "
-  # It either restores from git or reports it can't
-  [[ "$output" =~ "deployment.yaml" ]]
+  assert_success
+  [[ "$output" =~ "git checkout HEAD -- k8s/deployment.yaml" ]]
   rm -f "$FUNC_FILE"
 }

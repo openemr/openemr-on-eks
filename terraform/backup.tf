@@ -181,6 +181,10 @@ resource "aws_backup_selection" "daily" {
     [
       aws_s3_bucket.alb_logs.arn,
       aws_s3_bucket.loki_storage.arn,
+      aws_s3_bucket.tempo_storage.arn,
+      aws_s3_bucket.mimir_blocks_storage.arn,
+      aws_s3_bucket.mimir_ruler_storage.arn,
+      aws_s3_bucket.alertmanager_storage.arn,
       aws_s3_bucket.cloudtrail.arn
     ],
     # Conditionally include WAF logs bucket if WAF is enabled
@@ -209,6 +213,10 @@ resource "aws_backup_selection" "weekly" {
     [
       aws_s3_bucket.alb_logs.arn,
       aws_s3_bucket.loki_storage.arn,
+      aws_s3_bucket.tempo_storage.arn,
+      aws_s3_bucket.mimir_blocks_storage.arn,
+      aws_s3_bucket.mimir_ruler_storage.arn,
+      aws_s3_bucket.alertmanager_storage.arn,
       aws_s3_bucket.cloudtrail.arn
     ],
     # Conditionally include WAF logs bucket if WAF is enabled
@@ -237,6 +245,10 @@ resource "aws_backup_selection" "monthly" {
     [
       aws_s3_bucket.alb_logs.arn,
       aws_s3_bucket.loki_storage.arn,
+      aws_s3_bucket.tempo_storage.arn,
+      aws_s3_bucket.mimir_blocks_storage.arn,
+      aws_s3_bucket.mimir_ruler_storage.arn,
+      aws_s3_bucket.alertmanager_storage.arn,
       aws_s3_bucket.cloudtrail.arn
     ],
     # Conditionally include WAF logs bucket if WAF is enabled

@@ -215,7 +215,7 @@ graph TD
 
 - **Purpose**: KMS keys for encryption
 - **Key Components**:
-  - 6 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch)
+  - 7 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup)
   - Comprehensive key policies
   - Key rotation enabled
   - KMS aliases for easy reference
@@ -289,7 +289,7 @@ graph TD
 
 - **Purpose**: CloudWatch log groups
 - **Key Components**:
-  - 10+ log groups for OpenEMR 8.0.0
+  - 10+ log groups for OpenEMR 8.2.0
   - Fluent Bit metrics log group
   - Different retention periods for different log types
   - KMS encryption for all log groups

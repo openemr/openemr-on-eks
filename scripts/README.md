@@ -484,7 +484,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Purpose**: End-to-end backup/restore testing
 - **Dependencies**: kubectl, aws, helm, terraform, jq
 - **Key Features**:
-  - Tests complete backup/restore cycle (10 steps, ~2.5 hours full run on 8.1.x)
+  - Tests complete backup/restore cycle (10 steps; historical 8.1.x run was ~2.5 hours)
   - **Chunked execution** via `--from-step`, `--to-step`, `--step`, or `--group` for faster development iteration
   - Deploy chunk: ~35-40 min cold, ~10-15 min when infra already exists
   - Persists state (backup bucket, snapshot ID) to `.e2e-test-state` between chunks

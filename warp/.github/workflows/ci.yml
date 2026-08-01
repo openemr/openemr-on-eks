@@ -53,17 +53,20 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-26.04
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.14.6']
 
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
 
       # Step 2: Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v6.1.0
+        uses: actions/setup-python@v7.0.0
         with:
-          python-version: ${{ env.PYTHON_VERSION }}
+          python-version: ${{ matrix.python-version }}
 
       # Step 3: Install Python dependencies
       - name: Install dependencies
@@ -85,10 +88,10 @@ jobs:
 
       # Step 5: Upload coverage reports as artifacts
       - name: Upload coverage reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: coverage-report
+          name: coverage-report-${{ matrix.python-version }}
           path: ${{ env.WARP_DIR }}/htmlcov/
           retention-days: 7
 
@@ -100,11 +103,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
 
       # Step 2: Set up Python environment
       - name: Set up Python
-        uses: actions/setup-python@v6.1.0
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -112,7 +115,7 @@ jobs:
       - name: Install linting tools
         run: |
           python -m pip install --upgrade pip
-          pip install flake8 black mypy
+          pip install flake8 black mypy==2.3.0
 
       # Step 4: Run flake8 linting
       - name: Run flake8
@@ -140,11 +143,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
 
       # Step 2: Run Trivy vulnerability scanner (Table format - STRICT MODE)
       - name: Run Trivy vulnerability scanner (Table format - STRICT)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '${{ env.WARP_DIR }}'
@@ -158,7 +161,7 @@ jobs:
 
       # Step 3: Run Trivy vulnerability scanner (SARIF format)
       - name: Run Trivy vulnerability scanner (SARIF format)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         if: success()
         with:
           scan-type: 'fs'
@@ -210,11 +213,11 @@ jobs:
     steps:
       # Step 1: Checkout repository code
       - name: Checkout code
-        uses: actions/checkout@v6.0.1
+        uses: actions/checkout@v7.0.1
 
       # Step 2: Download test artifacts
       - name: Download test artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           path: test-results/
 

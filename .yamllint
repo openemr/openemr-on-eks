@@ -9,7 +9,6 @@ rules:
   empty-lines: disable
   empty-values: disable
   hyphens: disable
-  key-duplicates: disable
   key-ordering: disable
   new-line-at-end-of-file: disable
   octal-values: disable

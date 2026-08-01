@@ -99,9 +99,12 @@ spec:
   # Ingress Rules (Incoming Traffic)
   ingress:
   # Allow external access from load balancers and ingress controllers
-  # This is required for users to access OpenEMR through the load balancer
+  # Auto Mode ALB traffic reaches pod IPs from VPC addresses rather than from
+  # a Kubernetes namespace, so an ipBlock rule is required.
   - from:
-    - namespaceSelector: {}  # Allow from any namespace (load balancers, ingress)
+    - namespaceSelector: {}  # Allow in-cluster callers
+    - ipBlock:
+        cidr: ${VPC_CIDR}    # Restrict ALB-originated traffic to the deployment VPC
     ports:
     - protocol: TCP
       port: 80   # HTTP port for user access

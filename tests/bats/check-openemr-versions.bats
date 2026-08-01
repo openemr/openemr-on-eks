@@ -110,6 +110,12 @@ SCRIPT="${SCRIPTS_DIR}/check-openemr-versions.sh"
   [ "$status" -eq 0 ]
 }
 
+@test "script reads the reviewed version from versions.yaml with yq" {
+  grep -Fq 'command -v yq' "$SCRIPT"
+  grep -Fq "RECOMMENDED_VERSION=\$(yq eval '.applications.openemr.current'" "$SCRIPT"
+  ! grep -Fq 'Current recommended version: 8.0.0' "$SCRIPT"
+}
+
 # ── Functions defined ──────────────────────────────────────────────────────
 
 @test "script defines get_docker_tags function" {
@@ -218,7 +224,7 @@ SCRIPT="${SCRIPTS_DIR}/check-openemr-versions.sh"
   [ "$line_count" -eq 2 ]
 }
 
-@test "UNIT: filter_versions with latest_only returns second version (stable)" {
+@test "UNIT: filter_versions with latest_only returns newest clean candidate" {
   run bash -c '
     sort_versions() { sort -Vr; }
     filter_versions() {
@@ -226,8 +232,7 @@ SCRIPT="${SCRIPTS_DIR}/check-openemr-versions.sh"
       local filtered_tags
       filtered_tags=$(grep -E "^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9]+)?$" | sort_versions | head -n "$count")
       if [ "$latest_only" = true ]; then
-        local stable_version=$(echo "$filtered_tags" | sed -n "2p")
-        if [ -n "$stable_version" ]; then echo "$stable_version"; else echo "$filtered_tags" | head -n 1; fi
+        echo "$filtered_tags" | grep -E "^[0-9]+\.[0-9]+\.[0-9]+$" | head -n 1
       else
         echo "$filtered_tags"
       fi
@@ -235,7 +240,7 @@ SCRIPT="${SCRIPTS_DIR}/check-openemr-versions.sh"
     printf "7.0.3\n7.0.2\n7.0.1\n" | filter_versions "" true 10
   '
   [ "$status" -eq 0 ]
-  [[ "$output" == "7.0.2" ]]
+  [[ "$output" == "7.0.3" ]]
 }
 
 @test "UNIT: filter_versions rejects non-semver tags" {

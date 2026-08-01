@@ -401,7 +401,7 @@ cluster_name = "openemr-eks"
 kubernetes_version = "1.36"
 
 # OpenEMR Application Configuration
-openemr_version = "8.1.1"  # Latest stable OpenEMR version
+openemr_version = "8.2.0"  # Latest stable OpenEMR version
 
 # Network Configuration
 vpc_cidr        = "10.0.0.0/16"
@@ -479,13 +479,13 @@ terraform show -json tfplan | jq '.resource_changes[] | {address: .address, acti
 # Deploy with approval
 terraform apply tfplan
 
-# Monitor deployment (typically 35-42 minutes total on OpenEMR 8.1.x)
+# Monitor deployment (35-42 minute historical 8.1.x benchmark; remeasure for 8.2.x)
 # Infrastructure (Terraform): ~30-32 minutes (measured from E2E tests)
 #   - EKS cluster: 15-20 minutes
 #   - Aurora RDS cluster: 10-12 minutes  
 #   - VPC/NAT gateways: 3-5 minutes
 #   - Other resources (S3, EFS, ElastiCache, KMS, WAF): 5-8 minutes
-# Application deployment: ~3-6 minutes typical on OpenEMR 8.1.x (up to ~10 min on slow runs)
+# Application deployment: ~3-6 minute historical 8.1.x baseline (up to ~10 min on slow runs)
 
 # Save outputs for later use
 terraform output -json > ../terraform-outputs.json
@@ -608,16 +608,16 @@ The deployment supports configurable OpenEMR versions through Terraform variable
 
 ```hcl
 # In terraform.tfvars
-openemr_version = "8.1.1"    # Latest stable version (recommended)
-# openemr_version = "7.0.4"  # Previous stable version (deprecated)
+openemr_version = "8.2.0"    # Latest stable version (recommended)
+# openemr_version = "8.1.1"  # Previous stable version
 # openemr_version = "latest" # Latest development version (not recommended for production)
 ```
 
 **Available Versions:**
 
-- `8.0.0` - Latest stable release (recommended for production)
-- `7.0.2` - Previous stable release
-- `7.0.1` - Older stable release
+- `8.2.0` - Latest stable release (recommended for production)
+- `8.1.1` - Previous stable release
+- `8.0.0` - Older stable release
 - `latest` - Latest development build (use with caution)
 
 **Note:** OpenEMR follows a versioning pattern where the latest version may be a development release. The stable production version is typically the second-to-latest version.
@@ -642,7 +642,7 @@ cd scripts
 ./check-openemr-versions.sh --latest
 
 # 2. Update terraform.tfvars
-openemr_version = "8.1.1"
+openemr_version = "8.2.0"
 
 # 3. Apply infrastructure changes
 cd ../terraform
@@ -957,7 +957,7 @@ Next steps:
    • Basic deployment: CloudWatch logs + Database Insights
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v87.4.0 (metrics & alerting)
+     - Prometheus v88.0.1 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
@@ -969,7 +969,7 @@ Next steps:
    • Configure alerting for critical issues
    • Regular backup testing
 
-🔍 **Enhanced OpenEMR 8.0.0 Logging Configuration:**
+🔍 **Enhanced OpenEMR 8.2.0 Logging Configuration:**
    • **Comprehensive Log Capture**: All OpenEMR application logs, audit trails, and system events
    • **CloudWatch Log Groups**:
      - `/aws/eks/${CLUSTER_NAME}/openemr/application` - Application logs and events

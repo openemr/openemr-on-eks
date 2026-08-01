@@ -945,8 +945,8 @@ kubectl logs -n openemr $POD_NAME --container=fluent-bit-sidecar --tail=20 | gre
 
 1. Generate HTTP traffic to OpenEMR:
 ```bash
-# Get OpenEMR LoadBalancer URL
-LB_URL=$(kubectl get svc openemr-service -n openemr -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+# Get the EKS Auto Mode ALB URL
+LB_URL=$(kubectl get ingress openemr-ingress -n openemr -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
 # Make a request
 curl -k https://$LB_URL
@@ -1069,7 +1069,7 @@ chmod 644 /var/log/openemr/*.log
 # Add logging configuration to sqlconf.php
 kubectl exec -n openemr deployment/openemr -- bash -c '
 echo "" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
-echo "// OpenEMR 8.0.0 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
+echo "// OpenEMR 8.2.0 Logging Configuration" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"log_dir\"] = \"/var/log/openemr\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"error_log\"] = \"/var/log/openemr/error.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php
 echo "\$sqlconf[\"access_log\"] = \"/var/log/openemr/access.log\";" >> /var/www/localhost/htdocs/openemr/sites/default/sqlconf.php

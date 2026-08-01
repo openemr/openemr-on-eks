@@ -445,13 +445,13 @@ check_security_config() {
     if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
         echo -e "${BLUE}ℹ️  EKS cluster not found - security configuration will be applied during deployment${NC}"
         echo -e "${BLUE}📋 Planned deployment features:${NC}"
-        echo -e "${BLUE}   • OpenEMR 8.0.0 with HTTPS-only access (port 443)${NC}"
+        echo -e "${BLUE}   • OpenEMR 8.2.0 with HTTPS-only access (port 443)${NC}"
         echo -e "${BLUE}   • EKS Auto Mode for managed EC2 compute${NC}"
         echo -e "${BLUE}   • Aurora Serverless V2 MySQL database${NC}"
         echo -e "${BLUE}   • Valkey Serverless cache (Redis-compatible)${NC}"
         echo -e "${BLUE}   • IP-restricted cluster endpoint access${NC}"
         echo -e "${BLUE}   • Private subnet deployment${NC}"
-        echo -e "${BLUE}   • 6 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch)${NC}"
+        echo -e "${BLUE}   • 7 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup)${NC}"
         echo -e "${BLUE}   • Network policies and Pod Security Standards${NC}"
         return 0
     fi
@@ -544,7 +544,7 @@ provide_recommendations() {
     echo -e "   • Basic deployment: CloudWatch logs only"
     echo -e "   • Optional: Enhanced monitoring stack: cd $PROJECT_ROOT/monitoring && ./install-monitoring.sh"
     echo -e "   • Enhanced stack includes:"
-    echo -e "     - Prometheus v87.4.0 (metrics & alerting)"
+    echo -e "     - Prometheus v88.0.1 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
     echo -e "     - Loki v7.0.0 (log aggregation)"
     echo -e "     - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)"
@@ -645,7 +645,7 @@ main() {
         echo -e "${BLUE}   5. cd $PROJECT_ROOT/k8s${NC}"
         echo -e "${BLUE}   6. ./deploy.sh${NC}"
         echo ""
-        echo -e "${YELLOW}⏱️  Expected deployment time: 35-42 minutes total (OpenEMR 8.1.x)${NC}"
+        echo -e "${YELLOW}⏱️  Historical 8.1.x deployment baseline: 35-42 minutes; revalidate for 8.2.x${NC}"
         echo -e "${YELLOW}   • Infrastructure (Terraform): 30-32 minutes${NC}"
         echo -e "${YELLOW}   • Application (Kubernetes): 3-6 minutes typical (up to ~10 min)${NC}"
         echo ""

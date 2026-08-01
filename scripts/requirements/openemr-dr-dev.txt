@@ -3,5 +3,5 @@
 pytest==9.1.1
 pytest-cov==7.1.0
 ruff==0.11.12
-mypy==2.1.0
+mypy==2.3.0
 bandit[toml]==1.9.4

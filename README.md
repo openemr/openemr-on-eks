@@ -6,7 +6,7 @@
 <p>
   <a href="../../blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
   <a href="../../releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
-  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.1.1-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
+  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.2.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
 </p>
 
 <table>
@@ -53,7 +53,7 @@
 <td>
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.25-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Terraform-1.15.7-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
+  <img src="https://img.shields.io/badge/Terraform-1.15.8-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
   <img src="https://img.shields.io/badge/EKS-Auto%20Mode-FF9900?style=flat&logo=amazoneks&logoColor=white" alt="EKS Auto Mode">
   <img src="https://img.shields.io/badge/Kubernetes-1.36-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
   <img src="https://img.shields.io/badge/Aurora-MySQL%208.0-4479A1?style=flat&logo=mysql&logoColor=white" alt="Aurora MySQL">
@@ -397,7 +397,7 @@ graph TB
     subgraph "AWS Cloud"
         subgraph "VPC - Private Network"
             subgraph "EKS Auto Mode Cluster"
-                AM[Auto Mode Controller<br/>Kubernetes 1.35]
+                AM[Auto Mode Controller<br/>Kubernetes 1.36]
                 BN[Bottlerocket Nodes<br/>SELinux Enforced]
                 OP[OpenEMR Pods<br/>PHI Processing]
             end
@@ -409,7 +409,7 @@ graph TB
             end
 
             subgraph "Security Layer"
-                KMS[6 KMS Keys<br/>Granular Encryption]
+                KMS[7 KMS Keys<br/>Granular Encryption]
                 SM[Secrets Manager<br/>Dual-Slot Rotation]
                 SG[Security Groups]
                 NP[Network Policies]
@@ -450,9 +450,9 @@ The diagram below is auto-generated from the Terraform source code using [Terrav
   - **Fully Managed Compute**:
     - [AWS EKS Auto Mode Documentation](https://docs.aws.amazon.com/eks/latest/userguide/automode.html)
     - EC2 instances provisioned automatically with 12% management fee
-  - **Kubernetes 1.35**:
-    - [Kubernetes v1.35 "Timbernetes (The World Tree Release)" Release Blog](https://kubernetes.io/blog/2025/12/17/kubernetes-v1-35-release/)
-    - Latest stable version with Auto Mode support
+  - **Kubernetes 1.36**:
+    - [Amazon EKS platform versions](https://docs.aws.amazon.com/eks/latest/userguide/platform-versions.html)
+    - Cluster version configured consistently in Terraform and `versions.yaml`
   - **Bottlerocket OS**:
     - [Bottlerocket OS Github](https://github.com/bottlerocket-os/bottlerocket)
     - Rust-based, immutable, security-hardened Linux with SELinux enforcement and no SSH access
@@ -654,13 +654,13 @@ Checking Kubernetes resources...
 Checking security configuration...
 ℹ️  EKS cluster not found - security configuration will be applied during deployment
 📋 Planned deployment features:
-   • OpenEMR 8.0.0 with HTTPS-only access (port 443)
+   • OpenEMR 8.2.0 with HTTPS-only access (port 443)
    • EKS Auto Mode for managed EC2 compute
    • Aurora Serverless V2 MySQL database
    • Valkey Serverless cache (Redis-compatible)
    • IP-restricted cluster endpoint access
    • Private subnet deployment
-   • 6 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch)
+   • 7 dedicated KMS keys (EKS, EFS, RDS, ElastiCache, S3, CloudWatch, Backup)
    • Network policies and Pod Security Standards
 
 🎉 First-time deployment validation completed!
@@ -675,7 +675,7 @@ Next steps for first-time deployment:
    5. cd /path/to/GitHub/openemr-on-eks/k8s
    6. ./deploy.sh
 
-⏱️  Expected deployment time: 35-42 minutes total (OpenEMR 8.1.x)
+⏱️  Expected deployment time: 35-42 minutes total (historical OpenEMR 8.1.x benchmark; revalidate for 8.2.x)
    • Infrastructure (Terraform): 30-32 minutes
    • Application (Kubernetes): 3-6 minutes typical (up to ~10 min)
 
@@ -702,7 +702,7 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v87.4.0 (metrics & alerting)
+     - Prometheus v88.0.1 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
@@ -731,7 +731,7 @@ kubernetes_version = "1.36"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "8.1.1"    # Latest stable OpenEMR version
+openemr_version = "8.2.0"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -879,7 +879,7 @@ cd ../k8s
 # Update kubeconfig
 aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 
-# For testing deployments (~3-6 minutes on OpenEMR 8.1.x) (uses self-signed certificates)
+# For testing deployments (~3-6 minute historical 8.1.x baseline; uses self-signed certificates)
 ./deploy.sh
 
 # To time run for testing deployments (uses self-signed certificates)
@@ -900,14 +900,16 @@ kubectl get ingress -n openemr -o yaml | grep wafv2-acl-arn
 ### **5. Access Your System**
 
 ```bash
-# Get LoadBalancer URL (HTTPS-only so add "https://" to the beginning to make it work in the browser)
-kubectl get svc openemr-service -n openemr
+# Get the EKS Auto Mode ALB hostname
+kubectl get ingress openemr-ingress -n openemr
 
 # Get admin credentials
 cat openemr-credentials.txt
 ```
 
-**🔒 Security Note**: The load balancer only listens on port 443 (HTTPS). HTTP traffic on port 80 will be refused by the load balancer for maximum security. All access must use HTTPS.
+**🔒 Security Note**: With an ACM certificate, the ALB listens on HTTPS and
+redirects HTTP to port 443. Without an ACM certificate, deployment uses an HTTP
+listener for bootstrap/testing only.
 
 ### **6. Secure Your Deployment**
 
@@ -957,7 +959,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v87.4.0 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v88.0.1 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
@@ -1097,9 +1099,10 @@ openemr-on-eks/
 │   ├── AUTOSCALING_GUIDE.md               # Autoscaling configuration and optimization
 │   ├── MANUAL_RELEASES.md                 # Guide to the OpenEMR on EKS release system
 │   ├── VERSION_MANAGEMENT.md              # Version awareness and dependency management
+│   ├── KNOWLEDGE_MCP.md                   # Read-only local codebase MCP server guide
 │   ├── TROUBLESHOOTING.md                 # Troubleshooting and solutions
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
-│   ├── LOGGING_GUIDE.md                   # OpenEMR 8.0.0 Enhanced Logging
+│   ├── LOGGING_GUIDE.md                   # OpenEMR 8.2.0 enhanced logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
 │   ├── CREDENTIAL_ROTATION_GUIDE.md       # Zero-downtime RDS credential rotation guide
@@ -1125,6 +1128,9 @@ openemr-on-eks/
 │       ├── *.bats                         # Per-script BATS test suites (CLI contract + UNIT tests)
 │       └── ...                            # One .bats file per script with function-level unit tests
 ├── tools/                                 # Standalone tools and utilities
+│   ├── codebase-mcp/                      # uvx-installable read-only knowledge MCP server
+│   │   ├── README.md                      # Package quick start
+│   │   └── pyproject.toml                 # Python package and CLI metadata
 │   └── credential-rotation/               # Python-based credential rotation tool
 │       ├── README.md                      # Tool documentation, CLI, rotation algorithm
 │       ├── requirements.txt               # Python dependencies (boto3, pymysql, kubernetes)
@@ -1826,7 +1832,7 @@ The infrastructure is organized into **modular Terraform files** for better main
 ### **Networking & Security**
 
 - **`iam.tf`** - Service account roles with Auto Mode trust policies
-- **`kms.tf`** - 6 dedicated KMS keys for granular encryption
+- **`kms.tf`** - 7 dedicated KMS keys for granular encryption
 - **`vpc.tf`** - VPC, subnets, NAT gateways, and flow logs for regulatory compliance
 - **`waf.tf`** - Configures WAFv2 for our ingress to our application
 
@@ -2110,7 +2116,7 @@ The project includes a comprehensive **automated end-to-end backup/restore test 
 #### **⚠️ Test Considerations**
 
 - **Resources**: AWS resources will be created and destroyed during testing
-- **Duration**: ~2.5 hours (150-160 minutes on OpenEMR 8.1.x)
+- **Duration**: ~2.5 hours (historical 150-160 minute OpenEMR 8.1.x benchmark; revalidate for 8.2.x)
 - **Resources**: Creates and destroys real AWS resources
 - **Requirements**: Proper AWS credentials and permissions
 
@@ -2501,6 +2507,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Documentation Directory](docs/README.md)** - Complete documentation index and maintenance guide
 - **[Console Directory](console/README.md)** - Console folder documentation with quick start and development guide
 - **[Tests Directory](tests/README.md)** - BATS test suite documentation, design standards, and coverage summary
+- **[Codebase Knowledge MCP](docs/KNOWLEDGE_MCP.md)** - Secure local, read-only repository knowledge server for coding agents
 - **[Credential Rotation Tool](tools/credential-rotation/README.md)** - Python-based dual-slot credential rotation tool for RDS
 
 #### **📖 User Documentation**
@@ -2512,7 +2519,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
-- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 8.0.0 Enhanced Logging
+- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 8.2.0 enhanced logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures

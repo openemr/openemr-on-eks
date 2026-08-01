@@ -28,7 +28,7 @@ class TestRestorePlanFromMetadata(unittest.TestCase):
             "timestamp": "20260702-213048",
             "restore_plan": {
                 "app_data_key": "application-data/app-data-backup-20260702-213048.tar.gz",
-                "openemr_version": "8.1.1",
+                "openemr_version": "8.2.0",
                 "backup_region": "us-west-2",
                 "backup_strategy": "cross-region",
                 "kms_key_id": "arn:aws:kms:us-west-2:123:key/abc",
@@ -39,7 +39,7 @@ class TestRestorePlanFromMetadata(unittest.TestCase):
         self.assertEqual(plan.backup_bucket, "openemr-backups-123-openemr-eks-20260702")
         self.assertEqual(plan.snapshot_id, "openemr-eks-test-aurora-abc-backup-20260702-213048")
         self.assertEqual(plan.app_data_key, "application-data/app-data-backup-20260702-213048.tar.gz")
-        self.assertEqual(plan.openemr_version, "8.1.1")
+        self.assertEqual(plan.openemr_version, "8.2.0")
         self.assertEqual(plan.backup_strategy, "cross-region")
         self.assertEqual(plan.kms_key_id, "arn:aws:kms:us-west-2:123:key/abc")
 
@@ -56,7 +56,7 @@ class TestRestorePlanFromMetadata(unittest.TestCase):
         self.assertEqual(plan.manifest_version, 1)
         self.assertEqual(plan.app_data_key, "application-data/app-data-backup-20260101-120000.tar.gz")
         self.assertEqual(plan.backup_region, "eu-west-1")
-        self.assertEqual(plan.openemr_version, "8.1.1")
+        self.assertEqual(plan.openemr_version, "8.2.0")
 
     def test_snapshot_none_falls_back_to_restore_plan(self) -> None:
         data = {

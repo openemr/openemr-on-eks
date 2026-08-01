@@ -27,11 +27,11 @@ jobs:
     name: Contract & Version Consistency
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - name: Install yq
         run: |
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
       - name: Install BATS
@@ -47,7 +47,7 @@ jobs:
     name: Terraform Validate (offline)
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - uses: hashicorp/setup-terraform@v4.0.1
 
@@ -61,31 +61,37 @@ jobs:
     name: K8s Manifest Schema Validation
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - name: Install kubeconform
         run: |
-          curl -sL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          curl --fail --silent --show-error --location \
+            https://github.com/yannh/kubeconform/releases/download/v0.8.0/kubeconform-linux-amd64.tar.gz |
+            tar xz
           sudo mv kubeconform /usr/local/bin/
 
       - name: Validate K8s manifests
         run: |
           # Validate manifests that don't use shell variable substitution
           # Skip files with ${...} placeholders (credential-rotation templates)
+          failed=0
           for f in k8s/*.yaml; do
             if grep -q '\${' "$f"; then
               echo "Skipping template file: $f"
               continue
             fi
             echo "Validating: $f"
-            kubeconform -strict -summary "$f" || true
+            if ! kubeconform -strict -summary "$f"; then
+              failed=1
+            fi
           done
+          exit "$failed"
 
   tflint:
     name: TFLint
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - uses: terraform-linters/setup-tflint@v4
 
@@ -108,18 +114,18 @@ jobs:
     name: Full BATS Test Suite
     runs-on: ubuntu-26.04
     steps:
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@v7.0.0
         with:
-          go-version: '1.25'
+          go-version: '1.25.12'
           cache-dependency-path: console/go.sum
 
       - name: Install dependencies
         run: |
           sudo apt-get update && sudo apt-get install -y bats
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
       - name: Download Go modules

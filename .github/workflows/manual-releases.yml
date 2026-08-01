@@ -94,7 +94,7 @@ jobs:
       last-tag: ${{ steps.check-changes.outputs.last-tag }}       # Last release tag for reference
     steps:
       # Step 1: Checkout repository with full history for change detection
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for change detection
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -135,14 +135,14 @@ jobs:
       release-url: ${{ steps.create-release.outputs.html_url }} # GitHub release URL
     steps:
       # Step 1: Checkout repository with full history for release creation
-      - uses: actions/checkout@v7.0.0
+      - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for release notes
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Step 2: Set up Python environment for semantic versioning
       - name: Setup Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 

@@ -23,6 +23,7 @@ resource "random_id" "bucket_suffix" {
 # response codes, and timing information for monitoring and troubleshooting.
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "alb_logs" {
+  # checkov:skip=CKV_AWS_145: ALB access logging supports SSE-S3, not SSE-KMS.
   bucket = "${var.cluster_name}-alb-logs-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -53,16 +54,14 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
 }
 
 # Configure server-side encryption for the ALB logs bucket
-# Uses KMS encryption with the S3-specific KMS key for enhanced security
+# ALB access-log delivery supports only Amazon S3-managed keys (SSE-S3).
 resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.s3.arn
-      sse_algorithm     = "aws:kms"
+      sse_algorithm = "AES256"
     }
-    bucket_key_enabled = true
   }
 }
 
@@ -128,42 +127,15 @@ resource "aws_s3_bucket_policy" "alb_logs" {
         Sid    = "AllowALBPutObject"
         Effect = "Allow"
         Principal = {
-          Service = "delivery.logs.amazonaws.com"
+          Service = "logdelivery.elasticloadbalancing.amazonaws.com"
         }
         Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.alb_logs.arn}/alb-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/elasticloadbalancing/${var.aws_region}/*"
+        Resource = "${aws_s3_bucket.alb_logs.arn}/alb-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
         Condition = {
-          StringEquals = {
-            "s3:x-amz-acl"      = "bucket-owner-full-control"
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-          StringLike = {
+          ArnLike = {
             "aws:SourceArn" = "arn:aws:elasticloadbalancing:${var.aws_region}:${data.aws_caller_identity.current.account_id}:loadbalancer/*"
           }
         }
-      },
-      {
-        Sid    = "AllowALBPutObjectAcl"
-        Effect = "Allow"
-        Principal = {
-          Service = "delivery.logs.amazonaws.com"
-        }
-        Action   = "s3:PutObjectAcl"
-        Resource = "${aws_s3_bucket.alb_logs.arn}/alb-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/elasticloadbalancing/${var.aws_region}/*"
-        Condition = {
-          StringEquals = {
-            "s3:x-amz-acl" = "bucket-owner-full-control"
-          }
-        }
-      },
-      {
-        Sid    = "AllowALBGetBucketAcl"
-        Effect = "Allow"
-        Principal = {
-          Service = "delivery.logs.amazonaws.com"
-        }
-        Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.alb_logs.arn
       }
     ]
   })
@@ -906,7 +878,7 @@ resource "aws_s3_bucket_public_access_block" "alertmanager_storage" {
   restrict_public_buckets = true
 }
 
-# AlertManager bucket policy
+# Mimir's embedded Alertmanager bucket policy
 resource "aws_s3_bucket_policy" "alertmanager_storage" {
   bucket     = aws_s3_bucket.alertmanager_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.alertmanager_storage]
@@ -915,10 +887,10 @@ resource "aws_s3_bucket_policy" "alertmanager_storage" {
     Version = "2012-10-17"
     Statement = [
       {
-        Sid    = "AllowAlertManagerAccess"
+        Sid    = "AllowMimirAlertManagerAccess"
         Effect = "Allow"
         Principal = {
-          AWS = aws_iam_role.alertmanager_s3.arn
+          AWS = aws_iam_role.mimir_s3.arn
         }
         Action = [
           "s3:GetObject",

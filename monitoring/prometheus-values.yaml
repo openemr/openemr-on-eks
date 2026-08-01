@@ -22,14 +22,11 @@ grafana:
 
   resources:
     requests: { cpu: 100m, memory: 256Mi }
-    limits:   { cpu: 500m, memory: 512Mi }
+    limits: { cpu: 500m, memory: 512Mi }
 
-  autoscaling:
-    enabled: true
-    minReplicas: 1
-    maxReplicas: 3
-    targetCPUUtilizationPercentage: 70
-    targetMemoryUtilizationPercentage: 80
+  replicas: 1
+  deploymentStrategy:
+    type: Recreate
 
   sidecar:
     dashboards:
@@ -51,8 +48,6 @@ grafana:
       serve_from_sub_path: false
     security:
       admin_user: admin
-    tracing:
-      enabled: false
       disable_gravatar: true
       cookie_secure: true
       cookie_samesite: strict
@@ -63,11 +58,6 @@ grafana:
       level: info
     unified_alerting:
       enabled: true
-    tracing:
-      enabled: true
-      tempo:
-        address: "tempo-distributor.monitoring.svc.cluster.local:4317"
-        auth_type: ""
 
 prometheus:
   prometheusSpec:
@@ -85,7 +75,7 @@ prometheus:
 
     resources:
       requests: { cpu: 500m, memory: 2Gi }
-      limits:   { cpu: 2000m, memory: 4Gi }
+      limits: { cpu: 2000m, memory: 4Gi }
 
     replicas: 1
     retention: 30d
@@ -107,15 +97,6 @@ prometheus:
           maxBackoff: 100ms
     evaluationInterval: 30s
     scrapeInterval: 30s
-
-  prometheus:
-    prometheusSpec:
-      autoscaling:
-        enabled: true
-        minReplicas: 1
-        maxReplicas: 3
-        targetCPUUtilizationPercentage: 70
-        targetMemoryUtilizationPercentage: 80
 
 # alertmanager: using chart defaults (no custom config)
 
@@ -151,11 +132,11 @@ defaultRules:
     prometheus: true
     prometheusOperator: true
 
-kubeEtcd:             { enabled: false }
-kubeScheduler:        { enabled: false }
-kubeProxy:            { enabled: false }
-kubeControllerManager:{ enabled: false }
+kubeEtcd: { enabled: false }
+kubeScheduler: { enabled: false }
+kubeProxy: { enabled: false }
+kubeControllerManager: { enabled: false }
 prometheusOperator:
   resources:
     requests: { cpu: 100m, memory: 128Mi }
-    limits:   { cpu: 500m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 256Mi }

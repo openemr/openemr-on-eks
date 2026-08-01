@@ -61,8 +61,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.15.7"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.36.2"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.15.8"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.36.3"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -87,7 +87,7 @@ jobs:
     steps:
       # Step 1: Checkout repository with full history for version analysis
       - name: Checkout Repository
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for comprehensive analysis
 
@@ -111,7 +111,7 @@ jobs:
           sudo apt-get install -y curl jq  # curl for API calls, jq for JSON processing
 
           # Install yq for YAML processing
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/download/v4.53.3/yq_linux_amd64
           sudo chmod +x /usr/local/bin/yq
 
 

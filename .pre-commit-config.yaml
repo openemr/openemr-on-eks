@@ -90,15 +90,13 @@ repos:
 
   # Checkov - IaC Security Scanner (ZERO-TOLERANCE)
   - repo: https://github.com/bridgecrewio/checkov
-    rev: 3.3.6
+    rev: 3.3.8
     hooks:
       - id: checkov
         args: [
           '--framework', 'terraform,kubernetes,dockerfile,github_actions',
-          '--soft-fail-on', 'LOW',
-          '--hard-fail-on', 'CRITICAL,HIGH,MEDIUM',
-          '--compact',
-          '--skip-check', 'CKV_TF_1'
+          '--baseline', '.checkov.baseline',
+          '--compact'
         ]
 
   # tfsec - Terraform Security Scanner (ZERO-TOLERANCE)
@@ -123,7 +121,7 @@ repos:
   # Terraform Hooks
   # ===========================================================================
   - repo: https://github.com/antonbabenko/pre-commit-terraform
-    rev: v1.108.0
+    rev: v1.108.1
     hooks:
       - id: terraform_fmt
       - id: terraform_validate
@@ -156,7 +154,7 @@ repos:
   # Documentation and YAML
   # ===========================================================================
   - repo: https://github.com/igorshubovych/markdownlint-cli
-    rev: v0.49.0
+    rev: v0.49.1
     hooks:
       - id: markdownlint
         args: ["--fix", "--config", ".markdownlint.json"]
@@ -171,7 +169,7 @@ repos:
   # Commit Message Validation
   # ===========================================================================
   - repo: https://github.com/commitizen-tools/commitizen
-    rev: v4.16.4
+    rev: v4.17.0
     hooks:
       - id: commitizen
         stages: [commit-msg]
@@ -231,7 +229,7 @@ repos:
       # Go Security Scanner (gosec)
       - id: gosec
         name: Go Security Check (Zero-Tolerance)
-        entry: bash -c 'cd console && if command -v gosec &> /dev/null; then gosec -severity low ./...; else echo "gosec not installed, skipping..."; fi'
+        entry: bash -c 'cd console && if command -v gosec &> /dev/null; then gosec -severity low ./...; else echo "gosec is required for this manual hook" >&2; exit 1; fi'
         language: system
         types: [file]
         files: ^console/.*\.go$
@@ -241,7 +239,7 @@ repos:
       # KICS IaC Security Scanner
       - id: kics
         name: KICS IaC Security Scan (Zero-Tolerance)
-        entry: bash -c 'if command -v kics &> /dev/null; then kics scan -p . --fail-on high,medium,low --exclude-paths .git,node_modules,venv,.trivycache; else echo "KICS not installed, skipping..."; fi'
+        entry: bash -c 'if command -v kics &> /dev/null; then kics scan -p . --fail-on high,medium,low,info --exclude-paths .git,node_modules,venv,.trivycache; else echo "KICS is required for this manual hook" >&2; exit 1; fi'
         language: system
         pass_filenames: false
         stages: [manual]

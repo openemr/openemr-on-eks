@@ -213,6 +213,51 @@ func convertWindowsPathToUnix(windowsPath string) string {
 	return unixPath
 }
 
+func posixShellQuote(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
+}
+
+func appleScriptString(value string) string {
+	escaped := strings.ReplaceAll(value, `\`, `\\`)
+	escaped = strings.ReplaceAll(escaped, `"`, `\"`)
+	return `"` + escaped + `"`
+}
+
+func powerShellString(value string) string {
+	return "'" + strings.ReplaceAll(value, "'", "''") + "'"
+}
+
+func powerShellArray(values []string) string {
+	quoted := make([]string, len(values))
+	for i, value := range values {
+		quoted[i] = powerShellString(value)
+	}
+	return "@(" + strings.Join(quoted, ", ") + ")"
+}
+
+func hasUnsafeControlCharacters(values []string) bool {
+	for _, value := range values {
+		if strings.ContainsAny(value, "\x00\r\n") {
+			return true
+		}
+	}
+	return false
+}
+
+func buildPOSIXTerminalCommand(scriptPath, workingDir string, args []string) string {
+	var commandBuilder strings.Builder
+	commandBuilder.WriteString("cd ")
+	commandBuilder.WriteString(posixShellQuote(workingDir))
+	commandBuilder.WriteString(" && ")
+	commandBuilder.WriteString(posixShellQuote(scriptPath))
+	for _, arg := range args {
+		commandBuilder.WriteString(" ")
+		commandBuilder.WriteString(posixShellQuote(arg))
+	}
+	commandBuilder.WriteString("; echo ''; echo 'Press any key and then return to go back to the command line'; read -n 1")
+	return commandBuilder.String()
+}
+
 // buildFlatIndex creates a flattened navigation index from categories.
 func buildFlatIndex(cats []category) []flatEntry {
 	var entries []flatEntry
@@ -755,19 +800,20 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 		}
 
 		// #nosec G302 -- Script must be executable to run
-		os.Chmod(cmd.script, 0755)
+		if err := os.Chmod(cmd.script, 0755); err != nil {
+			return errorMsg(fmt.Sprintf("Failed to make script executable: %s", err.Error()))
+		}
 
 		scriptPath := cmd.script
-		scriptArgs := strings.Join(cmd.args, " ")
 		workingDir := filepath.Dir(cmd.script)
+		if hasUnsafeControlCharacters(append([]string{scriptPath, workingDir}, cmd.args...)) {
+			return errorMsg("Command paths and arguments must not contain NUL, carriage-return, or newline characters.")
+		}
 
 		if runtime.GOOS == "darwin" {
-			escapedScriptPath := strings.ReplaceAll(scriptPath, "'", "'\"'\"'")
-			escapedArgs := strings.ReplaceAll(scriptArgs, "'", "'\"'\"'")
-			escapedWorkingDir := strings.ReplaceAll(workingDir, "'", "'\"'\"'")
-			command := fmt.Sprintf("cd '%s' && '%s' %s; echo ''; echo 'Press any key and then return to go back to the command line'; read -n 1", escapedWorkingDir, escapedScriptPath, escapedArgs)
+			command := buildPOSIXTerminalCommand(scriptPath, workingDir, cmd.args)
 			// #nosec G204 -- Command constructed from internal script paths
-			execCmd := exec.Command("osascript", "-e", fmt.Sprintf(`tell application "Terminal" to do script "%s"`, command))
+			execCmd := exec.Command("osascript", "-e", `tell application "Terminal" to do script `+appleScriptString(command))
 			if err := execCmd.Run(); err != nil {
 				return errorMsg(fmt.Sprintf("Failed to open terminal window: %s", err.Error()))
 			}
@@ -780,7 +826,6 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 
 			escapedScriptPathUnix := strings.ReplaceAll(scriptPathUnix, "'", "''")
 			escapedScriptPathWin := strings.ReplaceAll(scriptPathWin, "'", "''")
-			escapedArgs := strings.ReplaceAll(scriptArgs, "'", "''")
 			escapedWorkingDirUnix := strings.ReplaceAll(workingDirUnix, "'", "''")
 			escapedWorkingDirWin := strings.ReplaceAll(workingDirWin, "'", "''")
 			escapedWorkingDirWinPS := strings.ReplaceAll(workingDirWinPS, "'", "''")
@@ -794,7 +839,8 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("try {\r\n")
 			scriptBuf.WriteString(fmt.Sprintf("  $workingDirUnix = '%s'\r\n", escapedWorkingDirUnix))
 			scriptBuf.WriteString(fmt.Sprintf("  $scriptPathUnix = '%s'\r\n", escapedScriptPathUnix))
-			scriptBuf.WriteString(fmt.Sprintf("  $scriptArgs = '%s'\r\n", escapedArgs))
+			scriptBuf.WriteString(fmt.Sprintf("  $scriptArgs = %s\r\n", powerShellArray(cmd.args)))
+			scriptBuf.WriteString("  $displayArgs = $scriptArgs -join ' '\r\n")
 			scriptBuf.WriteString("  $bashCmd = $null\r\n")
 			scriptBuf.WriteString("  $finalScriptPath = $null\r\n")
 			scriptBuf.WriteString("  $finalWorkingDir = $null\r\n")
@@ -852,18 +898,12 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("    try {\r\n")
 			scriptBuf.WriteString("      Set-Location $finalWorkingDirPS\r\n")
 			scriptBuf.WriteString("      Write-Host \"Working directory: $finalWorkingDir\" -ForegroundColor Cyan\r\n")
-			scriptBuf.WriteString("      Write-Host \"Executing: $finalScriptPath $scriptArgs\" -ForegroundColor Cyan\r\n")
+			scriptBuf.WriteString("      Write-Host \"Executing: $finalScriptPath $displayArgs\" -ForegroundColor Cyan\r\n")
 			scriptBuf.WriteString("      Write-Host ''\r\n")
 			scriptBuf.WriteString("      if ($bashCmd -eq 'wsl') {\r\n")
-			scriptBuf.WriteString("        $escapedCmd = \"cd `\"$finalWorkingDir`\" && bash `\"$finalScriptPath`\" $scriptArgs\"\r\n")
-			scriptBuf.WriteString("        wsl bash -c $escapedCmd\r\n")
+			scriptBuf.WriteString("        & wsl bash -c 'cd \"$1\" && shift && exec bash \"$@\"' bash $finalWorkingDir $finalScriptPath @scriptArgs\r\n")
 			scriptBuf.WriteString("      } else {\r\n")
-			scriptBuf.WriteString("        if ($scriptArgs) {\r\n")
-			scriptBuf.WriteString("          $argArray = $scriptArgs -split ' '\r\n")
-			scriptBuf.WriteString("          & $bashCmd $finalScriptPath $argArray\r\n")
-			scriptBuf.WriteString("        } else {\r\n")
-			scriptBuf.WriteString("          & $bashCmd $finalScriptPath\r\n")
-			scriptBuf.WriteString("        }\r\n")
+			scriptBuf.WriteString("        & $bashCmd $finalScriptPath @scriptArgs\r\n")
 			scriptBuf.WriteString("      }\r\n")
 			scriptBuf.WriteString("      if ($LASTEXITCODE -ne 0) {\r\n")
 			scriptBuf.WriteString("        Write-Host ''\r\n")
@@ -875,7 +915,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("      Write-Host \"Bash command: $bashCmd\" -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("      Write-Host \"Script path: $finalScriptPath\" -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("      Write-Host \"Working dir: $finalWorkingDir\" -ForegroundColor Red\r\n")
-			scriptBuf.WriteString("      Write-Host \"Script args: $scriptArgs\" -ForegroundColor Red\r\n")
+			scriptBuf.WriteString("      Write-Host \"Script args: $displayArgs\" -ForegroundColor Red\r\n")
 			scriptBuf.WriteString("    }\r\n")
 			scriptBuf.WriteString("  } else {\r\n")
 			scriptBuf.WriteString("    Write-Host 'Error: bash not found.' -ForegroundColor Red\r\n")
@@ -897,6 +937,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			scriptBuf.WriteString("  } catch {\r\n")
 			scriptBuf.WriteString("    Start-Sleep -Seconds 5\r\n")
 			scriptBuf.WriteString("  }\r\n")
+			scriptBuf.WriteString("  Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue\r\n")
 			scriptBuf.WriteString("}\r\n")
 			powershellScript := scriptBuf.String()
 
@@ -906,14 +947,25 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			}
 			bom := []byte{0xEF, 0xBB, 0xBF}
 			if _, err := tmpScript.Write(bom); err != nil {
-				tmpScript.Close()
+				if closeErr := tmpScript.Close(); closeErr != nil {
+					_ = os.Remove(tmpScript.Name())
+					return errorMsg(fmt.Sprintf("Failed to write BOM: %s (also failed to close temporary script: %s)", err.Error(), closeErr.Error()))
+				}
+				_ = os.Remove(tmpScript.Name())
 				return errorMsg(fmt.Sprintf("Failed to write BOM: %s", err.Error()))
 			}
 			if _, err := tmpScript.WriteString(powershellScript); err != nil {
-				tmpScript.Close()
+				if closeErr := tmpScript.Close(); closeErr != nil {
+					_ = os.Remove(tmpScript.Name())
+					return errorMsg(fmt.Sprintf("Failed to write temporary script: %s (also failed to close it: %s)", err.Error(), closeErr.Error()))
+				}
+				_ = os.Remove(tmpScript.Name())
 				return errorMsg(fmt.Sprintf("Failed to write temporary script: %s", err.Error()))
 			}
-			tmpScript.Close()
+			if err := tmpScript.Close(); err != nil {
+				_ = os.Remove(tmpScript.Name())
+				return errorMsg(fmt.Sprintf("Failed to close temporary script: %s", err.Error()))
+			}
 
 			tmpPath := strings.ReplaceAll(tmpScript.Name(), "'", "''")
 			startProcessCmd := fmt.Sprintf(
@@ -922,6 +974,7 @@ func (m model) executeCommand(cmd command) tea.Cmd {
 			// #nosec G204 -- Command constructed from internal script paths
 			execCmd := exec.Command("powershell", "-Command", startProcessCmd)
 			if err := execCmd.Run(); err != nil {
+				_ = os.Remove(tmpScript.Name())
 				return errorMsg(fmt.Sprintf("Failed to open PowerShell window: %s", err.Error()))
 			}
 		} else {

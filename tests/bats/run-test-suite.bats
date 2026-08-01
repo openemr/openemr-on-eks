@@ -1,10 +1,8 @@
 #!/usr/bin/env bats
 # -----------------------------------------------------------------------------
 # BATS Suite: Unit tests for scripts/run-test-suite.sh
-# Purpose: Validate CLI flag parsing, logging helpers, record_test_result
-#          counters, environment defaults, and structural integrity.
-# Note:    The script has no effective dry-run mode, so we avoid running the
-#          full suite and instead unit-test extracted functions + flag parsing.
+# Purpose: Validate CLI flag parsing, dry-run behavior, logging helpers,
+#          record_test_result counters, environment defaults, and structure.
 # -----------------------------------------------------------------------------
 
 load test_helper
@@ -34,6 +32,15 @@ SCRIPT="${SCRIPTS_DIR}/run-test-suite.sh"
   run bash "$SCRIPT" --nonexistent-flag
   assert_failure
   assert_output_contains "Unknown option"
+}
+
+@test "run-test-suite.sh dry-run prints a plan without executing tests" {
+  run bash "$SCRIPT" --dry-run --suite code_quality
+  assert_success
+  assert_output_contains "Dry run: no tests or external commands will be executed."
+  assert_output_contains "Planned suite: code_quality"
+  [[ "$output" != *"Running shellcheck"* ]]
+  [[ "$output" != *"Test report generated"* ]]
 }
 
 @test "--help lists all valid suites" {

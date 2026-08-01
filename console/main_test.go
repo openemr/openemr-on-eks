@@ -329,6 +329,44 @@ func TestConvertWindowsPathBackslashes(t *testing.T) {
 	}
 }
 
+func TestBuildPOSIXTerminalCommandQuotesEachArgument(t *testing.T) {
+	command := buildPOSIXTerminalCommand(
+		"/tmp/project's scripts/run.sh",
+		"/tmp/project's scripts",
+		[]string{"value with spaces", "'; touch /tmp/pwned; #", "$(whoami)"},
+	)
+	expected := "cd '/tmp/project'\"'\"'s scripts' && '/tmp/project'\"'\"'s scripts/run.sh' " +
+		"'value with spaces' ''\"'\"'; touch /tmp/pwned; #' '$(whoami)'"
+	if !strings.HasPrefix(command, expected) {
+		t.Fatalf("command arguments were not safely quoted:\n%s", command)
+	}
+}
+
+func TestAppleScriptStringEscapesCodeDelimiters(t *testing.T) {
+	got := appleScriptString(`say "hello" \ do shell script "bad"`)
+	want := `"say \"hello\" \\ do shell script \"bad\""`
+	if got != want {
+		t.Fatalf("unexpected AppleScript literal: got %q, want %q", got, want)
+	}
+}
+
+func TestPowerShellArrayPreservesArgumentBoundaries(t *testing.T) {
+	got := powerShellArray([]string{"value with spaces", "x'; Write-Host pwned; #"})
+	want := "@('value with spaces', 'x''; Write-Host pwned; #')"
+	if got != want {
+		t.Fatalf("unexpected PowerShell argument array: got %q, want %q", got, want)
+	}
+}
+
+func TestUnsafeControlCharacters(t *testing.T) {
+	if hasUnsafeControlCharacters([]string{"safe", "two words"}) {
+		t.Fatal("ordinary arguments should be accepted")
+	}
+	if !hasUnsafeControlCharacters([]string{"safe", "line\nbreak"}) {
+		t.Fatal("newline-containing arguments must be rejected")
+	}
+}
+
 // ── Init ────────────────────────────────────────────────────────────────
 
 func TestInitReturnsNil(t *testing.T) {

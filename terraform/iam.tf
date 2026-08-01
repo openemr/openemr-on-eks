@@ -344,6 +344,15 @@ resource "aws_iam_policy" "loki_s3" {
           "s3:RestoreObject"
         ]
         Resource = "${aws_s3_bucket.loki_storage.arn}/*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "kms:Decrypt",
+          "kms:GenerateDataKey",
+          "kms:DescribeKey"
+        ]
+        Resource = aws_kms_key.s3.arn
       }
     ]
   })
@@ -545,83 +554,4 @@ resource "aws_iam_policy" "mimir_s3" {
 resource "aws_iam_role_policy_attachment" "mimir_s3" {
   role       = aws_iam_role.mimir_s3.name
   policy_arn = aws_iam_policy.mimir_s3.arn
-}
-
-# =============================================================================
-# IAM ROLE AND POLICY FOR ALERTMANAGER S3 STORAGE
-# =============================================================================
-# This configuration creates an IAM role and policy for AlertManager to access S3 storage
-# for cluster state storage in high-availability deployments.
-
-# IAM Role for AlertManager - Service account role for S3 storage access
-resource "aws_iam_role" "alertmanager_s3" {
-  name        = "${var.cluster_name}-alertmanager-s3-role"
-  description = "IAM role for AlertManager to access S3 storage for cluster state"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = {
-          Federated = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}"
-        }
-        Action = "sts:AssumeRoleWithWebIdentity"
-        Condition = {
-          StringEquals = {
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:sub" = "system:serviceaccount:monitoring:alertmanager-prometheus-stack-kube-prom-alertmanager"
-            "${replace(module.eks.cluster_oidc_issuer_url, "https://", "")}:aud" = "sts.amazonaws.com"
-          }
-        }
-      }
-    ]
-  })
-
-  tags = {
-    Name        = "${var.cluster_name}-alertmanager-s3-role"
-    Component   = "monitoring"
-    Description = "AlertManager S3 storage access"
-  }
-}
-
-# IAM Policy for AlertManager S3 access
-resource "aws_iam_policy" "alertmanager_s3" {
-  name        = "${var.cluster_name}-alertmanager-s3-policy"
-  description = "Policy for AlertManager to access S3 storage bucket"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:ListBucket",
-          "s3:GetBucketLocation",
-          "s3:GetBucketVersioning"
-        ]
-        Resource = aws_s3_bucket.alertmanager_storage.arn
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:GetObjectVersion"
-        ]
-        Resource = "${aws_s3_bucket.alertmanager_storage.arn}/*"
-      }
-    ]
-  })
-
-  tags = {
-    Name      = "${var.cluster_name}-alertmanager-s3-policy"
-    Component = "monitoring"
-  }
-}
-
-# Attach the S3 policy to the AlertManager IAM role
-resource "aws_iam_role_policy_attachment" "alertmanager_s3" {
-  role       = aws_iam_role.alertmanager_s3.name
-  policy_arn = aws_iam_policy.alertmanager_s3.arn
 }

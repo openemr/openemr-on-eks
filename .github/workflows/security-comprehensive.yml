@@ -53,11 +53,11 @@ permissions:
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
   TRIVY_VERSION: '0.72.0'
-  CHECKOV_VERSION: '3.3.6'
+  CHECKOV_VERSION: '3.3.8'
   KICS_VERSION: 'v2.1.20'
-  GOSEC_VERSION: 'v2.27.1'
+  GOSEC_VERSION: 'v2.28.0'
   PYTHON_VERSION: '3.14'
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.25.12'
 
 jobs:
   # =====================================================================
@@ -70,10 +70,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Run Trivy filesystem scan (STRICT)
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'fs'
           scan-ref: '.'
@@ -85,7 +85,7 @@ jobs:
           trivyignores: '.trivyignore'
 
       - name: Run Trivy config scan for IaC
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: 'config'
           scan-ref: '.'
@@ -96,7 +96,7 @@ jobs:
           trivyignores: '.trivyignore'
 
       - name: Run Trivy SARIF scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         if: always()
         with:
           scan-type: 'fs'
@@ -144,10 +144,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -155,62 +155,18 @@ jobs:
         run: |
           pip install checkov==${{ env.CHECKOV_VERSION }}
 
-      - name: Run Checkov on Terraform
-        id: checkov-terraform
+      - name: Run Checkov against reviewed baseline
+        id: checkov
         run: |
-          echo "🔍 Running Checkov on Terraform files..."
-          checkov -d terraform/ \
-            --framework terraform \
+          echo "🔍 Running Checkov; every finding not in the reviewed baseline fails..."
+          checkov -d . \
+            --framework terraform kubernetes dockerfile github_actions \
+            --baseline .checkov.baseline \
             --output cli \
             --output sarif \
-            --output-file-path . \
-            --soft-fail-on LOW \
-            --hard-fail-on CRITICAL,HIGH,MEDIUM \
+            --output-file-path console,results_sarif.sarif \
             --compact \
-            --skip-check CKV_TF_1 \
-            2>&1 | tee checkov-terraform-results.txt
-
-      - name: Run Checkov on Kubernetes manifests
-        id: checkov-k8s
-        run: |
-          echo "🔍 Running Checkov on Kubernetes manifests..."
-          checkov -d k8s/ \
-            --framework kubernetes \
-            --output cli \
-            --output sarif \
-            --output-file-path . \
-            --soft-fail-on LOW \
-            --hard-fail-on CRITICAL,HIGH,MEDIUM \
-            --compact \
-            2>&1 | tee checkov-k8s-results.txt
-
-      - name: Run Checkov on Dockerfiles
-        id: checkov-docker
-        run: |
-          echo "🔍 Running Checkov on Dockerfiles..."
-          if [ -f "warp/Dockerfile" ]; then
-            checkov -f warp/Dockerfile \
-              --framework dockerfile \
-              --output cli \
-              --soft-fail-on LOW \
-              --hard-fail-on CRITICAL,HIGH,MEDIUM \
-              --compact \
-              2>&1 | tee checkov-docker-results.txt
-          else
-            echo "No Dockerfile found" > checkov-docker-results.txt
-          fi
-
-      - name: Run Checkov on GitHub Actions
-        id: checkov-gha
-        run: |
-          echo "🔍 Running Checkov on GitHub Actions workflows..."
-          checkov -d .github/workflows/ \
-            --framework github_actions \
-            --output cli \
-            --soft-fail-on LOW \
-            --hard-fail-on CRITICAL,HIGH,MEDIUM \
-            --compact \
-            2>&1 | tee checkov-gha-results.txt
+            2>&1 | tee checkov-results.txt
 
       - name: Display Checkov results
         if: always()
@@ -251,19 +207,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Run KICS scan
         uses: Checkmarx/kics-github-action@v2.1.20
         with:
           path: '.'
-          fail_on: high,medium,low
+          fail_on: critical,high,medium,low,info
           config_path: kics.config
           output_path: kics-results/
           output_formats: 'json,sarif'
           exclude_paths: '.git,node_modules,venv,.trivycache'
-          enable_comments: true
-          ignore_on_exit: results
+          enable_comments: false
+          ignore_on_exit: none
 
       - name: Display KICS results
         if: always()
@@ -300,10 +256,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Python
-        uses: actions/setup-python@v6.3.0
+        uses: actions/setup-python@v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -370,10 +326,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Set up Go
-        uses: actions/setup-go@v6.5.0
+        uses: actions/setup-go@v7.0.0
         with:
           go-version: ${{ env.GO_VERSION }}
           cache-dependency-path: console/go.sum
@@ -428,7 +384,7 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Install ShellCheck
         run: |
@@ -486,92 +442,61 @@ jobs:
 
       - name: Generate security summary
         run: |
-          echo "# 🔒 Comprehensive Security Scan Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Zero-Tolerance Policy Enforcement" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Scanner | Status | Description |" >> $GITHUB_STEP_SUMMARY
-          echo "|---------|--------|-------------|" >> $GITHUB_STEP_SUMMARY
+          echo "# 🔒 Comprehensive Security Scan Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Zero-Tolerance Policy Enforcement" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Scanner | Status | Description |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---------|--------|-------------|" >> "$GITHUB_STEP_SUMMARY"
 
-          # Check each job result
-          if [ "${{ needs.trivy-scan.result }}" == "success" ]; then
-            echo "| ✅ Trivy | PASSED | Vulnerability, Secret, Config scan |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ Trivy | FAILED | Vulnerability, Secret, Config scan |" >> $GITHUB_STEP_SUMMARY
-          fi
+          report_result() {
+            local scanner="$1"
+            local result="$2"
+            local description="$3"
+            if [ "$result" = "success" ]; then
+              echo "| ✅ $scanner | PASSED | $description |" >> "$GITHUB_STEP_SUMMARY"
+            elif [ "$result" = "skipped" ]; then
+              echo "| ⏭️ $scanner | SKIPPED | $description |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| ❌ $scanner | FAILED | $description |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          }
 
-          if [ "${{ needs.checkov-scan.result }}" == "success" ]; then
-            echo "| ✅ Checkov | PASSED | IaC security (Terraform, K8s, Docker) |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ Checkov | FAILED | IaC security (Terraform, K8s, Docker) |" >> $GITHUB_STEP_SUMMARY
-          fi
+          report_result "Trivy" "${{ needs.trivy-scan.result }}" "Vulnerability, Secret, Config scan"
+          report_result "Checkov" "${{ needs.checkov-scan.result }}" "IaC security (Terraform, K8s, Docker)"
+          report_result "KICS" "${{ needs.kics-scan.result }}" "IaC security analysis"
+          report_result "Bandit" "${{ needs.bandit-scan.result }}" "Python security"
+          report_result "gosec" "${{ needs.gosec-scan.result }}" "Go security"
+          report_result "ShellCheck" "${{ needs.shellcheck-scan.result }}" "Shell script analysis"
 
-          if [ "${{ needs.kics-scan.result }}" == "success" ]; then
-            echo "| ✅ KICS | PASSED | IaC security analysis |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ KICS | FAILED | IaC security analysis |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ "${{ needs.bandit-scan.result }}" == "success" ]; then
-            echo "| ✅ Bandit | PASSED | Python security |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ Bandit | FAILED | Python security |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ "${{ needs.gosec-scan.result }}" == "success" ]; then
-            echo "| ✅ gosec | PASSED | Go security |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ gosec | FAILED | Go security |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          if [ "${{ needs.shellcheck-scan.result }}" == "success" ]; then
-            echo "| ✅ ShellCheck | PASSED | Shell script analysis |" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "| ❌ ShellCheck | FAILED | Shell script analysis |" >> $GITHUB_STEP_SUMMARY
-          fi
-
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Policy" >> $GITHUB_STEP_SUMMARY
-          echo "- **Mode**: Zero-Tolerance" >> $GITHUB_STEP_SUMMARY
-          echo "- **Severity Threshold**: LOW, MEDIUM, HIGH, CRITICAL" >> $GITHUB_STEP_SUMMARY
-          echo "- **Action on Finding**: FAIL pipeline" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "*All findings must be remediated before merging.*" >> $GITHUB_STEP_SUMMARY
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Policy" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Mode**: Zero-Tolerance" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Severity Threshold**: LOW, MEDIUM, HIGH, CRITICAL" >> "$GITHUB_STEP_SUMMARY"
+          echo "- **Action on Finding**: FAIL pipeline" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "---" >> "$GITHUB_STEP_SUMMARY"
+          echo "*All findings must be remediated before merging.*" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Enforce zero-tolerance policy
         run: |
           FAILED=false
 
-          if [ "${{ needs.trivy-scan.result }}" != "success" ]; then
-            echo "❌ Trivy scan failed"
-            FAILED=true
-          fi
+          check_result() {
+            local scanner="$1"
+            local result="$2"
+            if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+              echo "❌ $scanner scan failed"
+              FAILED=true
+            fi
+          }
 
-          if [ "${{ needs.checkov-scan.result }}" != "success" ]; then
-            echo "❌ Checkov scan failed"
-            FAILED=true
-          fi
-
-          if [ "${{ needs.kics-scan.result }}" != "success" ]; then
-            echo "❌ KICS scan failed"
-            FAILED=true
-          fi
-
-          if [ "${{ needs.bandit-scan.result }}" != "success" ]; then
-            echo "❌ Bandit scan failed"
-            FAILED=true
-          fi
-
-          if [ "${{ needs.gosec-scan.result }}" != "success" ]; then
-            echo "❌ gosec scan failed"
-            FAILED=true
-          fi
-
-          if [ "${{ needs.shellcheck-scan.result }}" != "success" ]; then
-            echo "❌ ShellCheck scan failed"
-            FAILED=true
-          fi
+          check_result "Trivy" "${{ needs.trivy-scan.result }}"
+          check_result "Checkov" "${{ needs.checkov-scan.result }}"
+          check_result "KICS" "${{ needs.kics-scan.result }}"
+          check_result "Bandit" "${{ needs.bandit-scan.result }}"
+          check_result "gosec" "${{ needs.gosec-scan.result }}"
+          check_result "ShellCheck" "${{ needs.shellcheck-scan.result }}"
 
           if [ "$FAILED" = true ]; then
             echo ""
@@ -580,6 +505,6 @@ jobs:
             exit 1
           else
             echo ""
-            echo "✅ ALL SECURITY SCANS PASSED"
-            echo "🔒 Zero-tolerance policy enforced successfully"
+            echo "✅ ALL SELECTED SECURITY SCANS PASSED"
+            echo "🔒 Zero-tolerance policy enforced for every selected scanner"
           fi

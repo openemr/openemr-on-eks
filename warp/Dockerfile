@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_2: Batch CLI image exits after its command; it has no long-running service to probe.
 FROM python:3.14-slim
 
 WORKDIR /app

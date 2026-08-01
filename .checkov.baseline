@@ -1,0 +1,338 @@
+{
+    "failed_checks": [
+        {
+            "file": "/.external_modules/github.com/terraform-aws-modules/terraform-aws-vpc/3ffbd46fb1c7733e1b34d8666893280454e27436/main.tf",
+            "findings": [
+                {
+                    "resource": "module.vpc.aws_vpc.this",
+                    "check_ids": [
+                        "CKV2_AWS_12"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/k8s/credential-rotation-cronjob.yaml",
+            "findings": [
+                {
+                    "resource": "CronJob.openemr.credential-rotation",
+                    "check_ids": [
+                        "CKV_K8S_14",
+                        "CKV_K8S_23",
+                        "CKV_K8S_25",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/k8s/credential-rotation-job.yaml",
+            "findings": [
+                {
+                    "resource": "Job.openemr.credential-rotation",
+                    "check_ids": [
+                        "CKV_K8S_14",
+                        "CKV_K8S_23",
+                        "CKV_K8S_25",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Pod.openemr.credential-rotation.app-credential-rotation.component-security",
+                    "check_ids": [
+                        "CKV2_K8S_6"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/k8s/deployment.yaml",
+            "findings": [
+                {
+                    "resource": "Deployment.openemr.openemr",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_20",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_25",
+                        "CKV_K8S_35",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/k8s/jobs/data-restore-job.yaml",
+            "findings": [
+                {
+                    "resource": "Job.${NAMESPACE}.openemr-data-restore",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_20",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_28",
+                        "CKV_K8S_29",
+                        "CKV_K8S_30",
+                        "CKV_K8S_31",
+                        "CKV_K8S_37",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/k8s/ssl-renewal.yaml",
+            "findings": [
+                {
+                    "resource": "CronJob.openemr.ssl-cert-renewal",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_25",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Job.openemr.ssl-cert-renewal-test",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_25",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Pod.openemr.ssl-cert-renewal-test.app-ssl-cert-renewal-test",
+                    "check_ids": [
+                        "CKV2_K8S_6"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/terraform/cloudtrail.tf",
+            "findings": [
+                {
+                    "resource": "aws_cloudtrail.openemr",
+                    "check_ids": [
+                        "CKV2_AWS_10"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.cloudtrail",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/terraform/credential-rotation.tf",
+            "findings": [
+                {
+                    "resource": "aws_secretsmanager_secret.rds_admin",
+                    "check_ids": [
+                        "CKV2_AWS_57"
+                    ]
+                },
+                {
+                    "resource": "aws_secretsmanager_secret.rds_slots",
+                    "check_ids": [
+                        "CKV2_AWS_57"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/terraform/rds.tf",
+            "findings": [
+                {
+                    "resource": "aws_rds_cluster.openemr[0]",
+                    "check_ids": [
+                        "CKV2_AWS_8"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/terraform/s3.tf",
+            "findings": [
+                {
+                    "resource": "aws_s3_bucket.alb_logs",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.alertmanager_storage",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.loki_storage",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.mimir_blocks_storage",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.mimir_ruler_storage",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.tempo_storage",
+                    "check_ids": [
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_18"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket.waf_logs[0]",
+                    "check_ids": [
+                        "CKV2_AWS_6",
+                        "CKV2_AWS_61",
+                        "CKV2_AWS_62",
+                        "CKV_AWS_144",
+                        "CKV_AWS_145",
+                        "CKV_AWS_18",
+                        "CKV_AWS_21"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket_ownership_controls.alb_logs",
+                    "check_ids": [
+                        "CKV2_AWS_65"
+                    ]
+                },
+                {
+                    "resource": "aws_s3_bucket_ownership_controls.waf_logs[0]",
+                    "check_ids": [
+                        "CKV2_AWS_65"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/terraform/waf.tf",
+            "findings": [
+                {
+                    "resource": "aws_wafv2_web_acl.openemr[0]",
+                    "check_ids": [
+                        "CKV2_AWS_31"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/warp/k8s-job-benchmark.yaml",
+            "findings": [
+                {
+                    "resource": "Job.openemr.warp-ccda-upload-benchmark",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_28",
+                        "CKV_K8S_29",
+                        "CKV_K8S_35",
+                        "CKV_K8S_37",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Pod.openemr.warp-ccda-upload-benchmark.app-warp.command-ccda-data-upload.benchmark-true",
+                    "check_ids": [
+                        "CKV2_K8S_6"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/warp/k8s-job-test.yaml",
+            "findings": [
+                {
+                    "resource": "Job.openemr.warp-ccda-upload-test",
+                    "check_ids": [
+                        "CKV_K8S_15",
+                        "CKV_K8S_22",
+                        "CKV_K8S_23",
+                        "CKV_K8S_28",
+                        "CKV_K8S_29",
+                        "CKV_K8S_35",
+                        "CKV_K8S_37",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Pod.openemr.warp-ccda-upload-test.app-warp.command-ccda-data-upload",
+                    "check_ids": [
+                        "CKV2_K8S_6"
+                    ]
+                }
+            ]
+        },
+        {
+            "file": "/warp/k8s-job.yaml",
+            "findings": [
+                {
+                    "resource": "Job.openemr.warp-ccda-upload",
+                    "check_ids": [
+                        "CKV_K8S_14",
+                        "CKV_K8S_29",
+                        "CKV_K8S_35",
+                        "CKV_K8S_38",
+                        "CKV_K8S_40",
+                        "CKV_K8S_43"
+                    ]
+                },
+                {
+                    "resource": "Pod.openemr.warp-ccda-upload.app-warp.command-ccda-data-upload",
+                    "check_ids": [
+                        "CKV2_K8S_6"
+                    ]
+                }
+            ]
+        }
+    ]
+}

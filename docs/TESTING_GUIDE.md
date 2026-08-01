@@ -250,7 +250,7 @@ This test ensures that the optional monitoring stack doesn't interfere with core
 **Running the test:**
 
 ```bash
-# Full test (~2.5 hours on OpenEMR 8.1.x)
+# Full test (~2.5 hour historical 8.1.x benchmark; remeasure for 8.2.x)
 ./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
 
 # Chunked execution for development (see docs/END_TO_END_TESTING_REQUIREMENTS.md)
@@ -302,6 +302,33 @@ Included in the main script validation suite:
 ```
 
 See [Disaster Recovery Python Architecture](DISASTER_RECOVERY_PYTHON.md) for the migration plan and CLI reference.
+
+### 8. Codebase Knowledge MCP Tests
+
+The local read-only MCP package has unit, policy, transport, CLI, and
+no-network tests. Its locked development environment also runs Ruff, mypy,
+Bandit, coverage, a package build, an installability check through `uvx`, and
+an offline runtime check through the synchronized project environment.
+
+```bash
+uv sync --project tools/codebase-mcp --frozen --extra dev
+uv run --project tools/codebase-mcp ruff check \
+  --config tools/codebase-mcp/pyproject.toml tools/codebase-mcp
+uv run --project tools/codebase-mcp ruff format --check \
+  --config tools/codebase-mcp/pyproject.toml tools/codebase-mcp
+uv run --project tools/codebase-mcp mypy \
+  --config-file tools/codebase-mcp/pyproject.toml tools/codebase-mcp/src
+uv run --project tools/codebase-mcp bandit \
+  -c tools/codebase-mcp/pyproject.toml -q -r tools/codebase-mcp/src
+uv run --project tools/codebase-mcp pytest tools/codebase-mcp/tests
+uv build --project tools/codebase-mcp
+uvx --from ./tools/codebase-mcp openemr-eks-mcp --repo-root . --check
+uv run --project tools/codebase-mcp --frozen --offline \
+  openemr-eks-mcp --repo-root . --check
+```
+
+See [Codebase Knowledge MCP](KNOWLEDGE_MCP.md) for its interface and security
+boundaries.
 
 ## 🚀 Running Tests
 

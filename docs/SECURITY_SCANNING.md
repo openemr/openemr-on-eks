@@ -1,8 +1,9 @@
 # Security Scanning Guide
 
 This document describes the comprehensive security scanning configuration for the
-OpenEMR on EKS project. The security scanning follows a **ZERO-TOLERANCE** policy
-where any finding at any severity level will fail the CI/CD pipeline.
+OpenEMR on EKS project. The security scanning follows a **ZERO-TOLERANCE FOR
+NEW FINDINGS** policy: any finding at any severity level that is not in the
+reviewed Checkov baseline fails the CI/CD pipeline.
 
 ## Table of Contents
 
@@ -48,11 +49,12 @@ coverage across different security domains:
 
 ## Zero-Tolerance Policy
 
-All security scanners are configured with a **fail-fast, zero-tolerance** policy:
+All security scanners are configured with a **fail-fast** policy:
 
 - **Severity Levels**: CRITICAL, HIGH, MEDIUM, LOW
-- **Action on Finding**: Pipeline FAILS immediately
-- **No Exceptions**: All findings must be remediated before merge
+- **Action on New Finding**: Pipeline FAILS immediately
+- **Existing Checkov Debt**: Enumerated by resource and check ID in
+  `.checkov.baseline`; changes must not add findings
 
 ### Why Zero-Tolerance?
 
@@ -112,15 +114,12 @@ Only add entries after security team review and approval. Each entry must includ
 
 File: `.checkov.yaml`
 
-```yaml
-hard-fail-on:
-  - CRITICAL
-  - HIGH
-  - MEDIUM
-
-soft-fail-on:
-  - LOW
-```
+Checkov uses its default non-zero exit behavior for every non-skipped finding.
+The configuration contains only reviewed, documented exceptions; no severity is
+soft-failed. The committed `.checkov.baseline` makes pre-existing findings
+visible while allowing CI to reject every new finding. It is a debt inventory,
+not an approval: updates require security review and should reduce, never
+silently expand, the baseline.
 
 ## Pre-commit Hooks
 
@@ -172,13 +171,14 @@ When a security scan fails:
 
 ### Requesting Exceptions
 
-If a finding is a verified false positive:
+If a finding is a verified false positive or an existing item must be baselined:
 
 1. **Document the justification** in detail
 2. **Implement compensating controls** if applicable
 3. **Create a tracking ticket** for review
 4. **Request security team review** and approval
-5. **Add to ignore file** with full documentation
+5. **Add the narrowest possible exception** with full documentation; never
+   regenerate the baseline solely to make CI pass
 
 ## Scanner Details
 

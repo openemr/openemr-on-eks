@@ -254,6 +254,108 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
   assert_success
 }
 
+# ── UNIT: stable upstream version selection ────────────────────────────────
+
+@test "UNIT: Docker stable lookup returns newest clean semantic version" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"results":[{"name":"8.1.1"},{"name":"8.2.0"},{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
+    }
+    source "$1"
+    get_latest_docker_version "fluent/fluent-bit"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "8.2.0" ]
+}
+
+@test "UNIT: Docker stable lookup does not reinterpret prerelease tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"results":[{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
+    }
+    source "$1"
+    get_latest_docker_version "fluent/fluent-bit"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_failure
+  [ -z "$output" ]
+}
+
+@test "UNIT: OpenEMR lookup trusts official releases instead of newer Docker tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_openemr_release_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"tag_name":"v8_2_0","draft":false,"prerelease":false}'"'"'
+    }
+    source "$1"
+    get_latest_openemr_release_version
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "8.2.0" ]
+  grep -Fq 'openemr_latest=$(get_latest_openemr_release_version)' "$SCRIPT"
+}
+
+@test "UNIT: Helm lookup excludes weekly prereleases" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_helm_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      cat <<'"'"'YAML'"'"'
+entries:
+  mimir-distributed:
+    - version: 6.2.0-weekly.402
+    - version: 6.1.0
+    - version: 6.0.6
+YAML
+    }
+    source "$1"
+    get_latest_helm_version "mimir-distributed"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "6.1.0" ]
+}
+
+@test "UNIT: cert-manager Helm lookup restores release-tag v prefix" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_helm_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      cat <<'"'"'YAML'"'"'
+entries:
+  cert-manager:
+    - version: 1.21.1
+    - version: 1.21.0-alpha.1
+YAML
+    }
+    source "$1"
+    get_latest_helm_version "cert-manager"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v1.21.1" ]
+}
+
+@test "Tempo 3.x and Loki community upgrades require explicit migration" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  [ "$(yq eval '.monitoring.loki.update_policy' "$PROJECT_ROOT/versions.yaml")" = "manual-migration" ]
+  [ "$(yq eval '.monitoring.tempo.update_policy' "$PROJECT_ROOT/versions.yaml")" = "manual-migration" ]
+  grep -Fq '.monitoring.loki.update_policy' "$SCRIPT"
+  grep -Fq '.monitoring.tempo.update_policy' "$SCRIPT"
+}
+
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
 
 @test "UNIT: show_help prints usage and all component types" {

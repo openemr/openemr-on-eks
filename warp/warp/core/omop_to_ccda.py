@@ -61,6 +61,10 @@ class OMOPToCCDAConverter:
 
     def _load_from_s3(self, table_name: str) -> List[Dict]:
         """Load CSV file from S3 - handles compressed files and CDM naming"""
+        s3_client = self.s3_client
+        if s3_client is None:
+            raise RuntimeError("S3 client is not configured")
+
         # Try different naming conventions
         possible_keys = [
             f"{self.s3_prefix.rstrip('/')}/CDM_{table_name.upper()}.csv.bz2",
@@ -72,7 +76,7 @@ class OMOPToCCDAConverter:
         for key in possible_keys:
             try:
                 logger.debug(f"Trying to load from s3://{self.s3_bucket}/{key}")
-                obj = self.s3_client.get_object(Bucket=self.s3_bucket, Key=key)
+                obj = s3_client.get_object(Bucket=self.s3_bucket, Key=key)
                 content = obj["Body"].read()
 
                 # Handle bz2 compression
@@ -261,17 +265,19 @@ class OMOPToCCDAConverter:
             family.text = person_data.get("last_name", "")
 
         # Administrative gender
-        if person_data.get("gender_concept_id"):
-            gender_code = self._map_gender(person_data.get("gender_concept_id"))
+        gender_concept_id = person_data.get("gender_concept_id")
+        if gender_concept_id:
+            gender_code = self._map_gender(gender_concept_id)
             if gender_code:
                 gender = SubElement(patient, "{urn:hl7-org:v3}administrativeGenderCode")
                 gender.set("code", gender_code)
                 gender.set("codeSystem", "2.16.840.1.113883.5.1")
 
         # Birth time
-        if person_data.get("birth_datetime"):
+        birth_datetime = person_data.get("birth_datetime")
+        if birth_datetime:
             birth_time = SubElement(patient, "{urn:hl7-org:v3}birthTime")
-            birth_time.set("value", self._format_datetime(person_data.get("birth_datetime")))
+            birth_time.set("value", self._format_datetime(birth_datetime))
 
         # Add component section for problems/conditions
         if conditions:
@@ -297,10 +303,11 @@ class OMOPToCCDAConverter:
                 code.set("codeSystem", "2.16.840.1.113883.6.96")
 
                 effective_time = SubElement(act, "{urn:hl7-org:v3}effectiveTime")
-                if condition.get("condition_start_date"):
+                condition_start_date = condition.get("condition_start_date")
+                if condition_start_date:
                     effective_time.set(
                         "value",
-                        self._format_date(condition.get("condition_start_date")),
+                        self._format_date(condition_start_date),
                     )
 
         # Add medications section

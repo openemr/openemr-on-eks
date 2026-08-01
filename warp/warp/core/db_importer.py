@@ -67,8 +67,11 @@ class OpenEMRDBImporter:
 
     def _get_next_pid(self) -> int:
         """Get the next patient ID (pid)"""
+        connection = self.connection
+        if connection is None:
+            raise RuntimeError("Database not connected")
         try:
-            with self.connection.cursor() as cursor:
+            with connection.cursor() as cursor:
                 cursor.execute("SELECT MAX(pid) as max_pid FROM patient_data")
                 result = cursor.fetchone()
                 max_pid = result["max_pid"] if result and result["max_pid"] else 0

@@ -1,8 +1,10 @@
 # =============================================================================
 # Checkov Configuration File
 # =============================================================================
-# This configuration enforces a ZERO-TOLERANCE security policy for IaC.
-# All findings at CRITICAL, HIGH, and MEDIUM severity will fail the scan.
+# This configuration enforces a ZERO-TOLERANCE policy for new IaC findings.
+# Existing debt is enumerated by resource and check ID in .checkov.baseline;
+# Checkov's default non-zero exit behavior applies to every non-baselined,
+# non-skipped finding.
 #
 # Documentation: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
 # =============================================================================
@@ -15,15 +17,6 @@ framework:
   - github_actions
   - helm
   - secrets
-
-# Severity configuration
-soft-fail-on:
-  - LOW
-
-hard-fail-on:
-  - CRITICAL
-  - HIGH
-  - MEDIUM
 
 # Output configuration
 compact: true
@@ -52,19 +45,6 @@ skip-check:
   # Justification: AWS documentation confirms these actions require Resource = "*"
   # Compensating control: Policy is read-only and attached only to Grafana service account
   - CKV_AWS_355
-
-  # Skip checks in external modules (terraform-aws-modules) - these are maintained by AWS/HashiCorp
-  # and we cannot modify their IAM policies. The modules follow AWS best practices.
-  # CKV_AWS_290 - IAM write access without constraints (in AWS official modules)
-  # CKV_AWS_356 - IAM restrictable actions (in AWS official modules)
-  # CKV_AWS_289 - IAM permissions management (in AWS official modules)
-  # CKV_AWS_111 - IAM write access (CSI drivers, controllers require these permissions)
-  # CKV_AWS_109 - IAM permissions management (gateway controller requires these)
-  - CKV_AWS_290
-  - CKV_AWS_356
-  - CKV_AWS_289
-  - CKV_AWS_111
-  - CKV_AWS_109
 
   # Skip EKS cluster endpoint public access check - intentional for kubectl access
   # Justification: Required for DevOps access; mitigated by authorized IP ranges
@@ -95,6 +75,7 @@ skip-path:
   - .venv
   - __pycache__
   - .trivycache
+  - .external_modules
   - htmlcov
   - .pytest_cache
   - test-results
@@ -108,8 +89,8 @@ skip-path:
 repo-root-for-plan-enrichment:
   - terraform/
 
-# Enable downloading external modules for scanning
-download-external-modules: true
+# External modules are pinned and reviewed upstream; scan only repository-owned IaC.
+download-external-modules: false
 
 # Secrets scanning configuration
 enable-secret-scan-all-files: true

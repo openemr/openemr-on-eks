@@ -51,7 +51,7 @@ graph TB
         S3_LOKI[("Loki S3 Bucket<br/>720h retention")]
         S3_TEMPO[("Tempo S3 Bucket<br/>90 day retention")]
         S3_MIMIR[("Mimir S3 Bucket<br/>365 day retention")]
-        S3_AM[("AlertManager S3<br/>State Storage")]
+        S3_MIMIR_AM[("Mimir Alertmanager S3<br/>State Storage")]
     end
 
     subgraph EXT["External Access"]
@@ -80,7 +80,7 @@ graph TB
     LOKI -->|"IRSA<br/>S3 PutObject"| S3_LOKI
     TEMPO -->|"IRSA<br/>S3 PutObject"| S3_TEMPO
     MIMIR -->|"IRSA<br/>S3 PutObject"| S3_MIMIR
-    ALERT -->|"IRSA<br/>S3 State"| S3_AM
+    MIMIR -->|"IRSA<br/>Alert State"| S3_MIMIR_AM
 
     %% External Access
     PF -->|":3000"| GRAF
@@ -93,7 +93,7 @@ graph TB
 
     class PROM,GRAF,LOKI,TEMPO,MIMIR,OTEBPF,ALERT monitoring
     class OE_POD,FB,SM,PR openemr
-    class S3_LOKI,S3_TEMPO,S3_MIMIR,S3_AM storage
+    class S3_LOKI,S3_TEMPO,S3_MIMIR,S3_MIMIR_AM storage
     class PF external
 ```
 
@@ -106,10 +106,10 @@ graph TB
 | **Loki** | N/A | 720 hours | AWS S3 (Object Storage) | Variable (lifecycle policies) |
 | **Tempo** | N/A | 90 days | AWS S3 (Object Storage) | Variable (lifecycle policies) |
 | **Mimir** | N/A | 365 days | AWS S3 (Object Storage) | Variable (lifecycle policies) |
-| **AlertManager** | 5Gi | Persistent | gp3-monitoring-encrypted (EBS) + S3 state | $0.40/month + S3 |
+| **AlertManager** | 5Gi | Persistent | gp3-monitoring-encrypted (EBS) | $0.40/month |
 
-**S3 Storage Architecture (Loki, Tempo, Mimir, AlertManager):**
-- **Production-Grade Storage**: All components use AWS S3 for primary storage instead of filesystem storage
+**S3 Storage Architecture (Loki, Tempo, and Mimir):**
+- **Production-Grade Storage**: Loki, Tempo, and Mimir use AWS S3 for primary object storage
 - **Recommendation**: As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments
 - **Benefits**:
   - **Durability**: 99.999999999% (11 nines) durability with S3
@@ -123,7 +123,10 @@ graph TB
   - **Loki**: Log aggregation (720h retention, 720 day S3 lifecycle)
   - **Tempo**: Distributed tracing (90 day retention)
   - **Mimir**: Long-term metrics storage (365 day retention, Prometheus remote write)
-  - **AlertManager**: Cluster state storage (high availability)
+  - **Mimir Alertmanager**: Alert state for Mimir's embedded Alertmanager subsystem
+
+The kube-prometheus-stack Alertmanager uses its encrypted PVC. Alertmanager
+does not support S3 as a drop-in replacement for its local state directory.
 
 See pricing documentation for EBS [here](https://aws.amazon.com/ebs/pricing/).
 
@@ -196,13 +199,13 @@ graph TB
 ### Autoscaling with EKS Auto Mode
 
 ```yaml
-# Two-layer autoscaling architecture
-Layer 1: Pod-level (HPA) - Fully Configurable
-├── Grafana: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
-├── Prometheus: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+# Two-layer scaling architecture
+Layer 1: Pod-level
+├── Grafana: fixed at 1 replica (single RWO PVC, Recreate strategy)
+├── Prometheus: static replica count (min and max settings must match)
 ├── Loki (distributed mode): Read/Write/Backend components, each 2-3 replicas (CPU 70%, Memory 80%) [Configurable]
-├── Tempo: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
-├── Mimir: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
+├── Tempo: Distributor/Querier/Query Frontend 1-3 replicas (CPU 70%, Memory 80%); Ingester static
+├── Mimir: Gateway 1-3 replicas; core components use the configured minimum
 ├── AlertManager: 1-3 replicas (CPU 70%, Memory 80%) [Configurable]
 
 Layer 2: Node-level (EKS Auto Mode)
@@ -212,12 +215,14 @@ Layer 2: Node-level (EKS Auto Mode)
 
 # Configuration via environment variables:
 # ENABLE_AUTOSCALING="1"              # Enable/disable autoscaling
-# GRAFANA_MIN_REPLICAS="1"            # Min replicas per component
-# GRAFANA_MAX_REPLICAS="3"            # Max replicas per component
-# TEMPO_MIN_REPLICAS="1"              # Min Tempo replicas
-# TEMPO_MAX_REPLICAS="3"              # Max Tempo replicas
-# MIMIR_MIN_REPLICAS="1"              # Min Mimir replicas
-# MIMIR_MAX_REPLICAS="3"              # Max Mimir replicas
+# GRAFANA_MIN_REPLICAS="1"            # Fixed at 1
+# GRAFANA_MAX_REPLICAS="1"            # Must match the minimum
+# PROMETHEUS_MIN_REPLICAS="1"         # Static replica count
+# PROMETHEUS_MAX_REPLICAS="1"         # Must match the minimum
+# TEMPO_MIN_REPLICAS="1"              # Tempo baseline/HPA minimum
+# TEMPO_MAX_REPLICAS="3"              # Tempo stateless-component HPA maximum
+# MIMIR_MIN_REPLICAS="1"              # Mimir core replicas/gateway HPA minimum
+# MIMIR_MAX_REPLICAS="3"              # Mimir gateway HPA maximum
 # OTEBPF_ENABLED="1"                  # Enable OTeBPF (0 or 1)
 # HPA_CPU_TARGET="70"                 # CPU target percentage
 # HPA_MEMORY_TARGET="80"              # Memory target percentage
@@ -268,10 +273,11 @@ terraform output tempo_s3_role_arn
 terraform output mimir_s3_bucket_name
 terraform output mimir_s3_role_arn
 terraform output alertmanager_s3_bucket_name
-terraform output alertmanager_s3_role_arn
 ```
 
-The installation script will automatically retrieve the S3 bucket names and IAM role ARNs from Terraform outputs. Without these, component installations will fail.
+The Mimir IAM role also grants access to the bucket used by Mimir's embedded
+Alertmanager. The installation script retrieves the bucket names and component
+role ARNs from Terraform outputs. Without these, component installations fail.
 
 ### Cluster Capacity Requirements
 
@@ -321,7 +327,7 @@ cat credentials/monitoring-credentials.txt
 | EC2 Compute (Auto Mode) | 2 t3.small equiv. AVG ($0.0208/hr) | $30.36           |
 | Auto Mode Fee (12%) | Management overhead                | $3.64            |
 | Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80           |
-| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$10-30           |
+| **S3 Storage (Loki, Tempo, Mimir)** | Variable (lifecycle policies) | ~$10-30           |
 | **Total** |                                    | **~$55-75/month** |
 
 #### Hospital
@@ -331,7 +337,7 @@ cat credentials/monitoring-credentials.txt
 | EC2 Compute (Auto Mode) | 2 t3.medium equiv. AVG ($0.0416/hr) | $60.74           |
 | Auto Mode Fee (12%) | Management overhead                 | $7.29            |
 | Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80           |
-| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$15-40          |
+| **S3 Storage (Loki, Tempo, Mimir)** | Variable (lifecycle policies) | ~$15-40          |
 | **Total** |                                     | **~$94-119/month** |
 
 #### Large Hospital
@@ -341,7 +347,7 @@ cat credentials/monitoring-credentials.txt
 | EC2 Compute (Auto Mode) | 2 t3.large equiv. AVG ($0.0832/hr) | $121.47           |
 | Auto Mode Fee (12%) | Management overhead                | $14.58            |
 | Storage (135Gi EBS + S3) | GP3 encrypted (Prometheus 100Gi, Grafana 20Gi, Loki 10Gi, AlertManager 5Gi) | $10.80            |
-| **S3 Storage (Loki, Tempo, Mimir, AlertManager)** | Variable (lifecycle policies) | ~$25-60           |
+| **S3 Storage (Loki, Tempo, Mimir)** | Variable (lifecycle policies) | ~$25-60           |
 | **Total** |                                    | **~$172-207/month** |
 
 **S3 Storage Cost Notes:**
@@ -386,7 +392,10 @@ See complete reference in this project at [monitoring/openemr-monitoring.conf.ex
 
 ### Autoscaling Configuration
 
-The monitoring stack includes comprehensive autoscaling capabilities that can be customized for your environment:
+The monitoring stack autos-scales compatible distributed components. Grafana
+remains single-replica because it uses one RWO PVC, and Prometheus uses a static
+replica count because kube-prometheus-stack does not expose the attempted
+chart-level HPA configuration.
 
 #### Basic Autoscaling Settings
 
@@ -402,13 +411,13 @@ export HPA_MEMORY_TARGET="80" # Memory usage percentage (default: 80%)
 #### Component-Specific Replica Limits
 
 ```bash
-# Grafana autoscaling
-export GRAFANA_MIN_REPLICAS="1" # Minimum replicas (default: 1)
-export GRAFANA_MAX_REPLICAS="3" # Maximum replicas (default: 3)
+# Grafana is fixed at one replica with its single RWO PVC
+export GRAFANA_MIN_REPLICAS="1"
+export GRAFANA_MAX_REPLICAS="1"
 
-# Prometheus autoscaling
-export PROMETHEUS_MIN_REPLICAS="1" # Minimum replicas (default: 1)
-export PROMETHEUS_MAX_REPLICAS="3" # Maximum replicas (default: 3)
+# Prometheus uses a static replica count; min and max must match
+export PROMETHEUS_MIN_REPLICAS="1"
+export PROMETHEUS_MAX_REPLICAS="1"
 
 # Loki autoscaling
 export LOKI_MIN_REPLICAS="1" # Minimum replicas (default: 1)
@@ -418,13 +427,14 @@ export LOKI_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 export ALERTMANAGER_MIN_REPLICAS="1" # Minimum replicas (default: 1)
 export ALERTMANAGER_MAX_REPLICAS="3" # Maximum replicas (default: 3)
 
-# Tempo autoscaling
-export TEMPO_MIN_REPLICAS="1" # Minimum replicas (default: 1)
-export TEMPO_MAX_REPLICAS="3" # Maximum replicas (default: 3)
+# Tempo autoscaling for distributor, querier, and query frontend.
+# The ingester remains at the minimum because autoscaling it can lose data.
+export TEMPO_MIN_REPLICAS="1" # Baseline and HPA minimum (default: 1)
+export TEMPO_MAX_REPLICAS="3" # Stateless-component HPA maximum (default: 3)
 
-# Mimir autoscaling
-export MIMIR_MIN_REPLICAS="1" # Minimum replicas (default: 1)
-export MIMIR_MAX_REPLICAS="3" # Maximum replicas (default: 3)
+# Mimir core components are static; the gateway uses the supported chart HPA.
+export MIMIR_MIN_REPLICAS="1" # Core replicas and gateway minimum (default: 1)
+export MIMIR_MAX_REPLICAS="3" # Gateway HPA maximum (default: 3)
 
 
 
@@ -436,8 +446,8 @@ export OTEBPF_ENABLED="1"         # Enable OTeBPF (default: 1)
 
 **High Availability Setup:**
 ```bash
-export GRAFANA_MIN_REPLICAS="2"
 export PROMETHEUS_MIN_REPLICAS="2"
+export PROMETHEUS_MAX_REPLICAS="2"
 export LOKI_MIN_REPLICAS="2"
 export ALERTMANAGER_MIN_REPLICAS="2"
 export TEMPO_MIN_REPLICAS="2"
@@ -446,8 +456,6 @@ export MIMIR_MIN_REPLICAS="2"
 
 **Cost-Optimized Setup:**
 ```bash
-export GRAFANA_MAX_REPLICAS="2"
-export PROMETHEUS_MAX_REPLICAS="2"
 export LOKI_MAX_REPLICAS="2"
 export ALERTMANAGER_MAX_REPLICAS="2"
 export TEMPO_MAX_REPLICAS="2"
@@ -457,7 +465,7 @@ export HPA_CPU_TARGET="80"        # Higher threshold = less scaling
 
 **High Performance Setup:**
 ```bash
-export GRAFANA_MAX_REPLICAS="5"
+export PROMETHEUS_MIN_REPLICAS="3"
 export PROMETHEUS_MAX_REPLICAS="3"
 export LOKI_MAX_REPLICAS="4"
 export ALERTMANAGER_MAX_REPLICAS="3"
@@ -468,7 +476,7 @@ export HPA_CPU_TARGET="60"        # Lower threshold = more scaling
 
 **Disable Autoscaling:**
 ```bash
-export ENABLE_AUTOSCALING="0"     # All components run with minimum replicas
+export ENABLE_AUTOSCALING="0"     # Compatible distributed components use their minimum replicas
 ```
 
 ## 🌐 Access Methods
@@ -663,6 +671,7 @@ helm list -n monitoring
 # Check for new versions
 helm search repo prometheus-community/kube-prometheus-stack --versions | head -5
 helm search repo grafana/loki --versions | head -5
+helm search repo grafana-community/tempo-distributed --versions | head -5
 
 # Review and optimize retention
 # Adjust based on storage costs and compliance needs
@@ -678,20 +687,9 @@ helm get values prometheus-stack -n monitoring > prometheus-stack-values-backup.
 helm upgrade prometheus-stack prometheus-community/kube-prometheus-stack \
   --namespace monitoring \
   --version <new-version> \
+  --set crds.upgradeJob.enabled=true \
   --values prometheus-values.yaml \
   --timeout 45m --atomic
-
-# Upgrade Loki
-helm upgrade loki grafana/loki \
-  --namespace monitoring \
-  --version <new-version> \
-  --timeout 35m --atomic
-
-# Upgrade Tempo
-helm upgrade tempo grafana-community/tempo-distributed \
-  --namespace monitoring \
-  --version <new-version> \
-  --timeout 35m --atomic
 
 # Upgrade Mimir
 helm upgrade mimir grafana/mimir-distributed \
@@ -699,6 +697,14 @@ helm upgrade mimir grafana/mimir-distributed \
   --version <new-version> \
   --timeout 35m --atomic
 ```
+
+Do not perform a generic major-version Helm upgrade for Loki or Tempo. The
+current Loki chart is on Grafana's maintenance track and its OSS successor is
+in the `grafana-community` repository. Tempo chart 3.x replaces the 2.x
+ingester/compactor architecture with a Kafka-backed pipeline. Both are marked
+`manual-migration` in `versions.yaml` and require dedicated migration plans.
+See the [Loki community migration guide](https://grafana.com/docs/loki/latest/setup/upgrade/upgrade-to-community/)
+and the [Tempo 3 migration guide](https://grafana.com/docs/tempo/latest/set-up-for-tracing/setup-tempo/migrate-to-3/).
 
 ## 📚 Additional Resources
 

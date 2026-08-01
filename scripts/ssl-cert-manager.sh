@@ -430,7 +430,7 @@ deploy_with_certificate() {
         echo -e "${GREEN}✅ Deployment completed successfully with SSL certificate!${NC}"
         echo ""
         echo -e "${YELLOW}Your OpenEMR instance is now accessible with trusted SSL:${NC}"
-        LB_URL=$(kubectl get svc openemr-service -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+        LB_URL=$(kubectl get ingress openemr-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
         if [ -n "$LB_URL" ]; then
             echo "HTTPS URL: https://$LB_URL"
         fi
@@ -480,8 +480,8 @@ show_status() {
     echo -e "${YELLOW}Available ports:${NC}"
     kubectl get service openemr-service -n "$NAMESPACE" -o custom-columns=NAME:.metadata.name,PORTS:.spec.ports[*].port
 
-    # Show LoadBalancer URL
-    LB_URL=$(kubectl get svc openemr-service -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
+    # Show EKS Auto Mode ALB URL
+    LB_URL=$(kubectl get ingress openemr-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null)
     if [ -n "$LB_URL" ]; then
         echo ""
         echo -e "${YELLOW}Access URLs:${NC}"

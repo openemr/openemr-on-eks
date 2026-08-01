@@ -1,3 +1,4 @@
+# checkov:skip=CKV_DOCKER_2: Rotation runs as a finite Job/CronJob and has no service health endpoint.
 ARG PYTHON_VERSION=3.14
 FROM python:${PYTHON_VERSION}-slim
 

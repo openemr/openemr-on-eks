@@ -17,8 +17,24 @@ setup() {
   CRED_ROT_DOCKERFILE="${PROJECT_ROOT}/tools/credential-rotation/Dockerfile"
   CRED_ROT_REQUIREMENTS="${PROJECT_ROOT}/tools/credential-rotation/requirements.txt"
   WARP_REQUIREMENTS="${PROJECT_ROOT}/warp/requirements.txt"
+  WARP_SETUP="${PROJECT_ROOT}/warp/setup.py"
+  WARP_TEST_JOB="${PROJECT_ROOT}/warp/k8s-job-test.yaml"
+  WARP_BENCHMARK_JOB="${PROJECT_ROOT}/warp/k8s-job-benchmark.yaml"
+  WARP_E2E_SCRIPT="${PROJECT_ROOT}/scripts/test-warp-end-to-end.sh"
+  MCP_PYPROJECT="${PROJECT_ROOT}/tools/codebase-mcp/pyproject.toml"
   CI_WORKFLOW="${PROJECT_ROOT}/.github/workflows/ci-cd-tests.yml"
+  CONTRACT_WORKFLOW="${PROJECT_ROOT}/.github/workflows/ci-contract-tests.yml"
+  CONSOLE_WORKFLOW="${PROJECT_ROOT}/.github/workflows/console-ci.yml"
+  SECURITY_WORKFLOW="${PROJECT_ROOT}/.github/workflows/security-comprehensive.yml"
+  CHECKOV_BASELINE="${PROJECT_ROOT}/.checkov.baseline"
+  CONSOLE_GO_MOD="${PROJECT_ROOT}/console/go.mod"
+  OIDC_MAIN_TF="${PROJECT_ROOT}/oidc_provider/main.tf"
   K8S_DIR="${PROJECT_ROOT}/k8s"
+  VARIABLES_TF="${PROJECT_ROOT}/terraform/variables.tf"
+  CLOUDWATCH_TF="${PROJECT_ROOT}/terraform/cloudwatch.tf"
+  DEPLOYMENT_YAML="${K8S_DIR}/deployment.yaml"
+  LOGGING_YAML="${K8S_DIR}/logging.yaml"
+  K8S_DEPLOY_SCRIPT="${K8S_DIR}/deploy.sh"
 }
 
 # ── Helper: extract Terraform output names from outputs.tf + credential-rotation.tf ──
@@ -30,6 +46,39 @@ _all_tf_output_names() {
 # ===========================================================================
 # VERSION CONSISTENCY
 # ===========================================================================
+
+@test "CONTRACT: OpenEMR current version matches Terraform default and parameterized manifest" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver terraform_ver
+  yaml_ver=$(yq eval '.applications.openemr.current' "$VERSIONS_FILE")
+  terraform_ver=$(awk '
+    /^variable "openemr_version"/ { in_block = 1 }
+    in_block && $1 == "default" {
+      gsub(/"/, "", $3)
+      print $3
+      exit
+    }
+  ' "$VARIABLES_TF")
+
+  [ "$terraform_ver" = "$yaml_ver" ]
+  grep -Fq 'image: openemr/openemr:${OPENEMR_VERSION}' "$DEPLOYMENT_YAML"
+  grep -Fq 's/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" deployment.yaml' "$K8S_DEPLOY_SCRIPT"
+}
+
+@test "CONTRACT: Fluent Bit current version matches deployment image" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver manifest_ver
+  yaml_ver=$(yq eval '.applications.fluent_bit.current' "$VERSIONS_FILE")
+  manifest_ver=$(awk '
+    $1 == "image:" && $2 ~ /^fluent\/fluent-bit:/ {
+      sub(/^fluent\/fluent-bit:/, "", $2)
+      print $2
+      exit
+    }
+  ' "$DEPLOYMENT_YAML")
+
+  [ "$manifest_ver" = "$yaml_ver" ]
+}
 
 @test "CONTRACT: credential rotation Dockerfile PYTHON_VERSION matches versions.yaml" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
@@ -120,6 +169,111 @@ _all_tf_output_names() {
   [[ "$output" == *"$yaml_ver"* ]]
 }
 
+@test "CONTRACT: CI workflow UV_VERSION matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.uv.current' "$VERSIONS_FILE")
+  run grep "UV_VERSION:" "$CI_WORKFLOW"
+  [[ "$output" == *"$yaml_ver"* ]]
+}
+
+@test "CONTRACT: knowledge MCP FastMCP pin matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.fastmcp.current' "$VERSIONS_FILE")
+  run grep -F "\"fastmcp==${yaml_ver}\"" "$MCP_PYPROJECT"
+  [ "$status" -eq 0 ]
+}
+
+@test "CONTRACT: knowledge MCP PyYAML pin matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.python_packages.pyyaml.current' "$VERSIONS_FILE")
+  run grep -F "\"PyYAML==${yaml_ver}\"" "$MCP_PYPROJECT"
+  [ "$status" -eq 0 ]
+}
+
+@test "CONTRACT: KICS action version matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver
+  yaml_ver=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE")
+  grep -Fq "KICS_VERSION: '${yaml_ver}'" "$SECURITY_WORKFLOW"
+  grep -Fq "uses: Checkmarx/kics-github-action@${yaml_ver}" "$SECURITY_WORKFLOW"
+}
+
+@test "CONTRACT: every Trivy action matches versions.yaml and avoids moving branches" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver line
+  yaml_ver=$(yq eval '.github_workflows.trivy_action.current' "$VERSIONS_FILE")
+  run grep -h 'uses: aquasecurity/trivy-action@' \
+    "$CI_WORKFLOW" \
+    "$SECURITY_WORKFLOW" \
+    "$CONSOLE_WORKFLOW" \
+    "${PROJECT_ROOT}/warp/.github/workflows/ci.yml"
+  assert_success
+  while IFS= read -r line; do
+    [[ "$line" == *"aquasecurity/trivy-action@${yaml_ver}"* ]]
+  done <<< "$output"
+  [[ "$output" != *"@master"* ]]
+}
+
+@test "CONTRACT: Checkov rejects findings outside the reviewed baseline" {
+  [ -s "$CHECKOV_BASELINE" ]
+  jq -e '.failed_checks | type == "array" and length > 0' "$CHECKOV_BASELINE" >/dev/null
+  grep -Fq -- '--baseline .checkov.baseline' "$SECURITY_WORKFLOW"
+  grep -Fq "'--baseline', '.checkov.baseline'" "${PROJECT_ROOT}/.pre-commit-config.yaml"
+  ! grep -Fq -- '--soft-fail' "$SECURITY_WORKFLOW"
+}
+
+@test "CONTRACT: configurable OpenEMR version propagates to logging and SSL bootstrap" {
+  grep -Fq 'Version     = var.openemr_version' "$CLOUDWATCH_TF"
+  ! grep -Eq 'Version[[:space:]]*=[[:space:]]*"8\.' "$CLOUDWATCH_TF"
+  grep -Fq 'Record              openemr_version ${OPENEMR_VERSION}' "$LOGGING_YAML"
+  grep -Fq 's/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" logging.yaml' "$K8S_DEPLOY_SCRIPT"
+  grep -Fq 'NAMESPACE="$NAMESPACE" OPENEMR_VERSION="$OPENEMR_VERSION"' "$K8S_DEPLOY_SCRIPT"
+}
+
+@test "CONTRACT: deployment renders tracked manifests only in a temporary directory" {
+  grep -Fq 'MANIFEST_DIR=$(mktemp -d' "$K8S_DEPLOY_SCRIPT"
+  grep -Fq 'cp "$SCRIPT_DIR"/*.yaml "$MANIFEST_DIR/"' "$K8S_DEPLOY_SCRIPT"
+  grep -Fq 'cd "$MANIFEST_DIR"' "$K8S_DEPLOY_SCRIPT"
+  grep -Fq 'trap cleanup_rendered_manifests EXIT' "$K8S_DEPLOY_SCRIPT"
+  ! grep -Fq 'cd "$PROJECT_ROOT/k8s"' "$K8S_DEPLOY_SCRIPT"
+}
+
+@test "CONTRACT: Warp minimum Python matches boto3 compatibility" {
+  grep -Fq 'python_requires=">=3.10"' "$WARP_SETUP"
+  grep -Fq "python-version: ['3.10', '3.14.6']" "$CI_WORKFLOW"
+}
+
+@test "CONTRACT: Warp runtime PyMySQL pins match versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local pymysql_ver
+  pymysql_ver=$(yq eval '.python_packages.pymysql.current' "$VERSIONS_FILE")
+  grep -Fq "pymysql==${pymysql_ver}" "$WARP_REQUIREMENTS"
+  grep -Fq "pymysql==${pymysql_ver}" "$WARP_TEST_JOB"
+  grep -Fq "pymysql==${pymysql_ver}" "$WARP_BENCHMARK_JOB"
+  grep -Fq "pymysql==${pymysql_ver}" "$WARP_E2E_SCRIPT"
+}
+
+@test "CONTRACT: Go toolchain matches versions.yaml and gosec minimum" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local go_ver
+  go_ver=$(yq eval '.go_packages.go_version.current' "$VERSIONS_FILE")
+  grep -Fq "go ${go_ver}" "$CONSOLE_GO_MOD"
+  grep -Fq "GO_VERSION: '${go_ver}'" "$CONSOLE_WORKFLOW"
+  grep -Fq "GO_VERSION: '${go_ver}'" "$SECURITY_WORKFLOW"
+  grep -Fq "go-version: '${go_ver}'" "$CONTRACT_WORKFLOW"
+}
+
+@test "CONTRACT: OIDC and primary Terraform roots use the same AWS provider" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local aws_ver
+  aws_ver=$(yq eval '.terraform_modules.terraform_aws.current' "$VERSIONS_FILE")
+  grep -Fq "version = \"${aws_ver}\"" "$OIDC_MAIN_TF"
+  grep -Fq "version = \"${aws_ver}\"" "${PROJECT_ROOT}/terraform/main.tf"
+}
+
 # ===========================================================================
 # TERRAFORM-TO-SCRIPT CONTRACT
 # ===========================================================================
@@ -171,6 +325,19 @@ _all_tf_output_names() {
   for name in cluster_name alb_logs_bucket_name loki_s3_bucket_name tempo_s3_bucket_name mimir_blocks_s3_bucket_name alertmanager_s3_bucket_name backup_vault_name; do
     echo "$outputs" | grep -qx "$name" || {
       echo "Missing Terraform output: $name (referenced in destroy.sh)"
+      return 1
+    }
+  done
+}
+
+@test "CONTRACT: every backup schedule includes all monitoring S3 buckets" {
+  local backup_tf="${PROJECT_ROOT}/terraform/backup.tf"
+  local count
+
+  for bucket in loki_storage tempo_storage mimir_blocks_storage mimir_ruler_storage alertmanager_storage; do
+    count=$(grep -c "aws_s3_bucket\\.${bucket}\\.arn" "$backup_tf")
+    [ "$count" -eq 3 ] || {
+      echo "$bucket must appear in daily, weekly, and monthly backup selections"
       return 1
     }
   done
@@ -286,6 +453,13 @@ _all_tf_output_names() {
       }
     fi
   done
+}
+
+@test "CONTRACT: EKS Auto Mode ALB uses an internal ClusterIP backend" {
+  grep -q 'type: ClusterIP' "$K8S_DIR/service.yaml"
+  ! grep -q 'type: LoadBalancer' "$K8S_DIR/service.yaml"
+  grep -q 'controller: eks.amazonaws.com/alb' "$K8S_DIR/ingress.yaml"
+  grep -q 'ingressClassName: openemr-alb' "$K8S_DIR/ingress.yaml"
 }
 
 # ===========================================================================

@@ -6,6 +6,15 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 > **Note:** Timings can vary based on AWS region, time of day, AWS service load, and network conditions. The ranges provided represent typical behavior observed across multiple test runs.
 
+<!-- BEGIN AUTOMATED E2E TIMINGS -->
+## Latest Automated E2E Timing Report
+
+No successful automated OpenEMR 8.2.x E2E timing run has been recorded yet.
+
+Run `./scripts/test-end-to-end-backup-restore.sh` to replace this section after
+the selected E2E steps complete successfully.
+<!-- END AUTOMATED E2E TIMINGS -->
+
 ## 📋 Table of Contents
 
 ### **Deployment Operations**
@@ -93,6 +102,8 @@ This guide provides measured timing data for various operations in the OpenEMR o
 - **Monitoring** (CloudWatch Log Groups): 1-2 min
 
 ### Application Deployment (Kubernetes)
+
+> **Historical benchmark:** The OpenEMR 8.1.x timings below were recorded in July 2026 and are retained for comparison until 8.2.x is benchmarked.
 
 **Total Time (OpenEMR 8.1.x):** 8-12 minutes typical for `k8s/deploy.sh` end-to-end
 

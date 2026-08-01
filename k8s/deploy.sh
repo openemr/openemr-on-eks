@@ -79,7 +79,7 @@ readonly TERRAFORM_DIR # Terraform directory for state access
 # Deployment timeouts - carefully tuned based on OpenEMR's startup characteristics
 # These timeouts account for OpenEMR's complex initialization process which includes
 # database schema creation, configuration setup, and service startup.
-readonly POD_READY_TIMEOUT=1200  # 20 minutes ceiling - OpenEMR 8.1.x typically ready in 3-6 min
+readonly POD_READY_TIMEOUT=1200  # 20-minute ceiling; historical 8.1.x readiness was 3-6 minutes
 readonly HEALTH_CHECK_TIMEOUT=600 # 10 minutes - For PVC binding and service readiness
 readonly EFS_CSI_TIMEOUT=300      # 5 minutes - EFS CSI driver operations
 readonly CLEANUP_WAIT_TIME=5      # 5 seconds - Wait after cleanup operations
@@ -1129,6 +1129,7 @@ REDIS_ENDPOINT=$(terraform output -raw redis_endpoint 2>/dev/null || echo "redis
 REDIS_PORT=$(terraform output -raw redis_port 2>/dev/null || echo "6379")
 REDIS_PASSWORD=$(terraform output -raw redis_password 2>/dev/null || echo "fallback-password")
 ALB_LOGS_BUCKET=$(terraform output -raw alb_logs_bucket_name)
+VPC_CIDR=$(terraform output -raw vpc_cidr)
 
 # skip_rds_creation=true leaves aurora_endpoint as pending-restore even after snapshot restore
 if [ -z "$AURORA_ENDPOINT" ] || [ "$AURORA_ENDPOINT" = "pending-restore" ]; then
@@ -1207,7 +1208,16 @@ OPENEMR_VERSION=$(terraform output -json openemr_app_config | jq -r '.version')
 OPENEMR_API_ENABLED=$(terraform output -json openemr_app_config | jq -r '.api_enabled')
 PATIENT_PORTAL_ENABLED=$(terraform output -json openemr_app_config | jq -r '.patient_portal_enabled')
 
-cd "$PROJECT_ROOT/k8s"
+# Render from pristine tracked templates on every run. All substitutions and
+# conditional insertions happen in an isolated directory so a deployment never
+# rewrites the repository or leaves manifests unusable for a later upgrade.
+MANIFEST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/openemr-eks-manifests.XXXXXX")
+cleanup_rendered_manifests() {
+    rm -rf "$MANIFEST_DIR"
+}
+trap cleanup_rendered_manifests EXIT
+cp "$SCRIPT_DIR"/*.yaml "$MANIFEST_DIR/"
+cd "$MANIFEST_DIR"
 
 # Configure SSL certificate handling
 log_step "Configuring SSL certificates..."
@@ -1278,8 +1288,10 @@ fi
 sed -i.bak "s/\${AWS_ACCOUNT_ID}/$AWS_ACCOUNT_ID/g" logging.yaml
 sed -i.bak "s/\${AWS_REGION}/$AWS_REGION/g" logging.yaml
 sed -i.bak "s/\${CLUSTER_NAME}/$CLUSTER_NAME/g" logging.yaml
+sed -i.bak "s/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" logging.yaml
 sed -i.bak "s|\${OPENEMR_ROLE_ARN}|$OPENEMR_ROLE_ARN|g" logging.yaml
 sed -i.bak "s/\${S3_BUCKET_NAME}/$ALB_LOGS_BUCKET/g" ingress.yaml
+sed -i.bak "s|\${VPC_CIDR}|$VPC_CIDR|g" network-policies.yaml
 
 # Configure WAF ACL ARN if available
 if [ -n "$WAF_ACL_ARN" ]; then
@@ -1311,30 +1323,16 @@ sed -i.bak "s/\${OPENEMR_SCALE_UP_STABILIZATION}/$OPENEMR_SCALE_UP_STABILIZATION
 
 log_success "Autoscaling configured: ${OPENEMR_MIN_REPLICAS}-${OPENEMR_MAX_REPLICAS} replicas, CPU: ${OPENEMR_CPU_THRESHOLD}%, Memory: ${OPENEMR_MEMORY_THRESHOLD}%"
 
-# Configure SSL in service manifest
-if [ "$SSL_MODE" = "acm" ]; then
-  # ACM mode: SSL re-encryption (ACM cert at NLB, self-signed cert to pod)
-  log_info "Configuring ACM SSL with re-encryption to OpenEMR pods..."
-
-  # Set backend protocol to SSL for re-encryption
-  sed -i.bak "s|\${BACKEND_PROTOCOL}|ssl|g" service.yaml
-
-  # Replace SSL certificate ARN placeholder
-  sed -i.bak "s|\${SSL_CERT_ARN}|$SSL_CERT_ARN|g" service.yaml
-
-  # Enable SSL annotations by removing comment markers
-  sed -i.bak 's|#    service.beta.kubernetes.io/aws-load-balancer-ssl-ports:|    service.beta.kubernetes.io/aws-load-balancer-ssl-ports:|g' service.yaml
-  sed -i.bak 's|#    service.beta.kubernetes.io/aws-load-balancer-ssl-cert:|    service.beta.kubernetes.io/aws-load-balancer-ssl-cert:|g' service.yaml
-  sed -i.bak 's|#    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy:|    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy:|g' service.yaml
+# Configure the EKS Auto Mode ALB before both the fast path and full deployment.
+if [ -n "$SSL_CERT_ARN" ]; then
+  log_info "Configuring EKS Auto Mode ALB with ACM certificate"
+  sed -i.bak "s|\${SSL_CERT_ARN}|$SSL_CERT_ARN|g" ingress.yaml
 else
-  # Self-signed mode: SSL passthrough (no SSL termination at NLB)
-  log_info "Configuring self-signed SSL passthrough..."
-
-  # Set backend protocol to TCP for passthrough
-  sed -i.bak "s|\${BACKEND_PROTOCOL}|tcp|g" service.yaml
-
-  # Remove SSL certificate annotations (no SSL termination at NLB)
-  sed -i.bak '/service.beta.kubernetes.io\/aws-load-balancer-ssl-/d' service.yaml
+  log_warning "No ACM certificate provided; configuring the ALB HTTP listener"
+  sed -i.bak '/[$][{]SSL_CERT_ARN[}]/d' ingress.yaml
+  sed -i.bak '/^[[:space:]]*certificateARNs:[[:space:]]*$/d' ingress.yaml
+  sed -i.bak 's|alb.ingress.kubernetes.io/listen-ports:.*|alb.ingress.kubernetes.io/listen-ports: '"'"'[{"HTTP": 80}]'"'"'|' ingress.yaml
+  sed -i.bak '/alb.ingress.kubernetes.io\/ssl-redirect:/d' ingress.yaml
 fi
 
 # Use passwords from Terraform (retrieved above)
@@ -1372,8 +1370,8 @@ if [ $cluster_state_result -eq 2 ]; then
     # Still need to ensure service and other components are applied
     log_info "Ensuring service and other components are up to date..."
     kubectl apply -f service.yaml
-    kubectl apply -f ingress.yaml 2>/dev/null || true
-    kubectl apply -f network-policies.yaml 2>/dev/null || true
+    kubectl apply -f ingress.yaml
+    kubectl apply -f network-policies.yaml
     
     # Clean up temporary file
     rm -f deployment-temp.yaml 2>/dev/null || true
@@ -1547,6 +1545,7 @@ log_step "Setting up logging..."
 # Substitute environment variables in logging.yaml
 sed -i.bak "s/\${AWS_REGION}/$AWS_REGION/g" logging.yaml
 sed -i.bak "s/\${CLUSTER_NAME}/$CLUSTER_NAME/g" logging.yaml
+sed -i.bak "s/\${OPENEMR_VERSION}/$OPENEMR_VERSION/g" logging.yaml
 kubectl apply -f logging.yaml
 log_success "Logging configuration applied."
 
@@ -1597,7 +1596,8 @@ fi
 # Restored sites data may mark docker-completed while ssl PVC is still empty.
 if [ "${SSL_MODE:-self-signed}" = "self-signed" ]; then
     log_step "Ensuring self-signed SSL certificates exist before OpenEMR startup..."
-    if ! "$PROJECT_ROOT/scripts/ensure-ssl-certs-ready.sh"; then
+    if ! NAMESPACE="$NAMESPACE" OPENEMR_VERSION="$OPENEMR_VERSION" \
+        "$PROJECT_ROOT/scripts/ensure-ssl-certs-ready.sh"; then
         log_error "Failed to bootstrap SSL certificates on openemr-ssl-pvc"
         exit 1
     fi
@@ -1645,8 +1645,8 @@ fi
 
 # Wait for deployment rollout to complete with enhanced monitoring
 log_step "Waiting for deployment rollout to complete..."
-log_info "OpenEMR 8.1.x typically ready in 3-6 minutes (timeout ceiling: 20 min)..."
-log_info "OpenEMR containers start responding to HTTP requests much faster on 8.1.x"
+log_info "Historical OpenEMR 8.1.x readiness was 3-6 minutes (timeout ceiling: 20 min)."
+log_info "OpenEMR 8.2.x timing must be revalidated during end-to-end deployment testing."
 
 # Enhanced monitoring with periodic status updates
 log_info "📊 Monitoring deployment progress..."
@@ -1657,7 +1657,7 @@ echo ""
 # Monitor with periodic status updates, startup logs, and stuck-leader recovery
 {
     attempt=0
-    max_attempts=40  # 20 minutes at 30-second intervals (ceiling for 8.1.x)
+    max_attempts=40  # 20 minutes at 30-second intervals
     leader_wait_count=0
 
     while [ $attempt -lt $max_attempts ]; do
@@ -1764,26 +1764,9 @@ if [ -z "$DOMAIN_NAME" ]; then
   DOMAIN_NAME="openemr.local"  # Fallback domain for TLS
 fi
 
-# Substitute all required variables in ingress
-sed -i.bak "s/\${DOMAIN_NAME}/$DOMAIN_NAME/g" ingress.yaml
-
-# Handle SSL certificate configuration
-if [ -n "$SSL_CERT_ARN" ]; then
-  log_info "Using ACM certificate: $SSL_CERT_ARN"
-  sed -i.bak "s|\${SSL_CERT_ARN}|$SSL_CERT_ARN|g" ingress.yaml
-else
-  log_warning "No SSL certificate - removing SSL annotations"
-  # Remove SSL-related annotations when no certificate
-  sed -i.bak '/alb.ingress.kubernetes.io\/certificate-arn:/d' ingress.yaml
-  sed -i.bak '/alb.ingress.kubernetes.io\/ssl-policy:/d' ingress.yaml
-  sed -i.bak '/tls:/,/secretName:/d' ingress.yaml
-  sed -i.bak '/hosts:/d' ingress.yaml
-  sed -i.bak '/- host:/d' ingress.yaml
-fi
-
 # Apply the ingress configuration
 kubectl apply -f ingress.yaml
-log_success "Ingress applied with ALB and WAF support"
+log_success "Ingress applied through the EKS Auto Mode ALB controller"
 
 # Logging configuration already applied earlier
 log_success "Logging configuration applied"
@@ -1815,10 +1798,14 @@ else
     log_info "To enable: Set enable_waf = true in terraform.tfvars"
 fi
 
-# Get LoadBalancer URL
-LB_URL=$(kubectl get svc "$SERVICE_NAME" -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+# Get the EKS Auto Mode ALB URL.
+LB_URL=$(kubectl get ingress openemr-ingress -n "$NAMESPACE" -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+LB_SCHEME="http"
+if [ "$SSL_MODE" = "acm" ]; then
+  LB_SCHEME="https"
+fi
 if [ -n "$LB_URL" ]; then
-  log_info "LoadBalancer URL (HTTPS): https://$LB_URL"
+  log_info "LoadBalancer URL: ${LB_SCHEME}://$LB_URL"
 
   if [ "$SSL_MODE" = "self-signed" ]; then
     log_warning "SSL Mode: Self-signed certificates (browser warnings expected)"
@@ -1829,40 +1816,42 @@ if [ -n "$LB_URL" ]; then
   fi
 fi
 
-# Save credentials to file
-log_step "Saving credentials to openemr-credentials.txt..."
-if [ -f "openemr-credentials.txt" ]; then
+# Save credentials beside the source deployment script, not in the temporary
+# manifest-rendering directory.
+CREDENTIALS_FILE="$SCRIPT_DIR/openemr-credentials.txt"
+log_step "Saving credentials to $CREDENTIALS_FILE..."
+if [ -f "$CREDENTIALS_FILE" ]; then
   # Create backup of existing credentials file
-  BACKUP_FILE="openemr-credentials-$(date +%Y%m%d-%H%M%S).txt"
-  cp openemr-credentials.txt "$BACKUP_FILE"
+  BACKUP_FILE="$SCRIPT_DIR/openemr-credentials-$(date +%Y%m%d-%H%M%S).txt"
+  cp "$CREDENTIALS_FILE" "$BACKUP_FILE"
+  chmod 600 "$BACKUP_FILE"
   log_warning "Existing credentials file backed up to: $BACKUP_FILE"
 fi
 
-cat > openemr-credentials.txt << EOF
+umask 077
+cat > "$CREDENTIALS_FILE" << EOF
 OpenEMR Deployment Credentials
 ==============================
 Admin Username: admin
 Admin Password: $ADMIN_PASSWORD
 Database Password: $AURORA_PASSWORD
 Redis Password: $REDIS_PASSWORD
-LoadBalancer URL (HTTPS): https://$LB_URL
+LoadBalancer URL: ${LB_SCHEME}://$LB_URL
 SSL Mode: $SSL_MODE
 EOF
+chmod 600 "$CREDENTIALS_FILE"
 
 # Add certificate ARN if using ACM
 if [ "$SSL_MODE" = "acm" ]; then
-  echo "Certificate ARN: $SSL_CERT_ARN" >> openemr-credentials.txt
+  echo "Certificate ARN: $SSL_CERT_ARN" >> "$CREDENTIALS_FILE"
 fi
 
 # Add generation timestamp
-echo "" >> openemr-credentials.txt
-echo "Generated on: $(date)" >> openemr-credentials.txt
+echo "" >> "$CREDENTIALS_FILE"
+echo "Generated on: $(date)" >> "$CREDENTIALS_FILE"
 
-log_success "Credentials saved to openemr-credentials.txt"
+log_success "Credentials saved to $CREDENTIALS_FILE"
 log_success "Please store these credentials securely!"
-
-# Cleanup backup files
-rm ./*.yaml.bak
 
 echo ""
 log_header "🎉 DEPLOYMENT SUCCESSFUL!"

@@ -48,8 +48,8 @@ This directory contains all the Kubernetes manifests and deployment scripts for 
 - **`secrets.yaml`** - Secret templates for database and application credentials
 - **`storage.yaml`** - EFS storage classes and persistent volume claims
 - **`deployment.yaml`** - OpenEMR application deployment with sidecar logging
-- **`service.yaml`** - LoadBalancer service for external access
-- **`ingress.yaml`** - ALB ingress with WAF integration
+- **`service.yaml`** - Internal ClusterIP backend for OpenEMR
+- **`ingress.yaml`** - EKS Auto Mode ALB resources with WAF integration
 - **`hpa.yaml`** - Horizontal Pod Autoscaler and Pod Disruption Budget
 - **`security.yaml`** - ServiceAccount, RBAC, and IRSA configuration
 - **`network-policies.yaml`** - Network security policies
@@ -192,25 +192,22 @@ graph TD
 
 #### `service.yaml`
 
-- **Purpose**: LoadBalancer service for external access
+- **Purpose**: Internal backend service for the EKS Auto Mode ALB
 - **Key Components**:
-  - NLB configuration
-  - SSL termination options
+  - ClusterIP exposure for ALB IP targets
+  - HTTP and HTTPS backend ports
   - Session affinity configuration
-  - Backend protocol selection
 - **Dependencies**: `deployment.yaml`
 - **Maintenance Notes**:
-  - Update SSL certificate ARN references
-  - Modify load balancer attributes
   - Adjust session affinity settings
   - Add new ports for additional services
 
 #### `ingress.yaml`
 
-- **Purpose**: ALB ingress with WAF integration
+- **Purpose**: EKS Auto Mode ALB ingress with WAF integration
 - **Key Components**:
-  - ALB ingress controller configuration
-  - SSL certificate management
+  - `IngressClassParams` and `IngressClass` for `eks.amazonaws.com/alb`
+  - ACM certificate management
   - WAF integration
   - Access logging to S3
   - Health check configuration

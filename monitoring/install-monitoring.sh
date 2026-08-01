@@ -67,12 +67,12 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 87.4.0)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 88.0.1)
 #   CHART_LOKI_VERSION         Loki chart version (default: 7.0.0)
 #   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.26.0)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.1.0)
 #   OTEBPF_VERSION             OTeBPF version (default: v0.4.1)
-#   CERT_MANAGER_VERSION       cert-manager version (default: v1.20.2)
+#   CERT_MANAGER_VERSION       cert-manager version (default: v1.21.1)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Timeout and Retry Configuration                                         │
@@ -99,11 +99,11 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Autoscaling Configuration (HPA)                                         │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   ENABLE_AUTOSCALING         Enable HPA for monitoring components (0 or 1, default: 1)
-#   GRAFANA_MIN_REPLICAS       Grafana min replicas (default: 1)
-#   GRAFANA_MAX_REPLICAS       Grafana max replicas (default: 3)
-#   PROMETHEUS_MIN_REPLICAS    Prometheus min replicas (default: 1)
-#   PROMETHEUS_MAX_REPLICAS    Prometheus max replicas (default: 3)
+#   ENABLE_AUTOSCALING         Enable HPA for compatible distributed components (0 or 1, default: 1)
+#   GRAFANA_MIN_REPLICAS       Grafana replicas; must remain 1 with its single RWO PVC
+#   GRAFANA_MAX_REPLICAS       Grafana replicas; must remain 1 with its single RWO PVC
+#   PROMETHEUS_MIN_REPLICAS    Static Prometheus replicas (default: 1)
+#   PROMETHEUS_MAX_REPLICAS    Must equal PROMETHEUS_MIN_REPLICAS (default: 1)
 #   LOKI_MIN_REPLICAS          Loki min replicas (default: 1)
 #   LOKI_MAX_REPLICAS          Loki max replicas (default: 3)
 #   ALERTMANAGER_MIN_REPLICAS  Alertmanager min replicas (default: 1)
@@ -195,7 +195,7 @@
 #   - Default Grafana admin password is auto-generated
 #   - Access Grafana via port-forward: kubectl port-forward -n monitoring svc/prometheus-grafana 3000:80 (in browser go to "localhost:3000" and log in with credentials)
 #   - CloudWatch integration requires proper IAM role configuration
-#   - S3 storage is automatically configured for Loki, Tempo, Mimir, and AlertManager via Terraform
+#   - S3 storage is configured for Loki, Tempo, and Mimir; Prometheus Alertmanager uses an encrypted PVC
 #
 # =============================================================================
 
@@ -211,6 +211,17 @@ readonly SCRIPT_DIR
 readonly SCRIPT_NAME
 readonly CONFIG_FILE="${CONFIG_FILE:-${SCRIPT_DIR}/openemr-monitoring.conf}"
 
+# Configuration must be sourced before defaults become readonly so documented
+# overrides are effective. Logging helpers are defined later in the script.
+CONFIG_LOADED=0
+if [[ -f "$CONFIG_FILE" ]]; then
+  echo "[INFO] Loading configuration from: $CONFIG_FILE"
+  # shellcheck source=/dev/null
+  source "$CONFIG_FILE"
+  CONFIG_LOADED=1
+fi
+readonly CONFIG_LOADED
+
 # Default namespaces
 readonly MONITORING_NAMESPACE="${MONITORING_NAMESPACE:-monitoring}"
 readonly OPENEMR_NAMESPACE="${OPENEMR_NAMESPACE:-openemr}"
@@ -219,17 +230,25 @@ readonly OBSERVABILITY_NAMESPACE="${OBSERVABILITY_NAMESPACE:-observability}"
 # Storage configuration
 readonly STORAGE_CLASS_RWO="${STORAGE_CLASS_RWO:-gp3-monitoring-encrypted}"
 readonly STORAGE_CLASS_RWX="${STORAGE_CLASS_RWX:-}"   # e.g., efs-sc
-readonly ACCESS_MODE_RWO="${ACCESS_MODE_RWO:-ReadWriteOncePod}"
-readonly ACCESS_MODE_RWX="${ACCESS_MODE_RWX:-ReadWriteMany}"
+# ACCESS_MODE_RWO may be downgraded after a server-side capability probe.
+ACCESS_MODE_RWO="${ACCESS_MODE_RWO:-ReadWriteOncePod}"
+ACCESS_MODE_RWX="${ACCESS_MODE_RWX:-ReadWriteMany}"
 
 # Files
 readonly CREDENTIALS_DIR="${CREDENTIALS_DIR:-${SCRIPT_DIR}/credentials}"
 readonly BACKUP_DIR="${BACKUP_DIR:-${SCRIPT_DIR}/backups}"
-readonly VALUES_FILE="${VALUES_FILE:-${SCRIPT_DIR}/prometheus-values.yaml}"
+if [[ -n "${VALUES_FILE:-}" ]]; then
+  VALUES_FILE_IS_TEMP=0
+else
+  VALUES_FILE=$(mktemp "${TMPDIR:-/tmp}/openemr-prometheus-values.XXXXXX")
+  VALUES_FILE_IS_TEMP=1
+fi
+readonly VALUES_FILE
+readonly VALUES_FILE_IS_TEMP
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-87.4.0}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-88.0.1}"
 readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-7.0.0}"
 readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.26.0}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.1.0}"
@@ -354,9 +373,9 @@ readonly CLUSTER_NAME="${CLUSTER_NAME:-$(get_cluster_name)}"
 # Autoscaling Configuration
 readonly ENABLE_AUTOSCALING="${ENABLE_AUTOSCALING:-1}"
 readonly GRAFANA_MIN_REPLICAS="${GRAFANA_MIN_REPLICAS:-1}"
-readonly GRAFANA_MAX_REPLICAS="${GRAFANA_MAX_REPLICAS:-3}"
+readonly GRAFANA_MAX_REPLICAS="${GRAFANA_MAX_REPLICAS:-1}"
 readonly PROMETHEUS_MIN_REPLICAS="${PROMETHEUS_MIN_REPLICAS:-1}"
-readonly PROMETHEUS_MAX_REPLICAS="${PROMETHEUS_MAX_REPLICAS:-3}"
+readonly PROMETHEUS_MAX_REPLICAS="${PROMETHEUS_MAX_REPLICAS:-1}"
 # Loki SimpleScalable mode requires at least 2 replicas for high availability
 # Setting default to 2 to ensure proper operation
 readonly LOKI_MIN_REPLICAS="${LOKI_MIN_REPLICAS:-2}"
@@ -514,7 +533,7 @@ readonly TEMPO_SPAN_START_TIME_SHIFT="${TEMPO_SPAN_START_TIME_SHIFT:-1h}"
 readonly TEMPO_SPAN_END_TIME_SHIFT="${TEMPO_SPAN_END_TIME_SHIFT:--1h}"
 
 # ---- cert-manager (pinned version for TLS certificate management)
-readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.20.2}"
+readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.21.1}"
 
 # Colors
 readonly RED='\033[0;31m'; readonly GREEN='\033[0;32m'
@@ -550,8 +569,8 @@ capture_debug_info() {
     echo ""; echo "Helm releases:"; helm list --all-namespaces 2>/dev/null || echo "Failed to list helm releases"
   } > "$f"; log_info "Debug information captured: $f"
 }
-cleanup_on_error(){ log_info "Performing error cleanup..."; if [[ -f "${VALUES_FILE}.bak" ]]; then mv "${VALUES_FILE}.bak" "${VALUES_FILE}" 2>/dev/null || true; fi; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
-cleanup(){ log_debug "Performing normal cleanup..."; rm -f "${VALUES_FILE}.bak" 2>/dev/null || true; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
+cleanup_on_error(){ log_info "Performing error cleanup..."; if [[ -f "${VALUES_FILE}.bak" ]]; then mv "${VALUES_FILE}.bak" "${VALUES_FILE}" 2>/dev/null || true; fi; if [[ "$VALUES_FILE_IS_TEMP" == "1" ]]; then rm -f "$VALUES_FILE"; fi; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
+cleanup(){ log_debug "Performing normal cleanup..."; rm -f "${VALUES_FILE}.bak" 2>/dev/null || true; if [[ "$VALUES_FILE_IS_TEMP" == "1" ]]; then rm -f "$VALUES_FILE"; fi; find "$CREDENTIALS_DIR" -name "*.tmp" -type f -delete 2>/dev/null || true; }
 handle_error(){ local c="$1" l="$2" cmd="$3"; log_error "Command failed with exit code $c at line $l: $cmd"; log_error "Function stack: ${FUNCNAME[*]}"; log_audit "ERROR" "script_execution" "FAILED"; capture_debug_info; cleanup_on_error; exit "$c"; }
 trap 'handle_error $? $LINENO "$BASH_COMMAND"' ERR
 trap cleanup EXIT
@@ -560,11 +579,7 @@ trap cleanup EXIT
 # Config & Input Validation
 # ------------------------------
 load_config(){ 
-  if [[ -f "$CONFIG_FILE" ]]; then 
-    log_info "Loading configuration from: $CONFIG_FILE"
-    # shellcheck source=/dev/null
-    source "$CONFIG_FILE"
-  else 
+  if [[ "$CONFIG_LOADED" != "1" ]]; then
     log_debug "No configuration file found at: $CONFIG_FILE"
   fi
   mkdir -p "$CREDENTIALS_DIR" "$BACKUP_DIR"
@@ -582,7 +597,7 @@ validate_inputs(){
 
   # Validate autoscaling configuration
   if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
-    local components=("GRAFANA" "PROMETHEUS" "LOKI" "ALERTMANAGER" "TEMPO" "MIMIR")
+    local components=("LOKI" "ALERTMANAGER" "TEMPO" "MIMIR")
     for comp in "${components[@]}"; do
       local min_var="${comp}_MIN_REPLICAS"
       local max_var="${comp}_MAX_REPLICAS"
@@ -622,6 +637,19 @@ validate_inputs(){
     if [[ "$HPA_MEMORY_TARGET" -lt 10 || "$HPA_MEMORY_TARGET" -gt 90 ]]; then
       log_warn "Unusual memory target: $HPA_MEMORY_TARGET% (recommended: 60-85%)"
     fi
+  fi
+
+  if [[ "$GRAFANA_MIN_REPLICAS" != "1" || "$GRAFANA_MAX_REPLICAS" != "1" ]]; then
+    log_error "Grafana must use exactly one replica while persistence uses a single RWO PVC"
+    return 1
+  fi
+  if [[ ! "$PROMETHEUS_MIN_REPLICAS" =~ ^[0-9]+$ || "$PROMETHEUS_MIN_REPLICAS" -lt 1 ]]; then
+    log_error "PROMETHEUS_MIN_REPLICAS must be a positive integer"
+    return 1
+  fi
+  if [[ "$PROMETHEUS_MAX_REPLICAS" != "$PROMETHEUS_MIN_REPLICAS" ]]; then
+    log_error "PROMETHEUS_MAX_REPLICAS must equal PROMETHEUS_MIN_REPLICAS; chart-level Prometheus HPA is unsupported"
+    return 1
   fi
   
   log_success "Configuration validation passed"
@@ -920,11 +948,26 @@ cert_manager_ready(){
   return 0
 }
 
+cert_manager_installed_version(){
+  local image
+  image=$(kubectl -n cert-manager get deploy cert-manager \
+    -o jsonpath='{.spec.template.spec.containers[?(@.name=="cert-manager-controller")].image}' \
+    2>/dev/null || echo "")
+  if [[ "$image" == *:* ]]; then
+    echo "${image##*:}"
+  fi
+}
+
 install_cert_manager(){
   log_step "Ensuring cert-manager ${CERT_MANAGER_VERSION} is installed (for webhooks & optional TLS)..."
   if cert_manager_ready; then
-    log_info "cert-manager already installed and ready"
-    return 0
+    local installed_version
+    installed_version=$(cert_manager_installed_version)
+    if [[ "$installed_version" == "$CERT_MANAGER_VERSION" ]]; then
+      log_info "cert-manager ${CERT_MANAGER_VERSION} is already installed and ready"
+      return 0
+    fi
+    log_info "Upgrading cert-manager from ${installed_version:-unknown} to ${CERT_MANAGER_VERSION}"
   fi
   local CM_URL="https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.yaml"
   log_info "Installing cert-manager from ${CM_URL}"
@@ -991,23 +1034,9 @@ create_values_file(){
   local sc_prom="$STORAGE_CLASS_RWO" am_prom="$ACCESS_MODE_RWO"
   local sc_am="$STORAGE_CLASS_RWO"   am_am="$ACCESS_MODE_RWO"
 
-  # Get AlertManager S3 bucket and IAM role from Terraform
-  local terraform_dir="${SCRIPT_DIR}/../terraform"
-  local am_bucket_name=""
-  local am_role_arn=""
-  
-  if [[ -d "$terraform_dir" ]] && command -v terraform >/dev/null 2>&1; then
-    cd "$terraform_dir" || true
-    am_bucket_name=$(terraform output -raw alertmanager_s3_bucket_name 2>/dev/null || echo "")
-    am_role_arn=$(terraform output -raw alertmanager_s3_role_arn 2>/dev/null || echo "")
-    cd "$SCRIPT_DIR" || true
-  fi
-
   local AM_BLOCK=""
   if alertmanager_enabled; then
-    if [[ -n "$am_bucket_name" && -n "$am_role_arn" ]]; then
-      # Use S3 for AlertManager state storage
-      AM_BLOCK=$(cat <<EOF_AM
+    AM_BLOCK=$(cat <<EOF_AM
 alertmanager:
   alertmanagerSpec:
     storage:
@@ -1024,39 +1053,14 @@ alertmanager:
       runAsGroup: ${RUN_AS_GROUP}
       fsGroup: ${FS_GROUP}
     configSecret: alertmanager-config
-    # S3 storage for AlertManager cluster state
-      externalUrl: http://alertmanager-prometheus-stack-kube-prom-alertmanager.${MONITORING_NAMESPACE}.svc.cluster.local:${ALERTMANAGER_PORT}
+    externalUrl: http://alertmanager-prometheus-stack-kube-prom-alertmanager.${MONITORING_NAMESPACE}.svc.cluster.local:${ALERTMANAGER_PORT}
     cluster:
       peerTimeout: ${ALERTMANAGER_PEER_TIMEOUT}
       gossipInterval: ${ALERTMANAGER_GOSSIP_INTERVAL}
       pushPullInterval: ${ALERTMANAGER_PUSH_PULL_INTERVAL}
       tlsEnabled: false
-    # Note: S3 state storage is configured via AlertManager configuration
-    # The bucket ${am_bucket_name} will be used for cluster state
 EOF_AM
 )
-    else
-      # Fallback to EBS storage
-      AM_BLOCK=$(cat <<EOF_AM
-alertmanager:
-  alertmanagerSpec:
-    storage:
-      volumeClaimTemplate:
-        spec:
-          storageClassName: ${sc_am}
-          accessModes: ["${am_am}"]
-          resources: { requests: { storage: ${ALERTMANAGER_STORAGE_SIZE} } }
-    resources:
-      requests: { cpu: ${ALERTMANAGER_CPU_REQUEST}, memory: ${ALERTMANAGER_MEMORY_REQUEST} }
-      limits:   { cpu: ${ALERTMANAGER_CPU_LIMIT}, memory: ${ALERTMANAGER_MEMORY_LIMIT} }
-    securityContext:
-      runAsUser: ${RUN_AS_USER}
-      runAsGroup: ${RUN_AS_GROUP}
-      fsGroup: ${FS_GROUP}
-    configSecret: alertmanager-config
-EOF_AM
-)
-    fi
   else
     AM_BLOCK="# alertmanager: using chart defaults (no custom config)"
   fi
@@ -1087,22 +1091,10 @@ grafana:
   resources:
     requests: { cpu: ${GRAFANA_CPU_REQUEST}, memory: ${GRAFANA_MEMORY_REQUEST} }
     limits:   { cpu: ${GRAFANA_CPU_LIMIT}, memory: ${GRAFANA_MEMORY_LIMIT} }
-EOF
 
-  # Add autoscaling configuration for Grafana if enabled
-  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
-    cat >> "$VALUES_FILE" <<EOF
-
-  autoscaling:
-    enabled: true
-    minReplicas: ${GRAFANA_MIN_REPLICAS}
-    maxReplicas: ${GRAFANA_MAX_REPLICAS}
-    targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
-    targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
-EOF
-  fi
-
-  cat >> "$VALUES_FILE" <<EOF
+  replicas: 1
+  deploymentStrategy:
+    type: Recreate
 
   sidecar:
     dashboards:
@@ -1124,8 +1116,6 @@ EOF
       serve_from_sub_path: false
     security:
       admin_user: admin
-    tracing:
-      enabled: false
       disable_gravatar: true
       cookie_secure: true
       cookie_samesite: strict
@@ -1136,11 +1126,6 @@ EOF
       level: info
     unified_alerting:
       enabled: true
-    tracing:
-      enabled: true
-      tempo:
-        address: "tempo-distributor.monitoring.svc.cluster.local:${TEMPO_OTLP_GRPC_PORT}"
-        auth_type: ""
 
 prometheus:
   prometheusSpec:
@@ -1181,21 +1166,6 @@ prometheus:
     evaluationInterval: ${PROMETHEUS_EVALUATION_INTERVAL}
     scrapeInterval: ${PROMETHEUS_SCRAPE_INTERVAL}
 EOF
-
-  # Add autoscaling configuration for Prometheus if enabled
-  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
-    cat >> "$VALUES_FILE" <<EOF
-
-  prometheus:
-    prometheusSpec:
-      autoscaling:
-        enabled: true
-        minReplicas: ${PROMETHEUS_MIN_REPLICAS}
-        maxReplicas: ${PROMETHEUS_MAX_REPLICAS}
-        targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
-        targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
-EOF
-  fi
 
   cat >> "$VALUES_FILE" <<EOF
 
@@ -1276,29 +1246,6 @@ create_alertmanager_config(){
   if ! alertmanager_enabled; then log_info "Skipping Alertmanager config (SLACK_WEBHOOK_URL/SLACK_CHANNEL not set or invalid)."; return 0; fi
   log_step "Creating AlertManager configuration for Slack channel ${SLACK_CHANNEL}..."
   
-  # Get AlertManager S3 bucket from Terraform
-  local terraform_dir="${SCRIPT_DIR}/../terraform"
-  local am_bucket_name=""
-  local am_s3_config=""
-  
-  if [[ -d "$terraform_dir" ]] && command -v terraform >/dev/null 2>&1; then
-    cd "$terraform_dir" || true
-    am_bucket_name=$(terraform output -raw alertmanager_s3_bucket_name 2>/dev/null || echo "")
-    cd "$SCRIPT_DIR" || true
-    
-    if [[ -n "$am_bucket_name" ]]; then
-      am_s3_config="
-    # S3 storage for AlertManager cluster state
-    storage:
-      type: s3
-      s3:
-        bucket: ${am_bucket_name}
-        region: ${AWS_REGION}
-        endpoint: \"\"
-        s3forcepathstyle: false"
-    fi
-  fi
-  
   kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
@@ -1316,7 +1263,6 @@ stringData:
       group_interval: ${ALERTMANAGER_GROUP_INTERVAL}
       repeat_interval: ${ALERTMANAGER_REPEAT_INTERVAL}
       receiver: 'slack-default'
-      routes:${am_s3_config}
     receivers:
     - name: 'slack-default'
       slack_configs:
@@ -1329,7 +1275,7 @@ stringData:
           *Summary:* {{ .CommonAnnotations.summary }}
           *Description:* {{ .CommonAnnotations.description }}
 EOF
-  log_success "AlertManager configuration created (Slack${am_s3_config:+, S3 storage})"; log_audit "CREATE" "alertmanager_config" "SUCCESS"
+  log_success "AlertManager configuration created (Slack with PVC-backed state)"; log_audit "CREATE" "alertmanager_config" "SUCCESS"
 }
 
 # ------------------------------
@@ -1361,6 +1307,7 @@ install_prometheus_stack(){
       --namespace "$MONITORING_NAMESPACE" --create-namespace \
       --version "$CHART_KPS_VERSION" \
       --timeout "$TIMEOUT_HELM" --atomic --wait --wait-for-jobs \
+      --set crds.upgradeJob.enabled=true \
       --values "$vf" 2>&1 | tee "${SCRIPT_DIR}/helm-install-kps.log"; then
       
       # Verify installation success
@@ -1527,8 +1474,8 @@ EOF
       --set backend.autoscaling.maxReplicas="${LOKI_MAX_REPLICAS:-5}" \
       --set backend.autoscaling.targetCPUUtilizationPercentage="$HPA_CPU_TARGET" \
       --set backend.autoscaling.targetMemoryUtilizationPercentage="$HPA_MEMORY_TARGET" \
-      --set write.persistence.storageClassName="${STORAGE_CLASS_RWO}" \
-      --set backend.persistence.storageClassName="${STORAGE_CLASS_RWO}" \
+      --set write.persistence.storageClass="${STORAGE_CLASS_RWO}" \
+      --set backend.persistence.storageClass="${STORAGE_CLASS_RWO}" \
       2>&1 | tee "${SCRIPT_DIR}/helm-install-loki.log"; then
       
       # Verify installation success
@@ -1558,80 +1505,6 @@ EOF
     log_audit "INSTALL" "loki" "FAILED"
     return 1
   fi
-  
-  # Patch PVCs if storage class wasn't set (workaround for chart issues)
-  # Note: When scaling to multiple replicas, StatefulSets create additional PVCs (write-1, backend-1, etc.)
-  # We need to patch all PVCs, not just replica 0
-  log_info "Ensuring Loki PVCs have correct storage class..."
-  local pvc_patched=false
-  # Get all Loki PVCs that match the pattern (handles any number of replicas)
-  local loki_pvcs
-  loki_pvcs=$(kubectl get pvc -n "$MONITORING_NAMESPACE" --no-headers 2>/dev/null | grep -E "data-loki-(write|backend)-[0-9]+" | awk '{print $1}' || echo "")
-  
-  if [[ -z "$loki_pvcs" ]]; then
-    # Fallback to explicit list if grep doesn't find any (PVCs may not be created yet)
-    loki_pvcs="data-loki-write-0 data-loki-backend-0"
-  fi
-  
-  for pvc_name in $loki_pvcs; do
-    # Wait a moment for PVC to be created
-    sleep 1
-    if kubectl get pvc "$pvc_name" -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
-      local current_sc
-      current_sc=$(kubectl get pvc "$pvc_name" -n "$MONITORING_NAMESPACE" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "")
-      if [[ -z "$current_sc" ]] || [[ "$current_sc" == "<none>" ]]; then
-        log_info "Patching PVC $pvc_name with storage class ${STORAGE_CLASS_RWO}..."
-        if kubectl patch pvc "$pvc_name" -n "$MONITORING_NAMESPACE" --type='merge' -p="{\"spec\":{\"storageClassName\":\"${STORAGE_CLASS_RWO}\"}}" 2>/dev/null; then
-          log_success "Patched PVC $pvc_name with storage class"
-          pvc_patched=true
-        else
-          log_warn "Failed to patch PVC $pvc_name"
-        fi
-      else
-        log_info "PVC $pvc_name already has storage class: $current_sc"
-      fi
-    fi
-  done
-  
-  if [ "$pvc_patched" = true ]; then
-    log_info "Waiting for PVCs to be bound after patching..."
-    sleep 5
-  fi
-  
-  # Additional check: Wait for StatefulSets to create additional replica PVCs and patch them
-  # This is necessary because StatefulSets create PVCs asynchronously when scaling
-  log_info "Checking for additional Loki PVCs created by StatefulSet scaling..."
-  local max_wait=60  # Wait up to 60 seconds for additional PVCs
-  local waited=0
-  while [ $waited -lt $max_wait ]; do
-    local additional_pvcs
-    additional_pvcs=$(kubectl get pvc -n "$MONITORING_NAMESPACE" --no-headers 2>/dev/null | grep -E "data-loki-(write|backend)-[0-9]+" | awk '{print $1}' || echo "")
-    local found_new=false
-    for pvc_name in $additional_pvcs; do
-      local current_sc
-      current_sc=$(kubectl get pvc "$pvc_name" -n "$MONITORING_NAMESPACE" -o jsonpath='{.spec.storageClassName}' 2>/dev/null || echo "")
-      if [[ -z "$current_sc" ]] || [[ "$current_sc" == "<none>" ]]; then
-        log_info "Found new PVC $pvc_name without storage class, patching..."
-        if kubectl patch pvc "$pvc_name" -n "$MONITORING_NAMESPACE" --type='merge' -p="{\"spec\":{\"storageClassName\":\"${STORAGE_CLASS_RWO}\"}}" 2>/dev/null; then
-          log_success "Patched new PVC $pvc_name with storage class"
-          found_new=true
-        fi
-      fi
-    done
-    if [ "$found_new" = true ]; then
-      log_info "Found and patched new PVCs, waiting for them to bind..."
-      sleep 5
-      waited=$((waited + 5))
-    else
-      # No new PVCs found, check every 5 seconds
-      sleep 5
-      waited=$((waited + 5))
-      if [ $waited -ge $max_wait ]; then
-        log_info "No additional PVCs found within ${max_wait}s (StatefulSet scaling may still be in progress)"
-        break
-      fi
-    fi
-  done
   
   # Wait for pods with enhanced timeout - but don't fail if they're not ready immediately
   log_info "Waiting for Loki pods to be ready (this may take a few minutes for distributed mode)..."
@@ -1835,6 +1708,10 @@ EOF
 
   # Create Tempo values for Helm installation (tempo-distributed chart)
   local TEMPO_VALUES_FILE="${SCRIPT_DIR}/tempo-values.yaml"
+  local tempo_autoscaling_enabled=false
+  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
+    tempo_autoscaling_enabled=true
+  fi
   cat > "$TEMPO_VALUES_FILE" <<EOF
 # Tempo Distributed Configuration
 useExternalConfig: true
@@ -1851,6 +1728,12 @@ tempo:
 # Component replicas and resources
 distributor:
   replicas: ${TEMPO_MIN_REPLICAS}
+  autoscaling:
+    enabled: ${tempo_autoscaling_enabled}
+    minReplicas: ${TEMPO_MIN_REPLICAS}
+    maxReplicas: ${TEMPO_MAX_REPLICAS}
+    targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
+    targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
   resources:
     requests:
       cpu: ${TEMPO_DISTRIBUTOR_CPU_REQUEST}
@@ -1875,6 +1758,12 @@ ingester:
 
 querier:
   replicas: ${TEMPO_MIN_REPLICAS}
+  autoscaling:
+    enabled: ${tempo_autoscaling_enabled}
+    minReplicas: ${TEMPO_MIN_REPLICAS}
+    maxReplicas: ${TEMPO_MAX_REPLICAS}
+    targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
+    targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
   resources:
     requests:
       cpu: ${TEMPO_QUERIER_CPU_REQUEST}
@@ -1885,6 +1774,12 @@ querier:
 
 queryFrontend:
   replicas: ${TEMPO_MIN_REPLICAS}
+  autoscaling:
+    enabled: ${tempo_autoscaling_enabled}
+    minReplicas: ${TEMPO_MIN_REPLICAS}
+    maxReplicas: ${TEMPO_MAX_REPLICAS}
+    targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
+    targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
   resources:
     requests:
       cpu: ${TEMPO_QUERY_FRONTEND_CPU_REQUEST}
@@ -1943,19 +1838,6 @@ EOF
     --dry-run=client -o yaml | kubectl apply -f -
   
   log_success "Tempo runtime ConfigMap created"
-
-  # Add autoscaling configuration if enabled
-  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
-    cat >> "$TEMPO_VALUES_FILE" <<EOF
-
-autoscaling:
-  enabled: true
-  minReplicas: ${TEMPO_MIN_REPLICAS}
-  maxReplicas: ${TEMPO_MAX_REPLICAS}
-  targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
-  targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
-EOF
-  fi
 
   # Install Tempo using Helm (using tempo-distributed chart for distributed mode)
   if ! helm upgrade --install tempo grafana-community/tempo-distributed \
@@ -2102,6 +1984,10 @@ EOF
   
   # Create Mimir values for Helm installation
   local MIMIR_VALUES_FILE="${SCRIPT_DIR}/mimir-values.yaml"
+  local mimir_autoscaling_enabled=false
+  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
+    mimir_autoscaling_enabled=true
+  fi
   cat > "$MIMIR_VALUES_FILE" <<EOF
 # Mimir Configuration
 serviceAccount:
@@ -2144,19 +2030,15 @@ mimir:
         endpoint: s3.${AWS_REGION}.amazonaws.com
         # Note: Using AlertManager bucket for alertmanager storage
 
-  resources:
-    requests:
-      cpu: ${MIMIR_CPU_REQUEST}
-      memory: ${MIMIR_MEMORY_REQUEST}
-    limits:
-      cpu: ${MIMIR_CPU_LIMIT}
-      memory: ${MIMIR_MEMORY_LIMIT}
-
-  replicas: ${MIMIR_MIN_REPLICAS}
-
 gateway:
   enabled: true
   replicas: 1
+  autoscaling:
+    enabled: ${mimir_autoscaling_enabled}
+    minReplicas: ${MIMIR_MIN_REPLICAS}
+    maxReplicas: ${MIMIR_MAX_REPLICAS}
+    targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
+    targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
   resources:
     requests:
       cpu: ${MIMIR_GATEWAY_CPU_REQUEST}
@@ -2168,41 +2050,65 @@ gateway:
 ingress:
   enabled: false
 
-# Storage class configuration for StatefulSets
-# Note: The chart uses 'storageClass' in values (maps to 'storageClassName' in PVC spec)
+# Component sizing and storage use chart-supported per-component keys.
+distributor:
+  replicas: ${MIMIR_MIN_REPLICAS}
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
+
 ingester:
+  replicas: ${MIMIR_MIN_REPLICAS}
+  zoneAwareReplication:
+    enabled: false
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
   persistentVolume:
     enabled: true
     storageClass: ${STORAGE_CLASS_RWO}
+
+querier:
+  replicas: ${MIMIR_MIN_REPLICAS}
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
+
+query_frontend:
+  replicas: ${MIMIR_MIN_REPLICAS}
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
 
 compactor:
+  replicas: 1
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
   persistentVolume:
     enabled: true
     storageClass: ${STORAGE_CLASS_RWO}
 
-store-gateway:
+store_gateway:
+  replicas: ${MIMIR_MIN_REPLICAS}
+  zoneAwareReplication:
+    enabled: false
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
   persistentVolume:
     enabled: true
     storageClass: ${STORAGE_CLASS_RWO}
 
 alertmanager:
+  replicas: 1
+  resources:
+    requests: { cpu: ${MIMIR_CPU_REQUEST}, memory: ${MIMIR_MEMORY_REQUEST} }
+    limits: { cpu: ${MIMIR_CPU_LIMIT}, memory: ${MIMIR_MEMORY_LIMIT} }
   persistentVolume:
     enabled: true
     storageClass: ${STORAGE_CLASS_RWO}
 EOF
-
-  # Add autoscaling configuration if enabled
-  if [[ "$ENABLE_AUTOSCALING" == "1" ]]; then
-    cat >> "$MIMIR_VALUES_FILE" <<EOF
-
-autoscaling:
-  enabled: true
-  minReplicas: ${MIMIR_MIN_REPLICAS}
-  maxReplicas: ${MIMIR_MAX_REPLICAS}
-  targetCPUUtilizationPercentage: ${HPA_CPU_TARGET}
-  targetMemoryUtilizationPercentage: ${HPA_MEMORY_TARGET}
-EOF
-  fi
 
   # Install Mimir using Helm with classic architecture (no Kafka required)
   # Classic architecture: ingesters handle both read and write, no Kafka needed
@@ -2217,32 +2123,12 @@ EOF
     --set minio.enabled=false \
     --set ingester.persistentVolume.storageClass="${STORAGE_CLASS_RWO}" \
     --set compactor.persistentVolume.storageClass="${STORAGE_CLASS_RWO}" \
-    --set "store-gateway.persistentVolume.storageClass=${STORAGE_CLASS_RWO}" \
+    --set store_gateway.persistentVolume.storageClass="${STORAGE_CLASS_RWO}" \
     --set alertmanager.persistentVolume.storageClass="${STORAGE_CLASS_RWO}"; then
     log_error "Failed to install Mimir Helm chart"; return 1
   fi
   
   log_info "Mimir Helm chart installed (not waiting for readiness - will initialize in background)"
-
-  # Workaround: The mimir-distributed chart template has a bug where store-gateway PVCs
-  # don't get storageClassName from the values file. Manually patch the PVCs after creation.
-  log_info "Applying workaround for store-gateway PVC storageClassName..."
-  sleep "${PVC_WAIT_DELAY}"  # Wait for PVCs to be created
-  local store_gateway_pvcs
-  store_gateway_pvcs=$(kubectl get pvc -n "$MONITORING_NAMESPACE" -l app.kubernetes.io/instance=mimir,app.kubernetes.io/component=store-gateway -o name 2>/dev/null || true)
-  if [[ -n "$store_gateway_pvcs" ]]; then
-    for pvc in $store_gateway_pvcs; do
-      # Check if PVC already has storageClassName set
-      if ! kubectl get "$pvc" -n "$MONITORING_NAMESPACE" -o jsonpath='{.spec.storageClassName}' 2>/dev/null | grep -q "${STORAGE_CLASS_RWO}"; then
-        log_info "Patching $pvc to add storageClassName..."
-        if kubectl patch "$pvc" -n "$MONITORING_NAMESPACE" --type='merge' -p="{\"spec\":{\"storageClassName\":\"${STORAGE_CLASS_RWO}\"}}" 2>/dev/null; then
-          log_success "Patched $pvc with storageClassName"
-        else
-          log_warn "Failed to patch $pvc - may need manual intervention"
-        fi
-      fi
-    done
-  fi
 
   log_info "Waiting for Mimir pods to be ready..."
   # Mimir uses StatefulSets and Deployments, so we wait for pods to be ready
@@ -2540,25 +2426,28 @@ verify_installation(){
     fi
   done
   log_info "Pod status in ${MONITORING_NAMESPACE} ..."; local pending running failed_p
-  pending="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l || echo 0)"
-  running="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo 0)"
-  failed_p="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || echo 0)"
+  pending="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l || true)"
+  running="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || true)"
+  failed_p="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || true)"
+  pending="${pending:-0}"; running="${running:-0}"; failed_p="${failed_p:-0}"
   
   # Check OTeBPF separately - DaemonSets can have pending pods (normal for EKS Auto Mode)
   local otebpf_running otebpf_pending otebpf_failed
-  otebpf_running=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || echo 0)
-  otebpf_pending=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l || echo 0)
-  otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || echo 0)
+  otebpf_running=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || true)
+  otebpf_pending=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l || true)
+  otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || true)
+  otebpf_running="${otebpf_running:-0}"; otebpf_pending="${otebpf_pending:-0}"; otebpf_failed="${otebpf_failed:-0}"
   
   # Exclude OTeBPF pods from overall pending/failed counts since DaemonSet pending pods are expected
   pending=$((pending - otebpf_pending))
   failed_p=$((failed_p - otebpf_failed))
   
-  # Check HPA-enabled components separately - they can have pending pods during scale-up (normal for EKS Auto Mode)
-  # Grafana, Prometheus, AlertManager, Tempo, Mimir all have HPA enabled
+  # Check HPA-enabled components separately - they can have pending pods during scale-up (normal for EKS Auto Mode).
+  # Grafana and Prometheus are deliberately static because their chart-level HPA/PVC combinations are unsupported.
   local hpa_pending
   hpa_pending=$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Pending --no-headers 2>/dev/null | \
-    grep -cE "(grafana|prometheus|alertmanager|tempo|mimir)" || echo 0)
+    grep -cE "(alertmanager|tempo|mimir)" || true)
+  hpa_pending="${hpa_pending:-0}"
   
   # Exclude HPA-enabled component pending pods from failure count (they'll schedule as cluster scales)
   local non_hpa_pending=$((pending - hpa_pending))
@@ -2578,7 +2467,8 @@ verify_installation(){
   # Check for failed pods (excluding OTeBPF, which we check separately)
   if [[ "$failed_p" -gt 0 ]]; then
     local non_otebpf_failed
-    non_otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -cv "otebpf" || echo 0)
+    non_otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -cv "otebpf" || true)
+    non_otebpf_failed="${non_otebpf_failed:-0}"
     if [[ "$non_otebpf_failed" -gt 0 ]]; then
       kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | grep -v "otebpf" || true
       ((failed += 1))
@@ -2641,7 +2531,12 @@ verify_openemr_monitoring(){
 print_access_help(){
   log_info ""; log_info "🚀 Monitoring Stack Access Information:"; log_info ""
   local f="$CREDENTIALS_DIR/monitoring-credentials.txt"
-  if [[ -f "$f" ]]; then local pw; pw="$(grep "Grafana Admin Password:" "$f" | awk '{print $4}' || echo "check-credentials-file")"; log_info "📋 Grafana Credentials:"; log_info "   Username: admin"; log_info "   Password: $pw"; log_info ""; fi
+  if [[ -f "$f" ]]; then
+    log_info "📋 Grafana Credentials:"
+    log_info "   Username: admin"
+    log_info "   Password: stored in $f (not printed)"
+    log_info ""
+  fi
   log_info "🔗 Port-forward Commands:"; log_info "   Grafana:    kubectl -n $MONITORING_NAMESPACE port-forward svc/prometheus-stack-grafana ${GRAFANA_PORT}:80"
   log_info "   Prometheus: kubectl -n $MONITORING_NAMESPACE port-forward svc/prometheus-stack-kube-prom-prometheus ${PROMETHEUS_PORT}:9090"
   log_info "   AlertManager: kubectl -n $MONITORING_NAMESPACE port-forward svc/prometheus-stack-kube-prom-alertmanager ${ALERTMANAGER_PORT}:9093"
@@ -2892,31 +2787,8 @@ create_openemr_monitoring(){
   wait_for_prom_operator_webhook
   ensure_namespace "$OPENEMR_NAMESPACE"
 
-  kubectl apply -f - <<EOF
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: openemr-metrics
-  namespace: ${OPENEMR_NAMESPACE}
-  labels:
-    app: openemr
-    release: prometheus-stack
-    app.kubernetes.io/name: openemr-servicemonitor
-    app.kubernetes.io/component: monitoring
-spec:
-  selector:
-    matchLabels:
-      app: openemr
-  endpoints:
-    - port: http
-      path: /metrics
-      interval: ${PROMETHEUS_SCRAPE_INTERVAL}
-      scrapeTimeout: ${PROMETHEUS_SCRAPE_TIMEOUT}
-      honorLabels: true
-  namespaceSelector:
-    matchNames: [ ${OPENEMR_NAMESPACE} ]
-EOF
-
+  # OpenEMR does not expose a native Prometheus /metrics endpoint. The rules
+  # below use kubelet/cAdvisor metrics selected by namespace and pod labels.
   retry_with_backoff 5 10 60 kubectl apply -f - <<EOF
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -3144,4 +3016,6 @@ main(){
       ;;
   esac
 }
-main "$@"
+if [[ "${OPENEMR_MONITORING_LIBRARY_ONLY:-0}" != "1" ]]; then
+  main "$@"
+fi

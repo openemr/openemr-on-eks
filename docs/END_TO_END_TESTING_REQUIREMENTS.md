@@ -78,9 +78,20 @@ cd /path/to/openemr-on-eks
   --namespace openemr
 ```
 
+After any successful full or chunked run, the script replaces the bounded
+"Latest Automated E2E Timing Report" section in
+[`DEPLOYMENT_TIMINGS.md`](DEPLOYMENT_TIMINGS.md). Resource identifiers and
+backup details are excluded. Use `--no-timing-report` to opt out or
+`--timing-report PATH` to write the generated section to another prepared
+report file.
+
 ### **Chunked Execution (Development Iteration)**
 
-The full E2E test takes ~2.5 hours on OpenEMR 8.1.x (~150-160 min). For faster iteration while developing, run **step groups** or **individual steps**. State (backup bucket, snapshot ID, test timestamp) is persisted to `.e2e-test-state` between runs.
+The historical OpenEMR 8.1.x E2E benchmark is ~2.5 hours
+(~150-160 min); remeasure it for OpenEMR 8.2.x before using that estimate for
+release planning. For faster development iteration, run **step groups** or
+**individual steps**. State (backup bucket, snapshot ID, test timestamp) is
+persisted to `.e2e-test-state` between runs.
 
 ```bash
 # List all steps and predefined groups
@@ -353,7 +364,7 @@ cd /path/to/openemr-on-eks
 # 3. Run your first end-to-end test
 ./scripts/test-end-to-end-backup-restore.sh
 
-# 4. Document your results
+# 4. Review the automatically updated docs/DEPLOYMENT_TIMINGS.md report
 # 5. Proceed with development only after successful test
 ```
 

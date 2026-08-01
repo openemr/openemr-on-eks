@@ -184,7 +184,8 @@ The console provides access to 11 essential operations organized into three cate
 
 **When to use**: For fresh deployments or when you want to deploy everything in one go
 
-**Note:** This is a long-running operation (35-42 minutes total on OpenEMR 8.1.x)
+**Note:** This is a long-running operation. The historical OpenEMR 8.1.x
+benchmark is 35-42 minutes; remeasure it for 8.2.x.
 
 #### 3. Check Deployment Health
 **Script**: [`../scripts/validate-deployment.sh`](../scripts/validate-deployment.sh)

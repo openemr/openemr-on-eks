@@ -111,7 +111,8 @@ The OpenEMR deployment includes a comprehensive AWS Backup configuration that au
 
 AWS Backup automatically backs up the following resources on scheduled intervals:
 
-- **All S3 Buckets**: ALB logs, WAF logs, Loki storage, CloudTrail logs
+- **All S3 Buckets**: ALB/WAF logs, Loki and Tempo storage, Mimir blocks,
+  ruler and Alertmanager state, and CloudTrail logs
 - **EFS File System**: Application data and configuration files
 - **RDS Aurora Cluster**: Database snapshots with point-in-time recovery
 - **EKS Cluster**: Cluster configuration and metadata (using AWS Backup support for EKS)
@@ -224,9 +225,9 @@ AWS Backup storage costs vary by service and storage tier. Pricing is based on t
 - Cross-region backup information
 - Timestamp and versioning data
 
-### 🔍 Logging Configuration (OpenEMR 8.0.0)
+### 🔍 Logging Configuration (OpenEMR 8.2.0)
 
-The restore process now includes comprehensive logging configuration for OpenEMR 8.0.0:
+The restore process now includes comprehensive logging configuration for OpenEMR 8.2.0:
 
 **Log Directory Structure:**
 
@@ -824,7 +825,8 @@ For comprehensive testing of the entire backup and restore process, use the auto
 - This test creates and destroys real AWS resources
 - AWS resources will be created and destroyed during testing
 - Requires proper AWS credentials and permissions
-- Test duration: ~150-160 minutes (~2.5 hours on OpenEMR 8.1.x)
+- Test duration: historical OpenEMR 8.1.x benchmark of ~150-160 minutes
+  (~2.5 hours); remeasure for 8.2.x
 - Backup creation: ~30-35 seconds, Restore: 38-43 minutes (comprehensive restore with verification)
 
 ## Cross-Region Disaster Recovery
