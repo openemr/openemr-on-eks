@@ -113,6 +113,15 @@ SCRIPT="${SCRIPTS_DIR}/destroy.sh"
   [[ "$output" =~ "0-9" ]]
 }
 
+@test "AWS Backup disassociation failure is guarded under errexit" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "cleanup_aws_backup_resources")
+  run grep -A12 -F 'if disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \' "$FUNC_FILE"
+  assert_success
+  [[ "$output" =~ "else" ]]
+  [[ "$output" =~ 'disassociate_exit_code=$?' ]]
+  rm -f "$FUNC_FILE"
+}
+
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
 
 @test "UNIT: show_help prints usage information" {

@@ -1224,12 +1224,17 @@ cleanup_aws_backup_resources() {
                         local disassociate_output
                         local disassociate_exit_code=0
                         if command -v timeout >/dev/null 2>&1; then
-                            disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \
-                                --backup-vault-name "$backup_vault_name" \
-                                --recovery-point-arn "$recovery_point_arn" \
-                                --region "$AWS_REGION" \
-                                --no-cli-pager 2>&1)
-                            disassociate_exit_code=$?
+                            if disassociate_output=$(timeout 30 aws backup disassociate-recovery-point \
+                                    --backup-vault-name "$backup_vault_name" \
+                                    --recovery-point-arn "$recovery_point_arn" \
+                                    --region "$AWS_REGION" \
+                                    --no-cli-pager 2>&1); then
+                                disassociate_exit_code=0
+                            else
+                                # Capture expected API/timeout failures without
+                                # allowing the script's errexit mode to abort.
+                                disassociate_exit_code=$?
+                            fi
                             # Timeout returns 124 on timeout
                             if [ $disassociate_exit_code -eq 124 ]; then
                                 disassociate_output="Command timed out after 30 seconds"
