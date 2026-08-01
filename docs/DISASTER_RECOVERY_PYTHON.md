@@ -35,8 +35,8 @@ scripts/openemr_dr/
 | `bootstrap` | Python → `k8s/restore-bootstrap.sh` | Namespace, EFS PVC, IRSA |
 | `rds` | Python | Destroy empty cluster, restore from snapshot / AWS Backup |
 | `data` | Python | Apply `k8s/jobs/data-restore-job.yaml`; Job drops all capabilities and extracts with `tar --no-same-owner` |
-| `deploy` | Python → shell scripts | Restore defaults, ensure EFS CSI, deploy, prepare one replica, clean crypto keys |
-| `verify` | Python | Poll pod/HTTP health, clean crypto keys between retries, re-apply HPA |
+| `deploy` | Python → shell scripts | Restore defaults, ensure EFS CSI, deploy, remove `openemr-hpa`, prepare one replica, clean crypto keys |
+| `verify` | Python | Poll pod/HTTP health, clean crypto keys between retries, render pristine `hpa.yaml` from Terraform outputs, and re-apply the HPA |
 | `legacy` | Bash bridge | Old restore order only |
 
 ## Usage

@@ -471,7 +471,7 @@ Python CLI does not accept it.
 | `rds` | Restore Aurora from the selected snapshot or AWS Backup recovery point |
 | `data` | Render the data-restore Job, download the S3 archive, extract to EFS, and update `sqlconf.php` |
 | `deploy` | Restore manifest templates, ensure EFS CSI readiness, deploy OpenEMR, prepare one replica, and clean cached crypto keys |
-| `verify` | Poll pod and HTTP readiness (six attempts by default), re-clean crypto keys between failed attempts, and reapply autoscaling after success |
+| `verify` | Poll pod and HTTP readiness (six attempts by default), re-clean crypto keys between failed attempts, render pristine `hpa.yaml` from Terraform outputs, and reapply autoscaling |
 
 The data Job runs as UID 0 for its short-lived EFS/package work, but disables
 privilege escalation, uses `RuntimeDefault` seccomp, and drops all Linux

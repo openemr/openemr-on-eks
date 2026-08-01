@@ -1583,9 +1583,9 @@ log_success "Service configuration applied."
 #   3. Wait for the leader pod to become fully ready
 #   4. THEN apply the HPA (post-deployment, already handled below)
 # ---------------------------------------------------------------------------
-if kubectl get hpa openemr -n "$NAMESPACE" >/dev/null 2>&1; then
+if kubectl get hpa openemr-hpa -n "$NAMESPACE" >/dev/null 2>&1; then
     log_info "Removing existing HPA to ensure single-replica leader initialization..."
-    kubectl delete hpa openemr -n "$NAMESPACE" --ignore-not-found
+    kubectl delete hpa openemr-hpa -n "$NAMESPACE" --ignore-not-found
 fi
 if kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
     log_info "Scaling existing deployment to 1 replica for leader initialization..."

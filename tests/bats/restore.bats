@@ -143,6 +143,45 @@ SCRIPT="${SCRIPTS_DIR}/restore.sh"
   [ "$status" -eq 0 ]
 }
 
+@test "restore uses the deployed HPA name and renders its pristine template" {
+  grep -Fq 'kubectl delete hpa openemr-hpa' "$SCRIPT"
+  grep -Fq 'terraform output -json openemr_autoscaling_config' "$SCRIPT"
+  grep -Fq '${OPENEMR_MIN_REPLICAS}' "$SCRIPT"
+  [ "$(grep -Fc 'restore_autoscaling || return 1' "$SCRIPT")" -eq 2 ]
+  ! grep -Eq 'kubectl delete hpa openemr([[:space:]]|$)' "$SCRIPT"
+}
+
+@test "UNIT: restore_autoscaling renders Terraform values before applying" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "restore_autoscaling")
+  mkdir -p "$fixture/k8s" "$fixture/terraform"
+  cp "$PROJECT_ROOT/k8s/hpa.yaml" "$fixture/k8s/hpa.yaml"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    NAMESPACE="restored"
+    RED="" BLUE="" GREEN="" NC=""
+    terraform() {
+      printf "%s\n" "{\"min_replicas\":2,\"max_replicas\":10,\"cpu_utilization_threshold\":70,\"memory_utilization_threshold\":80,\"scale_down_stabilization_seconds\":300,\"scale_up_stabilization_seconds\":60}"
+    }
+    kubectl() {
+      cp "$3" "$PROJECT_ROOT/applied-hpa.yaml"
+    }
+    source "$2"
+    restore_autoscaling
+  ' _ "$fixture" "$func_file"
+
+  assert_success
+  grep -Fq 'namespace: restored' "$fixture/applied-hpa.yaml"
+  grep -Fq 'minReplicas: 2' "$fixture/applied-hpa.yaml"
+  grep -Fq 'maxReplicas: 10' "$fixture/applied-hpa.yaml"
+  ! grep -Fq '${OPENEMR_' "$fixture/applied-hpa.yaml"
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
 # ── Temp pod resource defaults ──────────────────────────────────────────────
 
 @test "default TEMP_POD_MEMORY_REQUEST is 1Gi" {

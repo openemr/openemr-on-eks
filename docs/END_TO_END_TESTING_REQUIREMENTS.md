@@ -261,7 +261,9 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 
 - **Test duration**: No successful OpenEMR 8.2.x full-run baseline is recorded
   yet. Historical planning data is ~150–160 minutes for 8.1.x and ~211–217
-  minutes for the December 2025 8.0.x runs.
+  minutes for the December 2025 8.0.x runs. A successful August 1, 2026 resume
+  measured steps 7–10 at 86 minutes 22 seconds; this is recovery-path evidence,
+  not a replacement for the full-suite baseline.
 - **Resource usage**: AWS resources will be created and destroyed during testing
 - **Cleanup verification**: No orphaned AWS resources after test completion
 

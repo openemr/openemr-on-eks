@@ -9,13 +9,24 @@ This guide provides measured timing data for various operations in the OpenEMR o
 <!-- BEGIN AUTOMATED E2E TIMINGS -->
 ## Latest Automated E2E Timing Report
 
-No successful automated OpenEMR 8.2.x E2E timing run has been recorded yet.
+- **Generated:** 2026-08-01 07:13:23 UTC
+- **OpenEMR:** 8.2.0
+- **AWS Region:** us-west-2
+- **Scope:** steps 7-10, resumed from state after step 6
+- **Run ID:** 20260731-230948
+- **Total elapsed:** 5182s (86m 22s)
 
-Run
-`AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh`
-to replace this section after a successful complete E2E run. Use
-`--no-timing-report` for partial development chunks so they do not replace the
-full-run baseline with incomplete timing data.
+| Phase | Status | Seconds | Duration |
+|---|---:|---:|---:|
+| Infrastructure Recreation | SUCCESS | 1535 | 25m 35s |
+| Backup Restoration | SUCCESS | 2097 | 34m 57s |
+| Restoration Verification | SUCCESS | 52 | 0m 52s |
+| Final Cleanup | SUCCESS | 1493 | 24m 53s |
+
+This resumed recovery-path result verifies infrastructure recreation, restore,
+data integrity, credential-rotation readiness, and resource cleanup. It is not
+an uninterrupted full 10-step timing baseline.
+
 <!-- END AUTOMATED E2E TIMINGS -->
 
 ## 📋 Table of Contents
@@ -181,6 +192,15 @@ full-run baseline with incomplete timing data.
 
 ### Full Restore from Backup
 
+**Current OpenEMR 8.2.0 recovery-path measurement:** 34 minutes 57 seconds
+(August 1, 2026).
+
+This resumed E2E step used the current
+`preflight → bootstrap → rds → data → deploy → verify` flow. The synchronous
+restore command took 31 minutes 53 seconds; the E2E harness then completed its
+configured 180-second post-restore observation window. Treat this as one current
+sample, not yet as a range.
+
 **Historical Total Time:** 53-55 minutes (OpenEMR 8.0.x, December 2025)
 
 These measurements predate the current
@@ -217,7 +237,14 @@ planning evidence, not a measured OpenEMR 8.2.x RTO.
 
 ### Full Infrastructure Recreation (After Deletion)
 
-**Total Time:** 45-49 minutes (updated December 2025)
+**Current E2E recovery-path measurement:** 25 minutes 35 seconds
+(August 1, 2026).
+
+The current step 7 plan uses `skip_rds_creation=true`, then performs its
+60-second infrastructure wait and EFS CSI readiness check. Aurora is restored
+separately in step 8. This is the applicable current recovery-path sample.
+
+**Historical Total Time:** 45-49 minutes (December 2025)
 
 **December 2025 Measurements:**
 - Test Run 1: 49.27 minutes (2,956 seconds)
@@ -236,7 +263,12 @@ planning evidence, not a measured OpenEMR 8.2.x RTO.
 
 ### Infrastructure Deletion (Terraform Destroy)
 
-**Total Time:** 13-16 minutes
+**Current E2E final-cleanup measurement:** 24 minutes 53 seconds
+(August 1, 2026). This includes the comprehensive destroy workflow plus manual
+snapshot handling and emptying/deleting the versioned backup bucket; it is
+broader than Terraform destruction alone.
+
+**Historical Terraform destruction time:** 13-16 minutes
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -268,9 +300,12 @@ planning evidence, not a measured OpenEMR 8.2.x RTO.
 
 ### Complete Backup/Restore Test
 
-**Total Time:** 211-217 minutes (~3.5-3.6 hours)
+**Historical full-suite total:** 211-217 minutes (~3.5-3.6 hours, December
+2025). No uninterrupted OpenEMR 8.2.x 10-step timing baseline has been recorded
+yet; the latest measured recovery-path resume is reported at the top of this
+document.
 
-| Phase | Duration | E2E step |
+| Historical phase | Duration | E2E step |
 |-------|----------|----------|
 | **1. Initial Deploy** | 24-25 min | Step 1 - infrastructure |
 | **2. OpenEMR Deploy** | 22-23 min | Step 2 - application |
@@ -278,8 +313,8 @@ planning evidence, not a measured OpenEMR 8.2.x RTO.
 | **4. Backup** | 34-35 sec | Step 4 - full backup |
 | **5. Monitoring Test** | 27-28 min | Step 5 - install and uninstall |
 | **6. Deletion** | 16-17 min | Step 6 - destroy infrastructure |
-| **7. Recreation** | 45-49 min | Step 7 - Terraform with RDS deferred |
-| **8. Restore** | 53-55 min | Step 8 - RDS, EFS data, and OpenEMR deploy |
+| **7. Recreation** | 45-49 min | Step 7 - historical infrastructure recreation |
+| **8. Restore** | 53-55 min | Step 8 - historical restore path |
 | **9. Verification** | 43 sec | Step 9 - verify restored data |
 | **10. Final Cleanup** | 18-18.5 min | Step 10 - remove test resources |
 
@@ -289,7 +324,9 @@ planning evidence, not a measured OpenEMR 8.2.x RTO.
 - **Average:** 211-217 minutes (3.5-3.6 hours)
 - **Range:** 211-217 minutes across December 2025 test runs
 
-**Updated December 2025:** Monitoring stack installation now takes 27-28 minutes (includes full install and uninstall cycle). Infrastructure recreation takes 45-49 minutes. Backup restoration takes 53-55 minutes.
+**Historical December 2025 note:** Monitoring stack installation took 27-28
+minutes, infrastructure recreation took 45-49 minutes, and backup restoration
+took 53-55 minutes under that version of the workflow.
 
 ---
 

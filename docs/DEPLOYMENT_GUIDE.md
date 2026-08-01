@@ -1325,7 +1325,7 @@ cd scripts
 # 3. rds       - restore Aurora from the snapshot
 # 4. data      - restore S3 application data to EFS with a Kubernetes Job
 # 5. deploy    - ensure EFS CSI, deploy OpenEMR, and prepare one replica
-# 6. verify    - poll pod/HTTP health and reapply autoscaling after success
+# 6. verify    - poll health, render hpa.yaml from Terraform outputs, and reapply it
 ```
 
 **Phased Restore Benefits:**
