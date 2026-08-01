@@ -59,6 +59,7 @@ exclude = ["tests/"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["SIM117"]
+"scripts/openemr_dr/tests/**" = ["SIM117"]
 
 [tool.bandit]
 exclude_dirs = ["tests"]

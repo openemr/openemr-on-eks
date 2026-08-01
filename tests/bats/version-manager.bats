@@ -302,7 +302,7 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
   rm -f "$FUNC_FILE"
   assert_success
   [ "$output" = "8.2.0" ]
-  grep -Fq 'openemr_latest=$(get_latest_openemr_release_version)' "$SCRIPT"
+  grep -Fq 'run_version_lookup openemr_latest' "$SCRIPT"
 }
 
 @test "UNIT: Helm lookup excludes weekly prereleases" {
@@ -346,6 +346,80 @@ YAML
   rm -f "$FUNC_FILE"
   assert_success
   [ "$output" = "v1.21.1" ]
+}
+
+@test "UNIT: Go lookup uses official feed and preserves patch version" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_go_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      [[ "$*" == *"https://go.dev/dl/?mode=json"* ]] || return 1
+      printf "%s\n" '"'"'[{"version":"go1.25.12","stable":true},{"version":"go1.26rc1","stable":false}]'"'"'
+    }
+    source "$1"
+    get_latest_go_version
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "1.25.12" ]
+}
+
+@test "UNIT: Terraform provider lookup reads registry metadata" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_terraform_provider_version")
+  run bash -c '
+    log() { :; }
+    curl() { printf "%s\n" '"'"'{"version":"6.52.0"}'"'"'; }
+    source "$1"
+    get_latest_terraform_provider_version "hashicorp/aws"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "6.52.0" ]
+}
+
+@test "UNIT: GitHub Action lookup ignores aliases and prereleases" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_github_action_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'[{"name":"v7"},{"name":"v7.0.1"},{"name":"v8.0.0-beta.1"}]'"'"'
+    }
+    source "$1"
+    get_latest_github_action_version "actions/checkout"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v7.0.1" ]
+}
+
+@test "UNIT: failed lookup marks the overall version check incomplete" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "run_version_lookup")
+  local tmpdir
+  tmpdir=$(make_temp_dir)
+  run bash -c '
+    log() { :; }
+    failing_lookup() { return 1; }
+    source "$1"
+    checks_failed=0
+    update_report="$2/report.md"
+    result=""
+    run_version_lookup result "test component" "1.0.0" failing_lookup
+    [ "$checks_failed" -eq 1 ]
+    [ "$result" = "1.0.0" ]
+    grep -q "Version check incomplete" "$update_report"
+  ' _ "$FUNC_FILE" "$tmpdir"
+  rm -f "$FUNC_FILE"
+  rm -rf "$tmpdir"
+  assert_success
+}
+
+@test "version checks are metadata-driven for providers and actions and include Ruff" {
+  grep -Fq '.value.kind == "provider"' "$SCRIPT"
+  grep -Fq '.value.repository != null' "$SCRIPT"
+  grep -Fq '"ruff:ruff"' "$SCRIPT"
 }
 
 @test "Tempo 3.x and Loki community upgrades require explicit migration" {

@@ -191,7 +191,7 @@ deploy_terraform() {
     cd "$PROJECT_ROOT/terraform" || exit 1
     
     log_step "Initializing Terraform..."
-    terraform init -upgrade -no-color
+    terraform init -lockfile=readonly -no-color
     
     log_step "Planning Terraform deployment..."
     terraform plan -out=tfplan -no-color

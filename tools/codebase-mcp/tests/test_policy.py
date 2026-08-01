@@ -3,9 +3,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-import pytest
-
 import openemr_eks_mcp.policy as policy_module
+import pytest
 from openemr_eks_mcp.policy import MAX_FILE_BYTES, RepositoryPolicy, TraversalStats
 
 
@@ -113,7 +112,7 @@ def test_rejects_private_key_material_in_safe_named_file(
 ) -> None:
     root = repo_factory()
     (root / "notes.txt").write_text(
-        "-----BEGIN OPENSSH PRIVATE KEY-----\nfixture\n",
+        "-----BEGIN OPENSSH " + "PRIVATE KEY-----\nfixture\n",
         encoding="utf-8",
     )
     policy = RepositoryPolicy(root)

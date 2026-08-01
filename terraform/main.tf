@@ -18,22 +18,22 @@ terraform {
       version = "6.52.0"
     }
     # Kubernetes Provider - For managing Kubernetes resources
-    # Version 2.38.0 supports latest Kubernetes API versions and features
+    # Version 3.0.1 supports current Kubernetes API versions and features
     kubernetes = {
       source  = "hashicorp/kubernetes"
       version = "3.0.1"
     }
     random = {
       source  = "hashicorp/random"
-      version = ">= 3.0"
+      version = "3.9.0"
     }
     time = {
       source  = "hashicorp/time"
-      version = ">= 0.9"
+      version = "0.14.0"
     }
     http = {
       source  = "hashicorp/http"
-      version = ">= 3.0"
+      version = "3.6.0"
     }
   }
 }

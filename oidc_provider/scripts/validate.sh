@@ -196,7 +196,7 @@ validate_terraform_config() {
     # Initialize if needed
     if [ ! -d ".terraform" ]; then
         log_info "Initializing Terraform..."
-        terraform init >/dev/null 2>&1
+        terraform init -lockfile=readonly >/dev/null 2>&1
     fi
 
     # Validate configuration
@@ -319,4 +319,3 @@ log_info "   3. Run ./deploy.sh to create the OIDC provider and IAM role"
 echo ""
 
 log_success "Validation completed successfully!"
-

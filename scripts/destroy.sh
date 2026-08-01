@@ -1710,7 +1710,7 @@ terraform_destroy() {
     fi
     
     # Initialize Terraform
-    if ! terraform init -upgrade -no-color; then
+    if ! terraform init -lockfile=readonly -no-color; then
         log_error "Terraform init failed"
         cd - >/dev/null
         return 1

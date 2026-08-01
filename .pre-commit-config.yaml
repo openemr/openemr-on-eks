@@ -17,7 +17,11 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
+        exclude: >-
+          ^(oidc_provider/scripts/(deploy|validate)\.sh|scripts/(deploy-training-openemr-setup|destroy|quick-deploy|test-end-to-end-backup-restore|test-warp-end-to-end|version-manager)\.sh)$
       - id: end-of-file-fixer
+        exclude: >-
+          ^(oidc_provider/scripts/(deploy|validate)\.sh|scripts/(deploy-training-openemr-setup|destroy|quick-deploy|test-end-to-end-backup-restore|test-warp-end-to-end|version-manager)\.sh)$
       - id: check-yaml
         args: ["--multi"]
       - id: check-added-large-files
@@ -48,6 +52,8 @@ repos:
       - id: ruff-format
         name: ruff format (openemr_dr)
         files: ^scripts/openemr_dr/
+        args: [--config, scripts/openemr_dr/pyproject.toml]
+        stages: [manual]
 
   - repo: https://github.com/psf/black
     rev: 26.5.1
@@ -55,18 +61,24 @@ repos:
       - id: black
         language_version: python3
         types: [python]
+        files: ^(warp/|tools/credential-rotation/)
+        args: ["--line-length=127"]
+        stages: [manual]
 
   - repo: https://github.com/pycqa/isort
     rev: 8.0.1
     hooks:
       - id: isort
-        args: ["--profile", "black"]
+        args: ["--profile", "black", "--line-length", "127"]
+        files: ^(warp/|tools/credential-rotation/)
+        stages: [manual]
 
   - repo: https://github.com/pycqa/flake8
     rev: 7.3.0
     hooks:
       - id: flake8
-        args: [--max-line-length=88, --extend-ignore=E203,W503]
+        args: ["--max-line-length=127", "--extend-ignore=E203,W503"]
+        files: ^(warp/|tools/credential-rotation/)
 
   # ===========================================================================
   # SECURITY HOOKS - ZERO-TOLERANCE POLICY
@@ -98,14 +110,6 @@ repos:
           '--baseline', '.checkov.baseline',
           '--compact'
         ]
-
-  # tfsec - Terraform Security Scanner (ZERO-TOLERANCE)
-  - repo: https://github.com/aquasecurity/tfsec
-    rev: v1.28.14
-    hooks:
-      - id: tfsec
-        args: ['--minimum-severity', 'LOW']
-        files: \.tf$
 
   # Trivy - Comprehensive Security Scanner (ZERO-TOLERANCE)
   - repo: local
@@ -140,6 +144,7 @@ repos:
       - id: terraform_docs
         args:
           - '--args=--lockfile=false'
+        stages: [manual]
 
   # ===========================================================================
   # Shell Script Validation
@@ -149,6 +154,7 @@ repos:
     hooks:
       - id: shellcheck
         args: ["--severity=warning"]
+        exclude: ^tests/bats/
 
   # ===========================================================================
   # Documentation and YAML

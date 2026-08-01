@@ -5,7 +5,6 @@ from collections.abc import Callable
 from pathlib import Path
 
 import pytest
-
 from openemr_eks_mcp.catalog import COMMANDS, TOPICS
 
 

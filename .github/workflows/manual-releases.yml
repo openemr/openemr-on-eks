@@ -94,7 +94,7 @@ jobs:
       last-tag: ${{ steps.check-changes.outputs.last-tag }}       # Last release tag for reference
     steps:
       # Step 1: Checkout repository with full history for change detection
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for change detection
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -135,14 +135,14 @@ jobs:
       release-url: ${{ steps.create-release.outputs.html_url }} # GitHub release URL
     steps:
       # Step 1: Checkout repository with full history for release creation
-      - uses: actions/checkout@v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0  # Fetch complete git history for release notes
           token: ${{ secrets.GITHUB_TOKEN }}
 
       # Step 2: Set up Python environment for semantic versioning
       - name: Setup Python
-        uses: actions/setup-python@v7.0.0
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -294,7 +294,7 @@ jobs:
       - name: Create GitHub Release
         id: create-release
         if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
-        uses: ncipollo/release-action@v1
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           tag: "v${{ steps.new-version.outputs.new-version }}"
           name: "v${{ steps.new-version.outputs.new-version }}"

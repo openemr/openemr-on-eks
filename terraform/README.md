@@ -125,8 +125,8 @@ graph TD
 
 - **Purpose**: Provider configuration and data sources
 - **Key Components**:
-  - AWS provider configuration (v6.6.0)
-  - Kubernetes provider configuration
+  - AWS provider configuration (v6.52.0)
+  - Kubernetes provider configuration (v3.0.1)
   - Data sources for availability zones, caller identity, and public IP
   - Common tags and local values
 - **Dependencies**: None (foundation file)
@@ -409,7 +409,9 @@ graph TD
 ### Updating Existing Resources
 
 1. **Version Updates**:
-   - Update provider versions in main.tf
+   - Update provider versions in `versions.yaml` and `main.tf`
+   - Regenerate both committed `.terraform.lock.hcl` files for Linux AMD64
+     and macOS ARM64
    - Update module versions in respective files
    - Test changes in testing environment first
 
@@ -477,8 +479,9 @@ graph TD
 ### Common Issues
 
 1. **Provider Version Conflicts**:
-   - Update provider versions
-   - Run `terraform init -upgrade`
+   - Confirm `main.tf`, `versions.yaml`, and `.terraform.lock.hcl` agree
+   - Regenerate the lock files deliberately when changing constraints; normal
+     deployments use `terraform init -lockfile=readonly`
 
 2. **Resource Dependencies**:
    - Check dependency order
@@ -492,7 +495,7 @@ graph TD
 
 ```bash
 # Plan with detailed output
-terraform init --upgrade && terraform plan -detailed-exitcode
+terraform init -lockfile=readonly && terraform plan -detailed-exitcode
 
 # Show current state
 terraform show

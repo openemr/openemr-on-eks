@@ -8,9 +8,8 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-import pytest
-
 import openemr_eks_mcp.cli as cli
+import pytest
 from openemr_eks_mcp import __version__
 from openemr_eks_mcp.cli import REPO_ROOT_ENV, discover_repository_root, main
 

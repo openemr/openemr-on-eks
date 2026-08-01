@@ -132,12 +132,20 @@ search_version_in_codebase() {
     
     # Determine search pattern based on component type
     local search_pattern="$escaped_version"
-    if [[ "$component" == *"actions/"* ]] || [[ "$component" == *"azure/"* ]] || [[ "$component" == *"hashicorp/"* ]]; then
-        # For GitHub Actions, search for the full action name with the version
-        # Format: component@version (e.g., actions/checkout@v3)
+    if [[ "$component" == actions/* ]] ||
+        [[ "$component" == azure/* ]] ||
+        [[ "$component" == hashicorp/setup-* ]] ||
+        [[ "$component" == aquasecurity/trivy-action ]] ||
+        [[ "$component" == aws-actions/* ]] ||
+        [[ "$component" == github/codeql-action ]] ||
+        [[ "$component" == dorny/* ]] ||
+        [[ "$component" == Checkmarx/kics-github-action ]] ||
+        [[ "$component" == ncipollo/* ]] ||
+        [[ "$component" == terraform-linters/* ]]; then
+        # Actions use immutable SHAs with a reviewed release tag in a comment.
         # shellcheck disable=SC2016
         local escaped_component=$(printf '%s\n' "$component" | sed 's/[[\.*^$()+?{|]/\\&/g')
-        search_pattern="${escaped_component}@${escaped_version}"
+        search_pattern="${escaped_component}.*@.*# ${escaped_version}"
     fi
     
     if grep -rn "${exclude_patterns[@]}" "$search_pattern" "$PROJECT_ROOT" > "$search_results" 2>/dev/null; then
@@ -669,6 +677,28 @@ get_latest_aurora_version() {
 
 # Function to get the latest Terraform module version
 # This function retrieves the latest version of a Terraform module from the registry
+get_latest_terraform_provider_version() {
+    local provider_source="$1"
+    local url="https://registry.terraform.io/v1/providers/${provider_source}"
+    local response
+    local version
+
+    log "INFO" "Checking latest version for Terraform provider: $provider_source..."
+    if ! response=$(curl --fail --silent --show-error --location "$url" 2>/dev/null) ||
+        ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Could not fetch Terraform provider metadata for $provider_source"
+        return 1
+    fi
+
+    version=$(echo "$response" | jq -r '.version // empty' 2>/dev/null)
+    if [ -z "$version" ]; then
+        log "ERROR" "Could not determine latest version for Terraform provider $provider_source"
+        return 1
+    fi
+
+    echo "$version"
+}
+
 get_latest_terraform_module_version() {
     local module_source="$1"  # Module source (e.g., "terraform-aws-modules/vpc/aws")
 
@@ -685,7 +715,7 @@ get_latest_terraform_module_version() {
     if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
         log "WARN" "Could not fetch or parse module information from Terraform registry"
         echo "❌ Error"
-        return
+        return 1
     fi
 
     # Extract latest version from the versions array
@@ -707,31 +737,28 @@ get_latest_terraform_module_version() {
 # This function retrieves the latest version of a GitHub Action from the repository
 get_latest_github_action_version() {
     local action_name="$1"  # GitHub Action name (e.g., "actions/checkout")
+    local tags_url="https://api.github.com/repos/${action_name}/tags?per_page=100"
+    local response
+    local version
 
     log "INFO" "Checking latest version for GitHub Action: $action_name..."
 
-    # For GitHub Actions, we'll check the marketplace or repository
-    # GitHub Actions are typically versioned using Git tags
-    local url="https://api.github.com/repos/${action_name}/releases/latest"
-
-    # Fetch the latest release information from GitHub API
-    local response=$(curl -s "$url" 2>/dev/null || echo "")
-
-    # Check if the API call was successful and response is valid JSON
-    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
-        log "ERROR" "Failed to fetch or parse GitHub API response for $action_name"
+    if ! response=$(curl --fail --silent --show-error --location "$tags_url" 2>/dev/null) ||
+        ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Failed to fetch or parse GitHub tags for $action_name"
         return 1
     fi
 
-    # Check for GitHub API error messages
-    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
-        log "ERROR" "GitHub API error for $action_name: $(echo "$response" | jq -r '.message')"
+    version=$(echo "$response" | jq -r '.[].name' 2>/dev/null |
+        grep -E '^v?[0-9]+(\.[0-9]+){0,2}$' |
+        sort -V |
+        tail -1 || true)
+    if [ -z "$version" ]; then
+        log "ERROR" "No stable semantic-version tags found for $action_name"
         return 1
     fi
 
-    # Extract tag name (version) from the release information
-    # GitHub releases use tag names for versioning
-    echo "$response" | jq -r '.tag_name' 2>/dev/null || echo "❌ Error"
+    echo "$version"
 }
 
 # Function to get the latest GitHub runner version
@@ -957,57 +984,21 @@ get_latest_go_package_version() {
 # This function retrieves the latest Go version from the official Go repository
 get_latest_go_version() {
     log "INFO" "Checking latest Go version..."
+    local response
+    local version
 
-    # Use GitHub API to get Go releases (golang/go repository)
-    local url="https://api.github.com/repos/golang/go/releases/latest"
-    local response=$(curl -s "$url" 2>/dev/null || echo "")
-
-    if [ -z "$response" ] || ! echo "$response" | jq empty 2>/dev/null; then
-        log "WARN" "Failed to fetch or parse GitHub API response for Go, trying tags..."
-        # Fallback to tags API
-        local tags_url="https://api.github.com/repos/golang/go/tags"
-        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
-        
-        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
-            # Get the first tag that matches go1.x.x pattern
-            local version=$(echo "$tags_response" | jq -r '.[] | select(.name | test("^go1\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^go//' || echo "")
-            if [ -n "$version" ] && [ "$version" != "null" ]; then
-                version=$(echo "$version" | cut -d. -f1,2)
-                log "INFO" "Latest Go version (from tags): $version"
-                echo "$version"
-                return 0
-            fi
-        fi
-        echo "❌ Error"
+    if ! response=$(curl --fail --silent --show-error --location \
+        "https://go.dev/dl/?mode=json" 2>/dev/null) ||
+        ! echo "$response" | jq empty 2>/dev/null; then
+        log "ERROR" "Failed to fetch the official Go release feed"
         return 1
     fi
 
-    # Check for GitHub API error messages
-    if echo "$response" | jq -e '.message' >/dev/null 2>&1; then
-        log "WARN" "GitHub API error for Go: $(echo "$response" | jq -r '.message'), trying tags..."
-        # Fallback to tags API
-        local tags_url="https://api.github.com/repos/golang/go/tags"
-        local tags_response=$(curl -s "$tags_url" 2>/dev/null || echo "")
-        
-        if [ -n "$tags_response" ] && [ "$tags_response" != "[]" ]; then
-            local version=$(echo "$tags_response" | jq -r '.[] | select(.name | test("^go1\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^go//' || echo "")
-            if [ -n "$version" ] && [ "$version" != "null" ]; then
-                version=$(echo "$version" | cut -d. -f1,2)
-                log "INFO" "Latest Go version (from tags): $version"
-                echo "$version"
-                return 0
-            fi
-        fi
-        echo "❌ Error"
-        return 1
-    fi
-
-    # Extract tag name and remove 'go' prefix (e.g., "go1.25.0" -> "1.25.0")
-    local version=$(echo "$response" | jq -r '.tag_name' 2>/dev/null | sed 's/^go//' || echo "")
-    
-    if [ -z "$version" ] || [ "$version" = "null" ]; then
-        log "WARN" "Could not determine latest Go version"
-        echo "❌ Unable to determine"
+    version=$(echo "$response" |
+        jq -r '[.[] | select(.stable == true) | .version][0] // empty' |
+        sed 's/^go//')
+    if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        log "ERROR" "Could not determine the latest stable Go patch release"
         return 1
     fi
 
@@ -1087,6 +1078,27 @@ get_latest_semver_version() {
     echo "$latest_version"
 }
 
+# Capture a lookup without allowing API failures to masquerade as "up to date".
+# Bash's dynamic scoping lets this helper update check_updates()'s local counters.
+run_version_lookup() {
+    local result_variable="$1"
+    local component_name="$2"
+    local current_version="$3"
+    shift 3
+
+    local latest_version
+    if latest_version=$("$@") && [ -n "$latest_version" ] &&
+        [[ "$latest_version" != "❌"* ]]; then
+        printf -v "$result_variable" '%s' "$latest_version"
+        return 0
+    fi
+
+    printf -v "$result_variable" '%s' "$current_version"
+    checks_failed=$((checks_failed + 1))
+    log "ERROR" "Version lookup failed for $component_name"
+    echo "- **${component_name}**: ❌ Version check incomplete" >> "$update_report"
+}
+
 # Function to check for updates across all components
 # This function orchestrates the version checking process for all components
 check_updates() {
@@ -1103,6 +1115,7 @@ check_updates() {
     fi
 
     local updates_found=0
+    local checks_failed=0
     local update_report="$TEMP_DIR/update-report.md"
 
     cat > "$update_report" << EOF
@@ -1117,7 +1130,8 @@ EOF
         # Check OpenEMR version
         log "INFO" "Checking OpenEMR version..."
         local openemr_latest
-        openemr_latest=$(get_latest_openemr_release_version) || openemr_latest=""
+        run_version_lookup openemr_latest "OpenEMR" "$OPENEMR_CURRENT" \
+            get_latest_openemr_release_version
         if [ -n "$openemr_latest" ] && [ "$openemr_latest" != "$OPENEMR_CURRENT" ]; then
             log "INFO" "OpenEMR update available: $OPENEMR_CURRENT -> $openemr_latest"
             echo "- **OpenEMR**: $OPENEMR_CURRENT → $openemr_latest" >> "$update_report"
@@ -1130,7 +1144,8 @@ EOF
         # Check Fluent Bit version
         log "INFO" "Checking Fluent Bit version..."
         local fluent_bit_latest
-        fluent_bit_latest=$(get_latest_docker_version "$FLUENT_BIT_REGISTRY") || fluent_bit_latest=""
+        run_version_lookup fluent_bit_latest "Fluent Bit" "$FLUENT_BIT_CURRENT" \
+            get_latest_docker_version "$FLUENT_BIT_REGISTRY"
         if [ -n "$fluent_bit_latest" ] && [ "$fluent_bit_latest" != "$FLUENT_BIT_CURRENT" ]; then
             log "INFO" "Fluent Bit update available: $FLUENT_BIT_CURRENT -> $fluent_bit_latest"
             echo "- **Fluent Bit**: $FLUENT_BIT_CURRENT → $fluent_bit_latest" >> "$update_report"
@@ -1151,7 +1166,7 @@ EOF
             local python_tags_url="https://registry.hub.docker.com/v2/repositories/${PYTHON_REGISTRY}/tags?page_size=100&name=3."
             local python_response=$(curl -s "$python_tags_url" 2>/dev/null || echo "")
             
-            if [ -n "$python_response" ]; then
+            if [ -n "$python_response" ] && echo "$python_response" | jq empty 2>/dev/null; then
                 # Extract latest 3.xx version (excluding RC/beta)
                 local python_latest=$(echo "$python_response" | jq -r '.results[].name' 2>/dev/null | \
                     grep -E "^3\.[0-9]+(-slim)?$" | \
@@ -1165,8 +1180,14 @@ EOF
                     search_version_in_codebase "Python Docker Image" "$PYTHON_CURRENT" "$python_latest"
                     updates_found=1
                 else
-                    log "INFO" "Python Docker image is up to date: $PYTHON_CURRENT"
+                    checks_failed=$((checks_failed + 1))
+                    log "ERROR" "Could not determine the latest stable Python Docker image"
+                    echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
                 fi
+            else
+                checks_failed=$((checks_failed + 1))
+                log "ERROR" "Could not fetch Python Docker image tags"
+                echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
             fi
         fi
     fi
@@ -1175,7 +1196,9 @@ EOF
     if [ "$components" = "all" ] || [ "$components" = "infrastructure" ]; then
         # Check Kubernetes version
         log "INFO" "Checking Kubernetes version..."
-        local k8s_latest=$(get_latest_k8s_version)
+        local k8s_latest
+        run_version_lookup k8s_latest "Kubernetes" "$K8S_CURRENT" \
+            get_latest_k8s_version
         if [ "$k8s_latest" != "❌ Unable to determine" ] && [ "$k8s_latest" != "$K8S_CURRENT" ]; then
             log "INFO" "Kubernetes update available: $K8S_CURRENT -> $k8s_latest"
             echo "- **Kubernetes**: $K8S_CURRENT → $k8s_latest" >> "$update_report"
@@ -1190,7 +1213,8 @@ EOF
         # Check EKS version
         log "INFO" "Checking EKS version..."
         local eks_current=$(yq eval '.infrastructure.eks.current' "$VERSIONS_FILE")
-        local eks_latest=$(get_latest_k8s_version)  # EKS uses same versioning as Kubernetes
+        local eks_latest
+        run_version_lookup eks_latest "EKS" "$eks_current" get_latest_k8s_version
         
         if [ "$eks_latest" != "❌ Unable to determine" ] && [ "$eks_latest" != "$eks_current" ]; then
             log "INFO" "EKS update available: $eks_current -> $eks_latest"
@@ -1202,16 +1226,53 @@ EOF
         else
             log "INFO" "EKS is up to date: $eks_current"
         fi
+
+        # Check Aurora MySQL engine version.
+        local aurora_current
+        local aurora_latest
+        aurora_current=$(yq eval '.databases.aurora_mysql.current' "$VERSIONS_FILE")
+        run_version_lookup aurora_latest "Aurora MySQL" "$aurora_current" \
+            get_latest_aurora_version
+        if [ "$aurora_latest" != "$aurora_current" ]; then
+            log "INFO" "Aurora MySQL update available: $aurora_current -> $aurora_latest"
+            echo "- **Aurora MySQL**: $aurora_current → $aurora_latest" >> "$update_report"
+            search_version_in_codebase "Aurora MySQL" "$aurora_current" "$aurora_latest"
+            updates_found=1
+        fi
     fi
 
     # Check Terraform modules if requested
     if [ "$components" = "all" ] || [ "$components" = "terraform_modules" ]; then
         log "INFO" "Checking Terraform modules..."
 
+        # Check directly required Terraform providers.
+        local provider_key
+        while IFS= read -r provider_key; do
+            local provider_current
+            local provider_source
+            local provider_latest
+            provider_current=$(yq eval ".terraform_modules.${provider_key}.current" "$VERSIONS_FILE")
+            provider_source=$(yq eval ".terraform_modules.${provider_key}.source" "$VERSIONS_FILE")
+            run_version_lookup provider_latest "$provider_source provider" "$provider_current" \
+                get_latest_terraform_provider_version "$provider_source"
+            if [ "$provider_latest" != "$provider_current" ]; then
+                log "INFO" "$provider_source provider update available: $provider_current -> $provider_latest"
+                echo "- **${provider_source} provider**: $provider_current → $provider_latest" >> "$update_report"
+                search_version_in_codebase "$provider_source provider" "$provider_current" "$provider_latest"
+                updates_found=1
+            fi
+        done < <(
+            yq eval -r \
+                '.terraform_modules | to_entries | .[] | select(.value.kind == "provider") | .key' \
+                "$VERSIONS_FILE"
+        )
+
         # Check EKS module
         local eks_module_current=$(yq eval '.terraform_modules.aws_eks.current' "$VERSIONS_FILE")
         local eks_module_source=$(yq eval '.terraform_modules.aws_eks.source' "$VERSIONS_FILE")
-        local eks_module_latest=$(get_latest_terraform_module_version "$eks_module_source")
+        local eks_module_latest
+        run_version_lookup eks_module_latest "EKS Terraform module" "$eks_module_current" \
+            get_latest_terraform_module_version "$eks_module_source"
 
         if [ "$eks_module_latest" != "❌ Error" ] && [ "$eks_module_latest" != "❌ Unable to determine" ] && [ "$eks_module_latest" != "$eks_module_current" ]; then
             log "INFO" "EKS module update available: $eks_module_current -> $eks_module_latest"
@@ -1225,7 +1286,9 @@ EOF
         # Check VPC module
         local vpc_module_current=$(yq eval '.terraform_modules.aws_vpc.current' "$VERSIONS_FILE")
         local vpc_module_source=$(yq eval '.terraform_modules.aws_vpc.source' "$VERSIONS_FILE")
-        local vpc_module_latest=$(get_latest_terraform_module_version "$vpc_module_source")
+        local vpc_module_latest
+        run_version_lookup vpc_module_latest "VPC Terraform module" "$vpc_module_current" \
+            get_latest_terraform_module_version "$vpc_module_source"
 
         if [ "$vpc_module_latest" != "❌ Error" ] && [ "$vpc_module_latest" != "❌ Unable to determine" ] && [ "$vpc_module_latest" != "$vpc_module_current" ]; then
             log "INFO" "VPC module update available: $vpc_module_current -> $vpc_module_latest"
@@ -1239,7 +1302,10 @@ EOF
         # Check aws_pod_identity module
         local pod_identity_module_current=$(yq eval '.terraform_modules.aws_pod_identity.current' "$VERSIONS_FILE")
         local pod_identity_module_source=$(yq eval '.terraform_modules.aws_pod_identity.source' "$VERSIONS_FILE")
-        local pod_identity_module_latest=$(get_latest_terraform_module_version "$pod_identity_module_source")
+        local pod_identity_module_latest
+        run_version_lookup pod_identity_module_latest "EKS Pod Identity module" \
+            "$pod_identity_module_current" \
+            get_latest_terraform_module_version "$pod_identity_module_source"
 
         if [ "$pod_identity_module_latest" != "❌ Error" ] && [ "$pod_identity_module_latest" != "❌ Unable to determine" ] && [ "$pod_identity_module_latest" != "$pod_identity_module_current" ]; then
             log "INFO" "AWS Pod Identity module update available: $pod_identity_module_current -> $pod_identity_module_latest"
@@ -1255,77 +1321,34 @@ EOF
     if [ "$components" = "all" ] || [ "$components" = "github_workflows" ]; then
         log "INFO" "Checking GitHub workflow dependencies..."
 
-        # Check actions/checkout
-        local checkout_current=$(yq eval '.github_workflows.actions_checkout.current' "$VERSIONS_FILE")
-        local checkout_latest=$(get_latest_github_action_version "actions/checkout")
+        # Drive action checks from versions.yaml so every tracked action is covered.
+        local action_key
+        while IFS= read -r action_key; do
+            local action_current
+            local action_repo
+            local action_latest
+            action_current=$(yq eval ".github_workflows.${action_key}.current" "$VERSIONS_FILE")
+            action_repo=$(yq eval ".github_workflows.${action_key}.repository" "$VERSIONS_FILE")
+            run_version_lookup action_latest "$action_repo" "$action_current" \
+                get_latest_github_action_version "$action_repo"
 
-        if [ "$checkout_latest" != "❌ Error" ] && ! compare_versions "$checkout_current" "$checkout_latest"; then
-            log "INFO" "actions/checkout update available: $checkout_current -> $checkout_latest"
-            echo "- **actions/checkout**: $checkout_current → $checkout_latest" >> "$update_report"
-            search_version_in_codebase "actions/checkout" "$checkout_current" "$checkout_latest"
-            updates_found=1
-        fi
-
-        # Check actions/setup-python
-        local python_action_current=$(yq eval '.github_workflows.actions_setup_python.current' "$VERSIONS_FILE")
-        local python_action_latest=$(get_latest_github_action_version "actions/setup-python")
-
-        if [ "$python_action_latest" != "❌ Error" ] && ! compare_versions "$python_action_current" "$python_action_latest"; then
-            log "INFO" "actions/setup-python update available: $python_action_current -> $python_action_latest"
-            echo "- **actions/setup-python**: $python_action_current → $python_action_latest" >> "$update_report"
-            search_version_in_codebase "actions/setup-python" "$python_action_current" "$python_action_latest"
-            updates_found=1
-        fi
-
-        # Check actions/setup-go
-        local go_action_current=$(yq eval '.github_workflows.actions_setup_go.current' "$VERSIONS_FILE")
-        local go_action_latest=$(get_latest_github_action_version "actions/setup-go")
-
-        if [ "$go_action_latest" != "❌ Error" ] && ! compare_versions "$go_action_current" "$go_action_latest"; then
-            log "INFO" "actions/setup-go update available: $go_action_current -> $go_action_latest"
-            echo "- **actions/setup-go**: $go_action_current → $go_action_latest" >> "$update_report"
-            search_version_in_codebase "actions/setup-go" "$go_action_current" "$go_action_latest"
-            updates_found=1
-        fi
-
-        # Check hashicorp/setup-terraform
-        local terraform_action_current=$(yq eval '.github_workflows.actions_setup_terraform.current' "$VERSIONS_FILE")
-        local terraform_action_latest=$(get_latest_github_action_version "hashicorp/setup-terraform")
-
-        if [ "$terraform_action_latest" != "❌ Error" ] && ! compare_versions "$terraform_action_current" "$terraform_action_latest"; then
-            log "INFO" "hashicorp/setup-terraform update available: $terraform_action_current -> $terraform_action_latest"
-            echo "- **hashicorp/setup-terraform**: $terraform_action_current → $terraform_action_latest" >> "$update_report"
-            search_version_in_codebase "hashicorp/setup-terraform" "$terraform_action_current" "$terraform_action_latest"
-            updates_found=1
-        fi
-
-        # Check azure/setup-kubectl
-        local kubectl_action_current=$(yq eval '.github_workflows.actions_setup_kubectl.current' "$VERSIONS_FILE")
-        local kubectl_action_latest=$(get_latest_github_action_version "azure/setup-kubectl")
-
-        if [ "$kubectl_action_latest" != "❌ Error" ] && ! compare_versions "$kubectl_action_current" "$kubectl_action_latest"; then
-            log "INFO" "azure/setup-kubectl update available: $kubectl_action_current -> $kubectl_action_latest"
-            echo "- **azure/setup-kubectl**: $kubectl_action_current → $kubectl_action_latest" >> "$update_report"
-            search_version_in_codebase "azure/setup-kubectl" "$kubectl_action_current" "$kubectl_action_latest"
-            updates_found=1
-        fi
-
-        # Check aquasecurity/trivy-action
-        local trivy_action_current
-        trivy_action_current=$(yq eval '.github_workflows.trivy_action.current' "$VERSIONS_FILE")
-        local trivy_action_latest
-        trivy_action_latest=$(get_latest_github_action_version "aquasecurity/trivy-action")
-
-        if [ "$trivy_action_latest" != "❌ Error" ] && ! compare_versions "$trivy_action_current" "$trivy_action_latest"; then
-            log "INFO" "aquasecurity/trivy-action update available: $trivy_action_current -> $trivy_action_latest"
-            echo "- **aquasecurity/trivy-action**: $trivy_action_current → $trivy_action_latest" >> "$update_report"
-            search_version_in_codebase "aquasecurity/trivy-action" "$trivy_action_current" "$trivy_action_latest"
-            updates_found=1
-        fi
+            if ! compare_versions "$action_current" "$action_latest"; then
+                log "INFO" "$action_repo update available: $action_current -> $action_latest"
+                echo "- **${action_repo}**: $action_current → $action_latest" >> "$update_report"
+                search_version_in_codebase "$action_repo" "$action_current" "$action_latest"
+                updates_found=1
+            fi
+        done < <(
+            yq eval -r \
+                '.github_workflows | to_entries | .[] | select(.value.repository != null) | .key' \
+                "$VERSIONS_FILE"
+        )
 
         # Check GitHub runner
         local runner_current=$(yq eval '.github_workflows.github_runner.current' "$VERSIONS_FILE")
-        local runner_latest=$(get_latest_github_runner_version)
+        local runner_latest
+        run_version_lookup runner_latest "GitHub runner" "$runner_current" \
+            get_latest_github_runner_version
 
         if [ "$runner_latest" != "❌ Unable to determine" ] && [ "$runner_latest" != "$runner_current" ]; then
             log "INFO" "GitHub runner update available: $runner_current -> $runner_latest"
@@ -1341,7 +1364,9 @@ EOF
 
         # Check pre-commit-hooks
         local pre_commit_current=$(yq eval '.pre_commit_hooks.pre_commit_hooks.current' "$VERSIONS_FILE")
-        local pre_commit_latest=$(get_latest_pre_commit_hook_version "pre_commit_hooks")
+        local pre_commit_latest
+        run_version_lookup pre_commit_latest "pre-commit-hooks" "$pre_commit_current" \
+            get_latest_pre_commit_hook_version "pre_commit_hooks"
 
         if [ "$pre_commit_latest" != "❌ Error" ] && [ "$pre_commit_latest" != "$pre_commit_current" ]; then
             log "INFO" "pre-commit-hooks update available: $pre_commit_current -> $pre_commit_latest"
@@ -1352,7 +1377,9 @@ EOF
 
         # Check black
         local black_current=$(yq eval '.pre_commit_hooks.black.current' "$VERSIONS_FILE")
-        local black_latest=$(get_latest_pre_commit_hook_version "black")
+        local black_latest
+        run_version_lookup black_latest "Black pre-commit hook" "$black_current" \
+            get_latest_pre_commit_hook_version "black"
 
         if [ "$black_latest" != "❌ Error" ] && [ "$black_latest" != "$black_current" ]; then
             log "INFO" "black update available: $black_current -> $black_latest"
@@ -1363,7 +1390,9 @@ EOF
 
         # Check isort
         local isort_current=$(yq eval '.pre_commit_hooks.isort.current' "$VERSIONS_FILE")
-        local isort_latest=$(get_latest_pre_commit_hook_version "isort")
+        local isort_latest
+        run_version_lookup isort_latest "isort pre-commit hook" "$isort_current" \
+            get_latest_pre_commit_hook_version "isort"
 
         if [ "$isort_latest" != "❌ Error" ] && [ "$isort_latest" != "$isort_current" ]; then
             log "INFO" "isort update available: $isort_current -> $isort_latest"
@@ -1373,7 +1402,9 @@ EOF
 
         # Check flake8
         local flake8_current=$(yq eval '.pre_commit_hooks.flake8.current' "$VERSIONS_FILE")
-        local flake8_latest=$(get_latest_pre_commit_hook_version "flake8")
+        local flake8_latest
+        run_version_lookup flake8_latest "Flake8 pre-commit hook" "$flake8_current" \
+            get_latest_pre_commit_hook_version "flake8"
 
         if [ "$flake8_latest" != "❌ Error" ] && [ "$flake8_latest" != "$flake8_current" ]; then
             log "INFO" "flake8 update available: $flake8_current -> $flake8_latest"
@@ -1383,7 +1414,9 @@ EOF
 
         # Check bandit
         local bandit_current=$(yq eval '.pre_commit_hooks.bandit.current' "$VERSIONS_FILE")
-        local bandit_latest=$(get_latest_pre_commit_hook_version "bandit")
+        local bandit_latest
+        run_version_lookup bandit_latest "Bandit pre-commit hook" "$bandit_current" \
+            get_latest_pre_commit_hook_version "bandit"
 
         if [ "$bandit_latest" != "❌ Error" ] && [ "$bandit_latest" != "$bandit_current" ]; then
             log "INFO" "bandit update available: $bandit_current -> $bandit_latest"
@@ -1393,7 +1426,9 @@ EOF
 
         # Check terraform hooks
         local terraform_hooks_current=$(yq eval '.pre_commit_hooks.terraform_hooks.current' "$VERSIONS_FILE")
-        local terraform_hooks_latest=$(get_latest_pre_commit_hook_version "terraform_hooks")
+        local terraform_hooks_latest
+        run_version_lookup terraform_hooks_latest "Terraform pre-commit hooks" \
+            "$terraform_hooks_current" get_latest_pre_commit_hook_version "terraform_hooks"
 
         if [ "$terraform_hooks_latest" != "❌ Error" ] && [ "$terraform_hooks_latest" != "$terraform_hooks_current" ]; then
             log "INFO" "terraform hooks update available: $terraform_hooks_current -> $terraform_hooks_latest"
@@ -1403,7 +1438,9 @@ EOF
 
         # Check shellcheck
         local shellcheck_current=$(yq eval '.pre_commit_hooks.shellcheck.current' "$VERSIONS_FILE")
-        local shellcheck_latest=$(get_latest_pre_commit_hook_version "shellcheck")
+        local shellcheck_latest
+        run_version_lookup shellcheck_latest "ShellCheck pre-commit hook" "$shellcheck_current" \
+            get_latest_pre_commit_hook_version "shellcheck"
 
         if [ "$shellcheck_latest" != "❌ Error" ] && [ "$shellcheck_latest" != "$shellcheck_current" ]; then
             log "INFO" "shellcheck update available: $shellcheck_current -> $shellcheck_latest"
@@ -1413,7 +1450,9 @@ EOF
 
         # Check markdownlint
         local markdownlint_current=$(yq eval '.pre_commit_hooks.markdownlint.current' "$VERSIONS_FILE")
-        local markdownlint_latest=$(get_latest_pre_commit_hook_version "markdownlint")
+        local markdownlint_latest
+        run_version_lookup markdownlint_latest "markdownlint pre-commit hook" \
+            "$markdownlint_current" get_latest_pre_commit_hook_version "markdownlint"
 
         if [ "$markdownlint_latest" != "❌ Error" ] && [ "$markdownlint_latest" != "$markdownlint_current" ]; then
             log "INFO" "markdownlint update available: $markdownlint_current -> $markdownlint_latest"
@@ -1423,7 +1462,9 @@ EOF
 
         # Check yamllint
         local yamllint_current=$(yq eval '.pre_commit_hooks.yamllint.current' "$VERSIONS_FILE")
-        local yamllint_latest=$(get_latest_pre_commit_hook_version "yamllint")
+        local yamllint_latest
+        run_version_lookup yamllint_latest "yamllint pre-commit hook" "$yamllint_current" \
+            get_latest_pre_commit_hook_version "yamllint"
 
         if [ "$yamllint_latest" != "❌ Error" ] && [ "$yamllint_latest" != "$yamllint_current" ]; then
             log "INFO" "yamllint update available: $yamllint_current -> $yamllint_latest"
@@ -1433,7 +1474,9 @@ EOF
 
         # Check commitizen
         local commitizen_current=$(yq eval '.pre_commit_hooks.commitizen.current' "$VERSIONS_FILE")
-        local commitizen_latest=$(get_latest_pre_commit_hook_version "commitizen")
+        local commitizen_latest
+        run_version_lookup commitizen_latest "Commitizen pre-commit hook" "$commitizen_current" \
+            get_latest_pre_commit_hook_version "commitizen"
 
         if [ "$commitizen_latest" != "❌ Error" ] && [ "$commitizen_latest" != "$commitizen_current" ]; then
             log "INFO" "commitizen update available: $commitizen_current -> $commitizen_latest"
@@ -1449,7 +1492,9 @@ EOF
 
         # Check Python version
         local python_current=$(yq eval '.semver_packages.python_version.current' "$VERSIONS_FILE")
-        local python_latest=$(get_latest_semver_version "python_version")
+        local python_latest
+        run_version_lookup python_latest "Python runtime" "$python_current" \
+            get_latest_semver_version "python_version"
 
         if [ "$python_latest" != "❌ Error" ] && [ "$python_latest" != "$python_current" ]; then
             log "INFO" "Python version update available: $python_current -> $python_latest"
@@ -1459,7 +1504,9 @@ EOF
 
         # Check Terraform version
         local terraform_current=$(yq eval '.semver_packages.terraform_version.current' "$VERSIONS_FILE")
-        local terraform_latest=$(get_latest_semver_version "terraform_version")
+        local terraform_latest
+        run_version_lookup terraform_latest "Terraform CLI" "$terraform_current" \
+            get_latest_semver_version "terraform_version"
 
         if [ "$terraform_latest" != "❌ Error" ] && [ "$terraform_latest" != "$terraform_current" ]; then
             log "INFO" "Terraform version update available: $terraform_current -> $terraform_latest"
@@ -1470,7 +1517,9 @@ EOF
 
         # Check kubectl version
         local kubectl_current=$(yq eval '.semver_packages.kubectl_version.current' "$VERSIONS_FILE")
-        local kubectl_latest=$(get_latest_semver_version "kubectl_version")
+        local kubectl_latest
+        run_version_lookup kubectl_latest "kubectl" "$kubectl_current" \
+            get_latest_semver_version "kubectl_version"
 
         if [ "$kubectl_latest" != "❌ Error" ] && [ "$kubectl_latest" != "$kubectl_current" ]; then
             log "INFO" "kubectl version update available: $kubectl_current -> $kubectl_latest"
@@ -1481,7 +1530,9 @@ EOF
 
         # Check semver package version
         local semver_current=$(yq eval '.semver_packages.semver.current' "$VERSIONS_FILE")
-        local semver_latest=$(get_latest_semver_version "semver")
+        local semver_latest
+        run_version_lookup semver_latest "Node semver package" "$semver_current" \
+            get_latest_semver_version "semver"
 
         if [ "$semver_latest" != "❌ Error" ] && [ "$semver_latest" != "$semver_current" ]; then
             log "INFO" "semver package update available: $semver_current -> $semver_latest"
@@ -1496,7 +1547,8 @@ EOF
 
         # Check Go version
         local go_current=$(yq eval '.go_packages.go_version.current' "$VERSIONS_FILE")
-        local go_latest=$(get_latest_go_version)
+        local go_latest
+        run_version_lookup go_latest "Go toolchain" "$go_current" get_latest_go_version
 
         if [ "$go_latest" != "❌ Error" ] && [ "$go_latest" != "❌ Unable to determine" ] && [ "$go_latest" != "$go_current" ]; then
             log "INFO" "Go version update available: $go_current -> $go_latest"
@@ -1512,7 +1564,9 @@ EOF
         if [[ "$bubbletea_repo" == github.com/* ]]; then
             bubbletea_repo="${bubbletea_repo#github.com/}"
         fi
-        local bubbletea_latest=$(get_latest_go_package_version "$bubbletea_repo")
+        local bubbletea_latest
+        run_version_lookup bubbletea_latest "Bubble Tea" "$bubbletea_current" \
+            get_latest_go_package_version "$bubbletea_repo"
 
         if [ "$bubbletea_latest" != "❌ Error" ] && [ "$bubbletea_latest" != "❌ Unable to determine" ] && [ "$bubbletea_latest" != "$bubbletea_current" ]; then
             log "INFO" "bubbletea update available: $bubbletea_current -> $bubbletea_latest"
@@ -1528,7 +1582,9 @@ EOF
         if [[ "$lipgloss_repo" == github.com/* ]]; then
             lipgloss_repo="${lipgloss_repo#github.com/}"
         fi
-        local lipgloss_latest=$(get_latest_go_package_version "$lipgloss_repo")
+        local lipgloss_latest
+        run_version_lookup lipgloss_latest "Lip Gloss" "$lipgloss_current" \
+            get_latest_go_package_version "$lipgloss_repo"
 
         if [ "$lipgloss_latest" != "❌ Error" ] && [ "$lipgloss_latest" != "❌ Unable to determine" ] && [ "$lipgloss_latest" != "$lipgloss_current" ]; then
             log "INFO" "lipgloss update available: $lipgloss_current -> $lipgloss_latest"
@@ -1544,7 +1600,8 @@ EOF
 
         # Prometheus Operator
         local prometheus_latest
-        prometheus_latest=$(get_latest_helm_version "kube-prometheus-stack") || prometheus_latest=""
+        run_version_lookup prometheus_latest "Prometheus Operator" "$PROMETHEUS_CURRENT" \
+            get_latest_helm_version "kube-prometheus-stack"
         if [ -n "$prometheus_latest" ] && [ "$prometheus_latest" != "$PROMETHEUS_CURRENT" ]; then
             log "INFO" "Prometheus Operator update available: $PROMETHEUS_CURRENT -> $prometheus_latest"
             echo "- **Prometheus Operator**: $PROMETHEUS_CURRENT → $prometheus_latest" >> "$update_report"
@@ -1561,7 +1618,8 @@ EOF
             log "WARN" "Skipping automatic Loki comparison; OSS chart migration requires manual review"
         else
             local loki_latest
-            loki_latest=$(get_latest_helm_version "loki") || loki_latest=""
+            run_version_lookup loki_latest "Loki" "$LOKI_CURRENT" \
+                get_latest_helm_version "loki"
             if [ -n "$loki_latest" ] && [ "$loki_latest" != "$LOKI_CURRENT" ]; then
                 log "INFO" "Loki update available: $LOKI_CURRENT -> $loki_latest"
                 echo "- **Loki**: $LOKI_CURRENT → $loki_latest" >> "$update_report"
@@ -1578,7 +1636,8 @@ EOF
             log "WARN" "Skipping automatic Tempo comparison; chart 3.x requires an architecture migration"
         else
             local tempo_latest
-            tempo_latest=$(get_latest_helm_version "tempo-distributed") || tempo_latest=""
+            run_version_lookup tempo_latest "Tempo" "$TEMPO_CURRENT" \
+                get_latest_helm_version "tempo-distributed"
             if [ -n "$tempo_latest" ] && [ "$tempo_latest" != "$TEMPO_CURRENT" ]; then
                 log "INFO" "Tempo update available: $TEMPO_CURRENT -> $tempo_latest"
                 echo "- **Tempo**: $TEMPO_CURRENT → $tempo_latest" >> "$update_report"
@@ -1589,7 +1648,8 @@ EOF
 
         # Mimir
         local mimir_latest
-        mimir_latest=$(get_latest_helm_version "mimir-distributed") || mimir_latest=""
+        run_version_lookup mimir_latest "Mimir" "$MIMIR_CURRENT" \
+            get_latest_helm_version "mimir-distributed"
         if [ -n "$mimir_latest" ] && [ "$mimir_latest" != "$MIMIR_CURRENT" ]; then
             log "INFO" "Mimir update available: $MIMIR_CURRENT -> $mimir_latest"
             echo "- **Mimir**: $MIMIR_CURRENT → $mimir_latest" >> "$update_report"
@@ -1601,7 +1661,8 @@ EOF
         local otebpf_repo
         otebpf_repo=$(yq eval '.monitoring.otebpf.repository' "$VERSIONS_FILE" 2>/dev/null || echo "ghcr.io/open-telemetry/opentelemetry-ebpf-instrumentation")
         local otebpf_latest
-        otebpf_latest=$(get_latest_docker_version "$otebpf_repo") || otebpf_latest=""
+        run_version_lookup otebpf_latest "OTeBPF" "$OTEBPF_CURRENT" \
+            get_latest_docker_version "$otebpf_repo"
         if [ -n "$otebpf_latest" ] && [ "$otebpf_latest" != "$OTEBPF_CURRENT" ]; then
             log "INFO" "OTeBPF update available: $OTEBPF_CURRENT -> $otebpf_latest"
             echo "- **OTeBPF**: $OTEBPF_CURRENT → $otebpf_latest" >> "$update_report"
@@ -1615,7 +1676,8 @@ EOF
         local cert_manager_current
         cert_manager_current=$(yq eval '.monitoring.cert_manager.current' "$VERSIONS_FILE")
         local cert_manager_latest
-        cert_manager_latest=$(get_latest_helm_version "cert-manager") || cert_manager_latest=""
+        run_version_lookup cert_manager_latest "cert-manager" "$cert_manager_current" \
+            get_latest_helm_version "cert-manager"
         if [ -n "$cert_manager_latest" ] && [ "$cert_manager_latest" != "$cert_manager_current" ]; then
             log "INFO" "cert-manager update available: $cert_manager_current -> $cert_manager_latest"
             echo "- **cert-manager**: $cert_manager_current → $cert_manager_latest" >> "$update_report"
@@ -1631,7 +1693,9 @@ EOF
         # Check Trivy version
         local trivy_current=$(yq eval '.security_tools.trivy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$trivy_current" ]; then
-            local trivy_latest=$(get_latest_go_package_version "aquasecurity/trivy")
+            local trivy_latest
+            run_version_lookup trivy_latest "Trivy" "$trivy_current" \
+                get_latest_go_package_version "aquasecurity/trivy"
             trivy_latest="${trivy_latest#v}"  # Remove 'v' prefix for comparison
             if [ "$trivy_latest" != "❌ Error" ] && [ "$trivy_latest" != "❌ Unable to determine" ] && [ "$trivy_latest" != "$trivy_current" ]; then
                 log "INFO" "Trivy update available: $trivy_current -> $trivy_latest"
@@ -1645,22 +1709,35 @@ EOF
         local checkov_current=$(yq eval '.security_tools.checkov.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$checkov_current" ]; then
             local checkov_url="https://pypi.org/pypi/checkov/json"
-            local checkov_response=$(curl -s "$checkov_url" 2>/dev/null || echo "")
-            if [ -n "$checkov_response" ]; then
-                local checkov_latest=$(echo "$checkov_response" | jq -r '.info.version' 2>/dev/null || echo "")
+            local checkov_response
+            checkov_response=$(curl -s "$checkov_url" 2>/dev/null || echo "")
+            if [ -n "$checkov_response" ] && echo "$checkov_response" | jq empty 2>/dev/null; then
+                local checkov_latest
+                checkov_latest=$(echo "$checkov_response" | jq -r '.info.version // empty' 2>/dev/null)
                 if [ -n "$checkov_latest" ] && [ "$checkov_latest" != "null" ] && [ "$checkov_latest" != "$checkov_current" ]; then
                     log "INFO" "Checkov update available: $checkov_current -> $checkov_latest"
                     echo "- **Checkov**: $checkov_current → $checkov_latest" >> "$update_report"
                     search_version_in_codebase "Checkov" "$checkov_current" "$checkov_latest"
                     updates_found=1
                 fi
+                if [ -z "$checkov_latest" ]; then
+                    checks_failed=$((checks_failed + 1))
+                    log "ERROR" "Could not determine latest Checkov version"
+                    echo "- **Checkov**: ❌ Version check incomplete" >> "$update_report"
+                fi
+            else
+                checks_failed=$((checks_failed + 1))
+                log "ERROR" "Could not fetch Checkov package metadata"
+                echo "- **Checkov**: ❌ Version check incomplete" >> "$update_report"
             fi
         fi
 
         # Check KICS version
         local kics_current=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$kics_current" ]; then
-            local kics_latest=$(get_latest_go_package_version "Checkmarx/kics-github-action")
+            local kics_latest
+            run_version_lookup kics_latest "KICS" "$kics_current" \
+                get_latest_go_package_version "Checkmarx/kics-github-action"
             if [ "$kics_latest" != "❌ Error" ] && [ "$kics_latest" != "❌ Unable to determine" ] && [ "$kics_latest" != "$kics_current" ]; then
                 log "INFO" "KICS update available: $kics_current -> $kics_latest"
                 echo "- **KICS**: $kics_current → $kics_latest" >> "$update_report"
@@ -1672,7 +1749,9 @@ EOF
         # Check gosec version
         local gosec_current=$(yq eval '.security_tools.gosec.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         if [ -n "$gosec_current" ]; then
-            local gosec_latest=$(get_latest_go_package_version "securego/gosec")
+            local gosec_latest
+            run_version_lookup gosec_latest "gosec" "$gosec_current" \
+                get_latest_go_package_version "securego/gosec"
             if [ "$gosec_latest" != "❌ Error" ] && [ "$gosec_latest" != "❌ Unable to determine" ] && [ "$gosec_latest" != "$gosec_current" ]; then
                 log "INFO" "gosec update available: $gosec_current -> $gosec_latest"
                 echo "- **gosec**: $gosec_current → $gosec_latest" >> "$update_report"
@@ -1693,6 +1772,7 @@ EOF
             "kubernetes:kubernetes"
             "pytest:pytest"
             "pytest_cov:pytest-cov"
+            "ruff:ruff"
             "flake8:flake8"
             "black:black"
             "mypy:mypy"
@@ -1711,15 +1791,24 @@ EOF
             local pypi_url="https://pypi.org/pypi/${pypi_name}/json"
             local pypi_response
             pypi_response=$(curl -s "$pypi_url" 2>/dev/null || echo "")
-            if [ -n "$pypi_response" ]; then
+            if [ -n "$pypi_response" ] && echo "$pypi_response" | jq empty 2>/dev/null; then
                 local pkg_latest
-                pkg_latest=$(echo "$pypi_response" | jq -r '.info.version' 2>/dev/null || echo "")
+                pkg_latest=$(echo "$pypi_response" | jq -r '.info.version // empty' 2>/dev/null)
                 if [ -n "$pkg_latest" ] && [ "$pkg_latest" != "null" ] && [ "$pkg_latest" != "$pkg_current" ]; then
                     log "INFO" "${pypi_name} update available: $pkg_current -> $pkg_latest"
                     echo "- **${pypi_name}**: $pkg_current → $pkg_latest" >> "$update_report"
                     search_version_in_codebase "$pypi_name" "$pkg_current" "$pkg_latest"
                     updates_found=1
                 fi
+                if [ -z "$pkg_latest" ]; then
+                    checks_failed=$((checks_failed + 1))
+                    log "ERROR" "Could not determine latest ${pypi_name} version"
+                    echo "- **${pypi_name}**: ❌ Version check incomplete" >> "$update_report"
+                fi
+            else
+                checks_failed=$((checks_failed + 1))
+                log "ERROR" "Could not fetch ${pypi_name} package metadata"
+                echo "- **${pypi_name}**: ❌ Version check incomplete" >> "$update_report"
             fi
         done
     fi
@@ -1733,7 +1822,9 @@ EOF
         
         # Check EFS CSI Driver
         local efs_csi_current=$(yq eval '.eks_addons.efs_csi_driver.current' "$VERSIONS_FILE")
-        local efs_csi_latest=$(get_latest_eks_addon_version "aws-efs-csi-driver" "$eks_version")
+        local efs_csi_latest
+        run_version_lookup efs_csi_latest "EFS CSI Driver" "$efs_csi_current" \
+            get_latest_eks_addon_version "aws-efs-csi-driver" "$eks_version"
         
         if [ "$efs_csi_latest" != "❌ Error" ] && [ "$efs_csi_latest" != "$efs_csi_current" ]; then
             log "INFO" "EFS CSI Driver update available: $efs_csi_current -> $efs_csi_latest"
@@ -1744,7 +1835,9 @@ EOF
         
         # Check Metrics Server
         local metrics_server_current=$(yq eval '.eks_addons.metrics_server.current' "$VERSIONS_FILE")
-        local metrics_server_latest=$(get_latest_eks_addon_version "metrics-server" "$eks_version")
+        local metrics_server_latest
+        run_version_lookup metrics_server_latest "Metrics Server" "$metrics_server_current" \
+            get_latest_eks_addon_version "metrics-server" "$eks_version"
         
         if [ "$metrics_server_latest" != "❌ Error" ] && [ "$metrics_server_latest" != "$metrics_server_current" ]; then
             log "INFO" "Metrics Server update available: $metrics_server_current -> $metrics_server_latest"
@@ -1755,11 +1848,18 @@ EOF
     fi
 
 
-    if [ $updates_found -eq 0 ]; then
+    if [ "$checks_failed" -gt 0 ]; then
+        log "ERROR" "$checks_failed component version check(s) did not complete"
+        {
+            echo ""
+            echo "⚠️ **Incomplete:** $checks_failed component check(s) failed."
+            echo "Review the log before concluding that dependencies are current."
+        } >> "$update_report"
+    elif [ "$updates_found" -eq 0 ]; then
         log "INFO" "All components are up to date!"
         echo "No updates available." >> "$update_report"
     else
-        log "INFO" "Found $updates_found component(s) with available updates"
+        log "INFO" "Found one or more components with available updates"
     fi
 
     # Display report
@@ -1771,9 +1871,7 @@ EOF
     cp "$update_report" "$report_file"
     log "INFO" "Update report saved to: $report_file"
 
-    # Return success (0) regardless of whether updates were found
-    # This prevents GitHub Actions from failing when no updates are available
-    return 0
+    [ "$checks_failed" -eq 0 ]
 }
 
 
@@ -1865,6 +1963,7 @@ show_status() {
         local requests_version=$(yq eval '.python_packages.requests.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local kubernetes_version=$(yq eval '.python_packages.kubernetes.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local pytest_version=$(yq eval '.python_packages.pytest.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        local ruff_version=$(yq eval '.python_packages.ruff.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local black_version=$(yq eval '.python_packages.black.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local mypy_version=$(yq eval '.python_packages.mypy.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
         local fastmcp_version=$(yq eval '.python_packages.fastmcp.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
@@ -1877,6 +1976,7 @@ show_status() {
         [ -n "$requests_version" ] && echo -e "  requests: ${GREEN}$requests_version${NC}"
         [ -n "$kubernetes_version" ] && echo -e "  kubernetes: ${GREEN}$kubernetes_version${NC}"
         [ -n "$pytest_version" ] && echo -e "  pytest: ${GREEN}$pytest_version${NC}"
+        [ -n "$ruff_version" ] && echo -e "  Ruff: ${GREEN}$ruff_version${NC}"
         [ -n "$black_version" ] && echo -e "  black: ${GREEN}$black_version${NC}"
         [ -n "$mypy_version" ] && echo -e "  mypy: ${GREEN}$mypy_version${NC}"
         [ -n "$fastmcp_version" ] && echo -e "  FastMCP: ${GREEN}$fastmcp_version${NC}"

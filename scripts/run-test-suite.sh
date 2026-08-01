@@ -332,7 +332,7 @@ test_terraform_validation() {
 
     cd "$PROJECT_ROOT/terraform" || return 1
     log_info "Initializing Terraform..."
-    if ! output=$(terraform init -backend=false 2>&1); then
+    if ! output=$(terraform init -backend=false -lockfile=readonly 2>&1); then
         log_error "Terraform init failed"
         log_error "Error details: $output"
         failed=1

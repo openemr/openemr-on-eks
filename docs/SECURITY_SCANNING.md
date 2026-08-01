@@ -80,7 +80,12 @@ Security scanning is also integrated into:
 
 - `ci-cd-tests.yml` - Main CI/CD pipeline
 - `console-ci.yml` - Console application CI
-- `warp/.github/workflows/ci.yml` - Warp project CI
+
+All third-party GitHub Actions are pinned to reviewed 40-character commit SHAs.
+The corresponding release tag and SHA are recorded in `versions.yaml`, and
+contract tests reject mutable action references. Terraform provider selections
+are committed in `terraform/.terraform.lock.hcl`; CI initializes Terraform with
+the lock file in read-only mode.
 
 ## Configuration Files
 

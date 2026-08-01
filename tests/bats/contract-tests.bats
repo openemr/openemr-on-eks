@@ -26,6 +26,7 @@ setup() {
   CONTRACT_WORKFLOW="${PROJECT_ROOT}/.github/workflows/ci-contract-tests.yml"
   CONSOLE_WORKFLOW="${PROJECT_ROOT}/.github/workflows/console-ci.yml"
   SECURITY_WORKFLOW="${PROJECT_ROOT}/.github/workflows/security-comprehensive.yml"
+  WORKFLOWS_DIR="${PROJECT_ROOT}/.github/workflows"
   CHECKOV_BASELINE="${PROJECT_ROOT}/.checkov.baseline"
   CONSOLE_GO_MOD="${PROJECT_ROOT}/console/go.mod"
   OIDC_MAIN_TF="${PROJECT_ROOT}/oidc_provider/main.tf"
@@ -145,14 +146,6 @@ _all_tf_output_names() {
   [[ "$output" == *"$yaml_ver"* ]]
 }
 
-@test "CONTRACT: warp CI workflow PYTHON_VERSION matches versions.yaml semver_packages" {
-  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
-  local yaml_ver
-  yaml_ver=$(yq eval '.semver_packages.python_version.current' "$VERSIONS_FILE")
-  run grep "PYTHON_VERSION:" "${PROJECT_ROOT}/warp/.github/workflows/ci.yml"
-  [[ "$output" == *"$yaml_ver"* ]]
-}
-
 @test "CONTRACT: CI workflow TERRAFORM_VERSION matches versions.yaml" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
   local yaml_ver
@@ -198,23 +191,39 @@ _all_tf_output_names() {
   local yaml_ver
   yaml_ver=$(yq eval '.security_tools.kics.current' "$VERSIONS_FILE")
   grep -Fq "KICS_VERSION: '${yaml_ver}'" "$SECURITY_WORKFLOW"
-  grep -Fq "uses: Checkmarx/kics-github-action@${yaml_ver}" "$SECURITY_WORKFLOW"
+  grep -Fq "# ${yaml_ver}" "$SECURITY_WORKFLOW"
+  [ "$(yq eval '.github_workflows.kics_action.current' "$VERSIONS_FILE")" = "$yaml_ver" ]
 }
 
-@test "CONTRACT: every Trivy action matches versions.yaml and avoids moving branches" {
+@test "CONTRACT: every external action uses its reviewed immutable SHA" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
-  local yaml_ver line
-  yaml_ver=$(yq eval '.github_workflows.trivy_action.current' "$VERSIONS_FILE")
-  run grep -h 'uses: aquasecurity/trivy-action@' \
-    "$CI_WORKFLOW" \
-    "$SECURITY_WORKFLOW" \
-    "$CONSOLE_WORKFLOW" \
-    "${PROJECT_ROOT}/warp/.github/workflows/ci.yml"
-  assert_success
+  local action_key current repository sha
+  while IFS= read -r action_key; do
+    current=$(yq eval ".github_workflows.${action_key}.current" "$VERSIONS_FILE")
+    repository=$(yq eval ".github_workflows.${action_key}.repository" "$VERSIONS_FILE")
+    sha=$(yq eval ".github_workflows.${action_key}.sha" "$VERSIONS_FILE")
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]]
+    grep -R -Eq "uses: ${repository}(/[^@[:space:]]+)?@${sha} # ${current}" \
+      "$WORKFLOWS_DIR" || {
+      echo "Missing reviewed pin for ${repository}@${sha} (${current})"
+      return 1
+    }
+  done < <(
+    yq eval -r \
+      '.github_workflows | to_entries | .[] | select(.value.repository != null) | .key' \
+      "$VERSIONS_FILE"
+  )
+}
+
+@test "CONTRACT: workflow action references are full commit SHAs" {
+  local line reference
   while IFS= read -r line; do
-    [[ "$line" == *"aquasecurity/trivy-action@${yaml_ver}"* ]]
-  done <<< "$output"
-  [[ "$output" != *"@master"* ]]
+    reference=$(sed -E 's/.*uses:[[:space:]]+[^@]+@([^[:space:]#]+).*/\1/' <<< "$line")
+    [[ "$reference" =~ ^[0-9a-f]{40}$ ]] || {
+      echo "Mutable action reference: $line"
+      return 1
+    }
+  done < <(grep -R -E 'uses:[[:space:]]+[^[:space:]#]+@' "$WORKFLOWS_DIR")
 }
 
 @test "CONTRACT: Checkov rejects findings outside the reviewed baseline" {
@@ -258,12 +267,17 @@ _all_tf_output_names() {
 
 @test "CONTRACT: Go toolchain matches versions.yaml and gosec minimum" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
-  local go_ver
+  local go_ver gosec_min compatibility_source gosec_version
   go_ver=$(yq eval '.go_packages.go_version.current' "$VERSIONS_FILE")
+  gosec_min=$(yq eval '.security_tools.gosec.minimum_go_version' "$VERSIONS_FILE")
+  gosec_version=$(yq eval '.security_tools.gosec.current' "$VERSIONS_FILE")
+  compatibility_source=$(yq eval '.security_tools.gosec.compatibility_source' "$VERSIONS_FILE")
   grep -Fq "go ${go_ver}" "$CONSOLE_GO_MOD"
   grep -Fq "GO_VERSION: '${go_ver}'" "$CONSOLE_WORKFLOW"
   grep -Fq "GO_VERSION: '${go_ver}'" "$SECURITY_WORKFLOW"
   grep -Fq "go-version: '${go_ver}'" "$CONTRACT_WORKFLOW"
+  [ "$(printf '%s\n' "$gosec_min" "$go_ver" | sort -V | head -1)" = "$gosec_min" ]
+  [[ "$compatibility_source" == *"${gosec_version}/go.mod" ]]
 }
 
 @test "CONTRACT: OIDC and primary Terraform roots use the same AWS provider" {
@@ -272,6 +286,45 @@ _all_tf_output_names() {
   aws_ver=$(yq eval '.terraform_modules.terraform_aws.current' "$VERSIONS_FILE")
   grep -Fq "version = \"${aws_ver}\"" "$OIDC_MAIN_TF"
   grep -Fq "version = \"${aws_ver}\"" "${PROJECT_ROOT}/terraform/main.tf"
+}
+
+@test "CONTRACT: direct Terraform providers are exactly pinned and locked" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local provider_key source version
+  local lock_file="${PROJECT_ROOT}/terraform/.terraform.lock.hcl"
+  [ -s "$lock_file" ]
+  while IFS= read -r provider_key; do
+    source=$(yq eval ".terraform_modules.${provider_key}.source" "$VERSIONS_FILE")
+    version=$(yq eval ".terraform_modules.${provider_key}.current" "$VERSIONS_FILE")
+    grep -Fq "source  = \"${source}\"" "${PROJECT_ROOT}/terraform/main.tf"
+    grep -Fq "version = \"${version}\"" "${PROJECT_ROOT}/terraform/main.tf"
+    grep -Fq "provider \"registry.terraform.io/${source}\"" "$lock_file"
+  done < <(
+    yq eval -r \
+      '.terraform_modules | to_entries | .[] | select(.value.kind == "provider") | .key' \
+      "$VERSIONS_FILE"
+  )
+  [ -s "${PROJECT_ROOT}/oidc_provider/.terraform.lock.hcl" ]
+  grep -Fq 'provider "registry.terraform.io/hashicorp/aws"' \
+    "${PROJECT_ROOT}/oidc_provider/.terraform.lock.hcl"
+  grep -Fq 'terraform_version: 1.15.8' "$CONTRACT_WORKFLOW"
+  grep -Fq 'terraform init -backend=false -lockfile=readonly' "$CONTRACT_WORKFLOW"
+  ! grep -R -F 'terraform init -upgrade' \
+    "${PROJECT_ROOT}/scripts" "${PROJECT_ROOT}/oidc_provider/scripts"
+}
+
+@test "CONTRACT: kubeconform validates rendered manifest templates" {
+  grep -Fq 'envsubst "$substitutions"' "$CONTRACT_WORKFLOW"
+  grep -Fq 'kubeconform -strict -ignore-missing-schemas' "$CONTRACT_WORKFLOW"
+  ! grep -Fq 'Skipping template file' "$CONTRACT_WORKFLOW"
+}
+
+@test "CONTRACT: monthly version checks preserve and report lookup failures" {
+  local workflow="${PROJECT_ROOT}/.github/workflows/monthly-version-check.yml"
+  grep -Fq 'check_status=${PIPESTATUS[0]}' "$workflow"
+  grep -Fq 'VERSION_CHECK_FAILED=true' "$workflow"
+  grep -Fq '### ❌ Check Incomplete' "$workflow"
+  ! grep -Eq 'version-manager\.sh.*\|\| echo' "$workflow"
 }
 
 # ===========================================================================

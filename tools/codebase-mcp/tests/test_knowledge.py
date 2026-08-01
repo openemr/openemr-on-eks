@@ -4,10 +4,9 @@ import socket
 from collections.abc import Callable
 from pathlib import Path
 
+import openemr_eks_mcp.knowledge as knowledge_module
 import pytest
 from conftest import repository_digest
-
-import openemr_eks_mcp.knowledge as knowledge_module
 from openemr_eks_mcp.knowledge import MAX_READ_CONTENT_CHARS, KnowledgeService
 
 

@@ -233,10 +233,10 @@ cd "$OIDC_PROVIDER_DIR"
 # Initialize Terraform
 log_step "Initializing Terraform..."
 if [ ! -d ".terraform" ]; then
-    terraform init
+    terraform init -lockfile=readonly
 else
-    log_info "Terraform already initialized, upgrading modules..."
-    terraform init -upgrade
+    log_info "Terraform already initialized; verifying the provider lock..."
+    terraform init -lockfile=readonly
 fi
 log_success "Terraform initialized"
 
@@ -299,4 +299,3 @@ fi
 rm -f tfplan
 
 log_success "Deployment completed successfully!"
-

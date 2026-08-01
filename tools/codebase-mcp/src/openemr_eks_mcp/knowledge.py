@@ -567,6 +567,10 @@ class KnowledgeService:
             "update_policy",
             "migration_target_repository",
             "migration_notes_url",
+            "sha",
+            "kind",
+            "minimum_go_version",
+            "compatibility_source",
         )
         metadata: dict[str, Any] = {}
         for key in keys:

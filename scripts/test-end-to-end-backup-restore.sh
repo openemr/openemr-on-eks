@@ -1220,7 +1220,7 @@ deploy_infrastructure() {
 
     # Initialize Terraform
     log_info "Initializing Terraform..."
-    if ! terraform init -upgrade; then
+    if ! terraform init -lockfile=readonly; then
         log_error "Terraform init failed"
         return 1
     fi
@@ -2292,7 +2292,7 @@ recreate_infrastructure() {
 
     # Initialize Terraform
     log_info "Initializing Terraform..."
-    terraform init
+    terraform init -lockfile=readonly
 
     # Plan and apply infrastructure
     log_info "Planning infrastructure recreation..."

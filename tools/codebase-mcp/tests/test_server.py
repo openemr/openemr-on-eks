@@ -4,11 +4,10 @@ import json
 from collections.abc import Callable
 from pathlib import Path
 
+import openemr_eks_mcp.server as server_module
 import pytest
 from conftest import repository_digest
 from fastmcp import Client
-
-import openemr_eks_mcp.server as server_module
 from openemr_eks_mcp.server import create_server, run_stdio_server
 
 

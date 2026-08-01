@@ -105,7 +105,7 @@
 <summary><strong>What you get</strong></summary>
 
 - 🌐 OpenEMR URL and admin credentials
-- 📊 Grafana URL and admin credentials  
+- 📊 Grafana URL and admin credentials
 - 📈 Full observability stack ready to use
 
 </details>
@@ -808,7 +808,7 @@ The WAF configuration is defined in `terraform/waf.tf` and includes:
 
 ```bash
 # Initialize Terraform
-terraform init -upgrade
+terraform init -lockfile=readonly
 
 # Validate configuration
 terraform validate
@@ -2658,9 +2658,9 @@ Version information is centrally managed in `versions.yaml`. To configure AWS cr
    ```bash
    cd oidc_provder/scripts
    ./deploy.sh
-   
+
    # Or ...
-   
+
    cd oidc_provider
    terraform init
    terraform apply
