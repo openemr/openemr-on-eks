@@ -16,7 +16,9 @@ aws s3 cp "s3://${BACKUP_BUCKET}/${APP_KEY}" /tmp/app-data.tar.gz
 ls -lh /tmp/app-data.tar.gz
 
 echo "Extracting to EFS..."
-tar -xzf /tmp/app-data.tar.gz -C /mnt/efs/ --strip-components=1
+# The restore container drops every Linux capability, including CHOWN.
+# Preserve the access point's enforced ownership instead of replaying archive owners.
+tar --no-same-owner -xzf /tmp/app-data.tar.gz -C /mnt/efs/ --strip-components=1
 ls -la /mnt/efs/default/ 2>/dev/null || ls -la /mnt/efs/
 
 if [ -z "${DB_ENDPOINT:-}" ] || [ -z "${DB_PASS:-}" ]; then

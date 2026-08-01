@@ -26,6 +26,7 @@ setup() {
   CONTRACT_WORKFLOW="${PROJECT_ROOT}/.github/workflows/ci-contract-tests.yml"
   CONSOLE_WORKFLOW="${PROJECT_ROOT}/.github/workflows/console-ci.yml"
   SECURITY_WORKFLOW="${PROJECT_ROOT}/.github/workflows/security-comprehensive.yml"
+  MANUAL_RELEASE_WORKFLOW="${PROJECT_ROOT}/.github/workflows/manual-releases.yml"
   WORKFLOWS_DIR="${PROJECT_ROOT}/.github/workflows"
   CONSOLE_GO_MOD="${PROJECT_ROOT}/console/go.mod"
   OIDC_MAIN_TF="${PROJECT_ROOT}/oidc_provider/main.tf"
@@ -194,6 +195,16 @@ _all_tf_output_names() {
   [ "$(yq eval '.github_workflows.kics_action.current' "$VERSIONS_FILE")" = "$yaml_ver" ]
 }
 
+@test "CONTRACT: Trivy action engine version matches versions.yaml" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver workflow
+  yaml_ver=$(yq eval '.security_tools.trivy.current' "$VERSIONS_FILE")
+
+  for workflow in "$CI_WORKFLOW" "$CONSOLE_WORKFLOW" "$SECURITY_WORKFLOW"; do
+    grep -Fq "TRIVY_VERSION: '${yaml_ver}'" "$workflow"
+  done
+}
+
 @test "CONTRACT: every external action uses its reviewed immutable SHA" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
   local action_key current repository sha
@@ -225,11 +236,34 @@ _all_tf_output_names() {
   done < <(grep -R -E 'uses:[[:space:]]+[^[:space:]#]+@' "$WORKFLOWS_DIR")
 }
 
-@test "CONTRACT: Checkov has no baseline or soft-fail path" {
+@test "CONTRACT: Checkov has no baseline, soft-fail, or broad source exclusion" {
   [ ! -e "${PROJECT_ROOT}/.checkov.baseline" ]
   ! grep -Fq -- '--baseline' "$SECURITY_WORKFLOW"
   ! grep -Fq -- '--baseline' "${PROJECT_ROOT}/.pre-commit-config.yaml"
   ! grep -Fq -- '--soft-fail' "$SECURITY_WORKFLOW"
+  ! grep -Fq 'CKV_GHA_7' "${PROJECT_ROOT}/.checkov.yaml"
+  grep -Fq -- '- ^\.git/' "${PROJECT_ROOT}/.checkov.yaml"
+  ! grep -Eq '^[[:space:]]*-[[:space:]]+\.git[[:space:]]*$' "${PROJECT_ROOT}/.checkov.yaml"
+  ! grep -Fq -- '- "*.md"' "${PROJECT_ROOT}/.checkov.yaml"
+}
+
+@test "CONTRACT: free-form release notes enter shell scripts only through environment" {
+  grep -Fq 'RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}' "$MANUAL_RELEASE_WORKFLOW"
+  ! grep -Fq '${{ github.event.inputs.release_notes }}' "$MANUAL_RELEASE_WORKFLOW"
+}
+
+@test "CONTRACT: Trivy defaults fail findings and keep committed source in scope" {
+  local trivy_config="${PROJECT_ROOT}/trivy.yaml"
+  local action_count version_count
+
+  grep -Eq '^exit-code:[[:space:]]*1[[:space:]]*$' "$trivy_config"
+  grep -Eq '^format:[[:space:]]*table[[:space:]]*$' "$trivy_config"
+  ! grep -Eq '^[[:space:]]+skip-files:' "$trivy_config"
+
+  action_count=$(grep -Rhc 'uses: aquasecurity/trivy-action@' "$WORKFLOWS_DIR" | awk '{ total += $1 } END { print total + 0 }')
+  version_count=$(grep -Rhc "version: 'v\${{ env.TRIVY_VERSION }}'" "$WORKFLOWS_DIR" | awk '{ total += $1 } END { print total + 0 }')
+  [ "$action_count" -gt 0 ]
+  [ "$version_count" -eq "$action_count" ]
 }
 
 @test "CONTRACT: configurable OpenEMR version propagates to logging and SSL bootstrap" {

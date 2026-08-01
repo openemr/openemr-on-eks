@@ -25,6 +25,7 @@
 name: Manual Releases
 
 # Manual workflow trigger with comprehensive input options
+# checkov:skip=CKV_GHA_7: Authorized release operators intentionally choose a validated semantic bump, release notes, and dry-run mode.
 on:
   workflow_dispatch:
     inputs:
@@ -71,15 +72,18 @@ jobs:
       # Step 1: Process and validate release type input
       - name: Determine release type
         id: determine-type
+        env:
+          RELEASE_TYPE_INPUT: ${{ inputs.release_type }}
+          TRIGGERED_BY_INPUT: ${{ github.actor }}
         run: |
-          echo "release-type=${{ github.event.inputs.release_type }}" >> $GITHUB_OUTPUT
-          echo "triggered-by=${{ github.actor }}" >> $GITHUB_OUTPUT
+          printf 'release-type=%s\n' "$RELEASE_TYPE_INPUT" >> "$GITHUB_OUTPUT"
+          printf 'triggered-by=%s\n' "$TRIGGERED_BY_INPUT" >> "$GITHUB_OUTPUT"
 
           # Validate release type and set appropriate semver bump type
-          case "${{ github.event.inputs.release_type }}" in
-            major) echo "bump-version=major" >> $GITHUB_OUTPUT ;; # Breaking changes
-            minor) echo "bump-version=minor" >> $GITHUB_OUTPUT ;; # New features
-            patch) echo "bump-version=patch" >> $GITHUB_OUTPUT ;; # Bug fixes
+          case "$RELEASE_TYPE_INPUT" in
+            major) echo "bump-version=major" >> "$GITHUB_OUTPUT" ;; # Breaking changes
+            minor) echo "bump-version=minor" >> "$GITHUB_OUTPUT" ;; # New features
+            patch) echo "bump-version=patch" >> "$GITHUB_OUTPUT" ;; # Bug fixes
             *) echo "::error::Invalid release type" && exit 1 ;;  # Invalid input
           esac
 
@@ -216,13 +220,13 @@ jobs:
       # This step creates detailed release notes including commit history and statistics
       - name: Generate release notes
         id: release-notes
+        env:
+          NEW_VERSION: ${{ steps.new-version.outputs.new-version }}
+          RELEASE_TYPE: ${{ needs.determine-release-type.outputs.release-type }}
+          TRIGGERED_BY: ${{ needs.determine-release-type.outputs.triggered-by }}
+          RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}
+          LAST_TAG: ${{ needs.check-changes.outputs.last-tag }}
         run: |
-          NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
-          RELEASE_TYPE="${{ needs.determine-release-type.outputs.release-type }}"
-          TRIGGERED_BY="${{ needs.determine-release-type.outputs.triggered-by }}"
-          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
-          LAST_TAG="${{ needs.check-changes.outputs.last-tag }}"
-
           # Create release notes file with header information
           cat > RELEASE_NOTES.md << ENDOFNOTES
           ## Release v${NEW_VERSION}
@@ -232,7 +236,7 @@ jobs:
           **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
           ### Release Notes
-          ${RELEASE_NOTES}
+          ${RELEASE_NOTES_INPUT}
 
           ### Changes
           ENDOFNOTES
@@ -243,33 +247,36 @@ jobs:
             git log --oneline --reverse --pretty=format:"- %h: %s" >> RELEASE_NOTES.md
           else
             # Subsequent release - include commits since last tag
-            git log --oneline --reverse --pretty=format:"- %h: %s" "$LAST_TAG..HEAD" >> RELEASE_NOTES.md
+            git log --oneline --reverse --pretty=format:"- %h: %s" "${LAST_TAG}..HEAD" >> RELEASE_NOTES.md
           fi
 
           # Add release statistics
           echo -e "\n\n### Statistics" >> RELEASE_NOTES.md
           if [[ -n "$LAST_TAG" ]]; then
-            echo "- Commits: $(git rev-list --count $LAST_TAG..HEAD)" >> RELEASE_NOTES.md
-            echo "- Contributors: $(git log $LAST_TAG..HEAD --format='%an' | sort -u | wc -l)" >> RELEASE_NOTES.md
-            echo "- Files changed: $(git diff --stat $LAST_TAG..HEAD | tail -1)" >> RELEASE_NOTES.md
+            echo "- Commits: $(git rev-list --count "${LAST_TAG}..HEAD")" >> RELEASE_NOTES.md
+            echo "- Contributors: $(git log "${LAST_TAG}..HEAD" --format='%an' | sort -u | wc -l)" >> RELEASE_NOTES.md
+            echo "- Files changed: $(git diff --stat "${LAST_TAG}..HEAD" | tail -1)" >> RELEASE_NOTES.md
           else
             echo "- First release" >> RELEASE_NOTES.md
           fi
 
           # Output release notes for GitHub Action
+          output_delimiter="release-notes-$(openssl rand -hex 16)"
           {
-            echo 'release-notes<<EOF'
+            printf 'release-notes<<%s\n' "$output_delimiter"
             cat RELEASE_NOTES.md
-            echo 'EOF'
-          } >> $GITHUB_OUTPUT
+            printf '%s\n' "$output_delimiter"
+          } >> "$GITHUB_OUTPUT"
 
       # Step 8: Commit changes and create Git tag (skip if dry run)
       - name: Commit and tag (Dry Run Check)
         if: ${{ !github.event.inputs.dry_run || github.event.inputs.dry_run == 'false' }}
+        env:
+          NEW_VERSION: ${{ steps.new-version.outputs.new-version }}
+          RELEASE_TYPE: ${{ needs.determine-release-type.outputs.release-type }}
+          TRIGGERED_BY: ${{ needs.determine-release-type.outputs.triggered-by }}
+          RELEASE_NOTES_INPUT: ${{ inputs.release_notes }}
         run: |
-          NEW_VERSION="${{ steps.new-version.outputs.new-version }}"
-          TRIGGERED_BY="${{ needs.determine-release-type.outputs.triggered-by }}"
-
           # Configure Git for automated commits
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
@@ -277,9 +284,9 @@ jobs:
           # Commit version file changes
           git add VERSION
           git commit -m "chore: bump version to $NEW_VERSION [skip ci]" \
-                     -m "Release type: ${{ needs.determine-release-type.outputs.release-type }}" \
+                     -m "Release type: $RELEASE_TYPE" \
                      -m "Triggered by: @$TRIGGERED_BY" \
-                     -m "Release notes: ${{ github.event.inputs.release_notes }}"
+                     -m "Release notes: $RELEASE_NOTES_INPUT"
 
           # Create annotated tag with release notes
           git tag -a "v$NEW_VERSION" -m "Release v$NEW_VERSION" -m "$(cat RELEASE_NOTES.md)"

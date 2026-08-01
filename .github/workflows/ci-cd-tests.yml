@@ -24,6 +24,7 @@
 name: CI/CD Tests
 
 # Workflow triggers - runs on code changes and manual dispatch
+# checkov:skip=CKV_GHA_7: The constrained choice selects one fixed test suite and cannot alter build commands or artifacts.
 on:
   # Automatic triggers on main and develop branches
   push:
@@ -66,6 +67,7 @@ env:
   TERRAFORM_VERSION: '1.15.8' # Terraform version for infrastructure validation
   KUBECTL_VERSION: 'v1.36.3'  # kubectl version for Kubernetes manifest validation
   UV_VERSION: '0.11.26'       # uv version for the knowledge MCP package
+  TRIVY_VERSION: '0.72.0'     # Trivy engine version (synced with versions.yaml)
 
 # Checkout/setup v7 actions require Node 24; the GitHub-hosted runners below provide it.
 jobs:
@@ -384,6 +386,7 @@ jobs:
       - name: Run Trivy vulnerability scanner (Table format - STRICT)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'                      # File system scan of entire repository
           scan-ref: '.'                        # Scan current directory
           format: 'table'                      # Use table format for better readability in logs
@@ -400,6 +403,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: success()
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'                      # File system scan of entire repository
           scan-ref: '.'                        # Scan current directory
           format: 'sarif'                      # SARIF format for GitHub Security tab
@@ -554,6 +558,7 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         if: matrix.python-version == env.PYTHON_VERSION
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: 'warp'
           format: 'table'
@@ -661,6 +666,7 @@ jobs:
       - name: Run Trivy security scan (Zero-Tolerance)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          version: 'v${{ env.TRIVY_VERSION }}'
           scan-type: 'fs'
           scan-ref: 'tools/credential-rotation'
           format: 'table'

@@ -101,9 +101,12 @@ severity:
   - MEDIUM
   - LOW
 
-exit:
-  code: 1  # Fail on any finding
+exit-code: 1  # Fail on any finding
+format: table
 ```
+
+Only generated dependency and cache directories are excluded. Committed tests,
+fixtures, and documentation remain in scan scope.
 
 ### Trivy Ignore File
 
@@ -177,14 +180,14 @@ When a security scan fails:
 
 ### Requesting Exceptions
 
-If a finding is a verified false positive or an existing item must be baselined:
+If a finding is a verified false positive or an intentional design requires an exception:
 
 1. **Document the justification** in detail
 2. **Implement compensating controls** if applicable
 3. **Create a tracking ticket** for review
 4. **Request security team review** and approval
 5. **Add the narrowest possible exception** with full documentation; never
-   regenerate the baseline solely to make CI pass
+   create a baseline solely to make CI pass
 
 ## Scanner Details
 

@@ -16,15 +16,8 @@ scan:
     - misconfig # Misconfiguration scanning
     - license   # License scanning
 
-  # File patterns to skip
-  skip-files:
-    - "**/*.md"
-    - "**/test/**"
-    - "**/tests/**"
-    - "**/*_test.go"
-    - "**/*_test.py"
-
-  # Generated dependency and test directories to skip
+  # Generated dependency and cache directories to skip. Source tests and
+  # documentation remain in scope so committed fixtures cannot hide findings.
   skip-dirs:
     - ".git"
     - "**/.git"
@@ -47,10 +40,8 @@ severity:
   - MEDIUM
   - LOW
 
-# Exit code configuration
-exit:
-  # Exit with code 1 on ANY finding (zero-tolerance)
-  code: 1
+# Exit with code 1 on ANY finding (zero-tolerance)
+exit-code: 1
 
 # Package scanning options
 pkg:
@@ -84,10 +75,8 @@ db:
   # Always use latest vulnerability database
   skip-update: false
 
-# Output configuration
-output:
-  # Use table format for readable output
-  format: table
+# Use table format for readable output
+format: table
 
 # Ignore configuration
 ignorefile: ".trivyignore"

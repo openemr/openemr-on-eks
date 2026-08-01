@@ -1073,7 +1073,7 @@ grafana:
   enabled: true
   adminUser: admin
   admin:
-    existingSecret: "grafana-admin-secret"
+    existingSecret: "grafana-admin-secret" # checkov:skip=CKV_SECRET_6:Kubernetes Secret name, not secret material.
     userKey: admin-user
     passwordKey: admin-password
   

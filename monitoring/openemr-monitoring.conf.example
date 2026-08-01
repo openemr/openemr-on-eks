@@ -78,7 +78,7 @@ SLACK_WEBHOOK_URL="" # Slack webhook URL (must start with https://hooks.slack.co
 SLACK_CHANNEL=""     # Slack channel (e.g., "#openemr-alerts")
 
 # Example Slack configuration:
-# SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+# SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX" # checkov:skip=CKV_SECRET_14:Nonfunctional documented placeholder.
 # SLACK_CHANNEL="#openemr-alerts"
 
 # =============================================================================

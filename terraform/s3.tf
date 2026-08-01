@@ -24,7 +24,7 @@ resource "random_id" "bucket_suffix" {
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "alb_logs" {
   # checkov:skip=CKV_AWS_18: Access logging an ALB log destination to itself would recurse.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup protect these reproducible access logs.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is intentionally omitted for short-retention access logs; versioning and same-region AWS Backup cover deletion but not regional loss.
   # checkov:skip=CKV2_AWS_62: No event-driven consumer exists; ALB log delivery is monitored at the load balancer.
   # checkov:skip=CKV_AWS_145: ALB access logging supports SSE-S3, not SSE-KMS.
   bucket = "${var.cluster_name}-alb-logs-${random_id.bucket_suffix.hex}"
@@ -178,7 +178,7 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "waf_logs" {
   # checkov:skip=CKV_AWS_18: Access logging a WAF log destination to itself would recurse.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup protect these reproducible security logs.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is intentionally omitted for short-retention WAF logs; versioning and same-region AWS Backup cover deletion but not regional loss.
   # checkov:skip=CKV2_AWS_62: No event-driven consumer exists; WAF log delivery is monitored by its logging configuration.
   # checkov:skip=CKV2_AWS_6: The matching conditional public-access-block resource enables all four controls.
   # checkov:skip=CKV2_AWS_61: The matching conditional lifecycle resource expires logs and incomplete uploads.
@@ -247,13 +247,13 @@ resource "aws_s3_bucket_lifecycle_configuration" "waf_logs" {
 
   bucket = aws_s3_bucket.waf_logs[0].id
 
-  # Rule for WAF logs with prefix
+  # WAF log delivery writes under AWSLogs/<account-id>/WAFLogs/<region>/.
   rule {
     id     = "waf_logs_lifecycle"
     status = "Enabled"
 
     filter {
-      prefix = "waf-logs/"
+      prefix = "AWSLogs/"
     }
 
     expiration {
@@ -393,7 +393,7 @@ resource "aws_s3_bucket_policy" "waf_logs" {
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "loki_storage" {
   # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is an explicit cost tradeoff for observability data; versioning and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: Loki manages object ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-loki-storage-${random_id.bucket_suffix.hex}"
 
@@ -536,7 +536,7 @@ resource "aws_s3_bucket_policy" "loki_storage" {
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "tempo_storage" {
   # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is an explicit cost tradeoff for observability data; versioning and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: Tempo manages object ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-tempo-storage-${random_id.bucket_suffix.hex}"
 
@@ -669,7 +669,7 @@ resource "aws_s3_bucket_policy" "tempo_storage" {
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_blocks_storage" {
   # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is an explicit cost tradeoff for observability data; versioning and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: Mimir manages block ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-mimir-blocks-storage-${random_id.bucket_suffix.hex}"
 
@@ -812,7 +812,7 @@ resource "aws_s3_bucket_policy" "mimir_blocks_storage" {
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_ruler_storage" {
   # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate observability state; IAM and CloudTrail audit access.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is an explicit cost tradeoff for observability data; versioning and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: Mimir manages ruler state directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-mimir-ruler-storage-${random_id.bucket_suffix.hex}"
 
@@ -955,7 +955,7 @@ resource "aws_s3_bucket_policy" "mimir_ruler_storage" {
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "alertmanager_storage" {
   # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate observability state; IAM and CloudTrail audit access.
-  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is an explicit cost tradeoff for observability data; versioning and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: Alertmanager manages state directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-alertmanager-storage-${random_id.bucket_suffix.hex}"
 

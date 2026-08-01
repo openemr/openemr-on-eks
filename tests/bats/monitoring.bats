@@ -328,7 +328,7 @@ EOF
 
 @test "UNIT: alertmanager_enabled returns true with valid slack config" {
   run bash -c '
-    SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00/B00/xxx"
+    SLACK_WEBHOOK_URL="https://hooks.slack.com/services/T00/B00/xxx" # checkov:skip=CKV_SECRET_14:Synthetic URL used only to test prefix validation.
     SLACK_CHANNEL="#alerts"
     alertmanager_enabled() { [[ -n "$SLACK_WEBHOOK_URL" && -n "$SLACK_CHANNEL" && "$SLACK_WEBHOOK_URL" =~ ^https://hooks\.slack\.com/ ]]; }
     alertmanager_enabled && echo "ENABLED" || echo "DISABLED"

@@ -69,7 +69,8 @@ skip-check:
 
 # Directory exclusions
 skip-path:
-  - .git
+  # Anchor the VCS metadata directory so this does not also exclude .github/.
+  - ^\.git/
   - node_modules
   - venv
   - .venv
@@ -82,7 +83,6 @@ skip-path:
   - htmlcov
   - .pytest_cache
   - test-results
-  - "*.md"
 
 # External checks (uncomment to enable custom policies)
 # external-checks-dir:

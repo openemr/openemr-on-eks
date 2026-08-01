@@ -124,8 +124,11 @@ def test_rejects_private_key_material_in_safe_named_file(
     ("value", "message"),
     [
         ("AKIA" + "1234567890ABCDEF\n", "AWS credential"),
+        # checkov:skip=CKV_SECRET_6:Synthetic split token verifies repository-policy detection.
         ("ghp_" + "1234567890abcdefghijklmnopqrstuvwxyz\n", "GitHub token"),
+        # checkov:skip=CKV_SECRET_6:Synthetic split token verifies repository-policy detection.
         ("xoxb-" + "123456789012-abcdefghijklmnopqrstuvwx\n", "Slack token"),
+        # checkov:skip=CKV_SECRET_6:Synthetic split token verifies repository-policy detection.
         ("AI" + "za1234567890abcdefghijklmnopqrstuvwxy\n", "Google API key"),
     ],
 )
@@ -145,6 +148,7 @@ def test_rejects_literal_credential_assignment_in_safe_named_file(
 ) -> None:
     root = repo_factory()
     (root / "notes.txt").write_text(
+        # checkov:skip=CKV_SECRET_6:Synthetic credential assignment is the test fixture under validation.
         'db_password = "CorrectHorseBatteryStaple"\n',
         encoding="utf-8",
     )
@@ -198,6 +202,7 @@ def test_rejects_structured_secrets_in_safe_named_files(
 def test_allows_explicit_structured_placeholders(repo_factory: Callable[[], Path]) -> None:
     root = repo_factory()
     (root / "config.json").write_text(
+        # checkov:skip=CKV_SECRET_6:Explicit placeholder verifies safe configuration is accepted.
         '{"database": {"password": "placeholder-password"}}\n',
         encoding="utf-8",
     )

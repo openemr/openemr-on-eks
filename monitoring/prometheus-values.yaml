@@ -5,9 +5,9 @@ grafana:
   enabled: true
   adminUser: admin
   admin:
-    existingSecret: "grafana-admin-secret"
-    userKey: admin-user
-    passwordKey: admin-password
+    existingSecret: "grafana-admin-secret" # checkov:skip=CKV_SECRET_6:Kubernetes Secret name, not secret material.
+    userKey: admin-user # checkov:skip=CKV_SECRET_6:Key name inside the referenced Secret, not secret material.
+    passwordKey: admin-password # checkov:skip=CKV_SECRET_6:Key name inside the referenced Secret, not secret material.
 
   persistence:
     enabled: true

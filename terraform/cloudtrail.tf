@@ -10,12 +10,14 @@ resource "random_id" "cloudtrail_suffix" {
   byte_length = 4
 }
 
+data "aws_partition" "current" {}
+
 # S3 bucket for storing CloudTrail logs
 # This bucket receives detailed API call logs from CloudTrail for audit and compliance purposes
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "cloudtrail" {
   # checkov:skip=CKV_AWS_18: Access logging a CloudTrail log destination to itself would recurse.
-  # checkov:skip=CKV_AWS_144: Multi-region CloudTrail, versioning, retention, and AWS Backup protect this centralized audit bucket.
+  # checkov:skip=CKV_AWS_144: Cross-region replication is not provisioned; multi-region capture, versioning, validation, retention, and same-region AWS Backup do not cover regional loss.
   # checkov:skip=CKV2_AWS_62: No event-driven consumer exists for CloudTrail objects; CloudTrail delivery and validation are monitored directly.
   bucket        = "${var.cluster_name}-cloudtrail-logs-${random_id.cloudtrail_suffix.hex}"
   force_destroy = true
@@ -73,6 +75,18 @@ data "aws_iam_policy_document" "cloudtrail" {
       variable = "s3:x-amz-acl"
       values   = ["bucket-owner-full-control"]
     }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/${var.cluster_name}-cloudtrail"]
+    }
   }
 
   statement {
@@ -103,11 +117,25 @@ data "aws_iam_policy_document" "cloudtrail" {
       type        = "Service"
       identifiers = ["cloudtrail.amazonaws.com"]
     }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:${data.aws_partition.current.partition}:cloudtrail:${var.aws_region}:${data.aws_caller_identity.current.account_id}:trail/${var.cluster_name}-cloudtrail"]
+    }
   }
 }
 
 resource "aws_s3_bucket_policy" "cloudtrail" {
   bucket = aws_s3_bucket.cloudtrail.id
+  # KICS cannot resolve the policy data source after source-account/ARN conditions; the document above denies insecure transport.
+  # kics-scan ignore-line
   policy = data.aws_iam_policy_document.cloudtrail.json
 }
 
@@ -149,13 +177,70 @@ resource "aws_s3_bucket_lifecycle_configuration" "cloudtrail" {
   }
 }
 
+# Stream CloudTrail management events to CloudWatch Logs for real-time detection.
+resource "aws_cloudwatch_log_group" "cloudtrail" {
+  name              = "/aws/cloudtrail/${var.cluster_name}"
+  retention_in_days = 365
+  kms_key_id        = aws_kms_key.cloudwatch.arn
+
+  tags = {
+    Name        = "${var.cluster_name}-cloudtrail"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+    LogType     = "Audit"
+  }
+}
+
+data "aws_iam_policy_document" "cloudtrail_cloudwatch_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    # CloudTrail's documented delivery-role trust uses its service principal.
+    # The attached policy below limits writes to this account's stream prefix.
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "cloudtrail_cloudwatch" {
+  name               = "${var.cluster_name}-cloudtrail-cloudwatch"
+  assume_role_policy = data.aws_iam_policy_document.cloudtrail_cloudwatch_assume_role.json
+
+  tags = {
+    Name        = "${var.cluster_name}-cloudtrail-cloudwatch"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
+  }
+}
+
+data "aws_iam_policy_document" "cloudtrail_cloudwatch" {
+  statement {
+    sid     = "WriteCloudTrailLogStream"
+    effect  = "Allow"
+    actions = ["logs:CreateLogStream", "logs:PutLogEvents"]
+    resources = [
+      "${aws_cloudwatch_log_group.cloudtrail.arn}:log-stream:${data.aws_caller_identity.current.account_id}_CloudTrail_${var.aws_region}*"
+    ]
+  }
+}
+
+resource "aws_iam_role_policy" "cloudtrail_cloudwatch" {
+  name   = "${var.cluster_name}-cloudtrail-cloudwatch"
+  role   = aws_iam_role.cloudtrail_cloudwatch.id
+  policy = data.aws_iam_policy_document.cloudtrail_cloudwatch.json
+}
+
 # CloudTrail configuration for comprehensive AWS API logging
 # This CloudTrail captures all API calls and resource changes across the AWS account
 # for security monitoring, compliance auditing, and operational troubleshooting
 resource "aws_cloudtrail" "openemr" {
-  # checkov:skip=CKV2_AWS_10: Audit logs use KMS-encrypted, versioned S3 with validation; real-time alerts are provided by the optional monitoring stack.
-  name           = "${var.cluster_name}-cloudtrail"
-  s3_bucket_name = aws_s3_bucket.cloudtrail.bucket
+  name                       = "${var.cluster_name}-cloudtrail"
+  s3_bucket_name             = aws_s3_bucket.cloudtrail.bucket
+  cloud_watch_logs_group_arn = "${aws_cloudwatch_log_group.cloudtrail.arn}:*"
+  cloud_watch_logs_role_arn  = aws_iam_role.cloudtrail_cloudwatch.arn
 
   enable_logging                = true
   include_global_service_events = true
@@ -163,6 +248,11 @@ resource "aws_cloudtrail" "openemr" {
   enable_log_file_validation    = true
 
   kms_key_id = aws_kms_key.cloudwatch.arn
+
+  depends_on = [
+    aws_iam_role_policy.cloudtrail_cloudwatch,
+    aws_s3_bucket_policy.cloudtrail
+  ]
 
   event_selector {
     read_write_type                  = "All"

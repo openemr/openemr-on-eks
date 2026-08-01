@@ -32,6 +32,7 @@
 name: Version Check & Awareness
 
 # Workflow triggers - scheduled and manual
+# checkov:skip=CKV_GHA_7: The constrained inputs select a fixed component category and whether the scheduled report creates an issue.
 on:
   schedule:
     # Run on the 1st of every month at 9:00 AM UTC
@@ -147,6 +148,9 @@ jobs:
       # This step runs the version-manager.sh script with appropriate parameters
       - name: Run Version Awareness Check
         id: version_check
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          CHECK_TYPE: ${{ inputs.check_type || 'all' }}
         run: |
           # Initialize log file for detailed tracking
           touch scripts/version-check.log
@@ -175,7 +179,7 @@ jobs:
           fi
 
           # Determine run type and set appropriate environment variables
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # Manual run - use timestamp for unique identification
             TIMESTAMP=$(date +"%Y-%m-%d %H:%M:%S UTC")
             REPORT_TITLE="Manual Version Check Report - $TIMESTAMP"
@@ -192,12 +196,12 @@ jobs:
           fi
 
           # Execute version check based on input parameters
-          echo "Running version check for: ${{ github.event.inputs.check_type || 'all' }}" >> scripts/version-check.log
+          echo "Running version check for: $CHECK_TYPE" >> scripts/version-check.log
           echo "Report title: $REPORT_TITLE" >> scripts/version-check.log
 
           # Build one command so its real status is preserved through tee.
           check_args=(check --create-issue --month "$REPORT_TITLE")
-          case "${{ github.event.inputs.check_type || 'all' }}" in
+          case "$CHECK_TYPE" in
             "applications")
               check_args+=(--components applications)
               ;;
