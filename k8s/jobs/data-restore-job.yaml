@@ -5,6 +5,14 @@ kind: Job
 metadata:
   name: openemr-data-restore
   namespace: ${NAMESPACE}
+  annotations:
+    checkov.io/skip1: "CKV_K8S_15=The restore image uses the pinned OpenEMR version rendered from versions.yaml."
+    checkov.io/skip2: "CKV_K8S_22=The short-lived restore job installs AWS CLI and writes only temporary and EFS restore data."
+    checkov.io/skip3: "CKV_K8S_23=UID 0 is required for package installation and ownership restoration on EFS."
+    checkov.io/skip4: "CKV_K8S_37=Default root capabilities are required by apk; NET_RAW is removed and privilege escalation is disabled."
+    checkov.io/skip5: "CKV_K8S_38=The projected service-account token is required for IRSA access to the backup S3 bucket."
+    checkov.io/skip6: "CKV_K8S_40=The root restore process is short-lived and constrained by seccomp, NetworkPolicy, and no privilege escalation."
+    checkov.io/skip7: "CKV_K8S_43=Central version management uses a validated immutable OpenEMR release tag."
   labels:
     app: openemr
     component: data-restore
@@ -19,6 +27,11 @@ spec:
     spec:
       serviceAccountName: openemr-sa
       restartPolicy: Never
+      securityContext:
+        runAsUser: 0
+        runAsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
       tolerations:
         - key: "CriticalAddonsOnly"
           operator: "Exists"
@@ -27,6 +40,16 @@ spec:
         - name: restore
           image: openemr/openemr:${OPENEMR_VERSION}
           command: ["/bin/sh", "/scripts/data-restore.sh"]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            runAsUser: 0
+            runAsGroup: 0
+            capabilities:
+              drop:
+                - NET_RAW
+            seccompProfile:
+              type: RuntimeDefault
           resources:
             requests:
               memory: "${MEMORY_REQUEST}"

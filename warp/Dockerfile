@@ -23,7 +23,8 @@ COPY README.md .
 RUN pip install --no-cache-dir -e .
 
 # Create non-root user for security
-RUN useradd --create-home --shell /bin/bash warp && \
+RUN groupadd --gid 10001 warp && \
+    useradd --uid 10001 --gid 10001 --create-home --shell /bin/bash warp && \
     chown -R warp:warp /app
 USER warp
 

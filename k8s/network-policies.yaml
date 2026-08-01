@@ -154,3 +154,97 @@ spec:
     ports:
     - protocol: TCP
       port: 443   # HTTPS port
+---
+# Credential Rotation Egress Policy
+# Rotation needs RDS, Kubernetes/AWS APIs, DNS, and the OpenEMR health endpoint.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: credential-rotation-egress
+  namespace: openemr
+  labels:
+    app: credential-rotation
+    component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: credential-rotation
+  policyTypes:
+  - Egress
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 3306
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+# SSL Renewal Isolation Policy
+# Certificate generation is local to the pod and its EFS volume.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ssl-renewal-deny-network
+  namespace: openemr
+  labels:
+    app: ssl-cert-renewal
+    component: security
+spec:
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - ssl-cert-renewal
+      - ssl-cert-renewal-test
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress: []
+---
+# Warp Import Egress Policy
+# Import jobs need RDS, S3/package repositories, and DNS, but no ingress.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: warp-import-egress
+  namespace: openemr
+  labels:
+    app: warp
+    component: security
+spec:
+  podSelector:
+    matchLabels:
+      app: warp
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress: []
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 3306
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  - to: []
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

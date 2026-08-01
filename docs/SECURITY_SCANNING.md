@@ -1,9 +1,10 @@
 # Security Scanning Guide
 
 This document describes the comprehensive security scanning configuration for the
-OpenEMR on EKS project. The security scanning follows a **ZERO-TOLERANCE FOR
-NEW FINDINGS** policy: any finding at any severity level that is not in the
-reviewed Checkov baseline fails the CI/CD pipeline.
+OpenEMR on EKS project. The security scanning follows a **ZERO-TOLERANCE**
+policy: any finding at any severity level that is not covered by a narrow,
+source-local, reviewed exception fails the CI/CD pipeline. Checkov does not use
+a baseline or soft-fail mode.
 
 ## Table of Contents
 
@@ -52,9 +53,9 @@ coverage across different security domains:
 All security scanners are configured with a **fail-fast** policy:
 
 - **Severity Levels**: CRITICAL, HIGH, MEDIUM, LOW
-- **Action on New Finding**: Pipeline FAILS immediately
-- **Existing Checkov Debt**: Enumerated by resource and check ID in
-  `.checkov.baseline`; changes must not add findings
+- **Action on Finding**: Pipeline FAILS immediately
+- **Checkov Baseline**: None; approved exceptions stay beside the affected
+  resource with a technical justification
 
 ### Why Zero-Tolerance?
 
@@ -120,11 +121,11 @@ Only add entries after security team review and approval. Each entry must includ
 File: `.checkov.yaml`
 
 Checkov uses its default non-zero exit behavior for every non-skipped finding.
-The configuration contains only reviewed, documented exceptions; no severity is
-soft-failed. The committed `.checkov.baseline` makes pre-existing findings
-visible while allowing CI to reject every new finding. It is a debt inventory,
-not an approval: updates require security review and should reduce, never
-silently expand, the baseline.
+The configuration contains only reviewed, documented tool-wide exceptions; no
+severity is soft-failed and no baseline is permitted. Resource-specific
+exceptions use Checkov's source annotations directly beside the affected
+Terraform or Kubernetes resource, where reviewers can evaluate the constraint
+and compensating control in context.
 
 ## Pre-commit Hooks
 

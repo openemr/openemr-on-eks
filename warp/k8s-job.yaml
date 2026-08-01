@@ -3,6 +3,11 @@ kind: Job
 metadata:
   name: warp-ccda-upload
   namespace: openemr
+  annotations:
+    checkov.io/skip1: "CKV_K8S_14=This user-facing template requires operators to replace latest with their immutable build tag before apply."
+    checkov.io/skip2: "CKV_K8S_35=The Warp CLI consumes DB credentials as environment variables; the Secret is KMS-encrypted and RBAC-scoped."
+    checkov.io/skip3: "CKV_K8S_38=The projected service-account token is required for IRSA access to the source S3 bucket."
+    checkov.io/skip4: "CKV_K8S_43=This user-facing template requires operators to replace the image reference with their immutable build digest."
   labels:
     app: warp
     command: ccda-data-upload
@@ -19,6 +24,12 @@ spec:
     spec:
       serviceAccountName: openemr-sa  # Use OpenEMR service account for IRSA
       restartPolicy: Never
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
 
       containers:
       - name: warp-ccda-upload
@@ -30,7 +41,8 @@ spec:
           allowPrivilegeEscalation: false
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-          runAsUser: 1000
+          runAsUser: 10001
+          runAsGroup: 10001
           seccompProfile:
             type: RuntimeDefault
           capabilities:

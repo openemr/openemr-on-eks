@@ -1,10 +1,10 @@
 # =============================================================================
 # Checkov Configuration File
 # =============================================================================
-# This configuration enforces a ZERO-TOLERANCE policy for new IaC findings.
-# Existing debt is enumerated by resource and check ID in .checkov.baseline;
-# Checkov's default non-zero exit behavior applies to every non-baselined,
-# non-skipped finding.
+# This configuration enforces a ZERO-TOLERANCE policy for IaC findings.
+# There is no baseline or soft-fail path. Checkov's default non-zero exit
+# behavior applies to every finding except narrowly documented source-local
+# exceptions and the reviewed tool limitations below.
 #
 # Documentation: https://www.checkov.io/2.Basics/CLI%20Command%20Reference.html
 # =============================================================================
@@ -75,6 +75,9 @@ skip-path:
   - .venv
   - __pycache__
   - .trivycache
+  - .terraform
+  - terraform/.terraform
+  - oidc_provider/.terraform
   - .external_modules
   - htmlcov
   - .pytest_cache

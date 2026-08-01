@@ -23,6 +23,9 @@ resource "random_id" "bucket_suffix" {
 # response codes, and timing information for monitoring and troubleshooting.
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "alb_logs" {
+  # checkov:skip=CKV_AWS_18: Access logging an ALB log destination to itself would recurse.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup protect these reproducible access logs.
+  # checkov:skip=CKV2_AWS_62: No event-driven consumer exists; ALB log delivery is monitored at the load balancer.
   # checkov:skip=CKV_AWS_145: ALB access logging supports SSE-S3, not SSE-KMS.
   bucket = "${var.cluster_name}-alb-logs-${random_id.bucket_suffix.hex}"
 
@@ -40,7 +43,7 @@ resource "aws_s3_bucket_ownership_controls" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
   rule {
-    object_ownership = "BucketOwnerPreferred"
+    object_ownership = "BucketOwnerEnforced"
   }
 }
 
@@ -55,6 +58,7 @@ resource "aws_s3_bucket_versioning" "alb_logs" {
 
 # Configure server-side encryption for the ALB logs bucket
 # ALB access-log delivery supports only Amazon S3-managed keys (SSE-S3).
+# trivy:ignore:AVD-AWS-0132 ALB access-log delivery does not support customer-managed KMS keys.
 resource "aws_s3_bucket_server_side_encryption_configuration" "alb_logs" {
   bucket = aws_s3_bucket.alb_logs.id
 
@@ -116,29 +120,52 @@ resource "aws_s3_bucket_public_access_block" "alb_logs" {
 # ALB bucket policy with proper conditions and dependencies
 # This policy allows the ALB service to write access logs to the bucket while maintaining
 # security through proper conditions and source account validation.
+data "aws_iam_policy_document" "alb_logs" {
+  statement {
+    sid     = "AllowALBPutObject"
+    effect  = "Allow"
+    actions = ["s3:PutObject"]
+    resources = [
+      "${aws_s3_bucket.alb_logs.arn}/alb-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["logdelivery.elasticloadbalancing.amazonaws.com"]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values = [
+        "arn:aws:elasticloadbalancing:${var.aws_region}:${data.aws_caller_identity.current.account_id}:loadbalancer/*"
+      ]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.alb_logs.arn, "${aws_s3_bucket.alb_logs.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "alb_logs" {
   bucket     = aws_s3_bucket.alb_logs.id
   depends_on = [aws_s3_bucket_ownership_controls.alb_logs]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowALBPutObject"
-        Effect = "Allow"
-        Principal = {
-          Service = "logdelivery.elasticloadbalancing.amazonaws.com"
-        }
-        Action   = "s3:PutObject"
-        Resource = "${aws_s3_bucket.alb_logs.arn}/alb-logs/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
-        Condition = {
-          ArnLike = {
-            "aws:SourceArn" = "arn:aws:elasticloadbalancing:${var.aws_region}:${data.aws_caller_identity.current.account_id}:loadbalancer/*"
-          }
-        }
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.alb_logs.json
 }
 
 ############################
@@ -150,6 +177,13 @@ resource "aws_s3_bucket_policy" "alb_logs" {
 # allowed requests, and security events for monitoring and analysis.
 # tfsec:ignore:AVD-AWS-0089 This is a log destination bucket - logging it would be recursive
 resource "aws_s3_bucket" "waf_logs" {
+  # checkov:skip=CKV_AWS_18: Access logging a WAF log destination to itself would recurse.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup protect these reproducible security logs.
+  # checkov:skip=CKV2_AWS_62: No event-driven consumer exists; WAF log delivery is monitored by its logging configuration.
+  # checkov:skip=CKV2_AWS_6: The matching conditional public-access-block resource enables all four controls.
+  # checkov:skip=CKV2_AWS_61: The matching conditional lifecycle resource expires logs and incomplete uploads.
+  # checkov:skip=CKV_AWS_145: The matching conditional encryption resource uses the S3 customer-managed KMS key.
+  # checkov:skip=CKV_AWS_21: The matching conditional versioning resource enables versioning.
   count = var.enable_waf ? 1 : 0
 
   bucket = "aws-waf-logs-${var.cluster_name}-${random_id.bucket_suffix.hex}"
@@ -174,7 +208,7 @@ resource "aws_s3_bucket_ownership_controls" "waf_logs" {
   bucket = aws_s3_bucket.waf_logs[0].id
 
   rule {
-    object_ownership = "BucketOwnerPreferred"
+    object_ownership = "BucketOwnerEnforced"
   }
 }
 
@@ -260,44 +294,94 @@ resource "aws_s3_bucket_public_access_block" "waf_logs" {
 # Fixed WAF bucket policy - allows official AWS log delivery paths
 # This policy allows the WAF service to write logs to the bucket while maintaining
 # security through proper conditions and source account validation.
+locals {
+  waf_logs_policy_bucket_arn = var.enable_waf ? aws_s3_bucket.waf_logs[0].arn : "arn:aws:s3:::disabled-waf-logs"
+}
+
+data "aws_iam_policy_document" "waf_logs" {
+  statement {
+    sid     = "AllowWAFPutObject"
+    effect  = "Allow"
+    actions = ["s3:PutObject"]
+    # WAF writes to AWSLogs/<account-id>/WAFLogs/<region>/ - not custom prefixes
+    resources = [
+      "${local.waf_logs_policy_bucket_arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
+    ]
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "s3:x-amz-acl"
+      values   = ["bucket-owner-full-control"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+
+  statement {
+    sid       = "AllowWAFGetBucketAcl"
+    effect    = "Allow"
+    actions   = ["s3:GetBucketAcl"]
+    resources = [local.waf_logs_policy_bucket_arn]
+
+    principals {
+      type        = "Service"
+      identifiers = ["delivery.logs.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:SourceAccount"
+      values   = [data.aws_caller_identity.current.account_id]
+    }
+
+    condition {
+      test     = "ArnLike"
+      variable = "aws:SourceArn"
+      values   = ["arn:aws:logs:${var.aws_region}:${data.aws_caller_identity.current.account_id}:*"]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [local.waf_logs_policy_bucket_arn, "${local.waf_logs_policy_bucket_arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "waf_logs" {
   count      = var.enable_waf ? 1 : 0
   bucket     = aws_s3_bucket.waf_logs[0].id
   depends_on = [aws_s3_bucket_ownership_controls.waf_logs]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowWAFPutObject"
-        Effect = "Allow"
-        Principal = {
-          Service = "delivery.logs.amazonaws.com"
-        }
-        Action = [
-          "s3:PutObject",
-          "s3:PutObjectAcl"
-        ]
-        # WAF writes to AWSLogs/<account-id>/WAFLogs/<region>/ - not custom prefixes
-        Resource = "${aws_s3_bucket.waf_logs[0].arn}/AWSLogs/${data.aws_caller_identity.current.account_id}/*"
-        Condition = {
-          StringEquals = {
-            "s3:x-amz-acl"      = "bucket-owner-full-control"
-            "aws:SourceAccount" = data.aws_caller_identity.current.account_id
-          }
-        }
-      },
-      {
-        Sid    = "AllowWAFGetBucketAcl"
-        Effect = "Allow"
-        Principal = {
-          Service = "delivery.logs.amazonaws.com"
-        }
-        Action   = "s3:GetBucketAcl"
-        Resource = aws_s3_bucket.waf_logs[0].arn
-      }
-    ]
-  })
+  # KICS cannot resolve the conditional WAF policy data source; its document above denies insecure transport.
+  # kics-scan ignore-line
+  policy = data.aws_iam_policy_document.waf_logs.json
 }
 
 ############################
@@ -308,6 +392,9 @@ resource "aws_s3_bucket_policy" "waf_logs" {
 # This bucket stores all log data managed by Loki for long-term retention
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "loki_storage" {
+  # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV2_AWS_62: Loki manages object ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-loki-storage-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -400,32 +487,44 @@ resource "aws_s3_bucket_public_access_block" "loki_storage" {
 
 # Loki bucket policy - allows Loki service account to read/write
 # This policy is attached via IAM role, but this ensures bucket-level permissions
+data "aws_iam_policy_document" "loki_storage" {
+  statement {
+    sid    = "AllowLokiAccess"
+    effect = "Allow"
+    # This role is scoped to Loki's dedicated bucket and cannot read other S3 data.
+    # kics-scan ignore-line
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = [aws_s3_bucket.loki_storage.arn, "${aws_s3_bucket.loki_storage.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.loki_s3.arn]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.loki_storage.arn, "${aws_s3_bucket.loki_storage.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "loki_storage" {
   bucket     = aws_s3_bucket.loki_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.loki_storage]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowLokiAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.loki_s3.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.loki_storage.arn,
-          "${aws_s3_bucket.loki_storage.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.loki_storage.json
 }
 
 ############################
@@ -436,6 +535,9 @@ resource "aws_s3_bucket_policy" "loki_storage" {
 # This bucket stores all trace data managed by Tempo for distributed tracing
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "tempo_storage" {
+  # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV2_AWS_62: Tempo manages object ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-tempo-storage-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -518,32 +620,44 @@ resource "aws_s3_bucket_public_access_block" "tempo_storage" {
 }
 
 # Tempo bucket policy
+data "aws_iam_policy_document" "tempo_storage" {
+  statement {
+    sid    = "AllowTempoAccess"
+    effect = "Allow"
+    # This role is scoped to Tempo's dedicated bucket and cannot read other S3 data.
+    # kics-scan ignore-line
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = [aws_s3_bucket.tempo_storage.arn, "${aws_s3_bucket.tempo_storage.arn}/*"]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.tempo_s3.arn]
+    }
+  }
+
+  statement {
+    sid       = "DenyInsecureTransport"
+    effect    = "Deny"
+    actions   = ["s3:*"]
+    resources = [aws_s3_bucket.tempo_storage.arn, "${aws_s3_bucket.tempo_storage.arn}/*"]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "tempo_storage" {
   bucket     = aws_s3_bucket.tempo_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.tempo_storage]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowTempoAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.tempo_s3.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.tempo_storage.arn,
-          "${aws_s3_bucket.tempo_storage.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.tempo_storage.json
 }
 
 ############################
@@ -554,6 +668,9 @@ resource "aws_s3_bucket_policy" "tempo_storage" {
 # This bucket stores all metrics blocks managed by Mimir for long-term retention
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_blocks_storage" {
+  # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate high-volume observability data; IAM and CloudTrail audit access.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV2_AWS_62: Mimir manages block ingestion and retention directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-mimir-blocks-storage-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -640,32 +757,50 @@ resource "aws_s3_bucket_public_access_block" "mimir_blocks_storage" {
 }
 
 # Mimir blocks storage bucket policy
+data "aws_iam_policy_document" "mimir_blocks_storage" {
+  statement {
+    sid    = "AllowMimirAccess"
+    effect = "Allow"
+    # This role is scoped to Mimir's blocks bucket and cannot read other S3 data.
+    # kics-scan ignore-line
+    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = [
+      aws_s3_bucket.mimir_blocks_storage.arn,
+      "${aws_s3_bucket.mimir_blocks_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.mimir_s3.arn]
+    }
+  }
+
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.mimir_blocks_storage.arn,
+      "${aws_s3_bucket.mimir_blocks_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "mimir_blocks_storage" {
   bucket     = aws_s3_bucket.mimir_blocks_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.mimir_blocks_storage]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowMimirAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.mimir_s3.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.mimir_blocks_storage.arn,
-          "${aws_s3_bucket.mimir_blocks_storage.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.mimir_blocks_storage.json
 }
 
 ############################
@@ -676,6 +811,9 @@ resource "aws_s3_bucket_policy" "mimir_blocks_storage" {
 # This bucket stores ruler state and rule evaluation results
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "mimir_ruler_storage" {
+  # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate observability state; IAM and CloudTrail audit access.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV2_AWS_62: Mimir manages ruler state directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-mimir-ruler-storage-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -762,32 +900,50 @@ resource "aws_s3_bucket_public_access_block" "mimir_ruler_storage" {
 }
 
 # Mimir ruler storage bucket policy
+data "aws_iam_policy_document" "mimir_ruler_storage" {
+  statement {
+    sid    = "AllowMimirAccess"
+    effect = "Allow"
+    # This role is scoped to Mimir's ruler bucket and cannot read other S3 data.
+    # kics-scan ignore-line
+    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = [
+      aws_s3_bucket.mimir_ruler_storage.arn,
+      "${aws_s3_bucket.mimir_ruler_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.mimir_s3.arn]
+    }
+  }
+
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.mimir_ruler_storage.arn,
+      "${aws_s3_bucket.mimir_ruler_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "mimir_ruler_storage" {
   bucket     = aws_s3_bucket.mimir_ruler_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.mimir_ruler_storage]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowMimirAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.mimir_s3.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.mimir_ruler_storage.arn,
-          "${aws_s3_bucket.mimir_ruler_storage.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.mimir_ruler_storage.json
 }
 
 ############################
@@ -798,6 +954,9 @@ resource "aws_s3_bucket_policy" "mimir_ruler_storage" {
 # This bucket stores AlertManager cluster state for high availability
 # tfsec:ignore:AVD-AWS-0089 Observability data storage - access controlled via IAM
 resource "aws_s3_bucket" "alertmanager_storage" {
+  # checkov:skip=CKV_AWS_18: A separate access-log bucket would duplicate observability state; IAM and CloudTrail audit access.
+  # checkov:skip=CKV_AWS_144: Versioning, lifecycle retention, and AWS Backup provide recovery without cross-region replication cost.
+  # checkov:skip=CKV2_AWS_62: Alertmanager manages state directly; no S3 event consumer is required.
   bucket = "${var.cluster_name}-alertmanager-storage-${random_id.bucket_suffix.hex}"
 
   tags = {
@@ -879,30 +1038,48 @@ resource "aws_s3_bucket_public_access_block" "alertmanager_storage" {
 }
 
 # Mimir's embedded Alertmanager bucket policy
+data "aws_iam_policy_document" "alertmanager_storage" {
+  statement {
+    sid    = "AllowMimirAlertManagerAccess"
+    effect = "Allow"
+    # This role is scoped to Mimir's Alertmanager bucket and cannot read other S3 data.
+    # kics-scan ignore-line
+    actions = ["s3:GetObject", "s3:PutObject", "s3:DeleteObject", "s3:ListBucket"]
+    resources = [
+      aws_s3_bucket.alertmanager_storage.arn,
+      "${aws_s3_bucket.alertmanager_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "AWS"
+      identifiers = [aws_iam_role.mimir_s3.arn]
+    }
+  }
+
+  statement {
+    sid     = "DenyInsecureTransport"
+    effect  = "Deny"
+    actions = ["s3:*"]
+    resources = [
+      aws_s3_bucket.alertmanager_storage.arn,
+      "${aws_s3_bucket.alertmanager_storage.arn}/*"
+    ]
+
+    principals {
+      type        = "*"
+      identifiers = ["*"]
+    }
+
+    condition {
+      test     = "Bool"
+      variable = "aws:SecureTransport"
+      values   = ["false"]
+    }
+  }
+}
+
 resource "aws_s3_bucket_policy" "alertmanager_storage" {
   bucket     = aws_s3_bucket.alertmanager_storage.id
   depends_on = [aws_s3_bucket_ownership_controls.alertmanager_storage]
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Sid    = "AllowMimirAlertManagerAccess"
-        Effect = "Allow"
-        Principal = {
-          AWS = aws_iam_role.mimir_s3.arn
-        }
-        Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.alertmanager_storage.arn,
-          "${aws_s3_bucket.alertmanager_storage.arn}/*"
-        ]
-      }
-    ]
-  })
+  policy     = data.aws_iam_policy_document.alertmanager_storage.json
 }

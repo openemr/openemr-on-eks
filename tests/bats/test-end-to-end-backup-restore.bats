@@ -225,7 +225,7 @@ EOF
   [ "$(grep -Fc '<!-- BEGIN AUTOMATED E2E TIMINGS -->' "$report_file")" -eq 1 ]
   [ "$(grep -Fc '<!-- END AUTOMATED E2E TIMINGS -->' "$report_file")" -eq 1 ]
   local report_mode report_content
-  report_mode=$(stat -f '%Lp' "$report_file" 2>/dev/null || stat -c '%a' "$report_file")
+  report_mode=$(stat -c '%a' "$report_file" 2>/dev/null || stat -f '%Lp' "$report_file")
   [ "$report_mode" = "644" ]
   report_content=$(<"$report_file")
   [[ "$report_content" == *$'| OpenEMR Deployment | SUCCESS | 125 | 2m 05s |\n\n<!-- END AUTOMATED E2E TIMINGS -->'* ]]

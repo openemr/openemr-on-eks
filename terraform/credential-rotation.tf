@@ -9,6 +9,7 @@
 # Secrets Manager: RDS slot secret (dual A/B credentials)
 # -----------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "rds_slots" {
+  # checkov:skip=CKV2_AWS_57: The audited dual-slot Kubernetes rotation job owns rotation; enabling a second Secrets Manager rotation path would break slot coordination.
   name                    = "${var.cluster_name}/credential-rotation/rds-slots"
   description             = "Dual-slot (A/B) RDS credentials for zero-downtime rotation"
   kms_key_id              = aws_kms_key.rds.arn
@@ -49,6 +50,7 @@ resource "aws_secretsmanager_secret_version" "rds_slots" {
 # Secrets Manager: RDS admin secret (master / dbadmin user)
 # -----------------------------------------------------------------------------
 resource "aws_secretsmanager_secret" "rds_admin" {
+  # checkov:skip=CKV2_AWS_57: The audited dual-slot Kubernetes rotation job rotates admin and application credentials atomically after deployment validation.
   name                    = "${var.cluster_name}/credential-rotation/rds-admin"
   description             = "RDS admin (master) credentials for credential rotation management"
   kms_key_id              = aws_kms_key.rds.arn

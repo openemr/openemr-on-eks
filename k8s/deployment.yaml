@@ -18,6 +18,16 @@ kind: Deployment
 metadata:
   name: openemr      # Deployment name - must match selector labels
   namespace: openemr # Target namespace for deployment
+  annotations:
+    checkov.io/skip1: "CKV_K8S_15=Pinned version tags are rendered from versions.yaml; IfNotPresent prevents unnecessary pulls."
+    checkov.io/skip2: "CKV_K8S_20=The upstream OpenEMR entrypoint needs SETUID/SETGID for Apache; capabilities are explicitly minimized."
+    checkov.io/skip3: "CKV_K8S_22=OpenEMR and Fluent Bit require writable runtime paths; persistent data is isolated on EFS."
+    checkov.io/skip4: "CKV_K8S_23=The upstream OpenEMR image and Fluent Bit host-log reader require UID 0."
+    checkov.io/skip5: "CKV_K8S_25=Only the documented OpenEMR and Fluent Bit capabilities are added after dropping ALL."
+    checkov.io/skip6: "CKV_K8S_35=The upstream OpenEMR image consumes credentials through environment variables; Secrets are KMS-encrypted and RBAC-scoped."
+    checkov.io/skip7: "CKV_K8S_38=The projected service-account token is required for Fluent Bit IRSA authentication."
+    checkov.io/skip8: "CKV_K8S_40=The upstream containers require root; seccomp, minimized capabilities, RBAC, and NetworkPolicy provide isolation."
+    checkov.io/skip9: "CKV_K8S_43=Central version management uses immutable release tags and validates them across deployment consumers."
   labels:
     app: openemr # Primary application label for service discovery
     version: v1  # Version tracking for deployment management

@@ -27,7 +27,6 @@ setup() {
   CONSOLE_WORKFLOW="${PROJECT_ROOT}/.github/workflows/console-ci.yml"
   SECURITY_WORKFLOW="${PROJECT_ROOT}/.github/workflows/security-comprehensive.yml"
   WORKFLOWS_DIR="${PROJECT_ROOT}/.github/workflows"
-  CHECKOV_BASELINE="${PROJECT_ROOT}/.checkov.baseline"
   CONSOLE_GO_MOD="${PROJECT_ROOT}/console/go.mod"
   OIDC_MAIN_TF="${PROJECT_ROOT}/oidc_provider/main.tf"
   K8S_DIR="${PROJECT_ROOT}/k8s"
@@ -226,11 +225,10 @@ _all_tf_output_names() {
   done < <(grep -R -E 'uses:[[:space:]]+[^[:space:]#]+@' "$WORKFLOWS_DIR")
 }
 
-@test "CONTRACT: Checkov rejects findings outside the reviewed baseline" {
-  [ -s "$CHECKOV_BASELINE" ]
-  jq -e '.failed_checks | type == "array" and length > 0' "$CHECKOV_BASELINE" >/dev/null
-  grep -Fq -- '--baseline .checkov.baseline' "$SECURITY_WORKFLOW"
-  grep -Fq "'--baseline', '.checkov.baseline'" "${PROJECT_ROOT}/.pre-commit-config.yaml"
+@test "CONTRACT: Checkov has no baseline or soft-fail path" {
+  [ ! -e "${PROJECT_ROOT}/.checkov.baseline" ]
+  ! grep -Fq -- '--baseline' "$SECURITY_WORKFLOW"
+  ! grep -Fq -- '--baseline' "${PROJECT_ROOT}/.pre-commit-config.yaml"
   ! grep -Fq -- '--soft-fail' "$SECURITY_WORKFLOW"
 }
 

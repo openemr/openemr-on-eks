@@ -107,7 +107,6 @@ repos:
       - id: checkov
         args: [
           '--framework', 'terraform,kubernetes,dockerfile,github_actions',
-          '--baseline', '.checkov.baseline',
           '--compact'
         ]
 

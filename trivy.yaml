@@ -16,6 +16,30 @@ scan:
     - misconfig # Misconfiguration scanning
     - license   # License scanning
 
+  # File patterns to skip
+  skip-files:
+    - "**/*.md"
+    - "**/test/**"
+    - "**/tests/**"
+    - "**/*_test.go"
+    - "**/*_test.py"
+
+  # Generated dependency and test directories to skip
+  skip-dirs:
+    - ".git"
+    - "**/.git"
+    - "**/node_modules"
+    - "**/venv"
+    - "**/.venv"
+    - "**/__pycache__"
+    - ".trivycache"
+    - "**/.trivycache"
+    - "**/.terraform"
+    - ".external_modules"
+    - "**/.external_modules"
+    - "**/htmlcov"
+    - "**/.pytest_cache"
+
 # Severity configuration - ZERO TOLERANCE
 severity:
   - CRITICAL
@@ -67,22 +91,3 @@ output:
 
 # Ignore configuration
 ignorefile: ".trivyignore"
-
-# File patterns to skip
-skip-files:
-  - "**/*.md"
-  - "**/test/**"
-  - "**/tests/**"
-  - "**/*_test.go"
-  - "**/*_test.py"
-
-# Directory patterns to skip
-skip-dirs:
-  - ".git"
-  - "node_modules"
-  - "venv"
-  - ".venv"
-  - "__pycache__"
-  - ".trivycache"
-  - "htmlcov"
-  - ".pytest_cache"
