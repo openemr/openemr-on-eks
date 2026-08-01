@@ -1740,10 +1740,12 @@ terraform_destroy() {
         if terraform destroy "${destroy_args[@]}"; then
             log_success "Terraform destroy completed successfully"
             
-            # Only clean up state files if destroy succeeded
-            log_info "Cleaning up Terraform state files..."
-            rm -f terraform.tfstate* .terraform.lock.hcl
-            log_info "Terraform state files cleaned up - random IDs will regenerate on next run"
+            # Only clean up transient state/plan files if destroy succeeded.
+            # The committed dependency lock file must survive destroy so the
+            # next init can enforce the repository's provider selections.
+            log_info "Cleaning up transient Terraform files..."
+            rm -f terraform.tfstate* tfplan
+            log_info "Terraform state and plan files cleaned up; dependency lock file preserved"
             
             cd - >/dev/null
             return 0

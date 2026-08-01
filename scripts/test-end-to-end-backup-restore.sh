@@ -2280,9 +2280,15 @@ recreate_infrastructure() {
 
     # Clean up existing Kubernetes resources before recreating infrastructure
     log_info "Cleaning up existing Kubernetes resources..."
-    ./scripts/restore-defaults.sh --force
+    if ! "$PROJECT_ROOT/scripts/restore-defaults.sh" --force; then
+        log_error "Failed to reset Kubernetes manifests before infrastructure recreation"
+        return 1
+    fi
 
-    cd "$TERRAFORM_DIR"
+    if ! cd "$TERRAFORM_DIR"; then
+        log_error "Cannot access Terraform directory: $TERRAFORM_DIR"
+        return 1
+    fi
 
     # Clean up manual RDS snapshots that might interfere with cluster recreation
     cleanup_manual_snapshots
@@ -2290,16 +2296,54 @@ recreate_infrastructure() {
     # Clean up existing CloudWatch log groups that might conflict
     cleanup_existing_log_groups
 
+    # Destroy removes state and plan artifacts, but the committed provider lock
+    # file must remain available for deterministic read-only initialization.
+    rm -f tfplan
+    if [ ! -s ".terraform.lock.hcl" ]; then
+        log_error "Terraform dependency lock file is missing: $TERRAFORM_DIR/.terraform.lock.hcl"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
+
     # Initialize Terraform
     log_info "Initializing Terraform..."
-    terraform init -lockfile=readonly
+    if ! terraform init -lockfile=readonly; then
+        log_error "Terraform init failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
 
     # Plan and apply infrastructure
     log_info "Planning infrastructure recreation..."
-    terraform plan -var="cluster_name=$CLUSTER_NAME" -var="aws_region=$AWS_REGION" -var="skip_rds_creation=true" -out=tfplan
+    if ! terraform plan \
+            -var="cluster_name=$CLUSTER_NAME" \
+            -var="aws_region=$AWS_REGION" \
+            -var="skip_rds_creation=true" \
+            -out=tfplan; then
+        log_error "Terraform plan failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
 
     log_info "Applying infrastructure recreation (RDS deferred to restore step)..."
-    terraform apply -auto-approve tfplan
+    if ! terraform apply -auto-approve tfplan; then
+        log_error "Terraform apply failed during infrastructure recreation"
+        cd "$PROJECT_ROOT" || true
+        return 1
+    fi
+
+    # Track successful creation immediately so any later failure triggers the
+    # emergency cleanup path instead of leaving billable resources behind.
+    INFRASTRUCTURE_CREATED=true
+    CLEANUP_REQUIRED=true
+    if ! cd "$PROJECT_ROOT"; then
+        log_error "Cannot return to project root after infrastructure recreation"
+        return 1
+    fi
+    if ! save_e2e_state; then
+        log_error "Failed to persist E2E state after infrastructure recreation"
+        return 1
+    fi
 
     # Wait for infrastructure to be ready
     log_info "Waiting for infrastructure to be ready..."
@@ -2307,21 +2351,23 @@ recreate_infrastructure() {
 
     # Update kubectl context to point to the new cluster
     log_info "Updating kubectl context to point to the new cluster..."
-    aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"
+    if ! aws eks update-kubeconfig --region "$AWS_REGION" --name "$CLUSTER_NAME"; then
+        log_error "Failed to update kubeconfig for recreated cluster: $CLUSTER_NAME"
+        return 1
+    fi
 
     # EFS CSI add-on starts before Pod Identity association in the same apply.
     log_info "Ensuring EFS CSI driver has Pod Identity credentials..."
-    ./scripts/ensure-efs-csi-ready.sh
+    if ! "$PROJECT_ROOT/scripts/ensure-efs-csi-ready.sh"; then
+        log_error "EFS CSI driver did not become ready after infrastructure recreation"
+        return 1
+    fi
 
     # Get outputs
     log_info "Getting Terraform outputs..."
     # Backup bucket will be created dynamically by backup script
 
     log_success "Infrastructure recreated successfully"
-
-    # Mark infrastructure as created again for cleanup tracking
-    INFRASTRUCTURE_CREATED=true
-    CLEANUP_REQUIRED=true
 
     # OpenEMR deploy is handled by restore.sh in step 8 (deploy here was redundant and
     # added ~15 min before restore wiped and redeployed everything anyway).

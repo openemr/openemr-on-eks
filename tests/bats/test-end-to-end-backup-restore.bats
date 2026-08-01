@@ -435,6 +435,56 @@ EOF
   rm -f "$state_file"
 }
 
+@test "UNIT: infrastructure recreation stops after Terraform init failure" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  mkdir -p "$fixture/scripts" "$fixture/terraform"
+  printf '#!/bin/bash\nexit 0\n' > "$fixture/scripts/restore-defaults.sh"
+  chmod +x "$fixture/scripts/restore-defaults.sh"
+  printf 'locked\n' > "$fixture/terraform/.terraform.lock.hcl"
+  printf 'stale plan\n' > "$fixture/terraform/tfplan"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_manual_snapshots() { :; }
+    cleanup_existing_log_groups() { :; }
+    save_e2e_state() { :; }
+    terraform() {
+      printf "%s\n" "$*" >> "$PROJECT_ROOT/terraform-calls"
+      [ "$1" != "init" ]
+    }
+    source "$2"
+    recreate_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform init failed during infrastructure recreation" ]]
+  grep -q '^init ' "$fixture/terraform-calls"
+  ! grep -q '^plan ' "$fixture/terraform-calls"
+  ! grep -q '^apply ' "$fixture/terraform-calls"
+  [ ! -e "$fixture/terraform/tfplan" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
+@test "infrastructure recreation guards each Terraform stage" {
+  local func_file
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  grep -Fq 'if ! terraform init -lockfile=readonly' "$func_file"
+  grep -Fq 'if ! terraform plan \' "$func_file"
+  grep -Fq 'if ! terraform apply -auto-approve tfplan' "$func_file"
+  grep -Fq '"$PROJECT_ROOT/scripts/ensure-efs-csi-ready.sh"' "$func_file"
+  rm -f "$func_file"
+}
+
 # ── UNIT: parse_arguments chunked flags ─────────────────────────────────────
 
 @test "UNIT: parse_arguments sets FROM_STEP and TO_STEP" {

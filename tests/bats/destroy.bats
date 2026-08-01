@@ -122,6 +122,13 @@ SCRIPT="${SCRIPTS_DIR}/destroy.sh"
   rm -f "$FUNC_FILE"
 }
 
+@test "successful destroy preserves Terraform dependency lock" {
+  run grep -F 'rm -f terraform.tfstate*' "$SCRIPT"
+  assert_success
+  [[ "$output" =~ "tfplan" ]]
+  [[ ! "$output" =~ ".terraform.lock.hcl" ]]
+}
+
 # ── UNIT: show_help ─────────────────────────────────────────────────────────
 
 @test "UNIT: show_help prints usage information" {
