@@ -79,7 +79,7 @@ readonly TERRAFORM_DIR # Terraform directory for state access
 # Deployment timeouts - carefully tuned based on OpenEMR's startup characteristics
 # These timeouts account for OpenEMR's complex initialization process which includes
 # database schema creation, configuration setup, and service startup.
-readonly POD_READY_TIMEOUT=1200  # 20-minute ceiling; historical 8.1.x readiness was 3-6 minutes
+readonly POD_READY_TIMEOUT=1200  # 20-minute ceiling; full 8.2.0 deployment step measured 17m 30s
 readonly HEALTH_CHECK_TIMEOUT=600 # 10 minutes - For PVC binding and service readiness
 readonly EFS_CSI_TIMEOUT=300      # 5 minutes - EFS CSI driver operations
 readonly CLEANUP_WAIT_TIME=5      # 5 seconds - Wait after cleanup operations
@@ -1645,8 +1645,8 @@ fi
 
 # Wait for deployment rollout to complete with enhanced monitoring
 log_step "Waiting for deployment rollout to complete..."
-log_info "Historical OpenEMR 8.1.x readiness was 3-6 minutes (timeout ceiling: 20 min)."
-log_info "OpenEMR 8.2.x timing must be revalidated during end-to-end deployment testing."
+log_info "OpenEMR 8.2.0 full deployment step measured 17m 30s (timeout ceiling: 20 min)."
+log_info "Historical OpenEMR 8.1.x readiness was 3-6 minutes."
 
 # Enhanced monitoring with periodic status updates
 log_info "📊 Monitoring deployment progress..."

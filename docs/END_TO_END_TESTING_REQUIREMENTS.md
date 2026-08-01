@@ -120,11 +120,11 @@ report file.
 
 ### **Chunked Execution (Development Iteration)**
 
-The historical OpenEMR 8.1.x E2E benchmark is ~2.5 hours
-(~150-160 min); remeasure it for OpenEMR 8.2.x before using that estimate for
-release planning. For faster development iteration, run **step groups** or
-**individual steps**. State (backup bucket, snapshot ID, test timestamp) is
-persisted to `.e2e-test-state` between runs.
+The OpenEMR 8.2.0 full-run baseline is 169 minutes 9 seconds (August 1, 2026).
+The historical OpenEMR 8.1.x benchmark was ~150-160 minutes. For faster
+development iteration, run **step groups** or **individual steps**. State
+(backup bucket, snapshot ID, test timestamp) is persisted to
+`.e2e-test-state` between runs.
 
 ```bash
 # List all steps and predefined groups
@@ -163,7 +163,7 @@ persisted to `.e2e-test-state` between runs.
 
 | Group | Steps | Use when |
 |-------|-------|----------|
-| `deploy` | 1–3 | Infrastructure + OpenEMR + test data (~35-40 min cold; ~10-15 min warm) |
+| `deploy` | 1–3 | Infrastructure + OpenEMR + test data (8.2.0: ~47 min cold; steps 2-3 ~23 min) |
 | `backup` | 4 | Testing backup script in isolation |
 | `monitoring` | 5 | Testing monitoring install/uninstall |
 | `destroy` / `recreate` | 6 / 7 | Testing infrastructure teardown/rebuild |
@@ -259,11 +259,10 @@ This step ensures that the monitoring stack integration is robust and doesn't in
 
 ### **Performance Requirements**
 
-- **Test duration**: No successful OpenEMR 8.2.x full-run baseline is recorded
-  yet. Historical planning data is ~150–160 minutes for 8.1.x and ~211–217
-  minutes for the December 2025 8.0.x runs. A successful August 1, 2026 resume
-  measured steps 7–10 at 86 minutes 22 seconds; this is recovery-path evidence,
-  not a replacement for the full-suite baseline.
+- **Test duration**: The successful OpenEMR 8.2.0 full 10-step baseline is
+  169 minutes 9 seconds (August 1, 2026). Historical planning data is
+  ~150–160 minutes for 8.1.x and ~211–217 minutes for the December 2025
+  8.0.x runs.
 - **Resource usage**: AWS resources will be created and destroyed during testing
 - **Cleanup verification**: No orphaned AWS resources after test completion
 
@@ -362,22 +361,22 @@ All changes must include:
 ```markdown
 ## End-to-End Test Results
 
-**Test Date**: 2025-10-26
+**Test Date**: 2026-08-01
 **Test Environment**: openemr-eks-test
-**Test Duration**: 2 hours 30 minutes (150-160 minutes on OpenEMR 8.1.x)
+**Test Duration**: 2 hours 49 minutes 9 seconds (OpenEMR 8.2.0)
 **Resources Used**: AWS resources created and destroyed
 
 ### Test Results
-- ✅ Infrastructure Deployment: PASS (31 minutes)
-- ✅ OpenEMR Installation: PASS (5 minutes)
-- ✅ Test Data Creation: PASS (8 seconds)
-- ✅ Backup Creation: PASS (32 seconds)
-- ✅ Monitoring Stack Test: PASS (8 minutes)
-- ✅ Infrastructure Destruction: PASS (16 minutes)
-- ✅ Infrastructure Recreation: PASS (35 minutes)
-- ✅ Backup Restoration: PASS (35 minutes)
-- ✅ Verification: PASS (10 seconds)
-- ✅ Final Cleanup: PASS (14 minutes)
+- ✅ Infrastructure Deployment: PASS (23m 52s)
+- ✅ OpenEMR Installation: PASS (17m 30s)
+- ✅ Test Data Creation: PASS (5m 14s)
+- ✅ Backup Creation: PASS (40s)
+- ✅ Monitoring Stack Test: PASS (18m 15s)
+- ✅ Infrastructure Destruction: PASS (21m 30s)
+- ✅ Infrastructure Recreation: PASS (26m 15s)
+- ✅ Backup Restoration: PASS (33m 33s)
+- ✅ Verification: PASS (51s)
+- ✅ Final Cleanup: PASS (21m 23s)
 
 **Overall Status**: PASS
 ```

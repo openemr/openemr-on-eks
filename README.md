@@ -679,9 +679,9 @@ Next steps for first-time deployment:
    5. cd /path/to/GitHub/openemr-on-eks/k8s
    6. ./deploy.sh
 
-⏱️  Expected deployment time: 35-42 minutes total (historical OpenEMR 8.1.x benchmark; revalidate for 8.2.x)
-   • Infrastructure (Terraform): 30-32 minutes
-   • Application (Kubernetes): 3-6 minutes typical (up to ~10 min)
+⏱️  OpenEMR 8.2.0 measured deployment time: 41 minutes 22 seconds total
+   • Infrastructure (Terraform): 23 minutes 52 seconds
+   • Application (Kubernetes): 17 minutes 30 seconds
 
 📋 Deployment Recommendations
 =============================
@@ -820,7 +820,7 @@ terraform validate
 # Review deployment plan
 terraform plan -out=tfplan
 
-# Deploy infrastructure (~30-32 minutes)
+# Deploy infrastructure (~24 minutes in the OpenEMR 8.2.0 E2E baseline)
 terraform apply tfplan
 
 # (OPTIONAL) Deploy infrastructure and measure the time it takes
@@ -883,7 +883,7 @@ cd ../k8s
 # Update kubeconfig
 aws eks update-kubeconfig --region us-west-2 --name openemr-eks
 
-# For testing deployments (~3-6 minute historical 8.1.x baseline; uses self-signed certificates)
+# Testing deployment (~18 minutes in the 8.2.0 baseline; uses self-signed certificates)
 ./deploy.sh
 
 # To time run for testing deployments (uses self-signed certificates)
@@ -2129,7 +2129,7 @@ AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
 
 - **Environment**: Use a non-production AWS account; resources are created and
   destroyed during testing
-- **Duration**: ~2.5 hours (historical 150-160 minute OpenEMR 8.1.x benchmark; revalidate for 8.2.x)
+- **Duration**: ~169 minutes (OpenEMR 8.2.0 full-run baseline, August 1, 2026)
 - **Requirements**: Proper AWS credentials and permissions
 - **Log**: `e2e-full-test.log` is appended by the wrapper and ignored by Git
 

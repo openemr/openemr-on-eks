@@ -482,13 +482,13 @@ terraform show -json tfplan | jq '.resource_changes[] | {address: .address, acti
 # Deploy with approval
 terraform apply tfplan
 
-# Monitor deployment (35-42 minute historical 8.1.x benchmark; remeasure for 8.2.x)
-# Infrastructure (Terraform): ~30-32 minutes (measured from E2E tests)
+# Monitor deployment (~41 minutes in the OpenEMR 8.2.0 full-run baseline)
+# Infrastructure (Terraform): 23 minutes 52 seconds
 #   - EKS cluster: 15-20 minutes
 #   - Aurora RDS cluster: 10-12 minutes  
 #   - VPC/NAT gateways: 3-5 minutes
 #   - Other resources (S3, EFS, ElastiCache, KMS, WAF): 5-8 minutes
-# Application deployment: ~3-6 minute historical 8.1.x baseline (up to ~10 min on slow runs)
+# Application deployment: 17 minutes 30 seconds in the 8.2.0 E2E phase
 
 # Save outputs for later use
 terraform output -json > ../terraform-outputs.json

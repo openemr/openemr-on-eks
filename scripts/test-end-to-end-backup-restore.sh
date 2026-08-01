@@ -48,12 +48,11 @@
 #
 # Notes:
 #   ⚠️  WARNING: This is a destructive test that creates and destroys AWS
-#   resources. Only run in development/testing environments. Historical OpenEMR
-#   8.1.x baseline: ~150-160 minutes (~2.5 hours). Measured timings: Infrastructure deployment
-#   30-32 min, Application deployment 3-6 min (8.1.x; can spike to ~10 min), Backup
-#   ~30-35 sec, Monitoring stack test ~6-7 min, Infrastructure deletion 13-16 min,
-#   Infrastructure recreation 40-42 min, Restore 38-43 min, Final cleanup 13-14 min.
-#   Deploy chunk (steps 1-3): ~35-40 min cold start, ~10-15 min when infra already exists.
+#   resources. Only run in development/testing environments. The OpenEMR 8.2.0
+#   full-run baseline is 169m 9s: infrastructure 23m 52s, OpenEMR 17m 30s,
+#   test data 5m 14s, backup 40s, monitoring 18m 15s, deletion 21m 30s,
+#   recreation 26m 15s, restore 33m 33s, verification 51s, and cleanup 21m 23s.
+#   Deploy chunk (steps 1-3): 46m 36s cold; steps 2-3 measured 22m 44s.
 #
 # Examples:
 #   ./test-end-to-end-backup-restore.sh
@@ -105,8 +104,9 @@ TEST_TIMESTAMP=$(date +%Y%m%d-%H%M%S) # Unique timestamp for test identification
 PROOF_FILE_CONTENT="OpenEMR Backup/Restore Test - Created: $(date '+%Y-%m-%d %H:%M:%S UTC') - Test ID: ${TEST_TIMESTAMP}"
 
 # Test results tracking
-TEST_RESULTS=()             # Array to store test results
-TEST_START_TIME=$(date +%s) # Start time for overall test duration
+TEST_RESULTS=()              # Array to store test results
+TEST_START_TIME=$(date +%s)  # Start time for overall test duration
+TEST_TOTAL_DURATION=""       # Frozen when results are first printed
 
 # Global variables for cleanup tracking
 INFRASTRUCTURE_CREATED=false # Flag to track if infrastructure was created during test
@@ -1236,6 +1236,9 @@ deploy_infrastructure() {
     fi
 
     log_info "Applying infrastructure deployment..."
+    # A failed apply can still leave a partial deployment in Terraform state.
+    INFRASTRUCTURE_CREATED=true
+    CLEANUP_REQUIRED=true
     if ! terraform apply -auto-approve tfplan; then
         log_error "Terraform apply failed"
         return 1
@@ -1285,10 +1288,6 @@ deploy_infrastructure() {
     log_success "Infrastructure deployed successfully"
     log_info "Backup bucket will be created during backup step"
 
-    # Mark infrastructure as created for cleanup tracking
-    INFRASTRUCTURE_CREATED=true
-    CLEANUP_REQUIRED=true
-
     local step_duration
     step_duration=$(get_duration "$step_start")
     add_test_result "Infrastructure Deployment" "SUCCESS" "Cluster: $CLUSTER_NAME" "$step_duration"
@@ -1323,7 +1322,7 @@ deploy_openemr() {
 
     # Wait for deployment to be ready with extended timeout
     # The deploy script may trigger a rolling restart, so we need to wait for it to complete
-    log_info "Waiting for OpenEMR deployment (historical 8.1.x baseline: 3-8 min; 8.2.x may vary)..."
+    log_info "Waiting for OpenEMR deployment (8.2.0 full deployment step measured 17m 30s)..."
     
     # First, wait for deployment to exist
     log_info "Validating OpenEMR deployment exists..."
@@ -1564,7 +1563,7 @@ deploy_test_data() {
 
     # Wait for pod to be ready (both containers) - with progress feedback
     log_info "Waiting for pod to be fully ready (both containers)..."
-    log_info "Historical OpenEMR 8.1.x readiness was 3-6 minutes; 8.2.x timing is unverified..."
+    log_info "OpenEMR 8.2.0 full deployment step measured 17m 30s; readiness uses a 20-minute ceiling..."
 
     # Use a more robust wait with progress feedback
     local wait_timeout=1200 # 20-minute ceiling
@@ -1598,7 +1597,7 @@ deploy_test_data() {
     log_info "========================================="
     log_info "Waiting for OpenEMR swarm mode initialization to complete..."
     log_info "This prevents test data from being overwritten during swarm init"
-    log_info "Fresh database setup may take 5-10 minutes; revalidate this estimate for 8.2.x"
+    log_info "Fresh database initialization is included in the 17m 30s OpenEMR 8.2.0 deployment baseline"
     log_info "========================================="
     
     local swarm_max_wait=900  # 15 minutes (ceiling)
@@ -1652,7 +1651,7 @@ deploy_test_data() {
     
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive..."
-    log_info "Waiting for OpenEMR responsiveness; 8.2.x timing is being revalidated..."
+    log_info "Waiting for OpenEMR responsiveness within the measured 8.2.0 deployment flow..."
     local max_attempts=72  # 72 × 10s = 12 minutes (ceiling)
     local attempt=1
 
@@ -2188,7 +2187,7 @@ test_monitoring_stack() {
 
     # Test monitoring stack installation
     log_info "Installing monitoring stack..."
-    log_info "This may take 10-15 minutes for full installation..."
+    log_info "The 8.2.0 install/verify/uninstall test cycle measured 18m 15s..."
     
     # Run monitoring installation
     if ! "$monitoring_script" install; then
@@ -2326,16 +2325,17 @@ recreate_infrastructure() {
     fi
 
     log_info "Applying infrastructure recreation (RDS deferred to restore step)..."
+    # Terraform may create resources before returning a failed apply. Mark the
+    # infrastructure for cleanup before apply so the ERR/EXIT trap tears down
+    # any partial deployment instead of leaving billable resources behind.
+    INFRASTRUCTURE_CREATED=true
+    CLEANUP_REQUIRED=true
     if ! terraform apply -auto-approve tfplan; then
         log_error "Terraform apply failed during infrastructure recreation"
         cd "$PROJECT_ROOT" || true
         return 1
     fi
 
-    # Track successful creation immediately so any later failure triggers the
-    # emergency cleanup path instead of leaving billable resources behind.
-    INFRASTRUCTURE_CREATED=true
-    CLEANUP_REQUIRED=true
     if ! cd "$PROJECT_ROOT"; then
         log_error "Cannot return to project root after infrastructure recreation"
         return 1
@@ -2480,7 +2480,7 @@ restore_from_backup() {
 
     # Run restore script with force flag for automated testing
     log_info "Running restore script with force flag..."
-    log_info "This may take 10-15 minutes for database restore and file restoration..."
+    log_info "The 8.2.0 full restore phase measured 33m 33s, including post-restore observation..."
     log_info "Using backup bucket: $BACKUP_BUCKET"
     log_info "Using snapshot ID: $SNAPSHOT_ID"
     log_info "Using AWS region: $AWS_REGION"
@@ -2534,7 +2534,7 @@ verify_restoration() {
 
     # Wait for OpenEMR to be ready - extended timeout for startup
     log_info "Waiting for OpenEMR to be ready after restoration..."
-    log_info "This may take 10-15 minutes for first startup..."
+    log_info "The 8.2.0 verification phase measured 51s; extended timeouts cover slower recovery..."
 
     # Check current deployment status first
     log_info "Checking current OpenEMR deployment status..."
@@ -2747,7 +2747,7 @@ verify_restoration() {
 
     # Additional wait for OpenEMR application to be responsive
     log_info "Waiting for OpenEMR application to be responsive after restoration..."
-    log_info "This may take 10-15 minutes for OpenEMR to fully initialize after restoration..."
+    log_info "The 8.2.0 verification phase measured 51s; allowing extra time for initialization..."
     local max_attempts=60  # Increased to 60 attempts (10 minutes) for better reliability
     local attempt=1
 
@@ -3010,9 +3010,10 @@ cleanup_final() {
 
 # Print test results
 print_test_results() {
-    local test_end_time
-    test_end_time=$(date +%s)
-    local total_duration=$((test_end_time - TEST_START_TIME))
+    if [ -z "$TEST_TOTAL_DURATION" ]; then
+        TEST_TOTAL_DURATION=$(get_duration "$TEST_START_TIME")
+    fi
+    local total_duration="$TEST_TOTAL_DURATION"
 
     echo ""
     echo -e "${BLUE}========================================${NC}"
@@ -3095,8 +3096,7 @@ update_deployment_timing_report() {
     openemr_version=$(yq eval '.applications.openemr.current' "$PROJECT_ROOT/versions.yaml")
     local generated_at
     generated_at=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
-    local total_duration
-    total_duration=$(get_duration "$TEST_START_TIME")
+    local total_duration="${TEST_TOTAL_DURATION:-$(get_duration "$TEST_START_TIME")}"
     local scope="steps ${FROM_STEP}-${TO_STEP}"
     if [ "$FROM_STEP" -eq 1 ] && [ "$TO_STEP" -eq "$TOTAL_STEPS" ] && [ -z "$SKIP_STEPS" ]; then
         scope="full 10-step suite"

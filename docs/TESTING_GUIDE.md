@@ -254,7 +254,7 @@ This test ensures that the optional monitoring stack doesn't interfere with core
 
 ```bash
 # Full test with AWS profile loading and persistent e2e-full-test.log
-# (~2.5 hour historical 8.1.x benchmark; remeasure for 8.2.x)
+# (OpenEMR 8.2.0 full-run baseline: 169 minutes 9 seconds)
 AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
   --cluster-name openemr-eks-test --aws-region us-west-2
 

@@ -4,15 +4,6 @@
 # This configuration creates an ElastiCache Valkey Serverless cache for OpenEMR
 # with high availability, encryption, and user authentication features.
 
-# ElastiCache Subnet Group for cache deployment
-# Defines which subnets the ElastiCache cluster can be deployed across
-resource "aws_elasticache_subnet_group" "openemr" {
-  # Unique name with random suffix to prevent naming conflicts
-  name = "${var.cluster_name}-cache-subnet-${random_id.global_suffix.hex}"
-  # Deploy cache cluster across private subnets for security
-  subnet_ids = module.vpc.private_subnets
-}
-
 # ElastiCache Security Group for cache network access control
 # Restricts cache access to EKS cluster nodes and provides fallback access
 resource "aws_security_group" "elasticache" {

@@ -649,7 +649,7 @@ AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
 - Run only in a non-production AWS account; the test creates and destroys real
   resources
 - Requires proper AWS credentials and permissions
-- No successful OpenEMR 8.2.x full-run timing is recorded yet
+- OpenEMR 8.2.0 full-run timing: 169 minutes 9 seconds (August 1, 2026)
 - Historical full-run baselines: ~150–160 minutes for 8.1.x and ~211–217
   minutes for the December 2025 8.0.x runs
 - The wrapper appends output to the gitignored `e2e-full-test.log`
@@ -933,20 +933,21 @@ The backup and restore system now leverages Amazon RDS's new cross-Region and cr
 - **RDS Snapshot Creation:** ~20 seconds (very fast, AWS-managed)
 - **S3 Data Backup:** ~5 seconds (application data)
 - **K8s Config Backup:** ~4 seconds (manifests and configs)
-- **Total Backup Time:** ~30-35 seconds (very consistent)
+- **OpenEMR 8.2.0 full-run backup phase:** 40 seconds
+- **Historical total backup time:** ~30-35 seconds
 
-### Historical Restore Timings
+### Measured Restore Timings
 
+- **OpenEMR 8.2.0 full-run restore phase:** 33 minutes 33 seconds
 - **December 2025 full restore:** ~53–55 minutes
 - **Application data extraction:** under one minute in that historical run
 - **Largest contributors:** Aurora deletion/restoration and OpenEMR deployment
-- **OpenEMR 8.2.x:** no successful automated full-run timing is recorded yet;
-  remeasure before setting an RTO from these figures
 
 ### General Performance Notes
-- **Backup:** Very consistent (~30-35 seconds) and incremental after first snapshot
-- **Restore:** Historical December 2025 runs were ~53–55 minutes; current 8.2.x
-  timing is pending
+- **Backup:** 40 seconds in the 8.2.0 full run and incremental after the first
+  snapshot
+- **Restore:** 33 minutes 33 seconds in the 8.2.0 full run; historical December
+  2025 runs were ~53–55 minutes
 - RDS cluster operations and OpenEMR deployment are the longest components
 - **Enhanced cross-region transfers** are faster with new RDS capabilities
 - **Automatic crypto key cleanup** prevents encryption key mismatches

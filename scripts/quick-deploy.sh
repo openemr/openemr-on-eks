@@ -196,7 +196,7 @@ deploy_terraform() {
     terraform plan -out=tfplan -no-color
     
     log_step "Applying Terraform configuration..."
-    log_info "This may take 30-45 minutes..."
+    log_info "OpenEMR 8.2.0 infrastructure measured 23m 52s; allow up to 45 minutes..."
     terraform apply tfplan -no-color
     
     log_success "Terraform infrastructure deployed successfully"
@@ -214,7 +214,7 @@ deploy_openemr() {
     cd "$PROJECT_ROOT/k8s" || exit 1
     
     log_step "Running OpenEMR deployment script..."
-    log_info "Historical OpenEMR 8.1.x initialization was 3-6 minutes; 8.2.x may vary..."
+    log_info "OpenEMR 8.2.0 full deployment step measured 17m 30s..."
     ./deploy.sh --cluster-name "$CLUSTER_NAME" --aws-region "$AWS_REGION" --namespace "$NAMESPACE"
     
     log_success "OpenEMR deployed successfully"

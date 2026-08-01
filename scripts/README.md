@@ -509,9 +509,11 @@ and run the Bash implementation directly.
 - **Purpose**: End-to-end backup/restore testing
 - **Dependencies**: kubectl, aws, helm, terraform, jq
 - **Key Features**:
-  - Tests complete backup/restore cycle (10 steps; historical 8.1.x run was ~2.5 hours)
+  - Tests complete backup/restore cycle (10 steps; OpenEMR 8.2.0 baseline:
+    169 minutes 9 seconds)
   - **Chunked execution** via `--from-step`, `--to-step`, `--step`, or `--group` for faster development iteration
-  - Deploy chunk: ~35-40 min cold, ~10-15 min when infra already exists
+  - Deploy chunk: 46 minutes 36 seconds cold; steps 2-3 measured 22 minutes
+    44 seconds
   - Persists state (backup bucket, snapshot ID) to `.e2e-test-state` between chunks
   - Validates data integrity
   - Tests infrastructure recreation

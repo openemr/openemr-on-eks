@@ -199,6 +199,7 @@ EOF
     AWS_REGION='us-west-2'
     TEST_TIMESTAMP='20260731-200700'
     TEST_START_TIME=1
+    TEST_TOTAL_DURATION=185
     FROM_STEP=1
     TO_STEP=10
     TOTAL_STEPS=10
@@ -217,6 +218,7 @@ EOF
   "
   assert_success
   grep -Fq '**OpenEMR:** 8.2.0' "$report_file"
+  grep -Fq '**Total elapsed:** 185s (3m 5s)' "$report_file"
   grep -Fq '| Infrastructure Deployment | SUCCESS | 61 | 1m 01s |' "$report_file"
   grep -Fq '| OpenEMR Deployment | SUCCESS | 125 | 2m 05s |' "$report_file"
   grep -Fq '## Preserved Guidance' "$report_file"
@@ -435,6 +437,43 @@ EOF
   rm -f "$state_file"
 }
 
+@test "UNIT: failed initial deployment marks partial apply for cleanup" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "deploy_infrastructure")
+  mkdir -p "$fixture/terraform"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    INFRASTRUCTURE_CREATED=false
+    CLEANUP_REQUIRED=false
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_existing_log_groups() { :; }
+    terraform() {
+      if [ "$1" = "apply" ]; then
+        printf "%s %s\n" "$INFRASTRUCTURE_CREATED" "$CLEANUP_REQUIRED" \
+          > "$PROJECT_ROOT/cleanup-flags"
+        return 1
+      fi
+      return 0
+    }
+    source "$2"
+    deploy_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform apply failed" ]]
+  [ "$(cat "$fixture/cleanup-flags")" = "true true" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
 @test "UNIT: infrastructure recreation stops after Terraform init failure" {
   local fixture func_file
   fixture=$(make_temp_dir)
@@ -471,6 +510,47 @@ EOF
   ! grep -q '^plan ' "$fixture/terraform-calls"
   ! grep -q '^apply ' "$fixture/terraform-calls"
   [ ! -e "$fixture/terraform/tfplan" ]
+  rm -rf "$fixture"
+  rm -f "$func_file"
+}
+
+@test "UNIT: failed infrastructure recreation marks partial apply for cleanup" {
+  local fixture func_file
+  fixture=$(make_temp_dir)
+  func_file=$(extract_function "$SCRIPT" "recreate_infrastructure")
+  mkdir -p "$fixture/scripts" "$fixture/terraform"
+  printf '#!/bin/bash\nexit 0\n' > "$fixture/scripts/restore-defaults.sh"
+  chmod +x "$fixture/scripts/restore-defaults.sh"
+  printf 'locked\n' > "$fixture/terraform/.terraform.lock.hcl"
+
+  run bash -c '
+    PROJECT_ROOT="$1"
+    TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+    CLUSTER_NAME="test-cluster"
+    AWS_REGION="us-west-2"
+    INFRASTRUCTURE_CREATED=false
+    CLEANUP_REQUIRED=false
+    start_timer() { printf "1\n"; }
+    log_step() { :; }
+    log_info() { :; }
+    log_error() { printf "ERROR: %s\n" "$*" >&2; }
+    cleanup_manual_snapshots() { :; }
+    cleanup_existing_log_groups() { :; }
+    terraform() {
+      if [ "$1" = "apply" ]; then
+        printf "%s %s\n" "$INFRASTRUCTURE_CREATED" "$CLEANUP_REQUIRED" \
+          > "$PROJECT_ROOT/cleanup-flags"
+        return 1
+      fi
+      return 0
+    }
+    source "$2"
+    recreate_infrastructure
+  ' _ "$fixture" "$func_file"
+
+  assert_failure
+  [[ "$output" =~ "Terraform apply failed during infrastructure recreation" ]]
+  [ "$(cat "$fixture/cleanup-flags")" = "true true" ]
   rm -rf "$fixture"
   rm -f "$func_file"
 }

@@ -645,9 +645,9 @@ main() {
         echo -e "${BLUE}   5. cd $PROJECT_ROOT/k8s${NC}"
         echo -e "${BLUE}   6. ./deploy.sh${NC}"
         echo ""
-        echo -e "${YELLOW}⏱️  Historical 8.1.x deployment baseline: 35-42 minutes; revalidate for 8.2.x${NC}"
-        echo -e "${YELLOW}   • Infrastructure (Terraform): 30-32 minutes${NC}"
-        echo -e "${YELLOW}   • Application (Kubernetes): 3-6 minutes typical (up to ~10 min)${NC}"
+        echo -e "${YELLOW}⏱️  OpenEMR 8.2.0 measured deployment: 41 minutes 22 seconds${NC}"
+        echo -e "${YELLOW}   • Infrastructure (Terraform): 23 minutes 52 seconds${NC}"
+        echo -e "${YELLOW}   • Application (Kubernetes): 17 minutes 30 seconds${NC}"
         echo ""
     elif [ $errors -eq 0 ]; then
         # Existing deployment scenario - all validations passed

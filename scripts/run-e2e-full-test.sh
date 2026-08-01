@@ -1,6 +1,6 @@
 #!/bin/bash
 # Launch the full 10-step E2E backup/restore test with AWS credentials and logging.
-# Run from your terminal (not via IDE agents) so the ~2.5 hr full test stays alive.
+# Run from your terminal so the ~2.8 hr OpenEMR 8.2.0 baseline stays alive.
 #
 # Usage:
 #   ./scripts/run-e2e-full-test.sh

@@ -345,6 +345,13 @@ _all_tf_output_names() {
     "${PROJECT_ROOT}/scripts" "${PROJECT_ROOT}/oidc_provider/scripts"
 }
 
+@test "CONTRACT: Valkey Serverless uses direct subnets without a legacy subnet group" {
+  local elasticache_tf="${PROJECT_ROOT}/terraform/elasticache.tf"
+  grep -Fq 'resource "aws_elasticache_serverless_cache" "openemr"' "$elasticache_tf"
+  grep -Fq 'subnet_ids           = module.vpc.private_subnets' "$elasticache_tf"
+  ! grep -Fq 'resource "aws_elasticache_subnet_group"' "$elasticache_tf"
+}
+
 @test "CONTRACT: kubeconform validates rendered manifest templates" {
   grep -Fq 'envsubst "$substitutions"' "$CONTRACT_WORKFLOW"
   grep -Fq 'kubeconform -strict -ignore-missing-schemas' "$CONTRACT_WORKFLOW"
