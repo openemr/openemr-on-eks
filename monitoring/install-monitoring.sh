@@ -667,12 +667,26 @@ check_dependencies(){ log_step "Checking required dependencies..."; local requir
 check_kubernetes(){ log_step "Checking Kubernetes cluster connectivity..."; kubectl cluster-info >/dev/null 2>&1 || { log_error "Cannot connect to cluster"; return 1; }; local kc sv; kc="$(kubectl version --short 2>/dev/null | grep Client | awk '{print $3}' || echo "unknown")"; sv="$(kubectl version --short 2>/dev/null | grep Server | awk '{print $3}' || echo "unknown")"; log_info "Connected. Client: $kc, Server: $sv"; log_audit "CONNECT" "kubernetes_cluster" "SUCCESS"; }
 check_cluster_resources(){
   log_step "Checking cluster resource availability..."
-  local nodes_ready nodes_total cpu_capacity memory_capacity memory_gib=0
-  nodes_ready="$(kubectl get nodes --no-headers 2>/dev/null | grep -c Ready || echo 0)"
-  nodes_total="$(kubectl get nodes --no-headers 2>/dev/null | wc -l || echo 0)"
+  local nodes_json summary nodes_ready nodes_total cpu_capacity memory_capacity memory_gib=0
+  if ! nodes_json="$(kubectl get nodes -o json 2>/dev/null)"; then
+    log_warn "Unable to query cluster nodes"
+    return 0
+  fi
+  if ! summary="$(jq -r '
+    .items as $nodes
+    | [
+        ([$nodes[] | select(any(.status.conditions[]?; .type == "Ready" and .status == "True"))] | length),
+        ($nodes | length),
+        ([$nodes[].status.capacity.cpu | tonumber] | add // 0),
+        ([$nodes[].status.capacity.memory | sub("Ki$"; "") | tonumber] | add // 0)
+      ]
+    | @tsv
+  ' <<<"$nodes_json" 2>/dev/null)"; then
+    log_warn "Unable to parse cluster node resources"
+    return 0
+  fi
+  IFS=$'\t' read -r nodes_ready nodes_total cpu_capacity memory_capacity <<<"$summary"
   if [[ "$nodes_total" -eq 0 ]]; then log_warn "No nodes found - EKS Auto Mode may provision as needed"; return 0; fi
-  cpu_capacity="$(kubectl get nodes -o json 2>/dev/null | jq -r '[.items[].status.capacity.cpu | tonumber] | add // 0' || echo 0)"
-  memory_capacity="$(kubectl get nodes -o json 2>/dev/null | jq -r '[.items[].status.capacity.memory | sub("Ki$";"") | tonumber] | add // 0' || echo 0)"
   if [[ "$memory_capacity" =~ ^[0-9]+$ && "$memory_capacity" -gt 0 ]]; then memory_gib=$((memory_capacity / 1024 / 1024)); fi
   log_info "Nodes ready: $nodes_ready/$nodes_total | Capacity: ${cpu_capacity} CPU, ${memory_gib} GiB"
   if [[ "$cpu_capacity" =~ ^[0-9]+$ && "$cpu_capacity" -gt 0 && "$cpu_capacity" -lt 4 ]]; then log_warn "Low CPU capacity; monitoring may trigger scale out"; fi

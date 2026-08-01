@@ -230,6 +230,30 @@ EOF
   rm -f "$FUNC_FILE"
 }
 
+@test "UNIT: cluster resource summary prints compact node counts" {
+  FUNC_FILE=$(extract_function "$MONITORING_SCRIPT" "check_cluster_resources")
+  run bash -c '
+    kubectl() {
+      printf "%s\n" "{\"items\":[
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"2\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"3\",\"memory\":\"8388608Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}},
+        {\"status\":{\"capacity\":{\"cpu\":\"3\",\"memory\":\"5242880Ki\"},\"conditions\":[{\"type\":\"Ready\",\"status\":\"True\"}]}}
+      ]}"
+    }
+    log_step() { :; }
+    log_warn() { printf "WARN: %s\n" "$*"; }
+    log_info() { printf "%s\n" "$*"; }
+    source "$1"
+    check_cluster_resources
+  ' _ "$FUNC_FILE"
+  assert_success
+  [ "$output" = "Nodes ready: 6/6 | Capacity: 14 CPU, 45 GiB" ]
+  rm -f "$FUNC_FILE"
+}
+
 @test "default MAX_RETRIES is 3" {
   run grep 'MAX_RETRIES.*3' "$MONITORING_SCRIPT"
   [ "$status" -eq 0 ]
