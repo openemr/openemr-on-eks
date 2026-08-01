@@ -13,11 +13,11 @@ This guide explains how to configure GitHub Actions to authenticate with AWS usi
   - [Step 1: Deploy OIDC Provider](#step-1-deploy-oidc-provider)
   - [Step 2: Get Role ARN](#step-2-get-role-arn)
   - [Step 3: Configure GitHub Secret](#step-3-configure-github-secret)
-  - [Step 4: Enjoy Using the Version Management GitHub Workflow](#step-4-enjoy-using-the-version-management-github-workflow-)
+  - [Step 4: Use the Version Management GitHub Workflow](#step-4-use-the-version-management-github-workflow)
 
 ### **⚠️ Option 2: Static IAM Credentials (Legacy)**
 - [Option 2: Static IAM Credentials (Legacy)](#option-2-static-iam-credentials-legacy)
-  - [Step 1: Follow IAM User Instructions](#step-1-follow-these-instructions-for-creating-iam-user-credentials-with-appropriate-permissions)
+  - [Step 1: Create IAM User Credentials](#step-1-create-iam-user-credentials)
   - [Step 2: Configure GitHub Secrets](#step-2-configure-github-secrets)
   - [Step 3: Consider Using OIDC](#step-3-consider-using-oidc-credentials-instead)
 
@@ -62,7 +62,7 @@ This project supports **two authentication methods** for GitHub Actions to acces
 
 ### Prerequisites
 
-- Terraform 1.14.6 (see main README for installation)
+- Terraform 1.15.8 or newer (see main README for installation)
 - AWS CLI 2.15+ configured with credentials
 - IAM permissions to create OIDC providers and roles
 
@@ -100,7 +100,11 @@ arn:aws:iam::123456789012:role/GitHubActionsOpenEMROIDCRole
 4. Value: Paste the ARN from Step 2
 5. Click **Add secret**
 
-### Step 4: Enjoy Using the [Version Management GitHub Workflow](../.github/workflows/monthly-version-check.yml) 🎉!
+### Step 4: Use the Version Management GitHub Workflow
+
+Run the
+[monthly version check workflow](../.github/workflows/monthly-version-check.yml)
+manually or wait for its scheduled invocation.
 
 **Key Points:**
 - `permissions: id-token: write` is required for OIDC to work
@@ -115,8 +119,10 @@ arn:aws:iam::123456789012:role/GitHubActionsOpenEMROIDCRole
 
 This is the traditional approach using long-lived AWS access keys.
 
-### Step 1: Follow [these instructions](VERSION_MANAGEMENT.md#-configuration-1) for creating IAM user credentials with appropriate permissions.
-Follow the link above for step by step instructions on how to create an IAM user, grant that IAM user appropriate permissions and then generate access keys for that user for use in GitHub workflows.
+### Step 1: Create IAM User Credentials
+
+Follow the [minimum IAM policy](VERSION_MANAGEMENT.md#minimum-iam-policy), then
+create access keys for that user only when OIDC cannot be used.
 
 ### Step 2: Configure GitHub Secrets
 

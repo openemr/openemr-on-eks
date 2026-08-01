@@ -8,18 +8,18 @@ A production-ready monitoring solution for OpenEMR on EKS Auto Mode, featuring a
 
 <img src="../images/monitoring_table_of_contents_section_picture.png" alt="Monitoring table of contents section picture" width="300">
 
-- [Architecture Overview](#%EF%B8%8F-architecture-overview)
+- [Architecture Overview](#architecture-overview)
 - [Prerequisites](#-prerequisites)
 - [Quick Start](#-quick-start)
 - [Cost Analysis](#-cost-analysis)
-- [Configuration](#️-configuration)
+- [Configuration](#configuration)
 - [Access Methods](#-access-methods)
 - [Dashboards](#-dashboards)
 - [Security & Compliance](#-security--compliance)
 - [Maintenance](#-maintenance)
 - [Additional Resources](#-additional-resources)
 
-## 🏗️ Architecture Overview
+## Architecture Overview
 
 ### Monitoring Stack Components
 
@@ -245,7 +245,7 @@ Layer 2: Node-level (EKS Auto Mode)
 kubectl version --client # >= 1.29
 helm version             # >= 3.12
 jq --version             # >= 1.6
-terraform version        # >= 1.14.6 (for S3 bucket and IAM role setup)
+terraform version        # >= 1.15.8 (for S3 bucket and IAM role setup)
 
 # Check cluster access
 kubectl cluster-info
@@ -384,7 +384,7 @@ export LOKI_RETENTION="360h"      # Default: 720h
 - **Cost-effective at scale**: S3 storage scales with your log volume without upfront provisioning
 - **Lifecycle management**: Old data is automatically archived and deleted according to retention policies
 
-## ⚙️ Configuration
+## Configuration
 
 ### Essential Environment Variables
 

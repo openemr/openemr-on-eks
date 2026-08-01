@@ -23,7 +23,6 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Manual Releases](#manual_releasesmd)
 - [Version Management](#version_managementmd)
 - [Codebase Knowledge MCP](#knowledge_mcpmd)
-- [Dependencies Guide](#dependenciesmd)
 - [Troubleshooting Guide](#troubleshootingmd)
 
 ### **🔗 Related Documentation**
@@ -86,6 +85,10 @@ graph TD
     M --> I[VERSION]
     M --> S
     L[scripts/] --> M
+    T[tools/codebase-mcp/] --> KM[KNOWLEDGE_MCP.md]
+    M --> KM
+    A --> KM
+    E --> KM
 
     I --> H
     J[terraform/] --> A
@@ -107,6 +110,7 @@ graph TD
     style M fill:#e1f5fe
     style S fill:#e1f5fe
     style CR fill:#ffebee
+    style KM fill:#e1f5fe
 ```
 
 ## File Descriptions

@@ -4,8 +4,8 @@
 
 <!-- Status Badges -->
 <p>
-  <a href="../../blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
-  <a href="../../releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
+  <a href="https://github.com/openemr/openemr-on-eks/blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
+  <a href="https://github.com/openemr/openemr-on-eks/releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
   <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.2.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
 </p>
 
@@ -82,7 +82,12 @@
 > - Staff training and access controls
 > - Regular security audits and risk assessments
 
-> **⚠️ End-to-End Test Warning**: The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) will create and delete AWS resources (including backup buckets and RDS snapshots) and automatically reset Kubernetes manifests to their default state. **Only run in development AWS accounts** and commit/stash any uncommitted changes to `k8s/` manifests before testing.
+> **⚠️ End-to-End Test Warning**: The recommended
+> `scripts/run-e2e-full-test.sh` wrapper and its inner
+> `scripts/test-end-to-end-backup-restore.sh` script create and delete AWS
+> resources (including backup buckets and RDS snapshots) and reset Kubernetes
+> manifests to their default state. **Only run in development AWS accounts**
+> and commit or stash uncommitted `k8s/` manifest changes first.
 ---
 
 <div align="center">
@@ -358,12 +363,12 @@ Launch an intuitive Terminal User Interface (TUI) to manage your OpenEMR deploym
 ### **🔒 Security & Compliance**
 
 - [Credential Rotation (Zero-Downtime)](#credential-rotation-scripts)
-- [Production Best Practice - Jumpbox Architecture](#%E2%80%8D-production-best-practice---jumpbox-architecture)
-- [Operational Scripts](#%EF%B8%8F-operational-scripts)
+- [Production Best Practice - Jumpbox Architecture](#production-best-practice---jumpbox-architecture)
+- [Operational Scripts](#operational-scripts)
 
 ### **📚 Infrastructure**
 
-- [Terraform Organization](#%EF%B8%8F-terraform-infrastructure-organization)
+- [Terraform Organization](#terraform-infrastructure-organization)
 - [Kubernetes Manifests](#-working-with-kubernetes-manifests)
 - [Deployment Workflow](#-deployment-workflow)
 - [Backup & Restore System](#-backup--restore-system)
@@ -464,7 +469,7 @@ The diagram below is auto-generated from the Terraform source code using [Terrav
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.14.6)**
+#### **Terraform Installation (Required: v1.15.8 or newer)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -472,17 +477,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.14.6/
+# Visit: https://releases.hashicorp.com/terraform/1.15.8/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.14.6
-tfenv use 1.14.6
+tfenv install 1.15.8
+tfenv use 1.15.8
 
 # Verify installation
-terraform --version  # Should show v1.14.6
+terraform --version  # Should show v1.15.8 or newer
 ```
 
 #### **Other Required Tools**
@@ -512,7 +517,7 @@ aws --version  # Must be 2.15.0 or higher
 
 # EKS Auto Mode specific requirements
 - Authentication mode: API or API_AND_CONFIG_MAP
-- Kubernetes version: 1.29 or higher (1.35 configured)
+- Kubernetes version: 1.29 or higher (1.36 configured by default)
 ```
 
 **(Recommended) Configure GitHub OIDC → AWS IAM role for CI/CD.** See `docs/GITHUB_AWS_CREDENTIALS.md`.
@@ -574,14 +579,13 @@ cd openemr-on-eks
 
 # Install required tools on macOS
 brew install awscli helm jq kubectl terraform
-# install docker if running pre-commit hooks locally by following instructions here: https://docs.docker.com/engine/install/
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.14.6/
+# Download from: https://releases.hashicorp.com/terraform/1.15.8/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.14.6
-# tfenv use 1.14.6
+# tfenv install 1.15.8
+# tfenv use 1.15.8
 
 # Configure AWS credentials
 aws configure
@@ -1080,11 +1084,12 @@ openemr-on-eks/
 │   ├── ssl-cert-manager.sh                # SSL certificate management (ACM integration)
 │   ├── ssl-renewal-manager.sh             # Self-signed certificate renewal automation
 │   ├── cluster-security-manager.sh        # Cluster access security management
-│   ├── backup.sh                          # Cross-region backup procedures
-│   ├── restore.sh                         # Cross-region disaster recovery (with DB reconfiguration)
+│   ├── backup.sh                          # Same/cross-region and cross-account backups
+│   ├── restore.sh                         # Checkpointed disaster-recovery entry point
 │   ├── destroy.sh                         # Complete infrastructure destruction (bulletproof cleanup)
 │   ├── search-codebase.sh                 # Interactive codebase search tool
 │   ├── test-end-to-end-backup-restore.sh  # End-to-end backup/restore testing
+│   ├── run-e2e-full-test.sh               # E2E profile loader and persistent log wrapper
 │   ├── test-warp-end-to-end.sh            # Warp end-to-end test with automatic cleanup
 │   ├── deploy-training-openemr-setup.sh   # Training setup deployment with synthetic patient data
 │   ├── quick-deploy.sh                    # Quick deployment with monitoring stack
@@ -1339,7 +1344,7 @@ WAFv2 fixed pricing is based on **Web ACL** and **rule processing** (you will al
 - **AWS Managed Rules**: Use AWS Managed Rules when possible for cost-effectiveness
 - **Log Retention**: S3 lifecycle policies for cost-effective log storage
 
-### **👨🏼‍💻 Production Best Practice - Jumpbox Architecture**
+### Production Best Practice - Jumpbox Architecture
 
 **After initial setup is complete**, the recommended production security architecture is to:
 
@@ -1530,7 +1535,7 @@ aws eks update-cluster-config \
 - **Always re-enable before running Terraform** or kubectl commands (unless using jumpbox)
 - **Jumpbox approach eliminates need** to toggle public access for routine operations
 
-## 🛠️ **Operational Scripts**
+## Operational Scripts
 
 The `scripts/` directory contains essential operational tools for managing your OpenEMR deployment:
 
@@ -1723,15 +1728,16 @@ cd scripts && ./ssl-renewal-manager.sh {deploy|status|run-now|logs|cleanup}
 
 ### **Backup & Recovery Scripts**
 
-#### **`backup.sh`** - Cross-Region Backup Procedures
+#### **`backup.sh`** - Backup Procedures
 
 ```bash
 cd scripts && ./backup.sh
 ```
 
-**Purpose:** Create comprehensive cross-region backups of all OpenEMR components
+**Purpose:** Back up the OpenEMR database, EFS application data, and
+Kubernetes configuration. The default is a same-region backup.
 **Features:** Aurora snapshots, EFS backups, K8s configs, application data, rich metadata
-**Cross-Region:** Automatic backup to different AWS regions for disaster recovery
+**Strategies:** `same-region` (default), `cross-region`, and `cross-account`
 **When to use:** Before major changes, routine backup schedules, disaster recovery preparation
 
 **🆕 Smart Polling & Timeout Management**
@@ -1752,33 +1758,26 @@ export POLLING_INTERVAL=30                # 30 sec default
 #### **`restore.sh`** - Simple, Reliable Disaster Recovery
 
 ```bash
-cd scripts && ./restore.sh <backup-bucket> <snapshot-id> [backup-region]
+./scripts/restore.sh <backup-bucket> <snapshot-id> [options]
 ```
 
 **Purpose:** Simple, reliable restore from cross-region backups during disaster recovery
 **Features:**
 - **One-command restore** with auto-detection
-- **Cross-region snapshot handling** with automatic copying
-- **Auto-reconfiguration** of database and Redis connections
-- **Manual fallback instructions** if automated process fails
+- **Explicit region selection** with `--region`
+- **Checkpointed Python phases** with `--from-phase` and `--state-file`
+- **Hardened Kubernetes Job** for restoring application data to EFS
 
 **🆕 Key Improvements**
 
 - **Simplified Usage**: Only requires backup bucket and snapshot ID
 - **Auto-Detection**: Automatically detects EKS cluster from Terraform
-- **Faster Execution**: Uses existing OpenEMR pods (no temporary resources)
-- **Smart Reconfiguration**: Automatically updates database and Redis settings
-- **Manual Fallback**: Built-in step-by-step manual restore instructions
+- **Inverted Restore**: Prepares EFS/IRSA before RDS and application-data restore
+- **Safe Resume**: Restarts at a named restore phase from `.restore-state`
+- **Legacy Path**: Use `--legacy-order` through the Python-managed Bash bridge;
+  add `--bash-only` only to bypass Python
 
 **When to use:** Disaster recovery, data corruption recovery, environment migration, testing
-
-**Environment Variables:**
-
-```bash
-export CLUSTER_AVAILABILITY_TIMEOUT=1800  # 30 min default
-export SNAPSHOT_AVAILABILITY_TIMEOUT=1800 # 30 min default
-export POLLING_INTERVAL=30                # 30 sec default
-```
 
 ### **Script Usage Patterns**
 
@@ -1802,7 +1801,7 @@ export POLLING_INTERVAL=30                # 30 sec default
 ./validate-efs-csi.sh
 ```
 
-## 🏗️ Terraform Infrastructure Organization
+## Terraform Infrastructure Organization
 
 The infrastructure is organized into **modular Terraform files** for better maintainability:
 
@@ -1810,7 +1809,8 @@ The infrastructure is organized into **modular Terraform files** for better main
 
 - **`efs.tf`** - EFS file system with elastic performance mode
 - **`eks.tf`** - EKS cluster with Auto Mode configuration
-- **`s3.tf`** - S3 buckets for ALB logs with lifecycle policies
+- **`s3.tf`** - Hardened S3 buckets and lifecycle policies for ALB/WAF logs
+  and the optional monitoring stack
 
 ### **Core Configuration**
 
@@ -1826,7 +1826,9 @@ The infrastructure is organized into **modular Terraform files** for better main
 
 ### **Observability & Compliance**
 
-- **`cloudtrail.tf`** - CloudTrail logging with encrypted S3 storage
+- **`cloudtrail.tf`** - Multi-region CloudTrail with log validation,
+  KMS-encrypted S3 retention, and real-time delivery to the KMS-encrypted
+  `/aws/cloudtrail/${cluster_name}` CloudWatch Logs group (365-day retention)
 - **`cloudwatch.tf`** - Log groups with retention settings
 
 ### **Networking & Security**
@@ -1850,7 +1852,7 @@ The Kubernetes manifests are organized for clear separation of concerns:
 
 ### **Observability & Operations**
 
-- **`hpa.yaml`** - Horizontal Pod Autoscaler configuration
+- **`hpa.yaml`** - Horizontal Pod Autoscaler and Pod Disruption Budget
 - **`logging.yaml`** - Fluent Bit sidecar configuration for log collection
 - **`ssl-renewal.yaml`** - Automated SSL certificate renewal
 
@@ -1858,7 +1860,7 @@ The Kubernetes manifests are organized for clear separation of concerns:
 
 - **`ingress.yaml`** - Ingress controller configuration
 - **`network-policies.yaml`** - Networking policies for our deployment
-- **`security.yaml`** - RBAC, service accounts, Pod Disruption Budget
+- **`security.yaml`** - Service account and namespace-scoped RBAC
 
 ### **Storage & Persistence**
 
@@ -1974,14 +1976,16 @@ The OpenEMR deployment includes a **comprehensive backup and restore system** wi
 - **✅ Automated Metadata**: Rich backup metadata for tracking and restoration
 - **✅ Cost Optimization**: Single-step operations eliminate intermediate snapshots
 - **✅ Disaster Recovery**: Full infrastructure restoration capabilities
-- **✅ Strategy Auto-Detection**: Automatically detects restore strategy from backup metadata
+- **✅ Manifest-Driven Restore**: `--from-metadata` loads the recorded region,
+  application-data key, and backup strategy
 
 ### **🌍 Enhanced Backup Strategies**
 
 - **📍 Same-Region**: Fastest backup, lowest cost (development/testing)
 - **🌍 Cross-Region**: Disaster recovery with new RDS single-step copy
 - **🏢 Cross-Account**: Compliance and data sharing between organizations
-- **🚀 Auto-Detection**: Intelligent restore strategy detection from metadata
+- **🚀 Metadata Restore**: Explicit `--from-metadata` loading for manifest-v2
+  backup plans
 
 ### **📋 What Gets Backed Up**
 
@@ -2040,40 +2044,48 @@ BACKUP_REGION=us-east-1 ./scripts/backup.sh
 
 ### **🔄 Simplified Restore Functionality**
 
-The restore script has been significantly simplified and made more reliable:
+The restore entry point delegates to the Python disaster-recovery orchestrator
+when Python is available. The default inverted flow prepares storage and
+identity before restoring RDS and EFS data, then deploys OpenEMR and verifies
+the result.
 
 #### 🎯 Key Improvements
 
-- **One-command restore** - Only requires backup bucket and snapshot ID
-- **Auto-detection** - Automatically detects EKS cluster from Terraform output
-- **Faster execution** - Uses existing OpenEMR pods instead of creating temporary ones
-- **Auto-reconfiguration** - Automatically updates database and Redis connections
-- **Manual fallback** - Built-in step-by-step manual restore instructions
+- **One-command restore** - Requires a backup bucket and snapshot ID
+- **Auto-detection** - Detects the EKS cluster from Terraform when possible
+- **Checkpointed phases** - Supports resuming at `preflight`, `bootstrap`,
+  `rds`, `data`, `deploy`, or `verify`
+- **Hardened data restore** - Uses a short-lived Kubernetes Job that drops all
+  Linux capabilities and extracts EFS data with `tar --no-same-owner`
+- **Legacy compatibility** - The older ordering remains available through
+  `--legacy-order`; `--bash-only` explicitly bypasses Python
 
-#### 🧩 Modular Restore Options
+#### 🧩 Restore Phases
 
-- **Database Restore**: Restore Aurora RDS from snapshots with cross-region support
-- **Application Data Restore**: Download and extract app data from S3 to EFS
-- **Auto-Reconfiguration**: Automatically update database and Redis connections
-- **Manual Instructions**: Get step-by-step manual restore guide if needed
+The default order is `preflight → bootstrap → rds → data → deploy → verify`.
+Use `--from-phase PHASE` and `--state-file PATH` to resume a checkpointed
+restore. The current orchestrator does not expose the former selective
+`RESTORE_*` environment toggles.
 
 #### Usage Examples
 
 ```bash
 # Basic restore (most common)
-./restore.sh my-backup-bucket my-snapshot-id
+./scripts/restore.sh my-backup-bucket my-snapshot-id
 
 # Cross-region restore
-./restore.sh my-backup-bucket my-snapshot-id us-east-1
+./scripts/restore.sh my-backup-bucket my-snapshot-id --region us-east-1
 
-# Automated restore (skip confirmations)
-./restore.sh my-backup-bucket my-snapshot-id --force
+# Resume from the data phase
+./scripts/restore.sh my-backup-bucket my-snapshot-id \
+  --from-phase data --state-file .restore-state
 
-# Selective restore
-RESTORE_APP_DATA=false ./restore.sh my-backup-bucket my-snapshot-id
+# Legacy order through the Python orchestrator's Bash bridge
+./scripts/restore.sh my-backup-bucket my-snapshot-id --legacy-order
 
-# Get manual instructions
-./restore.sh --manual-instructions
+# Force the Bash implementation with the same legacy order
+./scripts/restore.sh my-backup-bucket my-snapshot-id \
+  --legacy-order --bash-only
 ```
 
 ### **🧪 End-to-End Testing**
@@ -2083,11 +2095,11 @@ The project includes a comprehensive **automated end-to-end backup/restore test 
 #### **Complete Test Coverage**
 
 ```bash
-# Run the full end-to-end test
-./scripts/test-end-to-end-backup-restore.sh
+# Run the full end-to-end test with persistent terminal logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh
 
 # Custom test configuration
-./scripts/test-end-to-end-backup-restore.sh \
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
   --cluster-name openemr-eks-test \
   --aws-region us-west-2
 ```
@@ -2115,10 +2127,11 @@ The project includes a comprehensive **automated end-to-end backup/restore test 
 
 #### **⚠️ Test Considerations**
 
-- **Resources**: AWS resources will be created and destroyed during testing
+- **Environment**: Use a non-production AWS account; resources are created and
+  destroyed during testing
 - **Duration**: ~2.5 hours (historical 150-160 minute OpenEMR 8.1.x benchmark; revalidate for 8.2.x)
-- **Resources**: Creates and destroys real AWS resources
 - **Requirements**: Proper AWS credentials and permissions
+- **Log**: `e2e-full-test.log` is appended by the wrapper and ignored by Git
 
 ### **📚 Documentation**
 
@@ -2279,15 +2292,14 @@ kubectl get events -n openemr --sort-by='.lastTimestamp'
 #### **Pre-commit Hook Issues**
 
 ```bash
-# If ShellCheck fails with Docker errors, ensure Docker is running
-docker --version
-docker ps
+# ShellCheck is native; verify it directly
+shellcheck --version
 
 # If pre-commit is not found, use the full path (example below from MacOS)
 /Library/Frameworks/Python.framework/Versions/<python_version>/bin/python3 -m pre_commit run --all-files
 
-# Alternative: Skip ShellCheck if Docker is not available
-pre-commit run --all-files --hook shellcheck --verbose
+# Run ShellCheck only
+pre-commit run shellcheck --all-files --verbose
 
 # If yamllint is too strict, check the .yamllint configuration
 cat .yamllint
@@ -2320,22 +2332,26 @@ Our enhanced backup and restore system provides **simple, reliable, and comprehe
 #### **Quick Restore**
 
 ```bash
-# Auto-detect restore strategy (recommended)
-./scripts/restore.sh <backup-bucket> <snapshot-id> <backup-region>
+# Default checkpointed restore
+./scripts/restore.sh <backup-bucket> <snapshot-id>
 
-# Cross-region restore
-./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-region
+# Restore in the region containing the copied snapshot and backup data
+./scripts/restore.sh <backup-bucket> <snapshot-id> --region us-east-1
 
-# Cross-account restore
-./scripts/restore.sh <backup-bucket> <snapshot-id> --strategy cross-account --source-account 123456789012
+# Restore from a manifest-v2 metadata object
+./scripts/restore.sh \
+  --from-metadata s3://<backup-bucket>/metadata/<manifest>.json
 
-# Example with auto-detection
-./scripts/restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000-us-east-1 us-east-1
+# Example
+./scripts/restore.sh \
+  openemr-backups-123456789012-openemr-eks-20250815 \
+  openemr-eks-aurora-backup-20250815-120000-us-east-1 \
+  --region us-east-1
 ```
 
 ### **What Gets Protected**
 
-- ✅ **RDS Aurora snapshots** - Point-in-time database recovery
+- ✅ **RDS Aurora snapshots** - Discrete database recovery points
 - ✅ **Kubernetes configurations** - All resources, secrets, configs
 - ✅ **Application data** - Patient data, files, custom configurations
 - ✅ **Cross-region support** - Disaster recovery across AWS regions
@@ -2347,17 +2363,17 @@ Our enhanced backup and restore system provides **simple, reliable, and comprehe
 
    ```bash
    # Daily automated backup (add to cron)
-   0 2 * * * /path/to/scripts/backup.sh --backup-region us-east-1
+   0 2 * * * /path/to/scripts/backup.sh --strategy cross-region --backup-region us-east-1
    ```
 
 2. **In Case of Disaster**
 
    ```bash
    # Restore to disaster recovery region
-   AWS_REGION=us-east-1 ./scripts/restore.sh \
+   ./scripts/restore.sh \
      openemr-backups-123456789012-openemr-eks-20250815 \
      openemr-eks-aurora-backup-20250815-120000 \
-     us-east-1
+     --region us-east-1
    ```
 
 3. **Verify and Activate**
@@ -2433,19 +2449,23 @@ pip install pre-commit
 pre-commit install
 pre-commit install --hook-type commit-msg
 
-# Note: Docker is required for ShellCheck pre-commit hooks
-# Make sure Docker is running before running pre-commit
+# ShellCheck uses a native pre-commit hook; Docker is not required for it.
+# Install Trivy, KICS, and gosec before running all manual-stage security hooks.
 ```
 
 **Available Hooks:**
 
-- Code formatting (Black, isort, flake8)
-- Security scanning (Trivy)
+- Python checks: Ruff check runs on commit for `openemr_dr`; Ruff format,
+  Black, and isort are manual-stage hooks; flake8 runs on commit for Warp and
+  credential rotation
+- Security on commit: Checkov, Gitleaks, and scoped Bandit
+- Manual security: Trivy filesystem scan, KICS, and gosec
 - Validation (YAML with relaxed rules via `.yamllint`, JSON, Terraform, Kubernetes)
 - Documentation (Markdown linting with relaxed rules via `.markdownlint.json`)
-- Shell scripts (ShellCheck)
+- Shell scripts (ShellCheck at warning severity and above)
 
-> **Note:** Python-specific hooks (Black, isort, flake8, Bandit) are included for future machine learning and analytics capabilities, which will almost certainly be implemented in Python. These hooks ensure Python code quality and security from day one.
+Run manual-stage hooks with
+`pre-commit run --all-files --hook-stage manual`.
 
 ### **Test Results**
 
@@ -2468,6 +2488,15 @@ Automated testing and quality assurance through GitHub Actions.
 - **📊 Quality Check** - Common issue detection and prevention
 - **📋 Summary Report** - Comprehensive test results and status
 
+Pushes and pull requests also run:
+
+- **Contract & Consistency Tests** - BATS contracts, version consistency,
+  Terraform validation, kubeconform, TFLint, and the full BATS suite
+- **Comprehensive Security** - Trivy, Checkov, KICS, Bandit, gosec, and
+  ShellCheck
+- **Console CI** - Go lint, test, cross-platform build, and security checks
+  when console files change
+
 ### **Trigger Conditions**
 
 - **Push** to `main` or `develop` branches
@@ -2485,8 +2514,25 @@ Automated testing and quality assurance through GitHub Actions.
 
 - **Test Results** - Stored for 7 days with detailed reports
 - **Security Reports** - Available in GitHub Security tab
-- **Pull Request Comments** - Automatic status updates and summaries
+- **Workflow Summaries** - Aggregated status and diagnostics in GitHub Actions
 - **Failure Notifications** - Immediate feedback on test failures
+
+## 🧠 Local Codebase Knowledge MCP
+
+The optional `openemr-eks-mcp` server gives Cursor and other MCP clients
+read-only access to curated project topics, bounded repository search, safe
+text reads, the current `versions.yaml` inventory, and risk-labelled command
+guidance. It cannot execute commands, write files, call Git/AWS/Kubernetes, or
+serve HTTP.
+
+```bash
+# Validate the local STDIO server before adding it to Cursor
+uvx --from ./tools/codebase-mcp openemr-eks-mcp --repo-root . --check
+```
+
+See the [Codebase Knowledge MCP guide](docs/KNOWLEDGE_MCP.md) for the complete
+Cursor setup, interface, security model, verification, and troubleshooting
+instructions.
 
 ## 📚 Additional Resources
 
@@ -2499,7 +2545,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - **[Terraform Directory](terraform/README.md)** - Complete infrastructure documentation with dependency graphs
 - **[Kubernetes Directory](k8s/README.md)** - Kubernetes manifests documentation with deployment workflows
 - **[Scripts Directory](scripts/README.md)** - Operational scripts documentation and maintenance guide
-- **[Monitoring Directory](Monitoring/README.md)** - Optional monitoring stack documentation and also a maintenance and configuration guide
+- **[Monitoring Directory](monitoring/README.md)** - Optional monitoring stack documentation and also a maintenance and configuration guide
 - **[Warp Directory](warp/README.md)** - Main readme for the Warp project for rapid data uploads to OpenEMR on EKS
 - **[GitHub Directory](.github/workflows/README.md)** - CI/CD workflows and automation documentation
 - **[OIDC Provider Directory](oidc_provider/README.md)** - GitHub → AWS OIDC provider setup and configuration
@@ -2532,7 +2578,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 
 - [OpenEMR Community Forums Support Section](https://community.open-emr.org/c/support/16)
 - [AWS Support (with support plan)](https://aws.amazon.com/contact-us/)
-- [GitHub Issues for this deployment](../../issues)
+- [GitHub Issues for this deployment](https://github.com/openemr/openemr-on-eks/issues)
 
 ## 🔄 Version Awareness
 
@@ -2565,7 +2611,7 @@ The project features a comprehensive version check system that supports both aut
 #### **Monthly Automated Runs**
 - **Runs automatically** on the 1st of every month via GitHub Actions
 - **Creates monthly issues** titled "Version Check Report for Month of [Current Month]"
-- **Prevents duplicates** by checking for existing monthly issues
+- **Creates a new report issue** for each scheduled run when issue creation is enabled
 - **Uses AWS CLI** for definitive version lookups when credentials are available (prefers OIDC authentication)
 - **Gracefully handles** missing AWS credentials with fallback mechanisms
 
@@ -2586,8 +2632,11 @@ The system tracks versions for:
 - **Infrastructure**: Kubernetes, Terraform, AWS Provider
 - **Monitoring**: Prometheus, AlertManager, Grafana Loki, Grafana Tempo, Grafana Mimir, OTeBPF
 - **Pre-commit Hooks**: Code quality tools and versions
-- **Security**: Cert Manager
 - **Semver Packages**: The Python package called ["Semver"](https://pypi.org/project/semver/), Python, Terraform CLI, kubectl
+- **Go Packages**: Go toolchain, Bubble Tea, Lip Gloss, and console dependencies
+- **Python Packages**: Runtime, testing, disaster-recovery,
+  credential-rotation, and knowledge MCP dependencies
+- **Security Tools**: Trivy, Checkov, KICS, and gosec
 - **Terraform Modules**: EKS ([terraform-aws-modules/eks/aws](https://github.com/terraform-aws-modules/terraform-aws-eks)), EKS Pod Identity ([terraform-aws-modules/eks-pod-identity/aws](https://github.com/terraform-aws-modules/terraform-aws-eks-pod-identity)), VPC ([terraform-aws-modules/vpc/aws](https://github.com/terraform-aws-modules/terraform-aws-vpc)), AWS ([hashicorp/aws](https://github.com/hashicorp/terraform-provider-aws)), Kubernetes ([hashicorp/kubernetes](https://github.com/hashicorp/terraform-provider-kubernetes))
 
 ### **AWS Dependencies**

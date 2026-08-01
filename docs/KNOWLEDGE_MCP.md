@@ -98,14 +98,69 @@ the network; normal server operation does not.
 
 ## Cursor configuration
 
-Add a local STDIO server to the appropriate Cursor MCP JSON configuration.
-Replace both placeholders with absolute paths:
+Cursor's current configuration reference is
+[Model Context Protocol (MCP)](https://cursor.com/docs/mcp).
+
+### 1. Validate the exact local command
+
+From the repository root:
+
+```bash
+command -v uvx
+uvx --from ./tools/codebase-mcp openemr-eks-mcp --repo-root . --check
+```
+
+The check must return JSON with `"ok": true`, `"read_only": true`, and
+`"transport": "STDIO"`. Copy the absolute path returned by `command -v uvx`;
+Cursor launched from the macOS GUI may not inherit the same `PATH` as a shell.
+
+### 2. Choose configuration scope
+
+- **Project scope**: `.cursor/mcp.json` in the repository. Use this when the
+  server should be available only while this project is open.
+- **User scope**: `~/.cursor/mcp.json`. Use this when the same server should be
+  available in every Cursor workspace on this machine.
+
+If the selected JSON file already contains other servers, merge this entry into
+its existing `mcpServers` object instead of replacing the file.
+
+### 3. Add the STDIO server
+
+For project scope, replace the `uvx` placeholder with the absolute path from
+`command -v uvx`. Cursor resolves `${workspaceFolder}` to the repository that
+contains `.cursor/mcp.json`:
 
 ```json
 {
   "mcpServers": {
     "openemr-eks-knowledge": {
-      "command": "uvx",
+      "type": "stdio",
+      "command": "<ABSOLUTE_PATH_TO_UVX>",
+      "args": [
+        "--from",
+        "${workspaceFolder}/tools/codebase-mcp",
+        "openemr-eks-mcp",
+        "--repo-root",
+        "${workspaceFolder}"
+      ]
+    }
+  }
+}
+```
+
+For example, `<ABSOLUTE_PATH_TO_UVX>` may be `/opt/homebrew/bin/uvx` on an
+Apple Silicon Homebrew installation. Keep each argument as a separate JSON
+array element so paths containing spaces are passed correctly.
+
+For user scope, use absolute repository paths because the server always reads
+this specific checkout:
+
+```json
+{
+  "mcpServers": {
+    "openemr-eks-knowledge": {
+      "type": "stdio",
+      "command": "<ABSOLUTE_PATH_TO_UVX>",
       "args": [
         "--from",
         "<REPOSITORY_PATH>/tools/codebase-mcp",
@@ -118,28 +173,36 @@ Replace both placeholders with absolute paths:
 }
 ```
 
-An environment-based configuration is also supported:
-
-```json
-{
-  "mcpServers": {
-    "openemr-eks-knowledge": {
-      "command": "uvx",
-      "args": [
-        "--from",
-        "<REPOSITORY_PATH>/tools/codebase-mcp",
-        "openemr-eks-mcp"
-      ],
-      "env": {
-        "OPENEMR_EKS_REPO_ROOT": "<REPOSITORY_PATH>"
-      }
-    }
-  }
-}
-```
-
+Do not commit a project configuration containing a personal absolute path.
 Do not put AWS credentials, tokens, kubeconfigs, or other secrets in this
 configuration.
+
+### 4. Start and verify it in Cursor
+
+1. Save the JSON at one of the configuration paths above.
+2. Reload the Cursor window or restart Cursor so the configuration is read.
+3. Open **Customize** in the Cursor sidebar, find
+   `openemr-eks-knowledge`, and enable it. If Cursor asks whether to trust the
+   project MCP configuration, review the command and approve it.
+4. Confirm that the server is connected and that these five tools appear:
+   `get_topic`, `search_knowledge`, `read_repository_file`,
+   `get_version_inventory`, and `find_operational_command`.
+5. Start an Agent chat and ask:
+   `Use openemr-eks-knowledge get_version_inventory for infrastructure.`
+
+The first `uvx` start can access the network to populate its package cache.
+Running `--check` first normally completes that installation before Cursor
+starts the server.
+
+### Update or remove the Cursor integration
+
+The server reads the selected checkout dynamically, so normal documentation and
+`versions.yaml` changes need no reinstall. Restart the MCP server after changing
+its Python package, policy, or configured repository path.
+
+To remove it, delete only the `openemr-eks-knowledge` entry from the selected
+`mcpServers` object and refresh Cursor. Removing the configuration does not
+delete the repository or uv cache.
 
 ## MCP interface
 
@@ -369,8 +432,25 @@ Use an existing safe source or focused guide instead.
 ### Cursor shows no tools
 
 Run `--check` using the exact `uvx`, package, and root paths from the Cursor
-configuration. Then restart or reload the MCP server. Do not add an HTTP URL;
-this server uses STDIO.
+configuration. Then:
+
+1. validate the selected `mcp.json` as JSON and confirm this entry is nested
+   under the single top-level `mcpServers` object with `"type": "stdio"`;
+2. use the absolute `uvx` path returned by `command -v uvx`;
+3. confirm `${workspaceFolder}` resolves to this project, or that every global
+   repository path is absolute and still exists;
+4. open Cursor's Output panel with `Cmd+Shift+U`, select **MCP Logs**, and
+   inspect the initialization error;
+5. refresh the server or reload the Cursor window.
+
+Do not add an HTTP URL; this server uses STDIO. Do not redirect or print
+unrelated output to stdout because stdout carries the MCP protocol.
+
+### Cursor starts the server in other projects
+
+The entry was probably added to `~/.cursor/mcp.json`. Move it to this
+repository's `.cursor/mcp.json` when project-only scope is desired. Keep the
+configured repository root absolute.
 
 ### Git installation fails
 

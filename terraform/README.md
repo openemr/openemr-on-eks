@@ -272,13 +272,16 @@ graph TD
 
 #### `s3.tf`
 
-- **Purpose**: S3 buckets for logs and backups
+- **Purpose**: S3 buckets for load-balancer/WAF logs and optional observability storage
 - **Key Components**:
   - ALB access logs bucket
   - WAF logs bucket (conditional)
+  - Loki, Tempo, Mimir blocks/ruler, and AlertManager storage buckets
   - Encryption with KMS
   - Lifecycle policies
-  - Proper bucket policies for log delivery
+  - `BucketOwnerEnforced` object ownership and public-access blocks
+  - Bucket policies that deny non-TLS access
+  - WAF lifecycle filtering on its actual `AWSLogs/` delivery prefix
 - **Dependencies**: `kms.tf`
 - **Maintenance Notes**:
   - Update lifecycle policies when necessary
@@ -318,10 +321,13 @@ graph TD
 - **Purpose**: CloudTrail audit logging
 - **Key Components**:
   - Multi-region CloudTrail
-  - S3 bucket for log storage
-  - KMS encryption
-  - S3 object access logging
-- **Dependencies**: `s3.tf`, `kms.tf`
+  - KMS-encrypted, versioned S3 bucket with a 365-day lifecycle
+  - Source-account and trail-ARN restrictions on CloudTrail S3 delivery
+  - KMS-encrypted CloudWatch Logs group `/aws/cloudtrail/${cluster_name}` with
+    365-day retention
+  - Dedicated least-privilege IAM role for CloudTrail log delivery
+  - Management and S3 object data event selectors with log-file validation
+- **Dependencies**: `kms.tf`
 - **Maintenance Notes**:
   - Update log retention policies
   - Modify event selectors

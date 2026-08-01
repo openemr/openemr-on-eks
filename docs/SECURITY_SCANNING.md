@@ -42,18 +42,20 @@ coverage across different security domains:
 | Scanner | Purpose | Scope |
 |---------|---------|-------|
 | **Trivy** | Vulnerability, secret, and misconfiguration scanning | All files |
-| **Checkov** | Infrastructure as Code security | Terraform, K8s, Docker, GitHub Actions |
+| **Checkov** | Infrastructure as Code and secret scanning | Terraform, Kubernetes, Dockerfile, GitHub Actions; repository config also enables Helm and secrets |
 | **KICS** | IaC security analysis | All IaC files |
 | **ShellCheck** | Shell script static analysis | All .sh files |
 | **Bandit** | Python security linting | Python files |
 | **gosec** | Go security checking | Go files |
+| **Gitleaks** | Secret detection | Repository content in pre-commit |
 
 ## Zero-Tolerance Policy
 
 All security scanners are configured with a **fail-fast** policy:
 
-- **Severity Levels**: CRITICAL, HIGH, MEDIUM, LOW
-- **Action on Finding**: Pipeline FAILS immediately
+- **Severity Levels**: Every severity configured by each scanner, including
+  informational KICS findings
+- **Action on Finding**: The scanner job and final enforcement job fail
 - **Checkov Baseline**: None; approved exceptions stay beside the affected
   resource with a technical justification
 
@@ -117,7 +119,7 @@ Only add entries after security team review and approval. Each entry must includ
 1. CVE ID or finding ID
 2. Justification for ignoring
 3. Compensating control or mitigation plan
-4. Tracking ticket number
+4. A tracking ticket when remediation is still outstanding
 
 ### Checkov Configuration
 
@@ -130,6 +132,13 @@ exceptions use Checkov's source annotations directly beside the affected
 Terraform or Kubernetes resource, where reviewers can evaluate the constraint
 and compensating control in context.
 
+`.checkov.yaml` enables Terraform, Kubernetes, Dockerfile, GitHub Actions,
+Helm, and secrets (including secret scanning of all files). The dedicated CI
+workflow explicitly invokes the first four IaC/workflow frameworks; Trivy and
+Gitleaks provide repository-wide secret coverage. Run Checkov without an
+explicit `--framework` override when you want the complete repository-configured
+framework set locally.
+
 ## Pre-commit Hooks
 
 Security scanning is also available as pre-commit hooks:
@@ -141,12 +150,12 @@ pip install pre-commit
 # Install hooks
 pre-commit install
 
-# Run all security hooks
+# Run normal commit-stage hooks (includes Checkov, Gitleaks, and Bandit)
 pre-commit run --all-files
 
 # Run specific security hook
 pre-commit run checkov --all-files
-pre-commit run trivy --all-files
+pre-commit run gitleaks --all-files
 pre-commit run bandit --all-files
 ```
 
@@ -208,6 +217,7 @@ Checkov provides:
 - **Kubernetes**: Pod security, RBAC, network policies
 - **Dockerfile**: Best practices, security hardening
 - **GitHub Actions**: Workflow security
+- **Helm and secrets**: Enabled by `.checkov.yaml` for complete local scans
 
 ### KICS
 
@@ -248,11 +258,11 @@ ShellCheck analyzes shell scripts for:
 - Portability issues
 - Style and best practices
 
-Configuration: `.shellcheckrc`
-
 ## GitHub Security Tab
 
-All SARIF results are uploaded to the GitHub Security tab, providing:
+Trivy, Checkov, KICS, Bandit, and gosec SARIF results are uploaded to the
+GitHub Security tab when code scanning is available for the repository,
+providing:
 
 - Centralized view of all findings
 - Trend analysis over time
@@ -270,7 +280,23 @@ The security workflow runs weekly on Mondays at 2 AM UTC to:
 
 ## Tool Versions
 
-Security tool versions are tracked in `versions.yaml` under `security_tools`:
+`versions.yaml` is authoritative for centrally managed pins. The action release
+and scanner engine are separate pins for Trivy.
+
+| Tool | Current pin | Source |
+|------|-------------|--------|
+| Trivy engine | 0.72.0 | `security_tools.trivy` and `TRIVY_VERSION` in every workflow using `trivy-action` |
+| Trivy action | v0.36.0, SHA-pinned | `github_workflows.trivy_action` |
+| Checkov | 3.3.8 | `security_tools.checkov`, pre-commit, and the security workflow |
+| KICS action | v2.1.20, SHA-pinned | `security_tools.kics` and `github_workflows.kics_action` |
+| Bandit | 1.9.4 | `pre_commit_hooks.bandit` and Python project CI |
+| gosec | v2.28.0 | `security_tools.gosec` |
+| ShellCheck pre-commit hook | v0.11.0 | `pre_commit_hooks.shellcheck` |
+| Gitleaks | v8.30.0 | `.pre-commit-config.yaml` |
+
+Contract tests verify that every `trivy-action` invocation explicitly selects
+the centrally pinned engine version. GitHub Actions themselves are pinned to
+reviewed commit SHAs.
 
 ## Further Reading
 

@@ -28,8 +28,9 @@ This guide covers the comprehensive testing strategy for the OpenEMR EKS deploym
 
 ### **🔄 CI/CD Integration**
 
-- [GitHub Actions Workflow](#github-actions-workflow)
-- [CI/CD Jobs](#cicd-jobs)
+- [GitHub Actions Workflows](#github-actions-workflows)
+- [Main CI/CD Jobs](#main-cicd-jobs)
+- [Additional CI Workflows](#additional-ci-workflows)
 - [Test Results](#test-results)
 
 ### **🪝 Pre-commit Hooks**
@@ -148,7 +149,9 @@ Ensures Kubernetes manifests are syntactically correct and follow best practices
 
 **Tests included:**
 
-- Manifest syntax validation using `kubectl --dry-run`
+- YAML parsing in local/pre-commit checks
+- kubeconform schema validation of `envsubst`-rendered manifests in
+  `ci-contract-tests.yml`
 - Best practices checking (resource limits, security contexts)
 - Security policy validation
 
@@ -197,7 +200,7 @@ Ensures documentation quality and consistency.
 - Infrastructure deployment and teardown
 - OpenEMR application deployment
 - Database backup and restore
-- Kubernetes resource backup and restore
+- Kubernetes resource export and redeployment from the current reviewed manifests
 - Cross-region backup capabilities
 - Disaster recovery procedures
 - Monitoring stack installation and uninstallation
@@ -250,20 +253,30 @@ This test ensures that the optional monitoring stack doesn't interfere with core
 **Running the test:**
 
 ```bash
-# Full test (~2.5 hour historical 8.1.x benchmark; remeasure for 8.2.x)
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Full test with AWS profile loading and persistent e2e-full-test.log
+# (~2.5 hour historical 8.1.x benchmark; remeasure for 8.2.x)
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # Chunked execution for development (see docs/END_TO_END_TESTING_REQUIREMENTS.md)
 ./scripts/test-end-to-end-backup-restore.sh --list-groups
-./scripts/test-end-to-end-backup-restore.sh --group deploy
-./scripts/test-end-to-end-backup-restore.sh --from-step 4 --state-file .e2e-test-state
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group deploy --no-timing-report
+./scripts/test-end-to-end-backup-restore.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --from-step 4 --state-file .e2e-test-state
 
-# Fast in-place restore (steps 4, 8–9; skips destroy/recreate) — requires steps 1–3 done
-./scripts/run-e2e-full-test.sh --group backup-restore-inplace
-
-# Python E2E driver (same behavior; see docs/DISASTER_RECOVERY_PYTHON.md)
-cd scripts && python3 -m openemr_dr e2e --group backup-restore-inplace --cluster-name openemr-eks-test
+# Fast in-place restore (steps 4 and 8-9; requires steps 1-3 and saved state)
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2 \
+  --group backup-restore-inplace --state-file .e2e-test-state \
+  --no-timing-report
 ```
+
+The Python E2E command currently expands `backup-restore-inplace` to a
+contiguous step range and does not preserve the bash group's skipped steps.
+Use the shell command above when you specifically need steps 4 and 8-9 only.
 
 ### 6. Credential Rotation Tests
 
@@ -416,7 +429,7 @@ TEST_SUITE=documentation ./run-test-suite.sh
 
 ## 🔄 Automated CI/CD Testing
 
-### GitHub Actions Workflow
+### GitHub Actions Workflows
 
 The CI/CD pipeline automatically runs on:
 
@@ -424,13 +437,26 @@ The CI/CD pipeline automatically runs on:
 - **Pull requests** to `main` or `develop` branches
 - **Manual trigger** via workflow dispatch
 
-### CI/CD Jobs
+### Main CI/CD Jobs
 
-1. **Test Matrix** - Runs all test suites in parallel
-2. **Lint and Validate** - Additional validation and linting
-3. **Security Scan** - Vulnerability scanning with Trivy (always runs, SARIF upload optional)
-4. **Code Quality** - Common issue detection
-5. **Summary** - Comprehensive test results report
+1. **Changed-path detection** - Selects relevant Python project CI
+2. **Python requirements validation** - Enforces synchronized pins
+3. **Test Matrix** - Runs the four repository test suites in parallel
+4. **Lint and Validate** - Additional validation and linting
+5. **Security Scan** - Trivy scanning with engine version 0.72.0
+6. **Code Quality** - Common issue detection
+7. **Project CI** - Warp, OpenEMR DR, credential rotation, and knowledge MCP
+8. **Summary** - Comprehensive results report
+
+### Additional CI Workflows
+
+- **`ci-contract-tests.yml`** - BATS contracts and version consistency,
+  Terraform format/validate, rendered-manifest kubeconform, TFLint, and the
+  full BATS suite
+- **`security-comprehensive.yml`** - Trivy, Checkov, KICS, Bandit, gosec, and
+  ShellCheck; also runs Mondays at 02:00 UTC
+- **`console-ci.yml`** - Go formatting, vet/staticcheck, unit tests,
+  cross-platform builds, and Trivy for console changes
 
 **Note**: The security scan runs automatically and displays results in the workflow logs. If GitHub Advanced Security is enabled, results are also uploaded to the Security tab for enhanced vulnerability tracking.
 
@@ -445,7 +471,7 @@ The CI/CD pipeline automatically runs on:
 
 - **Artifacts** - Test results stored for 7 days
 - **Security Tab** - Vulnerability scan results in GitHub Security
-- **Summary** - Detailed test report in pull request comments
+- **Summary** - Detailed report in the GitHub Actions workflow summary
 
 ## 🪝 Pre-commit Hooks
 
@@ -464,16 +490,20 @@ pre-commit install --hook-type commit-msg
 
 ### Available Hooks
 
-- **Code Formatting** - Black, isort, flake8
-- **Security** - Bandit, private key detection
+- **Python commit stage** - Ruff check for `scripts/openemr_dr`; flake8 for
+  Warp and credential rotation
+- **Python manual stage** - Ruff format for `scripts/openemr_dr`; Black and
+  isort for Warp and credential rotation
+- **Commit-stage security** - Checkov, Gitleaks, scoped Bandit, and private-key detection
+- **Manual-stage security** - Trivy filesystem scan, KICS, and gosec
 - **Validation** - YAML, JSON, Terraform, Kubernetes
 - **Documentation** - Markdown linting (relaxed rules)
-- **Shell Scripts** - ShellCheck validation (errors only)
+- **Shell Scripts** - ShellCheck at warning severity and above
 - **Git** - Commit message formatting
 
-**Python Hooks Rationale:**
-
-The pre-commit configuration includes Python-specific hooks (Black, isort, flake8, Bandit) even though the current codebase is primarily shell scripts and infrastructure-as-code. These are included because any future machine learning or analytics capabilities we add will almost certainly be written in Python. Having these hooks in place from the beginning ensures Python code quality, security, and consistency from day one.
+Python hooks are scoped to the repository's current Python packages. Run
+manual-stage hooks explicitly because Trivy, KICS, and gosec must already be
+installed on the workstation.
 
 **Note**: The current configuration uses relaxed linting rules to focus on critical issues while avoiding overly strict formatting requirements. Multi-document YAML files are properly supported.
 
@@ -515,19 +545,11 @@ The `.pre-commit-config.yaml` file defines all hooks and their settings:
   rev: v0.11.0
   hooks:
     - id: shellcheck
-      args: ["--severity=error"]
+      args: ["--severity=warning"]
 ```
 
-#### **Per-Repository Overrides**
-
-```bash
-# Local overrides in .pre-commit-config.local.yaml
-# Git ignore patterns
-echo ".pre-commit-config.local.yaml" >> .gitignore
-
-# Environment-specific settings
-export PRE_COMMIT_HOME="$HOME/.cache/pre-commit"
-```
+Use `SKIP=<hook-id>` only for an explicitly reviewed one-off bypass. Pre-commit
+does not automatically merge a `.pre-commit-config.local.yaml` file.
 
 ## 📊 Test Results and Reporting
 
@@ -640,7 +662,7 @@ grep -n $'\t' k8s/*.yaml
 
 ```bash
 cd terraform
-terraform init -backend=false
+terraform init -backend=false -lockfile=readonly
 terraform validate
 ```
 

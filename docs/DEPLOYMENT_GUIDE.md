@@ -2,7 +2,8 @@
 
 This comprehensive guide provides step-by-step instructions for deploying a production-ready OpenEMR system on Amazon EKS with Auto Mode.
 
-> **📌 Prerequisites**: This guide assumes you're deploying to AWS region `us-west-2` with EKS version `1.35`. Adjust accordingly for your region.
+> **📌 Prerequisites**: This guide assumes you're deploying to AWS region
+> `us-west-2` with EKS version `1.36`. Adjust accordingly for your region.
 
 ## 📋 Table of Contents
 
@@ -51,7 +52,7 @@ This comprehensive guide provides step-by-step instructions for deploying a prod
 ```bash
 # Required tools and minimum versions
 aws-cli >= 2.15.0
-terraform >= 1.14.6
+terraform >= 1.15.8
 kubectl >= 1.29.0
 helm >= 3.12.0
 jq >= 1.6
@@ -208,8 +209,10 @@ Before a production deployment, ensure these requirements are met:
 
 - [ ] **Audit Requirements**
   - [ ] CloudTrail enabled
+  - [ ] CloudTrail management events delivered to
+    `/aws/cloudtrail/${CLUSTER_NAME}` with KMS encryption
   - [ ] VPC Flow Logs configured
-  - [ ] 365-day retention for audit logs
+  - [ ] 365-day retention for application audit and CloudTrail log groups
 
 - [ ] **Access Controls**
   - [ ] MFA enabled for AWS root account
@@ -501,7 +504,7 @@ aws eks describe-cluster --name openemr-eks \
 # Expected output:
 # {
 #    "Status": "ACTIVE",
-#    "Version": "1.35",
+#    "Version": "1.36",
 #    "ComputeConfig": {
 #        "enabled": true,
 #        "nodePools": [
@@ -787,13 +790,25 @@ aws rds modify-db-cluster \
   --preferred-backup-window "03:00-04:00" \
   --preferred-maintenance-window "sun:04:00-sun:05:00"
 
-# Create comprehensive cross-region backup (recommended)
+# Create comprehensive cross-region backup
 cd ../scripts
-./backup.sh --backup-region us-east-1
+./backup.sh --strategy cross-region --backup-region us-east-1
 
 # Or same-region backup
 ./backup.sh
 ```
+
+#### 2. S3 Log and Observability Bucket Hardening
+
+Terraform-managed ALB, WAF, Loki, Tempo, Mimir, and AlertManager buckets use
+S3 Object Ownership `BucketOwnerEnforced`, block public access, encrypt stored
+objects, and deny requests when `aws:SecureTransport` is `false`. CloudTrail's
+bucket policy also denies non-TLS access and restricts delivery by source
+account and trail ARN.
+
+WAF logs are delivered beneath
+`AWSLogs/<account-id>/WAFLogs/<region>/`; the WAF lifecycle rule therefore
+filters on `AWSLogs/` and expires current objects after 90 days.
 
 ### Operational Scripts Reference
 
@@ -898,7 +913,7 @@ Checking AWS credential sources...
 
 3. Checking Terraform state...
 ✅ Terraform state file exists
-✅ Terraform infrastructure deployed (77 resources)
+✅ Terraform infrastructure deployed (<root-module resource count> resources)
 
 4. Checking cluster access...
 ✅ EKS cluster 'openemr-eks' is accessible
@@ -973,13 +988,16 @@ Next steps:
    • **Comprehensive Log Capture**: All OpenEMR application logs, audit trails, and system events
    • **CloudWatch Log Groups**:
      - `/aws/eks/${CLUSTER_NAME}/openemr/application` - Application logs and events
-     - `/aws/eks/${CLUSTER_NAME}/openemr/access` - Apache access logs
-     - `/aws/eks/${CLUSTER_NAME}/openemr/error` - Apache error logs
+     - `/aws/eks/${CLUSTER_NAME}/openemr/apache` - Apache access and error logs
      - `/aws/eks/${CLUSTER_NAME}/openemr/audit` - Basic audit logs
-     - `/aws/eks/${CLUSTER_NAME}/openemr/audit_detailed` - Detailed audit logs with patient ID and event categorization
      - `/aws/eks/${CLUSTER_NAME}/openemr/system` - System-level logs and component status
      - `/aws/eks/${CLUSTER_NAME}/openemr/php_error` - PHP application errors with file/line information
      - `/aws/eks/${CLUSTER_NAME}/fluent-bit/metrics` - Fluent Bit operational metrics
+     - `/aws/cloudtrail/${CLUSTER_NAME}` - CloudTrail management events
+   • **Provisioned but not currently routed by Fluent Bit**:
+     - `/aws/eks/${CLUSTER_NAME}/openemr/access`
+     - `/aws/eks/${CLUSTER_NAME}/openemr/error`
+     - `/aws/eks/${CLUSTER_NAME}/openemr/audit_detailed`
    • **Log Retention**: Application logs (30 days), Audit logs (365 days)
    • **Security**: All logs encrypted with KMS and tagged for compliance
    • **Real-time Processing**: Fluent Bit with 5-second refresh intervals
@@ -1292,43 +1310,38 @@ cd scripts
 ```bash
 cd scripts
 
-# Restore from cross-region backup (with confirmation prompts)
-./restore.sh <backup-bucket> <snapshot-id> <backup-region>
+# Restore from a backup
+./restore.sh <backup-bucket> <snapshot-id> --region <aws-region>
 
 # Example with actual backup names:
-./restore.sh openemr-backups-123456789012-openemr-eks-20250815 openemr-eks-aurora-backup-20250815-120000 us-east-1
+./restore.sh \
+  openemr-backups-123456789012-openemr-eks-20250815 \
+  openemr-eks-aurora-backup-20250815-120000 \
+  --region us-east-1
 
-# The intelligent restore process automatically detects database state:
-# 
-# **When database doesn't exist or is misconfigured:**
-# 1. Restore database - creates database from snapshot (early)
-# 2. Clean deployment - removes existing resources and cleans database
-# 3. Deploy OpenEMR - fresh install (creates proper config files)
-# 4. Restore database - creates database from snapshot (always)
-# 5. Restore data - extracts backup files + updates configuration
-#
-# **When database exists and is properly configured:**
-# 1. Clean deployment - removes existing resources and database
-# 2. Deploy OpenEMR - fresh install (creates proper config files)
-# 3. Restore database - creates database from snapshot
-# 4. Restore data - extracts backup files + updates configuration
-#
-# - OpenEMR automatically starts working once database and config are ready
+# Default Python restore phases:
+# 1. preflight - validate Terraform state, S3 data, snapshot, and AWS identity
+# 2. bootstrap - prepare namespace, EFS PVC, and IRSA
+# 3. rds       - restore Aurora from the snapshot
+# 4. data      - restore S3 application data to EFS with a Kubernetes Job
+# 5. deploy    - ensure EFS CSI, deploy OpenEMR, and prepare one replica
+# 6. verify    - poll pod/HTTP health and reapply autoscaling after success
 ```
 
-**Intelligent Process Benefits:**
+**Phased Restore Benefits:**
 
-- ✅ **Smart database detection** - automatically detects if database exists and is properly configured
-- ✅ **Dynamic process order** - adjusts restore order based on actual database state
-- ✅ **Instance validation** - verifies correct cluster and instance names from Terraform
-- ✅ **Early restore capability** - creates database first when needed to avoid connection issues
-- ✅ **Fresh install approach** - OpenEMR creates proper config files during deployment
-- ✅ **Minimal reconfiguration** - only updates database endpoint after restore
-- ✅ **Automatic recovery** - pods start working once database and config are ready
-- ✅ **Cross-region support** - handles snapshot copying automatically
-- ✅ **Comprehensive validation** - checks all prerequisites before starting
+- ✅ **Dependency-safe order** - storage and identity are bootstrapped before data restoration
+- ✅ **Checkpointed phases** - resume with `--from-phase` and `--state-file`
+- ✅ **Explicit infrastructure targeting** - uses the current Terraform state
+  and selected AWS region
+- ✅ **Hardened restore Job** - drops all Linux capabilities and extracts with
+  `tar --no-same-owner`
+- ✅ **Explicit legacy path** - `--legacy-order` uses the Python-managed Bash
+  bridge; add `--bash-only` only to bypass Python
+- ✅ **Focused preflight** - checks Terraform state, S3 application data,
+  snapshot availability, and AWS caller identity before mutation
 - ✅ **Clear error messages** - provides actionable feedback and suggestions
-- ✅ **Resilient process** - handles edge cases and provides recovery options
+- ✅ **Resilient process** - persists checkpoint state for recovery
 
 **When to Use:**
 
@@ -1504,8 +1517,9 @@ kubectl get nodeclaim --watch
 Before any production deployment or configuration changes, the **complete end-to-end backup/restore test must pass successfully**. This ensures disaster recovery capabilities remain intact.
 
 ```bash
-# Run the comprehensive end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Run the comprehensive end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # Expected outcome: All 10 test steps must pass
 # ✅ Infrastructure deployment
@@ -1644,7 +1658,7 @@ terraform destroy  # Careful: This removes all infrastructure
 
 # Restore from backup
 cd ../scripts
-./restore.sh <backup-bucket> <snapshot-id> <backup-region>
+./restore.sh <backup-bucket> <snapshot-id> --region <aws-region>
 ```
 
 ## Support Resources

@@ -11,8 +11,11 @@ This guide provides measured timing data for various operations in the OpenEMR o
 
 No successful automated OpenEMR 8.2.x E2E timing run has been recorded yet.
 
-Run `./scripts/test-end-to-end-backup-restore.sh` to replace this section after
-the selected E2E steps complete successfully.
+Run
+`AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh`
+to replace this section after a successful complete E2E run. Use
+`--no-timing-report` for partial development chunks so they do not replace the
+full-run baseline with incomplete timing data.
 <!-- END AUTOMATED E2E TIMINGS -->
 
 ## 📋 Table of Contents
@@ -34,7 +37,7 @@ the selected E2E steps complete successfully.
 
 ### **Cleanup & Monitoring**
 
-- [Cleanup Operations](#%EF%B8%8F-cleanup-operations)
+- [Cleanup Operations](#cleanup-operations)
   - [Infrastructure Deletion (Terraform Destroy)](#infrastructure-deletion-terraform-destroy)
   - [S3 Bucket Cleanup](#s3-bucket-cleanup)
   - [CloudWatch Log Group Cleanup](#cloudwatch-log-group-cleanup)
@@ -178,7 +181,11 @@ the selected E2E steps complete successfully.
 
 ### Full Restore from Backup
 
-**Total Time:** 53-55 minutes (updated December 2025)
+**Historical Total Time:** 53-55 minutes (OpenEMR 8.0.x, December 2025)
+
+These measurements predate the current
+`preflight → bootstrap → rds → data → deploy → verify` default flow. They are
+planning evidence, not a measured OpenEMR 8.2.x RTO.
 
 | Component | Duration | Notes |
 |-----------|----------|-------|
@@ -188,7 +195,7 @@ the selected E2E steps complete successfully.
 | **RDS Cluster Restore** | 11-13 min | Restore from snapshot, create instances |
 | **Application Data Restore** | <1 min | Download from S3 and extract to EFS |
 | **Crypto Key Cleanup** | 40 sec | Delete sixa/sixb, wait for regeneration |
-| **Verification (with retry)** | 43 sec | Poll for pod readiness (3 attempts max) |
+| **Verification (with retry)** | 43 sec | Historical success time; current default permits 6 attempts |
 
 **Performance Characteristics:**
 - **December 2025 Test Run 1:** 55.35 minutes (3,321 seconds)
@@ -196,9 +203,10 @@ the selected E2E steps complete successfully.
 - **Average:** ~54 minutes
 - **Variation:** ±2.5% (very consistent)
 
-**Process Enhancements (v3.0.0):**
+**Current restore controls:**
 - ✅ **Automatic crypto key cleanup** - Prevents encryption key mismatches
-- ✅ **Verification with retry** - Up to 3 attempts with 5-minute timeout each
+- ✅ **Verification with retry** - Up to 6 attempts with a 5-minute poll
+  window per attempt
 - ✅ **Configurable polling** - Adjustable timeout and interval via environment variables
 - ✅ **IRSA for data restoration** - Secure AWS credentials for S3 access
 - ✅ **Fail-fast deployment detection** - Detects missing deployments immediately
@@ -224,7 +232,7 @@ the selected E2E steps complete successfully.
 
 ---
 
-## 🗑️ Cleanup Operations
+## Cleanup Operations
 
 ### Infrastructure Deletion (Terraform Destroy)
 
@@ -262,19 +270,18 @@ the selected E2E steps complete successfully.
 
 **Total Time:** 211-217 minutes (~3.5-3.6 hours)
 
-| Phase | Duration | Steps |
-|-------|----------|-------|
-| **1. Initial Deploy** | 24-25 min | Infrastructure deployment |
-| **2. OpenEMR Deploy** | 22-23 min | Application deployment |
-| **3. Test Data** | 74-75 sec | Create proof file |
-| **4. Backup** | 34-35 sec | Full backup creation |
-| **5. Monitoring Test** | 27-28 min | Install/uninstall monitoring stack |
-| **6. Deletion** | 16-17 min | Destroy all infrastructure |
-| **7. OpenEMR Deploy (Restore)** | 22-26 min | Application deployment after infrastructure recreation |
-| **8. Recreation** | 45-49 min | Redeploy infrastructure |
-| **9. Restore** | 53-55 min | Full restore (clean + deploy + restore data) |
-| **10. Verification** | 43 sec | Verify restored data |
-| **11. Final Cleanup** | 18-18.5 min | Clean up all resources |
+| Phase | Duration | E2E step |
+|-------|----------|----------|
+| **1. Initial Deploy** | 24-25 min | Step 1 - infrastructure |
+| **2. OpenEMR Deploy** | 22-23 min | Step 2 - application |
+| **3. Test Data** | 74-75 sec | Step 3 - proof file |
+| **4. Backup** | 34-35 sec | Step 4 - full backup |
+| **5. Monitoring Test** | 27-28 min | Step 5 - install and uninstall |
+| **6. Deletion** | 16-17 min | Step 6 - destroy infrastructure |
+| **7. Recreation** | 45-49 min | Step 7 - Terraform with RDS deferred |
+| **8. Restore** | 53-55 min | Step 8 - RDS, EFS data, and OpenEMR deploy |
+| **9. Verification** | 43 sec | Step 9 - verify restored data |
+| **10. Final Cleanup** | 18-18.5 min | Step 10 - remove test resources |
 
 **Total Measured Duration:**
 - **Test Run 1 (Dec 10, 2025):** 13,025 seconds (217.1 minutes / 3.62 hours)
@@ -365,11 +372,10 @@ These operations have very predictable timing:
 - **Backup Creation:** ±15% variation (30-35 sec)
 - **Test Data Creation:** ±10% variation (7-8 sec)
 - **Monitoring Stack:** ±5% variation (7-8 min)
-- **Restore Operations:** ±6% variation (38-43 min)
-  - Fast: 38 min
-  - Normal: 40-43 min
-  - Very consistent due to comprehensive process
-  - Recommendation: Plan for 45 min to be safe
+- **Restore Operations (OpenEMR 8.0.x, December 2025):** ±2.5% variation
+  (52.8-55.4 min)
+  - Average: ~54 min
+  - Recommendation: reserve at least 60 min until a current 8.2.x baseline exists
 
 ### Variable Metrics (High Variability)
 
@@ -416,7 +422,7 @@ These operations can vary significantly:
 - **Application update:** 20 minutes (includes rollback time)
 - **Credential rotation:** 10 minutes (includes validation and rolling restart)
 - **Backup operation:** 2 minutes (includes verification)
-- **Restore operation:** 45 minutes (full restore with verification)
+- **Restore operation:** At least 60 minutes pending an OpenEMR 8.2.x baseline
 - **Infrastructure teardown:** 25 minutes (includes verification)
 
 ### For Development/Testing
@@ -549,7 +555,8 @@ This timing data is based on multiple complete end-to-end test runs performed in
 2. Check RDS cluster restore timing (should be ~11-13 min)
 3. Check EFS wipe job completion (should complete in <5 min)
 4. Verify crypto key cleanup and pod restart (should be ~40 sec)
-5. Review verification retry attempts (max 3 attempts of 5 min each)
+5. Review verification retry attempts (default maximum: 6 attempts with a
+   5-minute poll window each)
 
 ---
 

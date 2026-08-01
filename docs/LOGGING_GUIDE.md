@@ -94,15 +94,29 @@ graph TB
 | `/aws/eks/${CLUSTER_NAME}/openemr/audit` | Basic audit trail | 365 days | KMS | 🔄 Monitoring |
 | `/aws/eks/${CLUSTER_NAME}/openemr/php_error` | PHP application errors | 30 days | KMS | 🔄 Monitoring |
 | `/aws/eks/${CLUSTER_NAME}/fluent-bit/metrics` | Fluent Bit operational metrics | 30 days | KMS | ✅ Working |
+| `/aws/cloudtrail/${CLUSTER_NAME}` | CloudTrail management events (direct AWS delivery, not Fluent Bit) | 365 days | KMS | Provisioned |
 
 **Status Legend:**
 
 - ✅ **Working**: Logs are actively flowing to CloudWatch
 - 🔄 **Monitoring**: Paths are monitored, waiting for log files to be generated
 
+Terraform also provisions
+`/aws/eks/${CLUSTER_NAME}/openemr/access`,
+`/aws/eks/${CLUSTER_NAME}/openemr/error`, and
+`/aws/eks/${CLUSTER_NAME}/openemr/audit_detailed`, but the current Fluent Bit
+outputs do not route records to those names. Apache access and error records
+are combined in `/aws/eks/${CLUSTER_NAME}/openemr/apache`; file-based audit
+records route to `/aws/eks/${CLUSTER_NAME}/openemr/audit`.
+OpenEMR's database-backed audit trail remains separate from this file stream.
+
 ### Log Group Features
 
-- **Auto-creation**: `auto_create_group: true` allows Fluent Bit to create log groups automatically
+- **Provisioning first**: Terraform pre-creates the expected KMS-encrypted log
+  groups and retention policies
+- **Auto-creation fallback**: Fluent Bit has `auto_create_group: true`, but a
+  fallback-created group does not inherit Terraform's KMS/retention settings;
+  investigate and import/recreate it through Terraform
 - **Dynamic naming**: Uses environment variables for cluster-specific naming
 - **IRSA integration**: Role-based authentication for secure access
 - **Retry handling**: Configurable retry limits for reliable log delivery

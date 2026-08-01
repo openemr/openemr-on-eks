@@ -410,8 +410,9 @@ kubectl get pod <pending-pod> -n openemr -o yaml | grep -A 5 "resources:"
 #### **Testing Process**
 
 ```bash
-# Run the complete end-to-end test
-./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+# Run the complete end-to-end test with persistent logging
+AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+  --cluster-name openemr-eks-test --aws-region us-west-2
 
 # Expected outcome: All 10 test steps must pass
 # ✅ Infrastructure deployment

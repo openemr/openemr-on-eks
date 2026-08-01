@@ -42,6 +42,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - [Testing & Validation](#7-testing--validation)
   - [run-test-suite.sh](#run-test-suitesh)
   - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
+  - [run-e2e-full-test.sh](#run-e2e-full-testsh)
   - [test-warp-pinned-versions.sh](#test-warp-pinned-versionssh)
   - [test-warp-end-to-end.sh](#test-warp-end-to-endsh)
   - [deploy-training-openemr-setup.sh](#deploy-training-openemr-setupsh)
@@ -74,12 +75,15 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 1. `backup.sh` (creates database snapshot + S3 backup)
 
 #### 🔄 **Restore Operation**
-1. `clean-deployment.sh` (cleanup existing resources)
-2. `restore.sh` (restores from backup)
-   - Calls `clean-deployment.sh --force --skip-db-cleanup`
-   - Calls `restore-defaults.sh --force`
-   - Calls `deploy.sh`
-4. `validate-deployment.sh` (verification)
+1. `restore.sh` (default Python inverted flow)
+   - `preflight` → `bootstrap` → `rds` → `data` → `deploy` → `verify`
+   - Uses `restore-bootstrap.sh` and the hardened data-restore Kubernetes Job
+   - Supports checkpoints with `--from-phase` and `--state-file`
+2. `validate-deployment.sh` (optional additional verification)
+
+Use `restore.sh ... --legacy-order` when the older clean/deploy/RDS/data
+ordering is intentionally required. Add `--bash-only` only to bypass Python
+and run the Bash implementation directly.
 
 #### 🧹 **Complete Cleanup**
 1. `clean-deployment.sh` (application cleanup; optional; destroy.sh will also destroy application)
@@ -97,7 +101,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 #### 🧪 **Testing**
 1. `run-test-suite.sh` (comprehensive tests)
 2. `test-end-to-end-backup-restore.sh` (backup/restore validation)
-3. `test-warp-end-to-end.sh` (Warp deployment and data import validation)
+3. `run-e2e-full-test.sh` (AWS profile loading and persistent E2E log)
+4. `test-warp-end-to-end.sh` (Warp deployment and data import validation)
 
 #### 🚀 **Quick Deployment**
 1. `quick-deploy.sh` (one-command deployment with monitoring)
@@ -136,6 +141,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 
 - **`run-test-suite.sh`** - Comprehensive test suite runner
 - **`test-end-to-end-backup-restore.sh`** - End-to-end backup/restore testing (this script MUST run successfully to test new additions)
+- **`run-e2e-full-test.sh`** - Terminal wrapper that appends E2E output to
+  `e2e-full-test.log`
 - **`test-warp-pinned-versions.sh`** - Tests that Warp Python package dependencies match versions.yaml (automatically runs in CI/CD)
 - **`test-warp-end-to-end.sh`** - Comprehensive end-to-end test for Warp that deploys infrastructure, OpenEMR, and imports test data and then waits a default of 5 minutes for the user to verify that the import was successful before deleting all the infrastructure.
 - **`quick-deploy.sh`** - Quick deployment script that deploys infrastructure, OpenEMR, and monitoring stack in one command
@@ -259,30 +266,48 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Purpose**: Simple, reliable restore system from backups
 - **Dependencies**: aws, kubectl, jq
 - **Key Features**:
-  - **Simplified workflow** - Single command restore with auto-detection
-  - **Database restore** - Restores Aurora RDS from snapshots with cross-region support
-  - **Application data restore** - Downloads and extracts app data from S3 to EFS
-  - **Auto-reconfiguration** - Automatically updates database and Redis/Valkey connections
-  - **Cluster auto-detection** - Automatically detects EKS cluster from Terraform
-  - **Flexible options** - Modular restore (database, app data, or both)
-  - **Manual fallback** - Provides manual restore instructions if automated process fails
+  - **Checkpointed workflow** - Python phases for preflight, bootstrap, RDS,
+    data, deploy, and verification
+  - **Database restore** - Restores Aurora from the selected snapshot
+  - **Application data restore** - Uses a short-lived Kubernetes Job to
+    download S3 data and extract it to EFS
+  - **Hardened Job** - Drops all Linux capabilities and uses
+    `tar --no-same-owner`
+  - **Cluster auto-detection** - Detects the EKS cluster from Terraform
+  - **Resume support** - `--from-phase` plus `.restore-state`
+  - **Legacy ordering** - `--legacy-order` uses the Python-managed Bash bridge;
+    `--bash-only` bypasses Python
 - **Usage Examples**:
   ```bash
   # Basic restore
   ./restore.sh my-backup-bucket my-snapshot-id
 
   # Cross-region restore
-  ./restore.sh my-backup-bucket my-snapshot-id us-east-1
+  ./restore.sh my-backup-bucket my-snapshot-id --region us-east-1
 
-  # Force restore (skip confirmations)
-  ./restore.sh my-backup-bucket my-snapshot-id --force
+  # Resume from application-data restore
+  ./restore.sh my-backup-bucket my-snapshot-id \
+    --from-phase data --state-file .restore-state
+
+  # Legacy order (add --bash-only only to bypass Python)
+  ./restore.sh my-backup-bucket my-snapshot-id --legacy-order
   ```
 - **Maintenance Notes**:
-  - Script is now much simpler and more reliable
-  - Uses existing OpenEMR pods for restore operations (no need to create temporary pods)
-  - Automatically handles database configuration updates via sqlconf.php
-  - Redis/Valkey reconfiguration is automatic and updates Kubernetes secrets
-  - Manual restore instructions available via `--manual-instructions` flag
+  - `restore.sh` delegates to `python3 -m openemr_dr restore` by default when
+    Python is available
+  - Keep phase documentation synchronized with `scripts/openemr_dr/restore/`
+  - The former positional region, `--force`, `--strategy`,
+    `--manual-instructions`, and selective `RESTORE_*` toggles are not part of
+    the current Python CLI
+
+#### `openemr_dr/` and `run-dr-tests.sh`
+
+- **Purpose**: Python package for checkpointed backup, restore, and E2E
+  orchestration
+- **CLI**: `cd scripts && python3 -m openemr_dr {backup|restore|e2e} ...`
+- **Tests**: `./scripts/run-dr-tests.sh`
+- **Architecture and phase reference**:
+  [Disaster Recovery Python](../docs/DISASTER_RECOVERY_PYTHON.md)
 
 ### 3. Security & Compliance
 
@@ -493,18 +518,47 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Usage**:
   ```bash
   # Full test
-  ./scripts/test-end-to-end-backup-restore.sh --cluster-name openemr-eks-test
+  AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+    --cluster-name openemr-eks-test --aws-region us-west-2
 
   # Development: run step groups
   ./scripts/test-end-to-end-backup-restore.sh --list-groups
-  ./scripts/test-end-to-end-backup-restore.sh --group deploy
-  ./scripts/test-end-to-end-backup-restore.sh --from-step 4 --state-file .e2e-test-state
-  ./scripts/test-end-to-end-backup-restore.sh --group restore --no-emergency-cleanup
+  ./scripts/test-end-to-end-backup-restore.sh \
+    --cluster-name openemr-eks-test --aws-region us-west-2 \
+    --group deploy --no-timing-report
+  ./scripts/test-end-to-end-backup-restore.sh \
+    --cluster-name openemr-eks-test --aws-region us-west-2 \
+    --from-step 4 --state-file .e2e-test-state --no-timing-report
+  ./scripts/test-end-to-end-backup-restore.sh \
+    --cluster-name openemr-eks-test --aws-region us-west-2 \
+    --group restore --no-emergency-cleanup --no-timing-report
   ```
 - **Maintenance Notes**:
   - Update test data as needed
   - Modify test validation criteria as needed
   - Pre-release requirement: full 10-step test must pass
+
+#### `run-e2e-full-test.sh`
+
+- **Purpose**: Convenience wrapper for terminal-launched E2E runs with AWS
+  profile loading and persistent logging
+- **Log file**: `<repository>/e2e-full-test.log` (append-only and gitignored)
+- **Defaults**: profile `440744216926_AdministratorAccess`; when no forwarded
+  arguments are supplied, the wrapper also passes cluster
+  `openemr-eks-test` and region `us-west-2`
+- **Usage**:
+  ```bash
+  # Always override the profile when your local profile has another name
+  AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh
+
+  # Forward any inner E2E options
+  AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
+    --cluster-name openemr-eks-test --aws-region us-west-2 \
+    --group deploy --no-timing-report
+  ```
+- **Safety**: Verify the account printed at startup and run only in a
+  non-production AWS account
+- **See also**: [End-to-End Testing Requirements](../docs/END_TO_END_TESTING_REQUIREMENTS.md)
 
 #### `test-warp-pinned-versions.sh`
 
@@ -622,7 +676,7 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
 - **Key Features**:
   - Deploys complete Terraform infrastructure (EKS, RDS, Redis, EFS, etc.)
   - Deploys OpenEMR on EKS using the standard deployment script
-  - Installs comprehensive monitoring stack (Prometheus, Grafana, Loki, Jaeger)
+  - Installs Prometheus, Grafana, Loki, Tempo, Mimir, OTeBPF, and AlertManager
   - Extracts and displays OpenEMR and Grafana login credentials and URLs
   - Supports skipping any deployment step for faster iteration
   - Port-forwarding access for monitoring stack
