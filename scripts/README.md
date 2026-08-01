@@ -543,12 +543,14 @@ and run the Bash implementation directly.
 - **Purpose**: Convenience wrapper for terminal-launched E2E runs with AWS
   profile loading and persistent logging
 - **Log file**: `<repository>/e2e-full-test.log` (append-only and gitignored)
-- **Defaults**: profile `440744216926_AdministratorAccess`; when no forwarded
-  arguments are supplied, the wrapper also passes cluster
-  `openemr-eks-test` and region `us-west-2`
+- **Credentials**: Uses `AWS_PROFILE_NAME` when provided, then `AWS_PROFILE`,
+  then the standard AWS credential provider chain; there is no account-specific
+  profile default
+- **Defaults**: When no forwarded arguments are supplied, the wrapper passes
+  cluster `openemr-eks-test` and region `us-west-2`
 - **Usage**:
   ```bash
-  # Always override the profile when your local profile has another name
+  # Select a named profile explicitly
   AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh
 
   # Forward any inner E2E options

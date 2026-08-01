@@ -77,8 +77,8 @@ This comprehensive test ensures that any changes to the repository don't break t
 # Navigate to project root
 cd /path/to/openemr-on-eks
 
-# Recommended terminal wrapper: loads an AWS profile and appends all output
-# to the gitignored e2e-full-test.log
+# Recommended terminal wrapper: uses the selected AWS profile and appends all
+# output to the gitignored e2e-full-test.log
 AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
   --cluster-name openemr-eks-test \
   --aws-region us-west-2
@@ -91,12 +91,12 @@ AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
 ```
 
 When invoked with no forwarded arguments, the wrapper supplies cluster
-`openemr-eks-test` and region `us-west-2`. Its profile default is
-`440744216926_AdministratorAccess`. Set `AWS_PROFILE_NAME` explicitly for your
-workstation and verify the account printed at startup before allowing the
-destructive test to continue. If you pass any E2E option, also pass
-`--cluster-name` and `--aws-region`; otherwise the inner script uses its
-Terraform auto-detection/fallback behavior.
+`openemr-eks-test` and region `us-west-2`. It uses `AWS_PROFILE_NAME` when
+provided, otherwise honors `AWS_PROFILE` or the standard AWS credential
+provider chain; it has no account-specific profile default. Verify the account
+printed at startup before allowing the destructive test to continue. If you
+pass any E2E option, also pass `--cluster-name` and `--aws-region`; otherwise
+the inner script uses its Terraform auto-detection/fallback behavior.
 
 Follow the persistent log from another terminal:
 
