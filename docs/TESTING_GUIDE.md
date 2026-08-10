@@ -70,13 +70,15 @@ This guide covers the comprehensive testing strategy for the OpenEMR EKS deploym
 
 ## 🎯 Testing Philosophy
 
-Our testing approach focuses on **code quality and validation** rather than infrastructure deployment, ensuring that:
+Our testing approach focuses on **code quality and validation** rather than
+infrastructure deployment for routine CI, ensuring that:
 
-- ✅ **All tests run automatically** in GitHub Actions CI/CD
-- ✅ **No AWS access required** - tests are completely self-contained
-- ✅ **Repository works anywhere** - clone and test without external dependencies
+- ✅ **Most tests run automatically** in GitHub Actions CI/CD without real AWS
+- ✅ **Offline unit/contract suites** are self-contained (no cloud credentials)
+- ✅ **Floci emulator suites** cover AWS API shapes in CI without a real account
 - ✅ **Catch issues early** - pre-commit hooks prevent bad code from being committed
 - ✅ **Comprehensive coverage** - test all aspects of the codebase
+- ⚠️ **Real-AWS end-to-end DR** remains a maintainer gate (not Floci e2e-lite)
 
 ## 🚀 Quick Start
 

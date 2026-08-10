@@ -16,6 +16,7 @@ This document describes the comprehensive version awareness and notification sys
 
 ### **📋 Component Management**
 - [OpenEMR Application](#openemr-application)
+- [Floci (local AWS emulator)](#floci-local-aws-emulator)
 - [Kubernetes Version](#kubernetes-version)
 - [Monitoring Stack](#monitoring-stack)
 - [Infrastructure Components](#infrastructure-components)
@@ -101,7 +102,8 @@ applications:
 ```
 
 Selected current project pins include OpenEMR 8.2.0, EKS 1.36, Terraform
-1.15.8, CI Python 3.14.6, kubectl v1.36.3, and the `ubuntu-26.04` GitHub runner.
+1.15.8, CI Python 3.14.6, kubectl v1.36.3, Floci 1.6.0 (`applications.floci`),
+and the `ubuntu-26.04` GitHub runner.
 Always read `versions.yaml` rather than copying this summary into automation.
 
 ### 2. Version Manager Script (`scripts/version-manager.sh`)
@@ -204,6 +206,29 @@ chmod +x scripts/version-manager.sh
 # Check for OpenEMR updates
 ./scripts/version-manager.sh check --components applications
 ```
+
+### Floci (local AWS emulator)
+
+**Version Source:** Docker Hub (`floci/floci`)
+**Pin:** `applications.floci` in `versions.yaml`
+**Purpose:** CI-only AWS API emulation for Floci integration and e2e-lite
+suites — **not** a runtime or deploy dependency for OpenEMR
+**Consumers:**
+- `tests/floci/compose.yaml` (`FLOCI_VERSION` / default tag)
+- `.github/workflows/ci-cd-tests.yml` (`floci-integration`, `floci-e2e-lite`)
+- Monthly version-check via `scripts/version-manager.sh check --components applications`
+
+```bash
+# Show pinned Floci version
+./scripts/version-manager.sh status
+
+# Check Docker Hub for newer Floci tags
+./scripts/version-manager.sh check --components applications
+```
+
+When bumping the pin, update `applications.floci.current` and confirm
+`tests/floci/compose.yaml` default (`${FLOCI_VERSION:-x.y.z}`) stays aligned
+(enforced by BATS contract tests).
 
 ### Kubernetes Version
 
@@ -530,7 +555,7 @@ category.
 
 #### **Available Component Types**
 - `all` - Check all components (default)
-- `applications` - OpenEMR, Fluent Bit
+- `applications` - OpenEMR, Fluent Bit, Python image, Floci
 - `infrastructure` - Kubernetes, Terraform, AWS Provider
 - `terraform_modules` - EKS, VPC, RDS modules
 - `github_workflows` - GitHub Actions dependencies

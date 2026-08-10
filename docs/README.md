@@ -34,6 +34,8 @@ This directory contains comprehensive documentation for the OpenEMR on EKS deplo
 - [Warp Project Documentation](../warp/README.md)
 - [Credential Rotation Tool](../tools/credential-rotation/README.md)
 - [Codebase Knowledge MCP Package](../tools/codebase-mcp/README.md)
+- [Floci Test Harness](../tests/floci/README.md)
+- [Tests Directory](../tests/README.md)
 
 ### **📖 Documentation Maintenance**
 - [Maintenance Guidelines](#maintenance-guidelines)
@@ -249,9 +251,11 @@ graph TD
   - Code quality tests and validation
   - Kubernetes manifest testing
   - Script validation and testing
+  - Floci integration and e2e-lite CI (AWS emulator suites)
   - Pre-commit hooks configuration (`.pre-commit-config.yaml`, `.yamllint`, `.markdownlint.json`)
   - CI/CD integration with GitHub Actions
-- **Dependencies**: `scripts/run-test-suite.sh`, `.github/workflows/`
+- **Dependencies**: `scripts/run-test-suite.sh`, `scripts/run-floci-integration.sh`,
+  `scripts/test-floci-e2e-lite.sh`, `tests/floci/`, `.github/workflows/`
 - **Maintenance Notes**:
   - Add new test suites as the system grows
   - Update test configurations for new tools
@@ -259,6 +263,7 @@ graph TD
   - Update pre-commit hooks for new file types
   - Adjust `.yamllint` rules if YAML linting becomes too strict/lenient
   - Adjust `.markdownlint.json` rules if Markdown linting becomes too strict/lenient
+  - Keep Floci pin (`applications.floci`) aligned with compose/CI when bumping
 
 #### `END_TO_END_TESTING_REQUIREMENTS.md`
 
@@ -267,9 +272,11 @@ graph TD
   - Complete disaster recovery testing
   - Infrastructure validation procedures
   - Data integrity verification
+  - Clarifies Floci e2e-lite vs the mandatory real-AWS gate
   - Team coordination requirements
   - Compliance documentation
-- **Dependencies**: `scripts/test-end-to-end-backup-restore.sh`
+- **Dependencies**: `scripts/test-end-to-end-backup-restore.sh`,
+  `scripts/run-e2e-full-test.sh` (Floci e2e-lite is complementary CI only)
 - **Maintenance Notes**:
   - Update test requirements as infrastructure changes
   - Modify team coordination procedures as needed

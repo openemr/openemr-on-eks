@@ -12,6 +12,8 @@ This guide covers the comprehensive backup and restore system for OpenEMR on EKS
 - [Backup Operations](#backup-operations)
 - [Restore Operations](#restore-operations)
 - [Testing & Validation](#testing--validation)
+  - [End-to-End Backup/Restore Testing](#end-to-end-backuprestore-testing)
+  - [CI Floci e2e-lite (not a substitute for real-AWS E2E)](#ci-floci-e2e-lite-not-a-substitute-for-real-aws-e2e)
 - [Cross-Region Disaster Recovery](#cross-region-disaster-recovery)
 - [Monitoring & Maintenance](#monitoring--maintenance)
 - [Troubleshooting](#troubleshooting)
@@ -653,6 +655,21 @@ AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
 - Historical full-run baselines: ~150–160 minutes for 8.1.x and ~211–217
   minutes for the December 2025 8.0.x runs
 - The wrapper appends output to the gitignored `e2e-full-test.log`
+
+### CI Floci e2e-lite (not a substitute for real-AWS E2E)
+
+GitHub Actions runs [`scripts/test-floci-e2e-lite.sh`](../scripts/test-floci-e2e-lite.sh)
+against the [Floci](https://github.com/floci-io/floci) AWS emulator for fast PR
+regression on S3 backup layout, KMS, Secrets Manager, and RDS mock API shapes.
+
+That job is valuable CI coverage, but it does **not** replace the maintainer
+real-AWS 10-step gate documented in
+[END_TO_END_TESTING_REQUIREMENTS.md](END_TO_END_TESTING_REQUIREMENTS.md). Floci
+cannot faithfully emulate EKS add-ons, EFS CSI, Aurora managed behavior, or AWS
+Backup restore jobs.
+
+Local debug: [tests/floci/README.md](../tests/floci/README.md). Broader Floci
+suites: [Testing Guide §6](TESTING_GUIDE.md#6-floci-integration-and-e2e-lite).
 
 ## Cross-Region Disaster Recovery
 

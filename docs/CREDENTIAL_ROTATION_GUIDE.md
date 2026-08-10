@@ -277,6 +277,7 @@ kubectl logs job/credential-rotation-<timestamp> -n openemr
 ## Related documentation
 
 - [Credential Rotation Tool README](../tools/credential-rotation/README.md) -- CLI flags, environment variables, rotation algorithm
+- [Testing Guide — Floci](TESTING_GUIDE.md#6-floci-integration-and-e2e-lite) -- CI Secrets Manager coverage via `pytest -m floci`
 - [Deployment Guide](DEPLOYMENT_GUIDE.md) -- Post-deployment credential rotation setup
 - [Troubleshooting Guide](TROUBLESHOOTING.md) -- Database connection issues after rotation
 - [Backup & Restore Guide](BACKUP_RESTORE_GUIDE.md) -- Re-syncing credentials after a restore

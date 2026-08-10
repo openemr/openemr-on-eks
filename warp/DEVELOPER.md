@@ -322,6 +322,8 @@ self.connection = pymysql.connect(
 ```
 tests/
 ├── test_omop_to_ccda.py # Converter/data loader tests
+├── test_omop_extended.py
+├── test_floci_s3.py     # Floci-backed S3 integration (pytest -m floci)
 ├── test_uploader.py     # Uploader tests
 └── benchmarks/
     └── test_performance.py    # Performance benchmarks
@@ -330,18 +332,24 @@ tests/
 ### Running Tests
 
 ```bash
-# All tests
-pytest tests/ -v
+# Unit tests (offline; CI uses -m "not floci")
+pytest tests/ -v -m "not floci"
 
 # With coverage
-pytest tests/ -v --cov=warp --cov-report=html
+pytest tests/ -v -m "not floci" --cov=warp --cov-report=html
 
 # Specific test
 pytest tests/test_omop_to_ccda.py::TestOMOPToCCDAConverter::test_convert_to_ccda -v
 
+# Floci S3 integration (requires AWS_ENDPOINT_URL; skips if unset)
+pytest -m floci tests/test_floci_s3.py -v
+
 # Benchmarks (requires pytest-benchmark)
 pytest tests/benchmarks/ --benchmark-only
 ```
+
+Floci helpers and compose live at repo-root [`tests/floci/`](../tests/floci/README.md).
+Prefer `./scripts/run-floci-integration.sh` from the repository root.
 
 ### Writing Tests
 
@@ -394,6 +402,8 @@ class TestClassName(unittest.TestCase):
 
 - Unit tests for all core functionality
 - Integration tests for end-to-end flows
+- Floci-marked tests (`pytest -m floci`) for live S3 against the emulator when
+  AWS API behavior matters
 - Performance benchmarks for critical paths
 - Maintain or improve code coverage
 

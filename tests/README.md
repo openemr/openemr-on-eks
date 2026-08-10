@@ -7,6 +7,7 @@
 - [BATS (Bash Automated Testing System)](#bats-bash-automated-testing-system)
   - [Running BATS Tests](#running-bats-tests)
   - [Installing BATS](#installing-bats)
+- [Floci Harness](#floci-harness)
 - [Test Design Standards](#test-design-standards)
   - [Uniform File Header](#uniform-file-header)
   - [Behavior-First Assertions](#behavior-first-assertions-required)
@@ -22,6 +23,11 @@
 ---
 
 This directory contains automated tests for the OpenEMR on EKS project.
+
+Layout:
+
+- `tests/bats/` — BATS script behavior and contract tests
+- `tests/floci/` — local Floci AWS emulator helpers for debugging CI Floci suites
 
 ## BATS (Bash Automated Testing System)
 
@@ -41,6 +47,9 @@ bats tests/bats/get-python-image-version.bats
 # Run only function-level unit tests (filtered by name)
 bats tests/bats/ --filter "UNIT"
 
+# Floci smoke (requires AWS_ENDPOINT_URL; skips cleanly when unset)
+bats tests/bats/floci-smoke.bats
+
 # Run via the project test runner
 cd scripts
 ./run-test-suite.sh -s script_validation
@@ -53,6 +62,33 @@ cd scripts
 - Source: <https://bats-core.readthedocs.io/en/stable/installation.html>
 
 If BATS is not installed, `run-test-suite.sh` skips BATS tests and continues with other script validation checks.
+
+## Floci Harness
+
+Local AWS emulator helpers live in [`tests/floci/`](floci/README.md). Routine
+validation runs in GitHub Actions (`floci-integration` and `floci-e2e-lite`);
+use compose only when reproducing a CI failure.
+
+| Path | Role |
+|------|------|
+| `floci/compose.yaml` | Pinned `floci/floci` from `versions.yaml` (`applications.floci`) |
+| `floci/env.sh` | Exports `AWS_ENDPOINT_URL` and test credentials |
+| `floci/wait.sh` | Polls Floci readiness |
+| `floci/seed.sh` | Seeds S3/KMS/Secrets/RDS mock resources |
+| `bats/floci-smoke.bats` | STS/S3/KMS/Secrets smoke (needs `AWS_ENDPOINT_URL`) |
+| `bats/test-floci-e2e-lite.bats` | CLI contract for `scripts/test-floci-e2e-lite.sh` |
+| `bats/floci_helper.bash` | Shared `require_floci` / `floci_aws` helpers |
+
+Python Floci suites (`pytest -m floci`) live under `warp/tests/`,
+`tools/credential-rotation/tests/`, and `scripts/openemr_dr/tests/`. Prefer:
+
+```bash
+./scripts/run-floci-integration.sh
+./scripts/test-floci-e2e-lite.sh
+```
+
+Floci e2e-lite mocks the DR *scenario*; it does **not** replace the real-AWS
+gate in [`docs/END_TO_END_TESTING_REQUIREMENTS.md`](../docs/END_TO_END_TESTING_REQUIREMENTS.md).
 
 ## Test Design Standards
 
@@ -156,7 +192,16 @@ bats tests/bats/ --filter "UNIT"
 
 ## Other Test Suites
 
-The credential rotation tool (`tools/credential-rotation/`) has its own `pytest`-based test suite for Python rotation logic. Run with `cd tools/credential-rotation && pytest tests/`.
+The credential rotation tool (`tools/credential-rotation/`) has its own `pytest`-based test suite for Python rotation logic. Run with `cd tools/credential-rotation && pytest tests/` (unit tests use `-m "not floci"` in CI).
+
+Floci-marked pytest suites (`pytest -m floci`) also live in:
+
+- `warp/tests/test_floci_s3.py`
+- `tools/credential-rotation/tests/test_floci_secrets.py`
+- `scripts/openemr_dr/tests/test_floci_aws.py`
+
+Run them via `./scripts/run-floci-integration.sh` (requires Floci /
+`AWS_ENDPOINT_URL`). See [Testing Guide §6](../docs/TESTING_GUIDE.md#6-floci-integration-and-e2e-lite).
 
 ## Adding New BATS Tests
 
@@ -259,6 +304,8 @@ A dedicated CI workflow (`.github/workflows/ci-contract-tests.yml`) runs these o
 | `ssl-cert-manager.bats` | `ssl-cert-manager.sh` | 12 | 12 | `show_usage`, `show_manual_dns_instructions`, `get_aws_region` |
 | `ssl-renewal-manager.bats` | `ssl-renewal-manager.sh` | 12 | 9 | `print_usage`, `get_aws_region` |
 | `test-end-to-end-backup-restore.bats` | `test-end-to-end-backup-restore.sh` | 12 | 14 | `show_help`, `start_timer`, `get_duration`, `add_test_result`, `parse_arguments`, `log_*` |
+| `floci-smoke.bats` | Floci emulator | 4 | 0 | STS/S3/KMS/Secrets smoke; requires `AWS_ENDPOINT_URL` (skips when unset) |
+| `test-floci-e2e-lite.bats` | `test-floci-e2e-lite.sh` | 3 | 0 | Help/usage and missing-endpoint contract (not the real-AWS E2E gate) |
 | `test-warp-end-to-end.bats` | `test-warp-end-to-end.sh` | 12 | 12 | `show_help`, `log_*`, `get_aws_region` |
 | `test-warp-pinned-versions.bats` | `test-warp-pinned-versions.sh` | 11 | 6 | `normalize_python_version`, `read_version` |
 | `validate-deployment.bats` | `validate-deployment.sh` | 11 | 10 | `check_command`, `get_aws_region`, function existence |

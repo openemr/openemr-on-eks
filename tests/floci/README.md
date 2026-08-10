@@ -48,3 +48,12 @@ docker compose -f tests/floci/compose.yaml down
 
 - Floci e2e-lite mocks the DR *scenario* (S3/KMS/Secrets/RDS API shapes). It does **not** replace the real-AWS gate in `docs/END_TO_END_TESTING_REQUIREMENTS.md`.
 - Image pin lives in `versions.yaml` under `applications.floci` and is tracked by the monthly version-check workflow.
+
+## Related documentation
+
+- [Testing Guide §6 — Floci Integration and E2E Lite](../../docs/TESTING_GUIDE.md#6-floci-integration-and-e2e-lite)
+- [End-to-End Testing Requirements](../../docs/END_TO_END_TESTING_REQUIREMENTS.md) (real-AWS gate)
+- [Version Management — Floci pin](../../docs/VERSION_MANAGEMENT.md#floci-local-aws-emulator)
+- [Scripts README — Floci runners](../../scripts/README.md#run-floci-integrationsh)
+- [Tests README](../README.md)
+- [CI/CD workflows README](../../.github/workflows/README.md)

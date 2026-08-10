@@ -29,6 +29,7 @@ are synchronized with [`../../versions.yaml`](../../versions.yaml).
     - [Lint and Validate](#2-lint-and-validate-lint-and-validate)
     - [Security Scan](#3-security-scan-security-scan)
     - [Code Quality](#4-code-quality-code-quality)
+    - [Floci Integration / E2E Lite](#floci-jobs)
     - [Test Summary](#5-test-summary-summary)
   - [Environment Configuration](#environment-configuration)
   - [Permissions](#permissions)
@@ -243,6 +244,8 @@ The workflow also detects changed paths and runs dedicated CI for
 Python requirement pins are validated when their source files or
 `versions.yaml` change.
 
+<a id="floci-jobs"></a>
+
 When Floci-related paths change (or `floci` / `floci_e2e_lite` is selected via
 workflow dispatch), the workflow also runs:
 
@@ -253,7 +256,8 @@ workflow dispatch), the workflow also runs:
   (`scripts/test-floci-e2e-lite.sh`); does **not** replace the real-AWS
   maintainer e2e gate
 
-Local Floci debug helpers live under `tests/floci/`.
+Local Floci debug helpers live under `tests/floci/`. Both Floci jobs are
+included in the Test Summary aggregation.
 
 ##### 2. **Lint and Validate** (`lint-and-validate`)
 

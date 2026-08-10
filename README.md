@@ -1088,8 +1088,10 @@ openemr-on-eks/
 │   ├── restore.sh                         # Checkpointed disaster-recovery entry point
 │   ├── destroy.sh                         # Complete infrastructure destruction (bulletproof cleanup)
 │   ├── search-codebase.sh                 # Interactive codebase search tool
-│   ├── test-end-to-end-backup-restore.sh  # End-to-end backup/restore testing
+│   ├── test-end-to-end-backup-restore.sh  # End-to-end backup/restore testing (real AWS)
 │   ├── run-e2e-full-test.sh               # E2E profile loader and persistent log wrapper
+│   ├── run-floci-integration.sh           # Floci emulator integration suites (CI)
+│   ├── test-floci-e2e-lite.sh             # Floci-mocked DR scenario (not real-AWS gate)
 │   ├── test-warp-end-to-end.sh            # Warp end-to-end test with automatic cleanup
 │   ├── deploy-training-openemr-setup.sh   # Training setup deployment with synthetic patient data
 │   ├── quick-deploy.sh                    # Quick deployment with monitoring stack
@@ -1125,8 +1127,17 @@ openemr-on-eks/
 │   └── README.md                          # Diagram generation guide, prerequisites, troubleshooting
 ├── tests/                                 # BATS test suite and test infrastructure
 │   ├── README.md                          # Test documentation, design standards, and coverage summary
+│   ├── floci/                             # Floci AWS emulator harness (local debug for CI suites)
+│   │   ├── README.md                      # Compose/env/seed/wait usage
+│   │   ├── compose.yaml                   # Pinned floci/floci from versions.yaml
+│   │   ├── env.sh                         # AWS_ENDPOINT_URL + test credentials
+│   │   ├── wait.sh                        # Readiness poll
+│   │   └── seed.sh                        # Seed S3/KMS/Secrets/RDS mock resources
 │   └── bats/                              # BATS test files and shared helpers
 │       ├── test_helper.bash               # Shared helpers: script runners, function extraction, assertions
+│       ├── floci_helper.bash              # Helpers for Floci-backed BATS suites
+│       ├── floci-smoke.bats               # STS/S3/KMS/Secrets smoke against Floci
+│       ├── test-floci-e2e-lite.bats       # CLI contract for test-floci-e2e-lite.sh
 │       ├── scripts_common.bats            # Cross-cutting conventions (executability, shebangs, structure)
 │       ├── config_defaults.bats           # Default value drift detection across all scripts
 │       ├── versions_yaml.bats             # versions.yaml structural contract validation
@@ -2424,6 +2435,9 @@ Our comprehensive testing strategy ensures code quality and reliability without 
 - **☸️ Kubernetes Manifest Tests** - K8s syntax validation and security checks
 - **📜 Script Validation Tests** - Shell script syntax and logic validation
 - **📚 Documentation Tests** - Markdown validation and link checking
+- **☁️ Floci Integration / E2E Lite** - AWS API smoke and mocked DR scenario against the
+  [Floci](https://github.com/floci-io/floci) emulator in CI (not a substitute for the
+  real-AWS end-to-end gate)
 
 ### **Running Tests Locally**
 
@@ -2437,6 +2451,11 @@ cd scripts
 ./run-test-suite.sh -s kubernetes_manifests
 ./run-test-suite.sh -s script_validation
 ./run-test-suite.sh -s documentation
+
+# Floci suites (prefer CI; local compose only for debugging)
+# See tests/floci/README.md
+./run-floci-integration.sh
+./test-floci-e2e-lite.sh
 ```
 
 ### **Pre-commit Hooks**
@@ -2496,6 +2515,8 @@ Pushes and pull requests also run:
   ShellCheck
 - **Console CI** - Go lint, test, cross-platform build, and security checks
   when console files change
+- **Floci CI** - `floci-integration` and `floci-e2e-lite` when Floci-related
+  paths change (image pinned at `applications.floci` in `versions.yaml`)
 
 ### **Trigger Conditions**
 
