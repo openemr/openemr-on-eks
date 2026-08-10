@@ -6,6 +6,8 @@ terraform/.terraform.tfstate.lock.info
 terraform/terraform.tfstate.backup
 terraform/tfplan
 terraform.tfstate
+terraform/.floci-state/
+terraform/zz_floci_backend_override.tf
 .idea/*
 backups/*
 test-results/

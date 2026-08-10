@@ -1,0 +1,24 @@
+# Local Floci AWS emulator for debugging CI Floci suites.
+# Prefer GitHub Actions for routine runs; use this compose only when reproducing failures.
+services:
+  floci:
+    image: floci/floci:${FLOCI_VERSION:-1.6.0}
+    ports:
+      # Bind to loopback only (local/CI debug; not exposed on all interfaces)
+      - "127.0.0.1:4566:4566"
+    environment:
+      FLOCI_STORAGE_MODE: memory
+      FLOCI_SERVICES_RDS_MOCK: "true"
+      FLOCI_SERVICES_EKS_MOCK: "true"
+      FLOCI_DEFAULT_REGION: us-east-1
+    security_opt:
+      - no-new-privileges:true
+    # Do not use read_only/cap_drop:ALL — the Floci native server needs writable
+    # runtime state under memory mode and fails to accept traffic otherwise.
+    healthcheck:
+      # Process liveness only; host-side tests/floci/wait.sh is authoritative.
+      test: ["CMD", "cat", "/proc/1/cmdline"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s

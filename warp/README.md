@@ -564,15 +564,22 @@ pip install -e .
 ### Running Tests
 
 ```bash
-# Run all tests
-pytest tests/ -v
+# Unit tests (CI excludes Floci with -m "not floci")
+pytest tests/ -v -m "not floci"
 
 # Run with coverage
-pytest tests/ -v --cov=warp --cov-report=html
+pytest tests/ -v -m "not floci" --cov=warp --cov-report=html
 
 # Run specific test file
 pytest tests/test_omop_to_ccda.py -v
+
+# Floci S3 integration (requires Floci / AWS_ENDPOINT_URL)
+pytest -m floci tests/test_floci_s3.py -v
+# Prefer from repo root:
+# ./scripts/run-floci-integration.sh
 ```
+
+See [`tests/floci/README.md`](../tests/floci/README.md) for local Floci compose.
 
 ### Code Quality
 
@@ -591,7 +598,9 @@ mypy warp/ --ignore-missing-imports
 
 The project uses GitHub Actions for CI/CD (integrated into main CI/CD pipeline):
 - **Pinned versions test**: Automatically validates that Python package versions match versions.yaml
-- Automated testing with pytest
+- Automated testing with pytest (`-m "not floci"` for offline unit coverage)
+- **Floci integration**: `floci-integration` job runs `pytest -m floci` (including
+  `tests/test_floci_s3.py`) against the Floci emulator when Floci-related paths change
 - Code quality checks (flake8, black, mypy)
 - Security scanning (Trivy)
 - Coverage reporting
@@ -600,10 +609,11 @@ The CI/CD pipeline includes a step (`test-warp-pinned-versions.sh`) that:
 - Reads Python package versions from `versions.yaml`
 - Installs exact pinned versions
 - Verifies versions match expectations
-- Runs all Warp tests with pinned versions
+- Runs Warp unit tests with pinned versions
 - Ensures consistency between versions.yaml and actual dependencies
 
 This ensures that the versions specified in `versions.yaml` are always tested and validated before code is merged.
+Floci image pin: `applications.floci` in `versions.yaml`.
 
 ## Advanced Topics
 

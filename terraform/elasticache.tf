@@ -13,11 +13,16 @@ resource "aws_security_group" "elasticache" {
 
   # Primary ingress rule: Allow Redis/Valkey connections from EKS cluster
   ingress {
-    description     = "Redis/Valkey connections from EKS cluster security group"
-    from_port       = 6379                                   # Standard Redis/Valkey port
-    to_port         = 6379                                   # Standard Redis/Valkey port
-    protocol        = "tcp"                                  # TCP protocol
-    security_groups = [module.eks.cluster_security_group_id] # EKS cluster security group
+    description = "Redis/Valkey connections from EKS cluster security group"
+    from_port   = 6379  # Standard Redis/Valkey port
+    to_port     = 6379  # Standard Redis/Valkey port
+    protocol    = "tcp" # TCP protocol
+    # Include Floci node SG when present so KICS sees it as used (module inputs alone
+    # are not enough for the "Security Group Not Used" query with count indexes).
+    security_groups = compact([
+      local.eks_cluster_security_group_id,
+      try(aws_security_group.floci_eks_node[0].id, null),
+    ])
   }
 
   # Fallback ingress rule: Allow Redis/Valkey connections from VPC CIDR

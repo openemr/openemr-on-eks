@@ -100,6 +100,9 @@ AWS_PROFILE_NAME=<your-profile> ./scripts/run-e2e-full-test.sh \
 ./scripts/ci/run-python-ci.sh openemr_dr
 ```
 
+Unit pytest runs use `-m "not floci"` so they stay offline. Floci-marked tests
+live in `scripts/openemr_dr/tests/test_floci_aws.py`.
+
 CI jobs **`openemr-dr-ci`**, **`warp-ci`**, **`credential-rotation-ci`**,
 and **`knowledge-mcp-ci`** use path filters so they run only when relevant
 files change. The first three share `scripts/ci/run-python-ci.sh` and
@@ -115,6 +118,21 @@ Project profiles are declared in `versions.yaml` under **`python_projects`**.
 # Or via main test suite
 ./scripts/run-test-suite.sh -s script_validation
 ```
+
+### Floci-backed AWS tests (emulator, not real AWS)
+
+Requires `AWS_ENDPOINT_URL` (CI Floci service or local `tests/floci` compose).
+These exercise STS/S3/KMS helpers against the Floci emulator and do **not**
+replace the real-AWS end-to-end gate.
+
+```bash
+./scripts/run-floci-integration.sh   # includes pytest -m floci for openemr_dr
+./scripts/test-floci-e2e-lite.sh     # mocked DR scenario; not END_TO_END gate
+```
+
+CI jobs: **`floci-integration`**, **`floci-e2e-lite`**. See
+[Testing Guide §6](TESTING_GUIDE.md#6-floci-integration-and-e2e-lite) and
+[tests/floci/README.md](../tests/floci/README.md).
 
 ### Backup
 
@@ -154,5 +172,6 @@ skip the RDS phase.
 ## Related docs
 
 - [Backup & Restore Guide](BACKUP_RESTORE_GUIDE.md)
-- [Testing Guide](TESTING_GUIDE.md)
+- [Testing Guide](TESTING_GUIDE.md) (including Floci integration / e2e-lite)
 - [End-to-End Testing Requirements](END_TO_END_TESTING_REQUIREMENTS.md)
+- [Floci harness README](../tests/floci/README.md)

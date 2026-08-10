@@ -43,6 +43,8 @@ This directory contains all the operational scripts for the OpenEMR on EKS deplo
   - [run-test-suite.sh](#run-test-suitesh)
   - [test-end-to-end-backup-restore.sh](#test-end-to-end-backup-restoresh)
   - [run-e2e-full-test.sh](#run-e2e-full-testsh)
+  - [run-floci-integration.sh](#run-floci-integrationsh)
+  - [test-floci-e2e-lite.sh](#test-floci-e2e-litesh)
   - [test-warp-pinned-versions.sh](#test-warp-pinned-versionssh)
   - [test-warp-end-to-end.sh](#test-warp-end-to-endsh)
   - [deploy-training-openemr-setup.sh](#deploy-training-openemr-setupsh)
@@ -100,9 +102,11 @@ and run the Bash implementation directly.
 
 #### 🧪 **Testing**
 1. `run-test-suite.sh` (comprehensive tests)
-2. `test-end-to-end-backup-restore.sh` (backup/restore validation)
-3. `run-e2e-full-test.sh` (AWS profile loading and persistent E2E log)
-4. `test-warp-end-to-end.sh` (Warp deployment and data import validation)
+2. `run-floci-integration.sh` (Floci emulator integration; needs `AWS_ENDPOINT_URL`)
+3. `test-floci-e2e-lite.sh` (CI-mocked DR scenario; not the real-AWS E2E gate)
+4. `test-end-to-end-backup-restore.sh` (real-AWS backup/restore validation)
+5. `run-e2e-full-test.sh` (AWS profile loading and persistent E2E log)
+6. `test-warp-end-to-end.sh` (Warp deployment and data import validation)
 
 #### 🚀 **Quick Deployment**
 1. `quick-deploy.sh` (one-command deployment with monitoring)
@@ -139,7 +143,9 @@ and run the Bash implementation directly.
 
 ### Testing & Validation
 
-- **`run-test-suite.sh`** - Comprehensive test suite runner
+- **`run-test-suite.sh`** - Comprehensive test suite runner (includes optional `floci_integration` suite)
+- **`run-floci-integration.sh`** - Floci-backed integration suites (BATS smoke + `pytest -m floci` for Warp, credential-rotation, and openemr_dr)
+- **`test-floci-e2e-lite.sh`** - CI-mocked backup/restore DR scenario against Floci (does **not** replace the real-AWS E2E gate)
 - **`test-end-to-end-backup-restore.sh`** - End-to-end backup/restore testing (this script MUST run successfully to test new additions)
 - **`run-e2e-full-test.sh`** - Terminal wrapper that appends E2E output to
   `e2e-full-test.log`
@@ -563,6 +569,52 @@ and run the Bash implementation directly.
 - **Safety**: Verify the account printed at startup and run only in a
   non-production AWS account
 - **See also**: [End-to-End Testing Requirements](../docs/END_TO_END_TESTING_REQUIREMENTS.md)
+
+#### `run-floci-integration.sh`
+
+- **Purpose**: Run Floci-backed integration suites against a live AWS emulator
+- **Dependencies**: Docker (for local Floci), AWS CLI v2, BATS, Python package
+  venvs from `install-python-dev.sh`, `AWS_ENDPOINT_URL`
+- **Key Features**:
+  - Waits for Floci readiness and seeds STS/S3/KMS/Secrets/RDS mock resources
+  - Runs `tests/bats/floci-smoke.bats`
+  - Runs `pytest -m floci` for Warp S3, credential-rotation Secrets Manager, and
+    openemr_dr AWS CLI helpers
+- **CI**: `floci-integration` job in `.github/workflows/ci-cd-tests.yml`
+- **Image pin**: `applications.floci` in `versions.yaml`
+- **Usage**:
+  ```bash
+  # Local debug (prefer CI for routine runs)
+  export FLOCI_VERSION="$(yq eval '.applications.floci.current' versions.yaml)"
+  docker compose -f tests/floci/compose.yaml up -d
+  ./tests/floci/wait.sh
+  source tests/floci/env.sh
+  ./scripts/run-floci-integration.sh
+  ```
+- **See also**: [tests/floci/README.md](../tests/floci/README.md),
+  [Testing Guide §6](../docs/TESTING_GUIDE.md#6-floci-integration-and-e2e-lite)
+
+#### `test-floci-e2e-lite.sh`
+
+- **Purpose**: CI-mocked backup/restore DR scenario using Floci-supported APIs
+  only (S3 layout, KMS, Secrets Manager, optional RDS mock snapshots)
+- **Dependencies**: AWS CLI v2, `AWS_ENDPOINT_URL` (or `FLOCI_ENDPOINT`) pointing
+  at Floci
+- **Key Features**:
+  - Steps: preflight → seed → backup artifacts → simulate destroy → restore
+    verify → cleanup
+  - Does **not** run Terraform, `k8s/deploy.sh`, EFS, monitoring, or AWS Backup
+    restore jobs
+  - Does **not** replace the real-AWS gate in
+    [END_TO_END_TESTING_REQUIREMENTS.md](../docs/END_TO_END_TESTING_REQUIREMENTS.md)
+- **CI**: `floci-e2e-lite` job in `.github/workflows/ci-cd-tests.yml`
+- **Usage**:
+  ```bash
+  source tests/floci/env.sh   # or export AWS_ENDPOINT_URL=http://localhost:4566
+  ./scripts/test-floci-e2e-lite.sh
+  ./scripts/test-floci-e2e-lite.sh --help
+  ```
+- **See also**: [tests/floci/README.md](../tests/floci/README.md)
 
 #### `test-warp-pinned-versions.sh`
 

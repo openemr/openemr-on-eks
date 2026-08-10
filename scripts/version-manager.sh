@@ -368,6 +368,10 @@ parse_config() {
     PYTHON_CURRENT=$(yq eval '.applications.python.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
     PYTHON_REGISTRY=$(yq eval '.applications.python.registry' "$VERSIONS_FILE" 2>/dev/null || echo "library/python")
 
+    # Floci local AWS emulator image (CI integration / e2e-lite)
+    FLOCI_CURRENT=$(yq eval '.applications.floci.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+    FLOCI_REGISTRY=$(yq eval '.applications.floci.registry' "$VERSIONS_FILE" 2>/dev/null || echo "floci/floci")
+
     # Database versions
     AURORA_CURRENT=$(yq eval '.databases.aurora_mysql.current' "$VERSIONS_FILE")
 
@@ -1016,16 +1020,18 @@ get_latest_semver_version() {
     # Handle different package types with their specific version sources
     case "$package_name" in
         "python_version")
-            # For Python, we'll check the official Python tags (no releases)
-            # Python uses Git tags for versioning, not GitHub releases
-            local url="https://api.github.com/repos/python/cpython/tags"
-            local response=$(curl -s "$url" 2>/dev/null || echo "")
+            # CPython publishes tags (not always a matching GitHub Release). Paginate
+            # and sort so patch bumps like 3.14.7 are not missed when newer RC tags
+            # appear first in the API response.
+            local response
+            response="$(curl -sS "https://api.github.com/repos/python/cpython/tags?per_page=100" 2>/dev/null || echo "")"
             if [ -z "$response" ] || [ "$response" = "[]" ]; then
                 echo "❌ Error"
                 return 1
             fi
-            # Get the latest stable version (not RC/beta) - get full version, not just major.minor
-            local latest_version=$(echo "$response" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^v//' || echo "")
+            local latest_version
+            latest_version="$(echo "$response" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null \
+                | sed 's/^v//' | sort -V | tail -1 || echo "")"
             ;;
         "terraform_version")
             # For Terraform, check HashiCorp releases
@@ -1188,6 +1194,24 @@ EOF
                 checks_failed=$((checks_failed + 1))
                 log "ERROR" "Could not fetch Python Docker image tags"
                 echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
+            fi
+        fi
+
+        # Check Floci Docker image version
+        FLOCI_CURRENT=$(yq eval '.applications.floci.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        FLOCI_REGISTRY=$(yq eval '.applications.floci.registry' "$VERSIONS_FILE" 2>/dev/null || echo "floci/floci")
+        if [ -n "$FLOCI_CURRENT" ]; then
+            log "INFO" "Checking Floci version..."
+            local floci_latest
+            run_version_lookup floci_latest "Floci" "$FLOCI_CURRENT" \
+                get_latest_docker_version "$FLOCI_REGISTRY"
+            if [ -n "$floci_latest" ] && [ "$floci_latest" != "$FLOCI_CURRENT" ]; then
+                log "INFO" "Floci update available: $FLOCI_CURRENT -> $floci_latest"
+                echo "- **Floci**: $FLOCI_CURRENT → $floci_latest" >> "$update_report"
+                search_version_in_codebase "Floci" "$FLOCI_CURRENT" "$floci_latest"
+                updates_found=1
+            else
+                log "INFO" "Floci is up to date: $FLOCI_CURRENT"
             fi
         fi
     fi
@@ -1499,6 +1523,7 @@ EOF
         if [ "$python_latest" != "❌ Error" ] && [ "$python_latest" != "$python_current" ]; then
             log "INFO" "Python version update available: $python_current -> $python_latest"
             echo "- **Python**: $python_current → $python_latest" >> "$update_report"
+            search_version_in_codebase "Python" "$python_current" "$python_latest"
             updates_found=1
         fi
 
@@ -1899,7 +1924,7 @@ Options:
   --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR)
 
 Component Types:
-  applications            OpenEMR, Fluent Bit
+  applications            OpenEMR, Fluent Bit, Python, Floci
   infrastructure          Kubernetes, Terraform, AWS Provider
   terraform_modules       EKS, VPC, RDS modules
   github_workflows        GitHub Actions dependencies
@@ -1935,6 +1960,8 @@ show_status() {
     echo -e "${BLUE}Applications:${NC}"
     echo -e "  OpenEMR: ${GREEN}$OPENEMR_CURRENT${NC}"
     echo -e "  Fluent Bit: ${GREEN}$FLUENT_BIT_CURRENT${NC}"
+    [ -n "${PYTHON_CURRENT:-}" ] && echo -e "  Python: ${GREEN}$PYTHON_CURRENT${NC}"
+    [ -n "${FLOCI_CURRENT:-}" ] && echo -e "  Floci: ${GREEN}$FLOCI_CURRENT${NC}"
     echo ""
     echo -e "${BLUE}Infrastructure:${NC}"
     echo -e "  Kubernetes: ${GREEN}$K8S_CURRENT${NC}"

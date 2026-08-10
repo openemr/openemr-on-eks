@@ -67,5 +67,16 @@ Flags:
 
 ```bash
 pip install -r requirements.txt
-pytest tests/
+
+# Unit tests (CI excludes Floci with -m "not floci")
+pytest tests/ -m "not floci"
+
+# Floci Secrets Manager integration (requires AWS_ENDPOINT_URL)
+pytest -m floci tests/test_floci_secrets.py -v
+
+# Prefer from repo root (starts/seeds Floci suites together):
+# ./scripts/run-floci-integration.sh
 ```
+
+See [`tests/floci/README.md`](../../tests/floci/README.md) and
+[Testing Guide §6](../../docs/TESTING_GUIDE.md#6-floci-integration-and-e2e-lite).

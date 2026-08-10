@@ -66,6 +66,27 @@ setup() {
   [ "$output" != "null" ]
 }
 
+@test "versions.yaml: applications.floci.current is set" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  run yq eval '.applications.floci.current' "$VERSIONS_FILE"
+  [ "$status" -eq 0 ]
+  [ "$output" != "null" ]
+  [ -n "$output" ]
+}
+
+@test "versions.yaml: Floci version is semver (x.y.z)" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  run yq eval '.applications.floci.current' "$VERSIONS_FILE"
+  [[ "$output" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+}
+
+@test "versions.yaml: applications.floci.registry is floci/floci" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  run yq eval '.applications.floci.registry' "$VERSIONS_FILE"
+  [ "$status" -eq 0 ]
+  [ "$output" = "floci/floci" ]
+}
+
 @test "versions.yaml: python auto_detect_latest is a boolean" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
   run yq eval '.applications.python.auto_detect_latest' "$VERSIONS_FILE"

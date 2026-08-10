@@ -29,6 +29,7 @@ are synchronized with [`../../versions.yaml`](../../versions.yaml).
     - [Lint and Validate](#2-lint-and-validate-lint-and-validate)
     - [Security Scan](#3-security-scan-security-scan)
     - [Code Quality](#4-code-quality-code-quality)
+    - [Floci Integration / E2E Lite](#floci-jobs)
     - [Test Summary](#5-test-summary-summary)
   - [Environment Configuration](#environment-configuration)
   - [Permissions](#permissions)
@@ -105,7 +106,11 @@ graph TD
     B --> D[Lint and Validate]
     B --> E[Security Scan]
     B --> F[Code Quality]
+    B --> F1[Floci Integration]
+    B --> F2[Floci E2E Lite]
     B --> G[Test Summary]
+    F1 --> G
+    F2 --> G
 
     H[Manual Trigger] --> I[manual-releases.yml]
     I --> J[Determine Release Type]
@@ -239,6 +244,21 @@ The workflow also detects changed paths and runs dedicated CI for
 Python requirement pins are validated when their source files or
 `versions.yaml` change.
 
+<a id="floci-jobs"></a>
+
+When Floci-related paths change (or `floci` / `floci_e2e_lite` is selected via
+workflow dispatch), the workflow also runs:
+
+- **`floci-integration`** — starts `floci/floci` pinned from
+  `versions.yaml` (`applications.floci`), seeds emulator state, then runs BATS
+  smoke plus `pytest -m floci` for Warp, credential rotation, and openemr_dr
+- **`floci-e2e-lite`** — CI-mocked backup/restore DR scenario against Floci
+  (`scripts/test-floci-e2e-lite.sh`); does **not** replace the real-AWS
+  maintainer e2e gate
+
+Local Floci debug helpers live under `tests/floci/`. Both Floci jobs are
+included in the Test Summary aggregation.
+
 ##### 2. **Lint and Validate** (`lint-and-validate`)
 
 - **Purpose**: Additional validation and linting beyond test matrix
@@ -282,7 +302,7 @@ Python requirement pins are validated when their source files or
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.6
+- **Python**: 3.14.7
 - **Terraform**: 1.15.8
 - **Kubectl**: v1.36.3
 - **Operating System**: `ubuntu-26.04`
@@ -364,7 +384,7 @@ Controlled release management system that allows manual version bumping and rele
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.6
+- **Python**: 3.14.7
 - **Semver Package**: 3.0.4
 - **Operating System**: `ubuntu-26.04`
 

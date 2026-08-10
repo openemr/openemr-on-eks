@@ -50,7 +50,7 @@ on:
 
 # Environment variables for consistent tool versions
 env:
-  PYTHON_VERSION: '3.14.6'               # Python version for semantic versioning (semver_packages.python_version)
+  PYTHON_VERSION: '3.14.7'               # Python version for semantic versioning (semver_packages.python_version)
   SEMVER_PYTHON_PACKAGE_VERSION: "3.0.4" # Specific semver package version
 
 # Required permissions for release operations

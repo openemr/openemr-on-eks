@@ -201,6 +201,10 @@ run_test() {
             test_python_requirements
             local test_result=$?
             ;;
+        "floci_integration")
+            test_floci_integration
+            local test_result=$?
+            ;;
         *)
             record_test_result "$test_name" "SKIP" "Unknown test type: $test_type" "0"
             return
@@ -580,6 +584,24 @@ test_python_requirements() {
     return 0
 }
 
+test_floci_integration() {
+    log_info "Running Floci integration suites via run-floci-integration.sh"
+
+    if [[ -z "${AWS_ENDPOINT_URL:-}" && -z "${FLOCI_ENDPOINT:-}" ]]; then
+        log_warning "AWS_ENDPOINT_URL unset; skipping Floci integration (start Floci or run the floci-integration CI job)"
+        return 0
+    fi
+
+    local output
+    if ! output=$("${PROJECT_ROOT}/scripts/run-floci-integration.sh" 2>&1); then
+        log_error "Floci integration suites failed"
+        log_error "$output"
+        return 1
+    fi
+    log_info "✓ Floci integration suites passed"
+    return 0
+}
+
 # Parse test configuration
 parse_test_config() {
     if [[ ! -f "$CONFIG_FILE" ]]; then
@@ -609,6 +631,9 @@ run_test_suite() {
             ;;
         "documentation")
             run_documentation_tests
+            ;;
+        "floci_integration")
+            run_floci_integration_tests
             ;;
         *)
             log_error "Unknown test suite: $suite_name"
@@ -682,6 +707,11 @@ run_documentation_tests() {
     run_test "Documentation Validation" "markdown_validation" "docs/*.md"
 }
 
+run_floci_integration_tests() {
+    log_info "Running Floci integration tests (requires AWS_ENDPOINT_URL)..."
+    run_test "Floci Integration Suites" "floci_integration" "scripts/run-floci-integration.sh"
+}
+
 # Print a read-only execution plan. This path must not create reports, initialize
 # Terraform, install dependencies, or run any validation command.
 show_dry_run() {
@@ -690,7 +720,7 @@ show_dry_run() {
         all)
             planned_suites=(code_quality kubernetes_manifests script_validation documentation)
             ;;
-        code_quality|kubernetes_manifests|script_validation|documentation)
+        code_quality|kubernetes_manifests|script_validation|documentation|floci_integration)
             planned_suites=("$TEST_SUITE")
             ;;
         *)
@@ -785,7 +815,7 @@ show_help() {
     echo "Options:"
     echo "  -s, --suite SUITE    Test suite to run (default: all)"
     echo "                       Available suites: all, code_quality, kubernetes_manifests,"
-    echo "                       script_validation, documentation"
+    echo "                       script_validation, documentation, floci_integration"
     echo "  -p, --parallel       Enable parallel test execution (default: true)"
     echo "  -d, --dry-run        Show what tests would run without executing them"
     echo "  -v, --verbose        Enable verbose output"

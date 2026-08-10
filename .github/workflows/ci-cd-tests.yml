@@ -49,6 +49,8 @@ on:
         - credential_rotation
         - openemr_dr
         - knowledge_mcp
+        - floci
+        - floci_e2e_lite
 
 # Cancel in-progress runs when a new commit is pushed to the same branch/PR
 concurrency:
@@ -63,7 +65,7 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.6'    # Python version for YAML validation and dependencies
+  PYTHON_VERSION: '3.14.7'    # Python version for YAML validation and dependencies
   TERRAFORM_VERSION: '1.15.8' # Terraform version for infrastructure validation
   KUBECTL_VERSION: 'v1.36.3'  # kubectl version for Kubernetes manifest validation
   UV_VERSION: '0.11.26'       # uv version for the knowledge MCP package
@@ -81,6 +83,7 @@ jobs:
       credential_rotation: ${{ steps.filter.outputs.credential_rotation }}
       knowledge_mcp: ${{ steps.filter.outputs.knowledge_mcp }}
       python_requirements: ${{ steps.filter.outputs.python_requirements }}
+      floci: ${{ steps.filter.outputs.floci }}
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -128,6 +131,20 @@ jobs:
               - 'scripts/lib/python-venv.sh'
               - 'scripts/validate-python-requirements.sh'
               - 'scripts/install-python-dev.sh'
+            floci:
+              - 'tests/floci/**'
+              - 'tests/bats/floci*.bats'
+              - 'tests/bats/floci_helper.bash'
+              - 'tests/bats/test-floci-e2e-lite.bats'
+              - 'scripts/run-floci-integration.sh'
+              - 'scripts/test-floci-e2e-lite.sh'
+              - 'scripts/run-test-suite.sh'
+              - 'scripts/test-config.yaml'
+              - 'warp/tests/test_floci_s3.py'
+              - 'tools/credential-rotation/tests/test_floci_secrets.py'
+              - 'scripts/openemr_dr/tests/test_floci_aws.py'
+              - '.github/workflows/ci-cd-tests.yml'
+              - 'versions.yaml'
 
   # Validate all Python requirement pins when versions.yaml or requirements/ change
   python-requirements-validate:
@@ -519,7 +536,7 @@ jobs:
     needs: changes
     strategy:
       matrix:
-        python-version: ['3.10', '3.14.6']
+        python-version: ['3.10', '3.14.7']
     if: |
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'warp')) ||
@@ -735,6 +752,132 @@ jobs:
           uv run --project tools/codebase-mcp --frozen --offline \
             openemr-eks-mcp --repo-root . --check
 
+  # Floci integration suites — live AWS API tests against the Floci emulator
+  floci-integration:
+    name: Floci Integration
+    runs-on: ubuntu-26.04
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.test_suite == 'all' ||
+        github.event.inputs.test_suite == 'floci')) ||
+      (github.event_name != 'workflow_dispatch' && needs.changes.outputs.floci == 'true')
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_EC2_METADATA_DISABLED: 'true'
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install yq
+        run: |
+          chmod +x scripts/ci/install-yq.sh
+          ./scripts/ci/install-yq.sh
+
+      - name: Resolve Floci image pin from versions.yaml
+        run: |
+          FLOCI_VERSION="$(yq eval '.applications.floci.current' versions.yaml)"
+          echo "FLOCI_VERSION=${FLOCI_VERSION}" >> "$GITHUB_ENV"
+          echo "Using floci/floci:${FLOCI_VERSION}"
+
+      - name: Install AWS CLI and BATS
+        run: |
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          fi
+          sudo apt-get update
+          sudo apt-get install -y bats jq
+
+      - name: Start Floci
+        run: |
+          chmod +x tests/floci/*.sh scripts/run-floci-integration.sh
+          docker compose -f tests/floci/compose.yaml up -d
+          ./tests/floci/wait.sh
+
+      - name: Install Python package test deps
+        run: |
+          ./scripts/install-python-dev.sh warp
+          ./scripts/install-python-dev.sh credential_rotation
+          ./scripts/install-python-dev.sh openemr_dr
+
+      - name: Run Floci integration suites
+        run: ./scripts/run-floci-integration.sh
+
+      - name: Stop Floci
+        if: always()
+        run: docker compose -f tests/floci/compose.yaml down || true
+
+  # Floci e2e-lite — CI-mocked backup/restore DR scenario (not the real-AWS gate)
+  floci-e2e-lite:
+    name: Floci E2E Lite
+    runs-on: ubuntu-26.04
+    needs: changes
+    if: |
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.test_suite == 'all' ||
+        github.event.inputs.test_suite == 'floci' ||
+        github.event.inputs.test_suite == 'floci_e2e_lite')) ||
+      (github.event_name != 'workflow_dispatch' && needs.changes.outputs.floci == 'true')
+    env:
+      AWS_ENDPOINT_URL: http://localhost:4566
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_EC2_METADATA_DISABLED: 'true'
+      AWS_CONFIG_FILE: /dev/null
+      AWS_SHARED_CREDENTIALS_FILE: /dev/null
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Install yq
+        run: |
+          chmod +x scripts/ci/install-yq.sh
+          ./scripts/ci/install-yq.sh
+
+      - name: Resolve Floci image pin from versions.yaml
+        run: |
+          FLOCI_VERSION="$(yq eval '.applications.floci.current' versions.yaml)"
+          echo "FLOCI_VERSION=${FLOCI_VERSION}" >> "$GITHUB_ENV"
+          echo "Using floci/floci:${FLOCI_VERSION}"
+
+      - name: Install AWS CLI
+        run: |
+          if ! command -v aws >/dev/null 2>&1; then
+            curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+            unzip -q /tmp/awscliv2.zip -d /tmp
+            sudo /tmp/aws/install
+          fi
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      - name: Start Floci
+        run: |
+          chmod +x tests/floci/*.sh scripts/test-floci-e2e-lite.sh
+          docker compose -f tests/floci/compose.yaml up -d
+          ./tests/floci/wait.sh
+
+      - name: Run Floci e2e-lite scenario
+        run: ./scripts/test-floci-e2e-lite.sh
+
+      - name: Stop Floci
+        if: always()
+        run: docker compose -f tests/floci/compose.yaml down || true
+
   # Summary job - generates comprehensive test results summary
   # This job collects results from all previous jobs and provides a unified
   # overview of the entire CI/CD pipeline execution
@@ -752,6 +895,8 @@ jobs:
       - openemr-dr-ci
       - credential-rotation-ci
       - knowledge-mcp-ci
+      - floci-integration
+      - floci-e2e-lite
     if: always()
 
     steps:
@@ -830,6 +975,26 @@ jobs:
           fi
           echo ""
 
+          echo "## ☁️ Floci Integration Status"
+          if [ "${{ needs.floci-integration.result }}" == "success" ]; then
+            echo "✅ **Floci integration suites passed successfully!**"
+          elif [ "${{ needs.floci-integration.result }}" == "skipped" ]; then
+            echo "⏭️ **Floci integration skipped** (no Floci-related files changed or not selected)"
+          else
+            echo "❌ **Floci integration failed** - Check the floci-integration job logs"
+          fi
+          echo ""
+
+          echo "## ☁️ Floci E2E Lite Status"
+          if [ "${{ needs.floci-e2e-lite.result }}" == "success" ]; then
+            echo "✅ **Floci e2e-lite scenario passed successfully!**"
+          elif [ "${{ needs.floci-e2e-lite.result }}" == "skipped" ]; then
+            echo "⏭️ **Floci e2e-lite skipped** (no Floci-related files changed or not selected)"
+          else
+            echo "❌ **Floci e2e-lite failed** - Check the floci-e2e-lite job logs"
+          fi
+          echo ""
+
           echo "## 📦 Python Requirements Validation"
           if [ "${{ needs.python-requirements-validate.result }}" == "success" ]; then
             echo "✅ **All Python requirement pins match versions.yaml**"
@@ -852,7 +1017,9 @@ jobs:
             "${{ needs.warp-ci.result }}" \
             "${{ needs.openemr-dr-ci.result }}" \
             "${{ needs.credential-rotation-ci.result }}" \
-            "${{ needs.knowledge-mcp-ci.result }}"; do
+            "${{ needs.knowledge-mcp-ci.result }}" \
+            "${{ needs.floci-integration.result }}" \
+            "${{ needs.floci-e2e-lite.result }}"; do
             if [ "$job_result" != "success" ] && [ "$job_result" != "skipped" ]; then
               OVERALL_OK=false
               break

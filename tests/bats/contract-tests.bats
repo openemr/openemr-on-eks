@@ -81,6 +81,18 @@ _all_tf_output_names() {
   [ "$manifest_ver" = "$yaml_ver" ]
 }
 
+@test "CONTRACT: Floci current version matches compose default and CI workflow" {
+  if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
+  local yaml_ver compose_file
+  yaml_ver=$(yq eval '.applications.floci.current' "$VERSIONS_FILE")
+  compose_file="${PROJECT_ROOT}/tests/floci/compose.yaml"
+  [ -f "$compose_file" ]
+  grep -Fq "floci/floci:\${FLOCI_VERSION:-${yaml_ver}}" "$compose_file"
+  grep -Fq "applications.floci.current" "$CI_WORKFLOW"
+  grep -Fq "floci-integration" "$CI_WORKFLOW"
+  grep -Fq "floci-e2e-lite" "$CI_WORKFLOW"
+}
+
 @test "CONTRACT: credential rotation Dockerfile PYTHON_VERSION matches versions.yaml" {
   if ! command -v yq >/dev/null 2>&1; then skip "yq not installed"; fi
   local yaml_ver
@@ -284,7 +296,7 @@ _all_tf_output_names() {
 
 @test "CONTRACT: Warp minimum Python matches boto3 compatibility" {
   grep -Fq 'python_requires=">=3.10"' "$WARP_SETUP"
-  grep -Fq "python-version: ['3.10', '3.14.6']" "$CI_WORKFLOW"
+  grep -Fq "python-version: ['3.10', '3.14.7']" "$CI_WORKFLOW"
 }
 
 @test "CONTRACT: Warp runtime PyMySQL pins match versions.yaml" {

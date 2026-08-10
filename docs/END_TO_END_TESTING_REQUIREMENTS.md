@@ -8,6 +8,16 @@ This is a maintainer process requirement. The current GitHub Actions and manual
 release workflows do not automatically launch or verify the destructive AWS
 E2E run; the operator must record and review the result before release.
 
+### Floci e2e-lite vs this gate
+
+GitHub Actions also runs a **Floci e2e-lite** job
+(`scripts/test-floci-e2e-lite.sh`) that mocks the backup/restore *scenario*
+against the Floci AWS emulator (S3/KMS/Secrets/RDS API shapes). That CI job is
+valuable regression coverage, but it is **not** a substitute for this
+real-AWS end-to-end gate: Floci does not provide full EKS/EFS/Aurora/AWS Backup
+restore fidelity. See [Testing Guide §6](TESTING_GUIDE.md#6-floci-integration-and-e2e-lite)
+and [tests/floci/README.md](../tests/floci/README.md).
+
 > **⚠️ AWS Resource Warning**: The recommended
 > `scripts/run-e2e-full-test.sh` wrapper and its inner
 > `scripts/test-end-to-end-backup-restore.sh` script create and delete AWS
@@ -21,6 +31,7 @@ E2E run; the operator must record and review the result before release.
 - [Why This Is Critical](#-why-this-is-critical)
 - [Testing Process](#-testing-process)
 - [Test Requirements](#-test-requirements)
+- [Floci e2e-lite vs this gate](#floci-e2e-lite-vs-this-gate)
 - [Integration with Development Workflows](#-integration-with-development-workflows)
 - [Failure Handling](#-failure-handling)
 - [Documentation Requirements](#-documentation-requirements)
