@@ -382,7 +382,7 @@ variable "enable_patient_portal" {
 }
 
 # =============================================================================
-# FLOCI / LOCAL AWS EMULATOR (CI EXPERIMENT)
+# FLOCI / LOCAL AWS EMULATOR
 # =============================================================================
 # When set, the AWS provider targets a local emulator (Floci) instead of real AWS.
 # Do not set this for production applies.

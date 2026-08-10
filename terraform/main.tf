@@ -118,8 +118,8 @@ resource "random_id" "global_suffix" {
 # =============================================================================
 # Configures the Kubernetes provider to manage resources in the EKS cluster
 # Uses AWS CLI for authentication via EKS token-based authentication.
-# Under Floci there are no kubernetes_* resources today; use a inert host so provider
-# init does not require a live API server during apply/destroy experiments.
+# Under Floci there are no kubernetes_* resources today; use an inert host so provider
+# init does not require a live API server during apply/destroy.
 provider "kubernetes" {
   host                   = local.use_floci ? "https://127.0.0.1:6443" : module.eks.cluster_endpoint
   cluster_ca_certificate = local.use_floci ? null : base64decode(module.eks.cluster_certificate_authority_data)

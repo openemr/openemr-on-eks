@@ -1,4 +1,4 @@
-# Floci CI experiment — apply/destroy the main terraform/ root against a local emulator.
+# Floci local apply/destroy of the main terraform/ root against a local emulator.
 # Never use for real AWS. Invoked by tests/floci/terraform/run-main-stack.sh.
 
 aws_region       = "us-east-1"
