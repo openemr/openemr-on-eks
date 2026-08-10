@@ -14,10 +14,10 @@ resource "aws_security_group" "elasticache" {
   # Primary ingress rule: Allow Redis/Valkey connections from EKS cluster
   ingress {
     description     = "Redis/Valkey connections from EKS cluster security group"
-    from_port       = 6379                                   # Standard Redis/Valkey port
-    to_port         = 6379                                   # Standard Redis/Valkey port
-    protocol        = "tcp"                                  # TCP protocol
-    security_groups = [module.eks.cluster_security_group_id] # EKS cluster security group
+    from_port       = 6379                                  # Standard Redis/Valkey port
+    to_port         = 6379                                  # Standard Redis/Valkey port
+    protocol        = "tcp"                                 # TCP protocol
+    security_groups = [local.eks_cluster_security_group_id] # EKS cluster security group
   }
 
   # Fallback ingress rule: Allow Redis/Valkey connections from VPC CIDR

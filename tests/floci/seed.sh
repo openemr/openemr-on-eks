@@ -53,15 +53,19 @@ else
 fi
 
 # Mock RDS cluster metadata (FLOCI_SERVICES_RDS_MOCK=true)
+# Floci returns exit 0 + DBClusters=[] for a missing identifier — do not treat
+# that as "already exists".
 RDS_CLUSTER_ID="${FLOCI_RDS_CLUSTER_ID:-openemr-floci-aurora}"
-if ! aws rds describe-db-clusters --db-cluster-identifier "${RDS_CLUSTER_ID}" >/dev/null 2>&1; then
+RDS_FOUND="$(aws rds describe-db-clusters --db-cluster-identifier "${RDS_CLUSTER_ID}" \
+  --query "DBClusters[?DBClusterIdentifier=='${RDS_CLUSTER_ID}'].DBClusterIdentifier | [0]" \
+  --output text 2>/dev/null || true)"
+if [ -z "${RDS_FOUND}" ] || [ "${RDS_FOUND}" = "None" ] || [ "${RDS_FOUND}" = "null" ]; then
   aws rds create-db-cluster \
     --db-cluster-identifier "${RDS_CLUSTER_ID}" \
     --engine aurora-mysql \
-    --engine-version 8.0.mysql_aurora.3.08.0 \
     --master-username openemr \
     --master-user-password 'SeedPassword123!' \
-    --database-name openemr >/dev/null || true
+    --database-name openemr >/dev/null
 fi
 
 # CloudWatch log group used by smoke / ops-shaped tests

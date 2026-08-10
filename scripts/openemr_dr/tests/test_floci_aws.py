@@ -79,12 +79,23 @@ def test_floci_kms_describe_key() -> None:
 def test_floci_rds_describe_seeded_cluster() -> None:
     _require_floci()
     cluster_id = os.environ.get("FLOCI_RDS_CLUSTER_ID", "openemr-floci-aurora")
-    try:
-        data = run_json(
-            ["aws", "rds", "describe-db-clusters", "--db-cluster-identifier", cluster_id],
-            retries=1,
-        )
-    except Exception:
+
+    def _clusters() -> list[dict]:
+        # Floci often returns HTTP 200 with DBClusters=[] for a missing id (exit 0).
+        try:
+            payload = run_json(
+                ["aws", "rds", "describe-db-clusters", "--db-cluster-identifier", cluster_id],
+                retries=1,
+                check=False,
+            )
+        except Exception:
+            return []
+        if not isinstance(payload, dict):
+            return []
+        return list(payload.get("DBClusters") or [])
+
+    clusters = _clusters()
+    if not any(c.get("DBClusterIdentifier") == cluster_id for c in clusters):
         run(
             [
                 "aws",
@@ -103,12 +114,9 @@ def test_floci_rds_describe_seeded_cluster() -> None:
             ],
             retries=1,
         )
-        data = run_json(
-            ["aws", "rds", "describe-db-clusters", "--db-cluster-identifier", cluster_id],
-            retries=1,
-        )
-    clusters = data.get("DBClusters") or []
-    assert clusters
+        clusters = _clusters()
+
+    assert clusters, f"Floci returned no DBClusters for {cluster_id}"
     assert clusters[0].get("DBClusterIdentifier") == cluster_id
 
 

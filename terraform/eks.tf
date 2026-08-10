@@ -4,6 +4,64 @@
 # This module creates an EKS cluster with Auto Mode for simplified node management,
 # including security configurations, networking, and essential add-ons.
 
+# Floci cannot reliably complete aws_security_group_rule create/refresh (rule-ID
+# API). When targeting Floci, supply pre-built SGs with inline rules and disable
+# the EKS module's separate SG rule resources. Real AWS keeps the module defaults.
+resource "aws_security_group" "floci_eks_cluster" {
+  count = local.use_floci ? 1 : 0
+
+  name_prefix = "${var.cluster_name}-cluster-"
+  description = "Floci EKS cluster security group (inline rules; no aws_security_group_rule)"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "VPC to cluster API"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "All egress"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, { Name = "${var.cluster_name}-cluster-floci" })
+}
+
+resource "aws_security_group" "floci_eks_node" {
+  count = local.use_floci ? 1 : 0
+
+  name_prefix = "${var.cluster_name}-node-"
+  description = "Floci EKS node security group (inline rules; no aws_security_group_rule)"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    description = "VPC to node ports"
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "All egress"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, {
+    Name                                        = "${var.cluster_name}-node-floci"
+    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
+  })
+}
+
 # EKS Cluster Module Configuration using terraform-aws-modules/eks/aws
 # This module provides a production-ready EKS setup with Auto Mode for simplified operations
 module "eks" {
@@ -16,8 +74,10 @@ module "eks" {
   kubernetes_version = var.kubernetes_version # Kubernetes version (default: 1.36)
 
   # EKS Auto Mode Configuration
-  # Auto Mode automatically manages compute nodes and scaling
-  compute_config = {
+  # Auto Mode automatically manages compute nodes and scaling.
+  # Floci only seeds classic EKS managed policies (not Auto Mode policies like
+  # AmazonEKSNetworkingPolicy), so disable Auto Mode under Floci.
+  compute_config = local.use_floci ? null : {
     enabled    = true                          # Enable Auto Mode for simplified node management
     node_pools = ["general-purpose", "system"] # Two node pools: general workloads and system pods
 
@@ -28,6 +88,7 @@ module "eks" {
       http_tokens                 = "required" # Require IMDSv2 for enhanced security
     }
   }
+  create_auto_mode_iam_resources = !local.use_floci
 
   # VPC and networking configuration
   vpc_id     = module.vpc.vpc_id          # VPC where EKS cluster will be deployed
@@ -52,6 +113,13 @@ module "eks" {
   # EFS CSI driver will use Pod Identity instead of IRSA
   enable_irsa                              = true # Enable IRSA for service account integration
   enable_cluster_creator_admin_permissions = true # Grant cluster creator admin permissions
+
+  # Floci: skip module-managed aws_security_group_rule resources (they hang).
+  create_security_group                        = !local.use_floci
+  create_node_security_group                   = !local.use_floci
+  security_group_id                            = local.use_floci ? aws_security_group.floci_eks_cluster[0].id : null
+  node_security_group_id                       = local.use_floci ? aws_security_group.floci_eks_node[0].id : null
+  node_security_group_enable_recommended_rules = !local.use_floci
 
   # Encryption configuration for cluster secrets
   # Use dedicated KMS key for encrypting Kubernetes secrets at rest
@@ -102,7 +170,7 @@ module "eks" {
 resource "time_sleep" "wait_for_vpc" {
   depends_on = [module.vpc]
 
-  create_duration = "30s" # 30 seconds to ensure VPC components are fully provisioned
+  create_duration = var.vpc_ready_wait_duration
 }
 
 # Wait for compute infrastructure to be fully ready before proceeding
@@ -110,7 +178,7 @@ resource "time_sleep" "wait_for_vpc" {
 resource "time_sleep" "wait_for_compute" {
   depends_on = [module.eks, time_sleep.wait_for_vpc]
 
-  create_duration = "60s" # 60 seconds to ensure compute nodes are ready for add-ons
+  create_duration = var.compute_ready_wait_duration
 }
 
 # =============================================================================

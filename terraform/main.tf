@@ -43,10 +43,53 @@ terraform {
 # =============================================================================
 # Configures the AWS provider with region and default tagging strategy
 # Default tags are automatically applied to all AWS resources created by Terraform
+# When var.aws_endpoint_url is set (Floci CI), static test creds + skip flags
+# redirect the provider at the local emulator. Leave unset for real AWS.
 provider "aws" {
   # AWS region where all resources will be deployed
   # This should match the region specified in your AWS CLI configuration
   region = var.aws_region
+
+  access_key = local.use_floci ? "test" : null
+  secret_key = local.use_floci ? "test" : null
+
+  skip_credentials_validation = local.use_floci
+  skip_metadata_api_check     = local.use_floci
+  skip_requesting_account_id  = local.use_floci
+  s3_use_path_style           = local.use_floci
+
+  # Prefer explicit endpoints when targeting Floci; AWS_ENDPOINT_URL alone is
+  # not always honored by every AWS provider service client path.
+  dynamic "endpoints" {
+    for_each = local.use_floci ? [var.aws_endpoint_url] : []
+    content {
+      acm                  = endpoints.value
+      autoscaling          = endpoints.value
+      backup               = endpoints.value
+      cloudformation       = endpoints.value
+      cloudtrail           = endpoints.value
+      cloudwatch           = endpoints.value
+      cloudwatchlogs       = endpoints.value
+      ec2                  = endpoints.value
+      ecr                  = endpoints.value
+      ecs                  = endpoints.value
+      efs                  = endpoints.value
+      eks                  = endpoints.value
+      elasticache          = endpoints.value
+      elasticloadbalancing = endpoints.value
+      iam                  = endpoints.value
+      kms                  = endpoints.value
+      lambda               = endpoints.value
+      rds                  = endpoints.value
+      s3                   = endpoints.value
+      secretsmanager       = endpoints.value
+      ssm                  = endpoints.value
+      sns                  = endpoints.value
+      sqs                  = endpoints.value
+      sts                  = endpoints.value
+      wafv2                = endpoints.value
+    }
+  }
 
   # Default tags applied to all AWS resources
   # These tags help with cost allocation, resource management, and compliance
@@ -74,24 +117,21 @@ resource "random_id" "global_suffix" {
 # KUBERNETES PROVIDER CONFIGURATION
 # =============================================================================
 # Configures the Kubernetes provider to manage resources in the EKS cluster
-# Uses AWS CLI for authentication via EKS token-based authentication
+# Uses AWS CLI for authentication via EKS token-based authentication.
+# Under Floci there are no kubernetes_* resources today; use a inert host so provider
+# init does not require a live API server during apply/destroy experiments.
 provider "kubernetes" {
-  # EKS cluster endpoint for API server communication
-  host = module.eks.cluster_endpoint
+  host                   = local.use_floci ? "https://127.0.0.1:6443" : module.eks.cluster_endpoint
+  cluster_ca_certificate = local.use_floci ? null : base64decode(module.eks.cluster_certificate_authority_data)
+  insecure               = local.use_floci
 
-  # Cluster CA certificate for secure TLS communication
-  cluster_ca_certificate = base64decode(module.eks.cluster_certificate_authority_data)
-
-  # Authentication configuration using AWS CLI and EKS token
-  exec {
-    # Kubernetes client authentication API version
-    api_version = "client.authentication.k8s.io/v1beta1"
-
-    # AWS CLI command to get EKS authentication token
-    args = ["eks", "get-token", "--cluster-name", var.cluster_name]
-
-    # Use AWS CLI for authentication
-    command = "aws"
+  dynamic "exec" {
+    for_each = local.use_floci ? [] : [1]
+    content {
+      api_version = "client.authentication.k8s.io/v1beta1"
+      args        = ["eks", "get-token", "--cluster-name", var.cluster_name]
+      command     = "aws"
+    }
   }
 }
 
@@ -127,6 +167,13 @@ data "http" "myip" {
 # These help reduce duplication and maintain consistency
 
 locals {
+  use_floci = var.aws_endpoint_url != null && var.aws_endpoint_url != ""
+
+  # EKS module output cluster_security_group_id is null when create_security_group=false
+  # (Floci path). Prefer the inline Floci SGs in that case.
+  eks_cluster_security_group_id = local.use_floci ? aws_security_group.floci_eks_cluster[0].id : module.eks.cluster_security_group_id
+  eks_node_security_group_id    = local.use_floci ? aws_security_group.floci_eks_node[0].id : module.eks.node_security_group_id
+
   # Common tags applied to resources for consistency
   # These tags help with cost allocation, resource management, and compliance
   common_tags = {

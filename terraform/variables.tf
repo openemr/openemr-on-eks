@@ -380,3 +380,28 @@ variable "enable_patient_portal" {
   type        = bool
   default     = false # Disabled by default for security
 }
+
+# =============================================================================
+# FLOCI / LOCAL AWS EMULATOR (CI EXPERIMENT)
+# =============================================================================
+# When set, the AWS provider targets a local emulator (Floci) instead of real AWS.
+# Do not set this for production applies.
+
+variable "aws_endpoint_url" {
+  description = "Optional AWS API endpoint override (e.g. http://localhost:4566 for Floci). Null uses real AWS."
+  type        = string
+  default     = null
+  nullable    = true
+}
+
+variable "vpc_ready_wait_duration" {
+  description = "Wait after VPC create before EKS (shorten for Floci CI)"
+  type        = string
+  default     = "30s"
+}
+
+variable "compute_ready_wait_duration" {
+  description = "Wait after EKS create before add-ons (shorten for Floci CI)"
+  type        = string
+  default     = "60s"
+}
