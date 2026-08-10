@@ -33,6 +33,9 @@ resource "aws_security_group" "floci_eks_cluster" {
   tags = merge(local.common_tags, { Name = "${var.cluster_name}-cluster-floci" })
 }
 
+# kics-scan ignore-block
+# Supplied to module.eks.node_security_group_id when use_floci; KICS "Security Group
+# Not Used" misses counted module-argument references (INFO is fail_on in CI).
 resource "aws_security_group" "floci_eks_node" {
   count = local.use_floci ? 1 : 0
 

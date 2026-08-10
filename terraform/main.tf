@@ -172,7 +172,6 @@ locals {
   # EKS module output cluster_security_group_id is null when create_security_group=false
   # (Floci path). Prefer the inline Floci SGs in that case.
   eks_cluster_security_group_id = local.use_floci ? aws_security_group.floci_eks_cluster[0].id : module.eks.cluster_security_group_id
-  eks_node_security_group_id    = local.use_floci ? aws_security_group.floci_eks_node[0].id : module.eks.node_security_group_id
 
   # Common tags applied to resources for consistency
   # These tags help with cost allocation, resource management, and compliance
