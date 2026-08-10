@@ -34,12 +34,11 @@ resource "aws_security_group" "floci_eks_cluster" {
 }
 
 # kics-scan ignore-block
-# Supplied to module.eks.node_security_group_id when use_floci; KICS "Security Group
-# Not Used" misses counted module-argument references (INFO is fail_on in CI).
 resource "aws_security_group" "floci_eks_node" {
   count = local.use_floci ? 1 : 0
 
   name_prefix = "${var.cluster_name}-node-"
+  # Passed to module.eks.node_security_group_id when use_floci (KICS may miss that).
   description = "Floci EKS node security group (inline rules; no aws_security_group_rule)"
   vpc_id      = module.vpc.vpc_id
 
