@@ -58,6 +58,7 @@ if [ -z "${AWS_ENDPOINT_URL:-}" ] && [ -z "${FLOCI_ENDPOINT:-}" ]; then
 fi
 
 # shellcheck source=tests/floci/env.sh
+# shellcheck disable=SC1091
 source "${FLOCI_DIR}/env.sh"
 
 step() {

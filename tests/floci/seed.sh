@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=tests/floci/env.sh
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/env.sh"
 
 CLUSTER_NAME="${FLOCI_CLUSTER_NAME:-openemr-eks-floci}"

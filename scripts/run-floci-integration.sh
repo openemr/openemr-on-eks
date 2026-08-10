@@ -8,6 +8,7 @@ PROJECT_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 FLOCI_DIR="${PROJECT_ROOT}/tests/floci"
 
 # shellcheck source=tests/floci/env.sh
+# shellcheck disable=SC1091
 source "${FLOCI_DIR}/env.sh"
 
 if [ -z "${AWS_ENDPOINT_URL:-}" ]; then

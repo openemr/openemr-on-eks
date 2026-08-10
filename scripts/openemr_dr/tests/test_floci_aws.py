@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import os
 import tempfile
 import uuid
@@ -64,13 +65,11 @@ def test_floci_kms_describe_key() -> None:
         created = run_json(["aws", "kms", "create-key", "--description", "openemr-floci-test"], retries=1)
         key_id = str((created.get("KeyMetadata") or {}).get("KeyId") or "").strip()
         assert key_id
-        try:
+        with contextlib.suppress(Exception):
             run(
                 ["aws", "kms", "create-alias", "--alias-name", alias, "--target-key-id", key_id],
                 retries=1,
             )
-        except Exception:
-            pass
         state, enabled = kms_mod._describe_key(region, alias)
 
     assert enabled is True
