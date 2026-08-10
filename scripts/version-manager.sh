@@ -368,6 +368,10 @@ parse_config() {
     PYTHON_CURRENT=$(yq eval '.applications.python.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
     PYTHON_REGISTRY=$(yq eval '.applications.python.registry' "$VERSIONS_FILE" 2>/dev/null || echo "library/python")
 
+    # Floci local AWS emulator image (CI integration / e2e-lite)
+    FLOCI_CURRENT=$(yq eval '.applications.floci.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+    FLOCI_REGISTRY=$(yq eval '.applications.floci.registry' "$VERSIONS_FILE" 2>/dev/null || echo "floci/floci")
+
     # Database versions
     AURORA_CURRENT=$(yq eval '.databases.aurora_mysql.current' "$VERSIONS_FILE")
 
@@ -1190,6 +1194,24 @@ EOF
                 echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
             fi
         fi
+
+        # Check Floci Docker image version
+        FLOCI_CURRENT=$(yq eval '.applications.floci.current' "$VERSIONS_FILE" 2>/dev/null || echo "")
+        FLOCI_REGISTRY=$(yq eval '.applications.floci.registry' "$VERSIONS_FILE" 2>/dev/null || echo "floci/floci")
+        if [ -n "$FLOCI_CURRENT" ]; then
+            log "INFO" "Checking Floci version..."
+            local floci_latest
+            run_version_lookup floci_latest "Floci" "$FLOCI_CURRENT" \
+                get_latest_docker_version "$FLOCI_REGISTRY"
+            if [ -n "$floci_latest" ] && [ "$floci_latest" != "$FLOCI_CURRENT" ]; then
+                log "INFO" "Floci update available: $FLOCI_CURRENT -> $floci_latest"
+                echo "- **Floci**: $FLOCI_CURRENT → $floci_latest" >> "$update_report"
+                search_version_in_codebase "Floci" "$FLOCI_CURRENT" "$floci_latest"
+                updates_found=1
+            else
+                log "INFO" "Floci is up to date: $FLOCI_CURRENT"
+            fi
+        fi
     fi
 
     # Check infrastructure if requested
@@ -1899,7 +1921,7 @@ Options:
   --log-level LEVEL       Set log level (DEBUG, INFO, WARN, ERROR)
 
 Component Types:
-  applications            OpenEMR, Fluent Bit
+  applications            OpenEMR, Fluent Bit, Python, Floci
   infrastructure          Kubernetes, Terraform, AWS Provider
   terraform_modules       EKS, VPC, RDS modules
   github_workflows        GitHub Actions dependencies
@@ -1935,6 +1957,8 @@ show_status() {
     echo -e "${BLUE}Applications:${NC}"
     echo -e "  OpenEMR: ${GREEN}$OPENEMR_CURRENT${NC}"
     echo -e "  Fluent Bit: ${GREEN}$FLUENT_BIT_CURRENT${NC}"
+    [ -n "${PYTHON_CURRENT:-}" ] && echo -e "  Python: ${GREEN}$PYTHON_CURRENT${NC}"
+    [ -n "${FLOCI_CURRENT:-}" ] && echo -e "  Floci: ${GREEN}$FLOCI_CURRENT${NC}"
     echo ""
     echo -e "${BLUE}Infrastructure:${NC}"
     echo -e "  Kubernetes: ${GREEN}$K8S_CURRENT${NC}"

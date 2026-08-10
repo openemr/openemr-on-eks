@@ -105,7 +105,11 @@ graph TD
     B --> D[Lint and Validate]
     B --> E[Security Scan]
     B --> F[Code Quality]
+    B --> F1[Floci Integration]
+    B --> F2[Floci E2E Lite]
     B --> G[Test Summary]
+    F1 --> G
+    F2 --> G
 
     H[Manual Trigger] --> I[manual-releases.yml]
     I --> J[Determine Release Type]
@@ -238,6 +242,18 @@ The workflow also detects changed paths and runs dedicated CI for
 `scripts/openemr_dr`, Warp, credential rotation, and the knowledge MCP package.
 Python requirement pins are validated when their source files or
 `versions.yaml` change.
+
+When Floci-related paths change (or `floci` / `floci_e2e_lite` is selected via
+workflow dispatch), the workflow also runs:
+
+- **`floci-integration`** — starts `floci/floci` pinned from
+  `versions.yaml` (`applications.floci`), seeds emulator state, then runs BATS
+  smoke plus `pytest -m floci` for Warp, credential rotation, and openemr_dr
+- **`floci-e2e-lite`** — CI-mocked backup/restore DR scenario against Floci
+  (`scripts/test-floci-e2e-lite.sh`); does **not** replace the real-AWS
+  maintainer e2e gate
+
+Local Floci debug helpers live under `tests/floci/`.
 
 ##### 2. **Lint and Validate** (`lint-and-validate`)
 

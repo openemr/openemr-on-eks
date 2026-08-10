@@ -1,6 +1,9 @@
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
+markers = [
+    "floci: tests that require a live Floci AWS emulator (AWS_ENDPOINT_URL)",
+]
 
 [tool.coverage.run]
 source = ["credential_rotation"]

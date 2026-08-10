@@ -18,6 +18,9 @@ dev = [
 testpaths = ["tests"]
 pythonpath = [".."]
 addopts = "-v --strict-markers"
+markers = [
+    "floci: tests that require a live Floci AWS emulator (AWS_ENDPOINT_URL)",
+]
 
 [tool.coverage.run]
 source = ["openemr_dr"]

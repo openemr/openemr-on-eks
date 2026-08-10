@@ -29,6 +29,14 @@ applications:
     requires_aws_cli: false
     description: "Python Docker image version for Warp Kubernetes jobs and credential rotation container (tools/credential-rotation/Dockerfile). Automatically detects latest 3.xx version."
 
+  floci:
+    current: "1.6.0"
+    registry: "floci/floci"
+    release_notes_url: "https://github.com/floci-io/floci/releases"
+    notify_on_update: true
+    requires_aws_cli: false
+    description: "Floci local AWS emulator image used by Floci CI integration and e2e-lite suites."
+
 # Infrastructure Versions
 infrastructure:
   eks:
@@ -611,7 +619,7 @@ notifications:
     enabled: true
     labels: ["version-update", "maintenance", "dependencies", "monthly-check"]
     create_for:
-      - "applications"           # Core application Docker images (OpenEMR, Fluent Bit, Python)
+      - "applications"           # Core application Docker images (OpenEMR, Fluent Bit, Python, Floci)
       - "infrastructure"         # Infrastructure components (EKS cluster version, Terraform)
       - "terraform_modules"      # Terraform provider modules and AWS modules (AWS provider, Kubernetes provider, EKS module, VPC module, Pod Identity module)
       - "github_workflows"       # GitHub Actions dependencies used in CI/CD workflows (checkout, setup-python, setup-terraform, setup-kubectl, upload/download artifacts, CodeQL, Trivy, GitHub runner)

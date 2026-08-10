@@ -97,6 +97,22 @@ test_suites:
         files: ["docs/*.md"]
         enabled: true
 
+  floci_integration:
+    name: "Floci Integration Tests"
+    description: "Live AWS API tests against the Floci emulator (CI service or local compose)"
+    tests:
+      - name: "floci_bats_smoke"
+        description: "STS/S3/KMS/Secrets Manager smoke via BATS"
+        type: "floci_integration"
+        files: ["tests/bats/floci-smoke.bats"]
+        enabled: true
+
+      - name: "floci_python_suites"
+        description: "pytest -m floci for warp, credential-rotation, and openemr_dr"
+        type: "floci_integration"
+        files: ["scripts/run-floci-integration.sh"]
+        enabled: true
+
 ci_cd_settings:
   github_actions:
     enabled: true

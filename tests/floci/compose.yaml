@@ -1,0 +1,12 @@
+# Local Floci AWS emulator for debugging CI Floci suites.
+# Prefer GitHub Actions for routine runs; use this compose only when reproducing failures.
+services:
+  floci:
+    image: floci/floci:${FLOCI_VERSION:-1.6.0}
+    ports:
+      - "4566:4566"
+    environment:
+      FLOCI_STORAGE_MODE: memory
+      FLOCI_SERVICES_RDS_MOCK: "true"
+      FLOCI_SERVICES_EKS_MOCK: "true"
+      FLOCI_DEFAULT_REGION: us-east-1

@@ -33,6 +33,7 @@ case "${PROJECT}" in
     python -m bandit -r openemr_dr -c openemr_dr/pyproject.toml -q
     echo "=== pytest ==="
     python -m pytest openemr_dr/tests/ \
+      -m "not floci" \
       --cov=openemr_dr \
       --cov-config=openemr_dr/pyproject.toml \
       --cov-report=term-missing \
@@ -47,6 +48,7 @@ case "${PROJECT}" in
     cd "${SCRIPTS_DIR}/../warp"
     echo "=== pytest ==="
     pytest tests/ -v \
+      -m "not floci" \
       --cov=warp \
       --cov-report=term-missing \
       --cov-report=html \
@@ -69,6 +71,7 @@ case "${PROJECT}" in
     cd "${SCRIPTS_DIR}/../tools/credential-rotation"
     echo "=== pytest ==="
     PYTHONPATH=src pytest tests/ -v \
+      -m "not floci" \
       --cov=credential_rotation \
       --cov-report=term-missing \
       --cov-report=html \

@@ -18,6 +18,7 @@ This guide covers the comprehensive testing strategy for the OpenEMR EKS deploym
 - [Script Validation Tests](#3-script-validation-tests)
 - [Documentation Tests](#4-documentation-tests)
 - [End-to-End Backup/Restore Tests](#5-end-to-end-backuprestore-tests)
+- [Floci Integration and E2E Lite](#6-floci-integration-and-e2e-lite)
 
 ### **🚀 Running Tests**
 
@@ -238,6 +239,44 @@ The end-to-end test script (`scripts/test-end-to-end-backup-restore.sh`) **autom
 
 - `k8s`
 
+### 6. Floci Integration and E2E Lite
+
+**Purpose:** Exercise AWS API surfaces used by backup/restore and Python packages
+against the [Floci](https://github.com/floci-io/floci) local AWS emulator in CI.
+Prefer GitHub Actions; use local compose only when debugging a failing Floci job.
+
+**What it covers:**
+
+- **Integration** (`scripts/run-floci-integration.sh`): STS, S3, KMS, Secrets
+  Manager BATS smoke; `pytest -m floci` for Warp S3, credential-rotation Secrets
+  Manager, and openemr_dr AWS CLI helpers
+- **E2E lite** (`scripts/test-floci-e2e-lite.sh`): seed → backup artifact layout →
+  simulate destroy → restore verification using Floci-supported APIs only
+
+**What it does not replace:**
+
+- The real-AWS 10-step maintainer gate in
+  [`END_TO_END_TESTING_REQUIREMENTS.md`](END_TO_END_TESTING_REQUIREMENTS.md)
+- Terraform apply, EKS/EFS CSI, monitoring install, or AWS Backup restore jobs
+
+**CI jobs:** `floci-integration` and `floci-e2e-lite` in
+`.github/workflows/ci-cd-tests.yml`. Image pin:
+`applications.floci` in `versions.yaml` (monthly version-check).
+
+**Local debug:**
+
+```bash
+export FLOCI_VERSION="$(yq eval '.applications.floci.current' versions.yaml)"
+docker compose -f tests/floci/compose.yaml up -d
+./tests/floci/wait.sh
+source tests/floci/env.sh
+./tests/floci/seed.sh
+./scripts/run-floci-integration.sh
+./scripts/test-floci-e2e-lite.sh
+```
+
+See [`tests/floci/README.md`](../tests/floci/README.md).
+
 **Monitoring Stack Test Details:**
 
 The end-to-end test now includes a comprehensive monitoring stack test (Step 5) that validates:
@@ -439,14 +478,15 @@ The CI/CD pipeline automatically runs on:
 
 ### Main CI/CD Jobs
 
-1. **Changed-path detection** - Selects relevant Python project CI
+1. **Changed-path detection** - Selects relevant Python project CI and Floci jobs
 2. **Python requirements validation** - Enforces synchronized pins
 3. **Test Matrix** - Runs the four repository test suites in parallel
 4. **Lint and Validate** - Additional validation and linting
 5. **Security Scan** - Trivy scanning with engine version 0.72.0
 6. **Code Quality** - Common issue detection
 7. **Project CI** - Warp, OpenEMR DR, credential rotation, and knowledge MCP
-8. **Summary** - Comprehensive results report
+8. **Floci CI** - Integration suites and e2e-lite against the Floci emulator
+9. **Summary** - Comprehensive results report
 
 ### Additional CI Workflows
 
