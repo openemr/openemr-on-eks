@@ -3,6 +3,14 @@
 Attempt to `terraform apply` / `destroy` the production `terraform/` root against
 [Floci](https://floci.io/).
 
+## Table of Contents
+
+- [Quick start](#quick-start)
+- [Result (2026-08-10, Floci 1.6.0)](#result-2026-08-10-floci-160)
+  - [Workarounds already in the root module (only when `aws_endpoint_url` is set)](#workarounds-already-in-the-root-module-only-when-aws_endpoint_url-is-set)
+  - [Remaining blockers on full apply](#remaining-blockers-on-full-apply)
+- [Cleanup after a failed run](#cleanup-after-a-failed-run)
+
 ## Quick start
 
 ```bash
