@@ -85,14 +85,15 @@ are synchronized with [`../../versions.yaml`](../../versions.yaml).
 
 ### Workflow Files
 
-- **`ci-cd-tests.yml`** - Main test matrix, validation, Trivy scan, and
-  path-filtered Python project CI
+- **`ci-cd-tests.yml`** - Main test matrix, validation, Trivy scan, Python
+  project CI, and Floci suites (all jobs on every push/PR; suite selection
+  only for manual `workflow_dispatch`)
 - **`ci-contract-tests.yml`** - BATS contracts, version consistency, Terraform,
   kubeconform, TFLint, and full BATS validation
 - **`security-comprehensive.yml`** - Trivy, Checkov, KICS, Bandit, gosec, and
   ShellCheck with zero tolerated unexempted findings
 - **`console-ci.yml`** - Go lint, test, cross-platform builds, and console
-  security scanning
+  security scanning (runs on every push/PR)
 - **`manual-releases.yml`** - Manually authorized semantic releases
 - **`monthly-version-check.yml`** - Monthly dependency awareness and optional
   GitHub issue creation
@@ -124,7 +125,7 @@ graph TD
 
     A --> X[ci-contract-tests.yml]
     A --> Y[security-comprehensive.yml]
-    Z[Console Change] --> AA[console-ci.yml]
+    A --> AA[console-ci.yml]
 
     R[VERSION] --> I
     S[versions.yaml] --> O

@@ -258,7 +258,7 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
 
 @test "UNIT: Docker stable lookup returns newest clean semantic version" {
   if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
-  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  FUNC_FILE=$(extract_functions "$SCRIPT" "_extract_latest_docker_semver_tag" "get_latest_docker_version")
   run bash -c '
     log() { :; }
     curl() {
@@ -274,11 +274,11 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
 
 @test "UNIT: Docker stable lookup does not reinterpret prerelease tags" {
   if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
-  FUNC_FILE=$(extract_function "$SCRIPT" "get_latest_docker_version")
+  FUNC_FILE=$(extract_functions "$SCRIPT" "_extract_latest_docker_semver_tag" "get_latest_docker_version")
   run bash -c '
     log() { :; }
     curl() {
-      printf "%s\n" '"'"'{"results":[{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
+      printf "%s\n" '"'"'{"next":null,"results":[{"name":"8.3.0-rc1"},{"name":"latest"}]}'"'"'
     }
     source "$1"
     get_latest_docker_version "fluent/fluent-bit"
@@ -286,6 +286,125 @@ SCRIPT="${SCRIPTS_DIR}/version-manager.sh"
   rm -f "$FUNC_FILE"
   assert_failure
   [ -z "$output" ]
+}
+
+@test "UNIT: Docker stable lookup accepts v-prefixed semver tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_functions "$SCRIPT" "_extract_latest_docker_semver_tag" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      printf "%s\n" '"'"'{"results":[{"name":"v0.4.1"},{"name":"v0.10.0"},{"name":"latest"},{"name":"main"}]}'"'"'
+    }
+    source "$1"
+    get_latest_docker_version "otel/ebpf-instrument"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v0.10.0" ]
+}
+
+@test "UNIT: Docker stable lookup paginates past commit and nightly tags" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_functions "$SCRIPT" "_extract_latest_docker_semver_tag" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      # Command substitution runs curl in a subshell; key off the URL, not a counter.
+      local url="${*: -1}"
+      if [[ "$url" == *page=2* ]]; then
+        printf "%s\n" '"'"'{"next":null,"results":[{"name":"v0.9.0"},{"name":"v0.10.0"},{"name":"nightly-20260810"}]}'"'"'
+      else
+        printf "%s\n" '"'"'{"next":"https://registry.hub.docker.com/v2/repositories/otel/ebpf-instrument/tags?page=2&page_size=100","results":[{"name":"deadbeef"},{"name":"nightly"},{"name":"main"}]}'"'"'
+      fi
+    }
+    source "$1"
+    get_latest_docker_version "otel/ebpf-instrument"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v0.10.0" ]
+}
+
+@test "UNIT: Docker stable lookup falls back to name-filtered tag search" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_functions "$SCRIPT" "_extract_latest_docker_semver_tag" "get_latest_docker_version")
+  run bash -c '
+    log() { :; }
+    curl() {
+      local url="${*: -1}"
+      if [[ "$url" == *name=v* ]]; then
+        printf "%s\n" '"'"'{"next":null,"results":[{"name":"v0.10.0"},{"name":"v0.4.1"}]}'"'"'
+      else
+        printf "%s\n" '"'"'{"next":null,"results":[{"name":"deadbeef"},{"name":"nightly"},{"name":"main"}]}'"'"'
+      fi
+    }
+    source "$1"
+    get_latest_docker_version "otel/ebpf-instrument"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "v0.10.0" ]
+}
+
+@test "UNIT: extract_latest_python_minor_tag prefers newest 3.xx series" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_function "$SCRIPT" "extract_latest_python_minor_tag")
+  run bash -c '
+    source "$1"
+    extract_latest_python_minor_tag '"'"'{"results":[{"name":"3.13.15"},{"name":"3.14-slim"},{"name":"3.14"},{"name":"3.14.7-slim"},{"name":"3.15.0rc1"}]}'"'"'
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "3.14" ]
+}
+
+@test "UNIT: classify_version_check_result treats matching versions as up to date" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "classify_version_check_result")
+  run bash -c '
+    source "$1"
+    classify_version_check_result "3.14" "3.14"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "up_to_date" ]
+}
+
+@test "UNIT: classify_version_check_result reports update_available for newer latest" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "classify_version_check_result")
+  run bash -c '
+    source "$1"
+    classify_version_check_result "3.13" "3.14"
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
+  [ "$output" = "update_available" ]
+}
+
+@test "UNIT: classify_version_check_result reports incomplete when latest is empty" {
+  FUNC_FILE=$(extract_function "$SCRIPT" "classify_version_check_result")
+  run bash -c '
+    source "$1"
+    classify_version_check_result "3.14" ""
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_failure
+  [ "$output" = "incomplete" ]
+}
+
+@test "UNIT: Python Docker image check does not fail when already current" {
+  if ! command -v jq >/dev/null 2>&1; then skip "jq not installed"; fi
+  FUNC_FILE=$(extract_functions "$SCRIPT" "extract_latest_python_minor_tag" "classify_version_check_result")
+  run bash -c '
+    source "$1"
+    payload='"'"'{"results":[{"name":"3.14"},{"name":"3.14-slim"},{"name":"3.13"},{"name":"3.14.7"}]}'"'"'
+    latest=$(extract_latest_python_minor_tag "$payload")
+    result=$(classify_version_check_result "3.14" "$latest")
+    [ "$latest" = "3.14" ]
+    [ "$result" = "up_to_date" ]
+  ' _ "$FUNC_FILE"
+  rm -f "$FUNC_FILE"
+  assert_success
 }
 
 @test "UNIT: OpenEMR lookup trusts official releases instead of newer Docker tags" {

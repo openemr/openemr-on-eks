@@ -480,15 +480,17 @@ The CI/CD pipeline automatically runs on:
 
 ### Main CI/CD Jobs
 
-1. **Changed-path detection** - Selects relevant Python project CI and Floci jobs
-2. **Python requirements validation** - Enforces synchronized pins
-3. **Test Matrix** - Runs the four repository test suites in parallel
-4. **Lint and Validate** - Additional validation and linting
-5. **Security Scan** - Trivy scanning with engine version 0.72.0
-6. **Code Quality** - Common issue detection
-7. **Project CI** - Warp, OpenEMR DR, credential rotation, and knowledge MCP
-8. **Floci CI** - Integration suites and e2e-lite against the Floci emulator
-9. **Summary** - Comprehensive results report
+Every push and pull request runs the full job set (manual `workflow_dispatch`
+may still select a single suite):
+
+1. **Python requirements validation** - Enforces synchronized pins
+2. **Test Matrix** - Runs the four repository test suites in parallel
+3. **Lint and Validate** - Additional validation and linting
+4. **Security Scan** - Trivy scanning with engine version 0.72.0
+5. **Code Quality** - Common issue detection
+6. **Project CI** - Warp, OpenEMR DR, credential rotation, and knowledge MCP
+7. **Floci CI** - Integration suites and e2e-lite against the Floci emulator
+8. **Summary** - Comprehensive results report
 
 ### Additional CI Workflows
 
@@ -498,7 +500,7 @@ The CI/CD pipeline automatically runs on:
 - **`security-comprehensive.yml`** - Trivy, Checkov, KICS, Bandit, gosec, and
   ShellCheck; also runs Mondays at 02:00 UTC
 - **`console-ci.yml`** - Go formatting, vet/staticcheck, unit tests,
-  cross-platform builds, and Trivy for console changes
+  cross-platform builds, and Trivy (runs on every push/PR)
 
 **Note**: The security scan runs automatically and displays results in the workflow logs. If GitHub Advanced Security is enabled, results are also uploaded to the Security tab for enhanced vulnerability tracking.
 

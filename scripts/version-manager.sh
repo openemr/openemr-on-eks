@@ -385,50 +385,113 @@ parse_config() {
 
 # Function to get the latest Docker image version from Docker Hub
 # This function queries Docker Hub's API to retrieve the latest available version
+# Newest stable Python 3.minor tag from a Docker Hub tags JSON payload.
+# Matches 3.xx / 3.xx-slim and returns the minor series (e.g. 3.14).
+extract_latest_python_minor_tag() {
+    local response="$1"
+    echo "$response" | jq -r '.results[]?.name // empty' 2>/dev/null \
+        | grep -E '^3\.[0-9]+(-slim)?$' \
+        | sed 's/-slim$//' \
+        | sort -V -r \
+        | head -1 || true
+}
+
+# Classify pinned-vs-latest for awareness checks.
+# Prints: up_to_date | update_available | incomplete
+# Returns 0 for up_to_date/update_available, 1 for incomplete.
+# Matching current and latest must be treated as success (not incomplete).
+classify_version_check_result() {
+    local current="$1"
+    local latest="$2"
+
+    if [ -z "$latest" ]; then
+        echo "incomplete"
+        return 1
+    fi
+    if [ "$latest" = "$current" ]; then
+        echo "up_to_date"
+        return 0
+    fi
+    echo "update_available"
+    return 0
+}
+
+# Extract the newest stable Docker Hub tag from a JSON tags payload.
+# Accepts plain and v-prefixed semver (e.g. 1.6.0, v0.10.0). Architecture
+# suffixes are stripped as a fallback when only arch-qualified tags exist.
+_extract_latest_docker_semver_tag() {
+    local response="$1"
+    local versions
+
+    versions=$(echo "$response" | jq -r '.results[]?.name // empty' 2>/dev/null \
+        | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+$' \
+        | sort -V -r) || versions=""
+
+    if [ -z "$versions" ]; then
+        versions=$(echo "$response" \
+            | jq -r '.results[]?.name // empty' 2>/dev/null \
+            | grep -E '^v?[0-9]+\.[0-9]+\.[0-9]+-(amd64|arm64|aarch64|x86_64)$' \
+            | sed -E 's/-(amd64|arm64|aarch64|x86_64)$//' \
+            | sort -V -r \
+            | uniq) || versions=""
+    fi
+
+    echo "$versions" | head -n 1
+}
+
 get_latest_docker_version() {
     local registry="$1" # Docker registry name (e.g., "fluent/fluent-bit")
 
     log "INFO" "Checking latest version for $registry..."
 
-    # Construct Docker Hub API URL for the registry
-    local url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100"
-    local response
-    if ! response=$(curl -s "$url"); then
-        log "ERROR" "Failed to fetch tags from Docker Hub for $registry"
-        return 1
-    fi
+    local page=1
+    local max_pages=5
+    local next_url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100"
+    local versions=""
+    local response=""
 
-    # Validate that response is valid JSON before parsing
-    if ! echo "$response" | jq empty 2>/dev/null; then
-        log "ERROR" "Invalid JSON response from Docker Hub for $registry. API may be rate-limited or changed."
-        log "DEBUG" "Response preview: $(echo "$response" | head -c 200)..."
-        return 1
-    fi
+    # Paginate: some repos (e.g. otel/ebpf-instrument) bury release tags under
+    # many commit/nightly tags on earlier pages.
+    while [ -n "$next_url" ] && [ "$page" -le "$max_pages" ]; do
+        if ! response=$(curl -sS "$next_url"); then
+            log "ERROR" "Failed to fetch tags from Docker Hub for $registry"
+            return 1
+        fi
 
-    # Parse and filter versions, excluding architecture-specific tags
-    # Only include semantic version numbers (e.g., "7.0.4", not "7.0.4-amd64")
-    local versions=$(echo "$response" | jq -r '.results[].name' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V -r)
+        if ! echo "$response" | jq empty 2>/dev/null; then
+            log "ERROR" "Invalid JSON response from Docker Hub for $registry. API may be rate-limited or changed."
+            log "DEBUG" "Response preview: $(echo "$response" | head -c 200)..."
+            return 1
+        fi
 
-    # Handle case where no clean semantic versions are found
-    if [ -z "$versions" ]; then
-        # If no clean versions found, try to extract base versions from architecture-specific tags
-        # This handles cases where tags include architecture suffixes (e.g., "7.0.4-amd64")
-        local arch_versions
-        arch_versions=$(echo "$response" \
-            | jq -r '.results[].name' \
-            | grep -E '^[0-9]+\.[0-9]+\.[0-9]+-(amd64|arm64|aarch64|x86_64)$' \
-            | sed -E 's/-(amd64|arm64|aarch64|x86_64)$//' \
-            | sort -V -r \
-            | uniq) || arch_versions=""
-        versions="$arch_versions"
-    fi
+        versions=$(_extract_latest_docker_semver_tag "$response")
+        if [ -n "$versions" ]; then
+            echo "$versions"
+            return 0
+        fi
 
-    if [ -z "$versions" ]; then
-        log "ERROR" "No stable semantic-version tags found for $registry"
-        return 1
-    fi
+        next_url=$(echo "$response" | jq -r '.next // empty' 2>/dev/null || echo "")
+        page=$((page + 1))
+    done
 
-    echo "$versions" | head -n 1
+    # Targeted search when release tags never appear in the first pages.
+    for name_filter in v 0 1 2 3 4 5 6 7 8 9; do
+        local filter_url="https://registry.hub.docker.com/v2/repositories/${registry}/tags?page_size=100&name=${name_filter}"
+        if ! response=$(curl -sS "$filter_url"); then
+            continue
+        fi
+        if ! echo "$response" | jq empty 2>/dev/null; then
+            continue
+        fi
+        versions=$(_extract_latest_docker_semver_tag "$response")
+        if [ -n "$versions" ]; then
+            echo "$versions"
+            return 0
+        fi
+    done
+
+    log "ERROR" "No stable semantic-version tags found for $registry"
+    return 1
 }
 
 # Return the latest official non-draft, non-prerelease OpenEMR release.
@@ -1173,22 +1236,20 @@ EOF
             local python_response=$(curl -s "$python_tags_url" 2>/dev/null || echo "")
             
             if [ -n "$python_response" ] && echo "$python_response" | jq empty 2>/dev/null; then
-                # Extract latest 3.xx version (excluding RC/beta)
-                local python_latest=$(echo "$python_response" | jq -r '.results[].name' 2>/dev/null | \
-                    grep -E "^3\.[0-9]+(-slim)?$" | \
-                    sed 's/-slim$//' | \
-                    sort -V -r | \
-                    head -1 || echo "")
-                
-                if [ -n "$python_latest" ] && [ "$python_latest" != "$PYTHON_CURRENT" ]; then
+                local python_latest
+                python_latest=$(extract_latest_python_minor_tag "$python_response")
+                local python_check_result
+                if ! python_check_result=$(classify_version_check_result "$PYTHON_CURRENT" "$python_latest"); then
+                    checks_failed=$((checks_failed + 1))
+                    log "ERROR" "Could not determine the latest stable Python Docker image"
+                    echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
+                elif [ "$python_check_result" = "update_available" ]; then
                     log "INFO" "Python Docker image update available: $PYTHON_CURRENT -> $python_latest"
                     echo "- **Python Docker Image**: $PYTHON_CURRENT → $python_latest (latest 3.xx)" >> "$update_report"
                     search_version_in_codebase "Python Docker Image" "$PYTHON_CURRENT" "$python_latest"
                     updates_found=1
                 else
-                    checks_failed=$((checks_failed + 1))
-                    log "ERROR" "Could not determine the latest stable Python Docker image"
-                    echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
+                    log "INFO" "Python Docker image is up to date: $PYTHON_CURRENT"
                 fi
             else
                 checks_failed=$((checks_failed + 1))

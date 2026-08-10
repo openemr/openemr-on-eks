@@ -104,11 +104,11 @@ Unit pytest runs use `-m "not floci"` so they stay offline. Floci-marked tests
 live in `scripts/openemr_dr/tests/test_floci_aws.py`.
 
 CI jobs **`openemr-dr-ci`**, **`warp-ci`**, **`credential-rotation-ci`**,
-and **`knowledge-mcp-ci`** use path filters so they run only when relevant
-files change. The first three share `scripts/ci/run-python-ci.sh` and
+**`knowledge-mcp-ci`**, and **`python-requirements-validate`** run on every
+push and pull request. Manual `workflow_dispatch` can still select a single
+suite. The first three share `scripts/ci/run-python-ci.sh` and
 `scripts/install-python-dev.sh`; the knowledge MCP uses its locked `uv`
-project. A dedicated **`python-requirements-validate`** job runs when
-`versions.yaml` or `scripts/requirements/` change.
+project.
 
 Shared libraries: `scripts/lib/versions-yq.sh`, `scripts/lib/python-venv.sh`.
 
