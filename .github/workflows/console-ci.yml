@@ -5,7 +5,7 @@
 # including building, testing, and linting to ensure code quality.
 #
 # Key Features:
-# - Automatic builds on push and pull requests
+# - Automatic builds on every push and pull request
 # - Go code quality checks (fmt, vet, staticcheck)
 # - Multi-platform builds (macOS, Linux) to verify cross-compilation
 # - Security scanning with Trivy
@@ -17,24 +17,12 @@
 
 name: Console CI/CD
 
-# Workflow triggers
+# Workflow triggers — runs on every check-in (same branch set as other CI)
 on:
-  # Automatic triggers on console changes
   push:
     branches: [ main, develop ]
-    paths:
-      - 'console/**'
-      - '.github/workflows/console-ci.yml'
-      - 'go.mod'
-      - 'go.sum'
   pull_request:
     branches: [ main, develop ]
-    paths:
-      - 'console/**'
-      - '.github/workflows/console-ci.yml'
-      - 'go.mod'
-      - 'go.sum'
-  # Manual trigger
   workflow_dispatch:
 
 # Cancel in-progress runs when a new commit is pushed to the same branch/PR

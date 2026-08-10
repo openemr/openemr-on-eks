@@ -232,14 +232,6 @@ github_workflows:
     requires_aws_cli: false
     description: "Runs JavaScript in GitHub Actions workflows."
 
-  paths_filter:
-    current: "v4.0.2"
-    repository: "dorny/paths-filter"
-    sha: "7b450fff21473bca461d4b92ce414b9d0420d706"
-    notify_on_update: true
-    requires_aws_cli: false
-    description: "Selects CI jobs based on changed repository paths."
-
   setup_tflint:
     current: "v6.3.0"
     repository: "terraform-linters/setup-tflint"
