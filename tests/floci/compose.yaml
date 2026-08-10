@@ -4,9 +4,25 @@ services:
   floci:
     image: floci/floci:${FLOCI_VERSION:-1.6.0}
     ports:
-      - "4566:4566"
+      # Bind to loopback only (local/CI debug; not exposed on all interfaces)
+      - "127.0.0.1:4566:4566"
     environment:
       FLOCI_STORAGE_MODE: memory
       FLOCI_SERVICES_RDS_MOCK: "true"
       FLOCI_SERVICES_EKS_MOCK: "true"
       FLOCI_DEFAULT_REGION: us-east-1
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    read_only: true
+    tmpfs:
+      - /tmp
+    healthcheck:
+      # Minimal image may lack curl/wget; confirm PID 1 is alive. Host wait.sh is
+      # still the readiness authority used by CI scripts.
+      test: ["CMD", "cat", "/proc/1/cmdline"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
