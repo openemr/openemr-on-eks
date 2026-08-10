@@ -84,6 +84,22 @@ extract_function() {
   echo "$tmp"
 }
 
+# Extract multiple functions into one sourcable temp file (for helpers that
+# call each other, e.g. get_latest_docker_version + _extract_latest_docker_semver_tag).
+extract_functions() {
+  local script="$1"
+  shift
+  local tmp part fn
+  tmp=$(mktemp "${BATS_TEST_TMPDIR:-/tmp}/bats_funcs_XXXXXX.bash")
+  : >"$tmp"
+  for fn in "$@"; do
+    part=$(extract_function "$script" "$fn")
+    cat "$part" >>"$tmp"
+    rm -f "$part"
+  done
+  echo "$tmp"
+}
+
 # ---------------------------------------------------------------------------
 # Temp fixture helpers — create disposable files/dirs for tests that need
 # to control the filesystem (e.g., providing a custom versions.yaml).

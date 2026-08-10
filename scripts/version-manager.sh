@@ -385,6 +385,37 @@ parse_config() {
 
 # Function to get the latest Docker image version from Docker Hub
 # This function queries Docker Hub's API to retrieve the latest available version
+# Newest stable Python 3.minor tag from a Docker Hub tags JSON payload.
+# Matches 3.xx / 3.xx-slim and returns the minor series (e.g. 3.14).
+extract_latest_python_minor_tag() {
+    local response="$1"
+    echo "$response" | jq -r '.results[]?.name // empty' 2>/dev/null \
+        | grep -E '^3\.[0-9]+(-slim)?$' \
+        | sed 's/-slim$//' \
+        | sort -V -r \
+        | head -1 || true
+}
+
+# Classify pinned-vs-latest for awareness checks.
+# Prints: up_to_date | update_available | incomplete
+# Returns 0 for up_to_date/update_available, 1 for incomplete.
+# Matching current and latest must be treated as success (not incomplete).
+classify_version_check_result() {
+    local current="$1"
+    local latest="$2"
+
+    if [ -z "$latest" ]; then
+        echo "incomplete"
+        return 1
+    fi
+    if [ "$latest" = "$current" ]; then
+        echo "up_to_date"
+        return 0
+    fi
+    echo "update_available"
+    return 0
+}
+
 # Extract the newest stable Docker Hub tag from a JSON tags payload.
 # Accepts plain and v-prefixed semver (e.g. 1.6.0, v0.10.0). Architecture
 # suffixes are stripped as a fallback when only arch-qualified tags exist.
@@ -1205,18 +1236,14 @@ EOF
             local python_response=$(curl -s "$python_tags_url" 2>/dev/null || echo "")
             
             if [ -n "$python_response" ] && echo "$python_response" | jq empty 2>/dev/null; then
-                # Extract latest 3.xx version (excluding RC/beta)
-                local python_latest=$(echo "$python_response" | jq -r '.results[].name' 2>/dev/null | \
-                    grep -E "^3\.[0-9]+(-slim)?$" | \
-                    sed 's/-slim$//' | \
-                    sort -V -r | \
-                    head -1 || echo "")
-                
-                if [ -z "$python_latest" ]; then
+                local python_latest
+                python_latest=$(extract_latest_python_minor_tag "$python_response")
+                local python_check_result
+                if ! python_check_result=$(classify_version_check_result "$PYTHON_CURRENT" "$python_latest"); then
                     checks_failed=$((checks_failed + 1))
                     log "ERROR" "Could not determine the latest stable Python Docker image"
                     echo "- **Python Docker Image**: ❌ Version check incomplete" >> "$update_report"
-                elif [ "$python_latest" != "$PYTHON_CURRENT" ]; then
+                elif [ "$python_check_result" = "update_available" ]; then
                     log "INFO" "Python Docker image update available: $PYTHON_CURRENT -> $python_latest"
                     echo "- **Python Docker Image**: $PYTHON_CURRENT → $python_latest (latest 3.xx)" >> "$update_report"
                     search_version_in_codebase "Python Docker Image" "$PYTHON_CURRENT" "$python_latest"
