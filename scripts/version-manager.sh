@@ -1020,16 +1020,18 @@ get_latest_semver_version() {
     # Handle different package types with their specific version sources
     case "$package_name" in
         "python_version")
-            # For Python, we'll check the official Python tags (no releases)
-            # Python uses Git tags for versioning, not GitHub releases
-            local url="https://api.github.com/repos/python/cpython/tags"
-            local response=$(curl -s "$url" 2>/dev/null || echo "")
+            # CPython publishes tags (not always a matching GitHub Release). Paginate
+            # and sort so patch bumps like 3.14.7 are not missed when newer RC tags
+            # appear first in the API response.
+            local response
+            response="$(curl -sS "https://api.github.com/repos/python/cpython/tags?per_page=100" 2>/dev/null || echo "")"
             if [ -z "$response" ] || [ "$response" = "[]" ]; then
                 echo "❌ Error"
                 return 1
             fi
-            # Get the latest stable version (not RC/beta) - get full version, not just major.minor
-            local latest_version=$(echo "$response" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null | head -1 | sed 's/^v//' || echo "")
+            local latest_version
+            latest_version="$(echo "$response" | jq -r '.[] | select(.name | test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | .name' 2>/dev/null \
+                | sed 's/^v//' | sort -V | tail -1 || echo "")"
             ;;
         "terraform_version")
             # For Terraform, check HashiCorp releases
@@ -1521,6 +1523,7 @@ EOF
         if [ "$python_latest" != "❌ Error" ] && [ "$python_latest" != "$python_current" ]; then
             log "INFO" "Python version update available: $python_current -> $python_latest"
             echo "- **Python**: $python_current → $python_latest" >> "$update_report"
+            search_version_in_codebase "Python" "$python_current" "$python_latest"
             updates_found=1
         fi
 

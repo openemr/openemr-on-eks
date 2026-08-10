@@ -74,3 +74,68 @@ def test_floci_kms_describe_key() -> None:
 
     assert enabled is True
     assert state
+
+
+def test_floci_rds_describe_seeded_cluster() -> None:
+    _require_floci()
+    cluster_id = os.environ.get("FLOCI_RDS_CLUSTER_ID", "openemr-floci-aurora")
+    try:
+        data = run_json(
+            ["aws", "rds", "describe-db-clusters", "--db-cluster-identifier", cluster_id],
+            retries=1,
+        )
+    except Exception:
+        run(
+            [
+                "aws",
+                "rds",
+                "create-db-cluster",
+                "--db-cluster-identifier",
+                cluster_id,
+                "--engine",
+                "aurora-mysql",
+                "--master-username",
+                "openemr",
+                "--master-user-password",
+                "SeedPassword123!",
+                "--database-name",
+                "openemr",
+            ],
+            retries=1,
+        )
+        data = run_json(
+            ["aws", "rds", "describe-db-clusters", "--db-cluster-identifier", cluster_id],
+            retries=1,
+        )
+    clusters = data.get("DBClusters") or []
+    assert clusters
+    assert clusters[0].get("DBClusterIdentifier") == cluster_id
+
+
+def test_floci_secrets_manager_get_slot_secret() -> None:
+    _require_floci()
+    secret_name = os.environ.get("FLOCI_SLOT_SECRET_NAME", "openemr/floci/rds-slots")
+    try:
+        data = run_json(
+            ["aws", "secretsmanager", "get-secret-value", "--secret-id", secret_name],
+            retries=1,
+        )
+    except Exception:
+        run(
+            [
+                "aws",
+                "secretsmanager",
+                "create-secret",
+                "--name",
+                secret_name,
+                "--secret-string",
+                '{"active_slot":"A","A":{"username":"openemr","password":"slot-a-password"}}',
+            ],
+            retries=1,
+        )
+        data = run_json(
+            ["aws", "secretsmanager", "get-secret-value", "--secret-id", secret_name],
+            retries=1,
+        )
+    payload = data.get("SecretString") or ""
+    assert "active_slot" in payload

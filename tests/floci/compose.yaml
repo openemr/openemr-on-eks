@@ -13,16 +13,12 @@ services:
       FLOCI_DEFAULT_REGION: us-east-1
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
-    read_only: true
-    tmpfs:
-      - /tmp
+    # Do not use read_only/cap_drop:ALL — the Floci native server needs writable
+    # runtime state under memory mode and fails to accept traffic otherwise.
     healthcheck:
-      # Minimal image may lack curl/wget; confirm PID 1 is alive. Host wait.sh is
-      # still the readiness authority used by CI scripts.
+      # Process liveness only; host-side tests/floci/wait.sh is authoritative.
       test: ["CMD", "cat", "/proc/1/cmdline"]
       interval: 5s
       timeout: 3s
       retries: 12
-      start_period: 5s
+      start_period: 10s

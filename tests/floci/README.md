@@ -48,6 +48,8 @@ docker compose -f tests/floci/compose.yaml down
 
 - Floci e2e-lite mocks the DR *scenario* (S3/KMS/Secrets/RDS API shapes). It does **not** replace the real-AWS gate in `docs/END_TO_END_TESTING_REQUIREMENTS.md`.
 - Image pin lives in `versions.yaml` under `applications.floci` and is tracked by the monthly version-check workflow.
+- Do not set `read_only: true` or `cap_drop: ALL` on the Floci service — the native server needs writable runtime state and will time out in `wait.sh` otherwise.
+- `wait.sh` defaults to a 180s timeout and dumps compose logs on failure. Override with `FLOCI_WAIT_TIMEOUT`.
 
 ## Related documentation
 

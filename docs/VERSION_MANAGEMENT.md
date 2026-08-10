@@ -102,7 +102,7 @@ applications:
 ```
 
 Selected current project pins include OpenEMR 8.2.0, EKS 1.36, Terraform
-1.15.8, CI Python 3.14.6, kubectl v1.36.3, Floci 1.6.0 (`applications.floci`),
+1.15.8, CI Python 3.14.7, kubectl v1.36.3, Floci 1.6.0 (`applications.floci`),
 and the `ubuntu-26.04` GitHub runner.
 Always read `versions.yaml` rather than copying this summary into automation.
 

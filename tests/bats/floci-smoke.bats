@@ -70,3 +70,58 @@ setup() {
   [ "$status" -eq 0 ]
   [[ "$output" == *'"active_slot":"A"'* ]] || [[ "$output" == *'"active_slot": "A"'* ]]
 }
+
+@test "Floci: CloudWatch Logs create group and put events" {
+  local group="/openemr/floci/${TEST_PREFIX}"
+  local stream="smoke-stream"
+  run floci_aws logs create-log-group --log-group-name "$group"
+  [ "$status" -eq 0 ]
+
+  run floci_aws logs create-log-stream --log-group-name "$group" --log-stream-name "$stream"
+  [ "$status" -eq 0 ]
+
+  local ts
+  ts="$(date +%s000)"
+  run floci_aws logs put-log-events \
+    --log-group-name "$group" \
+    --log-stream-name "$stream" \
+    --log-events "timestamp=${ts},message=floci-smoke-ok"
+  [ "$status" -eq 0 ]
+}
+
+@test "Floci: IAM create-role and get-role" {
+  local role="floci-smoke-role-${TEST_PREFIX}"
+  local trust='{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ec2.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
+  run floci_aws iam create-role --role-name "$role" --assume-role-policy-document "$trust"
+  [ "$status" -eq 0 ]
+
+  run floci_aws iam get-role --role-name "$role" --query Role.RoleName --output text
+  [ "$status" -eq 0 ]
+  [ "$output" = "$role" ]
+}
+
+@test "Floci: SSM put-parameter and get-parameter" {
+  local name="/openemr/floci/${TEST_PREFIX}/endpoint"
+  run floci_aws ssm put-parameter --name "$name" --type String --value "http://localhost:4566" --overwrite
+  [ "$status" -eq 0 ]
+
+  run floci_aws ssm get-parameter --name "$name" --query Parameter.Value --output text
+  [ "$status" -eq 0 ]
+  [ "$output" = "http://localhost:4566" ]
+}
+
+@test "Floci: RDS create-db-cluster and describe-db-clusters" {
+  local cluster_id="floci-smoke-rds-${RANDOM}"
+  run floci_aws rds create-db-cluster \
+    --db-cluster-identifier "$cluster_id" \
+    --engine aurora-mysql \
+    --master-username openemr \
+    --master-user-password 'SeedPassword123!' \
+    --database-name openemr
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$cluster_id"* ]]
+
+  run floci_aws rds describe-db-clusters --db-cluster-identifier "$cluster_id"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"$cluster_id"* ]]
+}

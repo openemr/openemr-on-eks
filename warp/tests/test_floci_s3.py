@@ -45,3 +45,20 @@ def test_floci_converter_loads_person_csv_from_s3(floci_s3_bucket: str) -> None:
     rows = conv._load_from_s3("person")
     assert len(rows) == 1
     assert rows[0]["person_id"] == "1"
+
+
+def test_floci_s3_work_bucket_put_get() -> None:
+    endpoint = _require_floci()
+    region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    bucket = os.environ.get("FLOCI_WORK_BUCKET") or f"openemr-floci-work-{os.getpid()}"
+    client = boto3.client("s3", region_name=region, endpoint_url=endpoint)
+    try:
+        client.head_bucket(Bucket=bucket)
+    except Exception:
+        client.create_bucket(Bucket=bucket)
+
+    key = "reports/floci-smoke.txt"
+    body = b"warp-floci-work-ok"
+    client.put_object(Bucket=bucket, Key=key, Body=body)
+    got = client.get_object(Bucket=bucket, Key=key)["Body"].read()
+    assert got == body

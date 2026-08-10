@@ -48,3 +48,21 @@ def test_floci_secrets_manager_slots_round_trip() -> None:
     refreshed = slots.get_secret(secret_name)
     assert refreshed.active_slot == "B"
     assert refreshed.slot("B")["password"] == "rotated-b"
+
+
+def test_floci_admin_secret_round_trip() -> None:
+    _require_floci()
+    region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
+    secret_name = os.environ.get("FLOCI_ADMIN_SECRET_NAME", "openemr/floci/rds-admin")
+    client = boto3.client("secretsmanager", region_name=region)
+    payload = {"username": "admin", "password": "admin-password-floci"}
+    try:
+        client.describe_secret(SecretId=secret_name)
+        client.put_secret_value(SecretId=secret_name, SecretString=json.dumps(payload))
+    except client.exceptions.ResourceNotFoundException:
+        client.create_secret(Name=secret_name, SecretString=json.dumps(payload))
+
+    got = client.get_secret_value(SecretId=secret_name)
+    body = json.loads(got["SecretString"])
+    assert body["username"] == "admin"
+    assert body["password"] == "admin-password-floci"

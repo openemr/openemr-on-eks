@@ -64,6 +64,17 @@ if ! aws rds describe-db-clusters --db-cluster-identifier "${RDS_CLUSTER_ID}" >/
     --database-name openemr >/dev/null || true
 fi
 
+# CloudWatch log group used by smoke / ops-shaped tests
+LOG_GROUP="${FLOCI_LOG_GROUP:-/openemr/floci/${CLUSTER_NAME}}"
+if ! aws logs describe-log-groups --log-group-name-prefix "${LOG_GROUP}" \
+  --query "logGroups[?logGroupName=='${LOG_GROUP}'].logGroupName" --output text 2>/dev/null | grep -qx "${LOG_GROUP}"; then
+  aws logs create-log-group --log-group-name "${LOG_GROUP}" >/dev/null || true
+fi
+
+# SSM parameter shaped like cluster metadata lookups
+SSM_PARAM="${FLOCI_SSM_CLUSTER_PARAM:-/openemr/floci/${CLUSTER_NAME}/cluster-name}"
+aws ssm put-parameter --name "${SSM_PARAM}" --type String --value "${CLUSTER_NAME}" --overwrite >/dev/null || true
+
 # Export paths for downstream suites / e2e-lite
 export FLOCI_BACKUP_BUCKET="${BACKUP_BUCKET}"
 export FLOCI_WARP_BUCKET="${WARP_BUCKET}"
@@ -73,6 +84,8 @@ export FLOCI_ADMIN_SECRET_NAME="${ADMIN_SECRET_NAME}"
 export FLOCI_RDS_CLUSTER_ID="${RDS_CLUSTER_ID}"
 export FLOCI_CLUSTER_NAME="${CLUSTER_NAME}"
 export FLOCI_KMS_ALIAS="alias/openemr-floci-test"
+export FLOCI_LOG_GROUP="${LOG_GROUP}"
+export FLOCI_SSM_CLUSTER_PARAM="${SSM_PARAM}"
 
 # Persist for GitHub Actions job steps
 if [ -n "${GITHUB_ENV:-}" ]; then
@@ -86,6 +99,8 @@ if [ -n "${GITHUB_ENV:-}" ]; then
     echo "FLOCI_RDS_CLUSTER_ID=${FLOCI_RDS_CLUSTER_ID}"
     echo "FLOCI_CLUSTER_NAME=${FLOCI_CLUSTER_NAME}"
     echo "FLOCI_KMS_ALIAS=${FLOCI_KMS_ALIAS}"
+    echo "FLOCI_LOG_GROUP=${FLOCI_LOG_GROUP}"
+    echo "FLOCI_SSM_CLUSTER_PARAM=${FLOCI_SSM_CLUSTER_PARAM}"
   } >> "${GITHUB_ENV}"
 fi
 

@@ -302,7 +302,7 @@ included in the Test Summary aggregation.
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.6
+- **Python**: 3.14.7
 - **Terraform**: 1.15.8
 - **Kubectl**: v1.36.3
 - **Operating System**: `ubuntu-26.04`
@@ -384,7 +384,7 @@ Controlled release management system that allows manual version bumping and rele
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.6
+- **Python**: 3.14.7
 - **Semver Package**: 3.0.4
 - **Operating System**: `ubuntu-26.04`
 
