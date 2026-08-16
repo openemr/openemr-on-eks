@@ -621,4 +621,4 @@ For advanced development topics, architecture details, and contributing guidelin
 
 ## License
 
-MIT License
+Same MIT-0 License as the rest of the project.
