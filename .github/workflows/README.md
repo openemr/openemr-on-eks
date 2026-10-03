@@ -303,9 +303,9 @@ included in the Test Summary aggregation.
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.7
-- **Terraform**: 1.16.0
-- **Kubectl**: v1.37.0
+- **Python**: 3.14.8
+- **Terraform**: 1.16.4
+- **Kubectl**: v1.37.1
 - **Operating System**: `ubuntu-26.04`
 
 #### **Permissions**
@@ -385,8 +385,8 @@ Controlled release management system that allows manual version bumping and rele
 
 #### **Environment Configuration**
 
-- **Python**: 3.14.7
-- **Semver Package**: 3.0.4
+- **Python**: 3.14.8
+- **Semver Package**: 3.1.0
 - **Operating System**: `ubuntu-26.04`
 
 #### **Permissions**
@@ -437,8 +437,8 @@ enabled, it creates a report issue with the configured labels. The
 
 #### **Environment Configuration**
 
-- **Terraform**: 1.16.0
-- **Kubectl**: v1.37.0
+- **Terraform**: 1.16.4
+- **Kubectl**: v1.37.1
 - **Operating System**: `ubuntu-26.04`
 - **Tools**: `yq`, `jq`, `curl` for API interactions
 

@@ -6,7 +6,7 @@
 <p>
   <a href="https://github.com/openemr/openemr-on-eks/blob/main/LICENSE"><img src="https://img.shields.io/github/license/openemr/openemr-on-eks?style=flat" alt="License"></a>
   <a href="https://github.com/openemr/openemr-on-eks/releases"><img src="https://img.shields.io/github/v/release/openemr/openemr-on-eks?label=version&color=blue&style=flat" alt="Version"></a>
-  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.3.0-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
+  <a href="https://hub.docker.com/r/openemr/openemr/tags"><img src="https://img.shields.io/badge/OpenEMR-8.4.1-green?style=flat&logo=docker&logoColor=white" alt="OpenEMR"></a>
 </p>
 
 <table>
@@ -53,7 +53,7 @@
 <td>
   <img src="https://img.shields.io/badge/Python-3.14-3776AB?style=flat&logo=python&logoColor=white" alt="Python">
   <img src="https://img.shields.io/badge/Go-1.27-00ADD8?style=flat&logo=go&logoColor=white" alt="Go">
-  <img src="https://img.shields.io/badge/Terraform-1.16.0-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
+  <img src="https://img.shields.io/badge/Terraform-1.16.4-7B42BC?style=flat&logo=terraform&logoColor=white" alt="Terraform">
   <img src="https://img.shields.io/badge/EKS-Auto%20Mode-FF9900?style=flat&logo=amazoneks&logoColor=white" alt="EKS Auto Mode">
   <img src="https://img.shields.io/badge/Kubernetes-1.36-326CE5?style=flat&logo=kubernetes&logoColor=white" alt="Kubernetes">
   <img src="https://img.shields.io/badge/Aurora-MySQL%208.0-4479A1?style=flat&logo=mysql&logoColor=white" alt="Aurora MySQL">
@@ -469,7 +469,7 @@ The diagram below is auto-generated from the Terraform source code using [Terrav
 
 ### **Required Tools and Versions**
 
-#### **Terraform Installation (Required: v1.16.0 or newer)**
+#### **Terraform Installation (Required: v1.16.4 or newer)**
 
 ```bash
 # Option 1: Install via Homebrew (macOS/Linux)
@@ -477,17 +477,17 @@ brew tap hashicorp/tap
 brew install hashicorp/tap/terraform
 
 # Option 2: Download directly from HashiCorp (All platforms)
-# Visit: https://releases.hashicorp.com/terraform/1.16.0/
+# Visit: https://releases.hashicorp.com/terraform/1.16.4/
 # Download the appropriate binary for your OS and architecture
 # Extract and add to your PATH
 
 # Option 3: Use tfenv for version management (Recommended)
 brew install tfenv
-tfenv install 1.16.0
-tfenv use 1.16.0
+tfenv install 1.16.4
+tfenv use 1.16.4
 
 # Verify installation
-terraform --version  # Should show v1.16.0 or newer
+terraform --version  # Should show v1.16.4 or newer
 ```
 
 #### **Other Required Tools**
@@ -581,11 +581,11 @@ cd openemr-on-eks
 brew install awscli helm jq kubectl terraform
 
 # Alternative: Install latest Terraform directly from HashiCorp
-# Download from: https://releases.hashicorp.com/terraform/1.16.0/
+# Download from: https://releases.hashicorp.com/terraform/1.16.4/
 # Or use tfenv for version management:
 # brew install tfenv
-# tfenv install 1.16.0
-# tfenv use 1.16.0
+# tfenv install 1.16.4
+# tfenv use 1.16.4
 
 # Configure AWS credentials
 aws configure
@@ -658,7 +658,7 @@ Checking Kubernetes resources...
 Checking security configuration...
 ℹ️  EKS cluster not found - security configuration will be applied during deployment
 📋 Planned deployment features:
-   • OpenEMR 8.3.0 with HTTPS-only access (port 443)
+   • OpenEMR 8.4.1 with HTTPS-only access (port 443)
    • EKS Auto Mode for managed EC2 compute
    • Aurora Serverless V2 MySQL database
    • Valkey Serverless cache (Redis-compatible)
@@ -706,12 +706,12 @@ Next steps for first-time deployment:
    • **✅ Logging Status**: Fully functional with test logs, Apache logs, and forward protocol support
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v88.6.2 (metrics & alerting)
+     - Prometheus v91.8.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.2.0 (long-term metrics storage)
-     - OTeBPF v0.12.2 (eBPF auto-instrumentation)
+     - OTeBPF v0.13.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.
@@ -735,7 +735,7 @@ kubernetes_version = "1.36"  # Latest stable with Auto Mode
 aws_region = "us-west-2"
 
 # OpenEMR Application Configuration
-openemr_version = "8.3.0"    # Latest stable OpenEMR version
+openemr_version = "8.4.1"    # Latest stable OpenEMR version
 
 # Compliance Settings
 backup_retention_days = 30
@@ -963,7 +963,7 @@ cd ../scripts
 
 **What this optional monitoring stack adds:**
 
-- 📊 **Prometheus**: kube-prometheus-stack v88.6.2 (metrics collection & alerting)
+- 📊 **Prometheus**: kube-prometheus-stack v91.8.2 (metrics collection & alerting)
 - 📈 **Grafana**: 20+ pre-built Kubernetes dashboards with auto-discovery and secure credentials
   - **AlertManager Integration**: Automatically receives alerts from AlertManager
   - **On-Call Management**: Manages on-call schedules, escalations, and incident response
@@ -979,7 +979,7 @@ cd ../scripts
   - **Remote Write**: Prometheus automatically forwards metrics to Mimir for long-term retention
   - **S3 Storage**: All metrics stored in S3 with lifecycle policies
   - **Retention**: 365 days of metrics storage
-- 🎯 **OTeBPF**: v0.12.2 (eBPF auto-instrumentation)
+- 🎯 **OTeBPF**: v0.13.0 (eBPF auto-instrumentation)
   - **Zero-Code Instrumentation**: Automatically instruments OpenEMR pods without code changes
   - **Traces**: Exports traces to Tempo for distributed tracing
   - **Integration**: Exposes metrics in Prometheus format (scraped by Prometheus)
@@ -1109,7 +1109,7 @@ openemr-on-eks/
 │   ├── KNOWLEDGE_MCP.md                   # Read-only local codebase MCP server guide
 │   ├── TROUBLESHOOTING.md                 # Troubleshooting and solutions
 │   ├── BACKUP_RESTORE_GUIDE.md            # Comprehensive backup and restore guide
-│   ├── LOGGING_GUIDE.md                   # OpenEMR 8.3.0 enhanced logging
+│   ├── LOGGING_GUIDE.md                   # OpenEMR 8.4.1 enhanced logging
 │   ├── TESTING_GUIDE.md                   # Comprehensive CI/CD testing framework
 │   ├── SECURITY_SCANNING.md               # Security scanning tools and configuration guide
 │   ├── CREDENTIAL_ROTATION_GUIDE.md       # Zero-downtime RDS credential rotation guide
@@ -2586,7 +2586,7 @@ Each directory now includes detailed README.md files with maintenance guidance f
 - [Troubleshooting Guide](docs/TROUBLESHOOTING.md) - Common issues and solutions
 - [Backup & Restore Guide](docs/BACKUP_RESTORE_GUIDE.md) - Data backup and recovery procedures
 - [Manual Releases Guide](docs/MANUAL_RELEASES.md) - Manual release process and version management
-- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 8.3.0 enhanced logging
+- [Logging Guide](docs/LOGGING_GUIDE.md) - OpenEMR 8.4.1 enhanced logging
 - [Testing Guide](docs/TESTING_GUIDE.md) - Comprehensive CI/CD testing framework
 - [Security Scanning Guide](docs/SECURITY_SCANNING.md) - Security tools configuration (Trivy, Checkov, KICS)
 - [End-to-End Testing Requirements](docs/END_TO_END_TESTING_REQUIREMENTS.md) - **MANDATORY** testing procedures

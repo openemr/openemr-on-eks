@@ -171,11 +171,11 @@ graph TB
     LOKI_STORE -->|"Trace ID in Logs"| TRACE_ID
     TEMPO_STORE -->|"Trace Context"| TRACE_ID
     TRACE_ID -->|"Correlated View"| GRAF_UI
-    
+
     TEMPO_STORE -->|"RED Metrics<br/>Rate/Errors/Duration"| MIMIR_STORE
     MIMIR_STORE -->|"Exemplars<br/>Link to Traces"| EXEMPLARS
     EXEMPLARS -->|"Trace Details"| TEMPO_STORE
-    
+
     LOKI_STORE -->|"Labels<br/>job, namespace, pod"| LABELS
     PROM_STORE -->|"Labels"| LABELS
     LABELS -->|"Unified Query"| GRAF_UI
@@ -245,7 +245,7 @@ Layer 2: Node-level (EKS Auto Mode)
 kubectl version --client # >= 1.29
 helm version             # >= 3.12
 jq --version             # >= 1.6
-terraform version        # >= 1.16.0 (for S3 bucket and IAM role setup)
+terraform version        # >= 1.16.4 (for S3 bucket and IAM role setup)
 
 # Check cluster access
 kubectl cluster-info

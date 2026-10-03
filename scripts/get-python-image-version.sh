@@ -65,7 +65,7 @@ PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 # to support running the script from different directories
 get_python_version_from_config() {
     local versions_file=""
-    
+
     # Try current directory first
     if [ -f "versions.yaml" ]; then
         versions_file="versions.yaml"
@@ -73,7 +73,7 @@ get_python_version_from_config() {
     elif [ -f "$PROJECT_ROOT/versions.yaml" ]; then
         versions_file="$PROJECT_ROOT/versions.yaml"
     fi
-    
+
     # Extract Python version if versions.yaml found
     if [ -n "$versions_file" ]; then
         yq eval '.applications.python.current' "$versions_file" 2>/dev/null || echo "$DEFAULT_VERSION"
@@ -86,7 +86,7 @@ get_python_version_from_config() {
 # Returns "true" if auto_detect_latest is enabled, "false" otherwise
 is_auto_detect_enabled() {
     local versions_file=""
-    
+
     # Try current directory first
     if [ -f "versions.yaml" ]; then
         versions_file="versions.yaml"
@@ -94,7 +94,7 @@ is_auto_detect_enabled() {
     elif [ -f "$PROJECT_ROOT/versions.yaml" ]; then
         versions_file="$PROJECT_ROOT/versions.yaml"
     fi
-    
+
     # Extract auto_detect_latest setting if versions.yaml found
     if [ -n "$versions_file" ]; then
         yq eval '.applications.python.auto_detect_latest' "$versions_file" 2>/dev/null || echo "false"
@@ -108,20 +108,20 @@ is_auto_detect_enabled() {
 # matching the specified suffix pattern (e.g., 3.14-slim, 3.15-slim)
 get_latest_python_version_from_docker_hub() {
     local suffix="$1"
-    
+
     echo "Detecting latest Python 3.xx${suffix:+-$suffix} version from Docker Hub..." >&2
-    
+
     # Query Docker Hub API for Python tags matching 3.x pattern
     local tags_url="https://registry.hub.docker.com/v2/repositories/library/python/tags?page_size=100&name=3."
     local response=$(curl -s "$tags_url" 2>/dev/null || echo "")
-    
+
     if [ -n "$response" ]; then
         # Extract 3.xx versions matching the suffix pattern, sort, and get latest
         local latest=$(echo "$response" | jq -r '.results[].name' 2>/dev/null | \
             grep -E "^3\.[0-9]+(-${suffix})?$" | \
             sort -V -r | \
             head -1 || echo "")
-        
+
         if [ -n "$latest" ]; then
             # Remove suffix to get version number only
             echo "$latest" | sed -E "s/-${suffix}$//"
@@ -143,7 +143,7 @@ AUTO_DETECT=$(is_auto_detect_enabled)
 # 3. If auto-detection enabled, query Docker Hub for latest version
 if [ "$AUTO_DETECT" = "true" ]; then
     detected_version=$(get_latest_python_version_from_docker_hub "$SUFFIX")
-    
+
     if [ -n "$detected_version" ]; then
         PYTHON_VERSION="$detected_version"
         echo "Found latest Python version: ${PYTHON_VERSION}${SUFFIX:+-$SUFFIX}" >&2
@@ -152,4 +152,3 @@ fi
 
 # 4. Output Docker image tag in standard format
 echo "python:${PYTHON_VERSION}${SUFFIX:+-$SUFFIX}"
-

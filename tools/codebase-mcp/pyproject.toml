@@ -24,7 +24,7 @@ classifiers = [
   "Topic :: Software Development :: Documentation",
 ]
 dependencies = [
-  "fastmcp==4.0.1",
+  "fastmcp==4.0.10",
   "PyYAML==6.0.3",
 ]
 

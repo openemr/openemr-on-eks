@@ -71,14 +71,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -86,7 +86,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -97,7 +97,7 @@ get_aws_region() {
             echo -e "${YELLOW}⚠️  Invalid AWS_REGION format in environment: $AWS_REGION${NC}"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     echo -e "${YELLOW}⚠️  Could not determine AWS region, using default: $AWS_REGION${NC}"
@@ -114,7 +114,7 @@ echo -e "${BLUE}================================${NC}"
 # It uses the 'command -v' builtin to check for command existence without executing it
 check_command() {
     local cmd="$1"  # Command name to check for availability
-    
+
     # Use command -v to check if the command exists in PATH
     # Redirect stderr to /dev/null to suppress error messages
     if command -v "$cmd" >/dev/null 2>&1; then
@@ -445,7 +445,7 @@ check_security_config() {
     if ! aws eks describe-cluster --name "$CLUSTER_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
         echo -e "${BLUE}ℹ️  EKS cluster not found - security configuration will be applied during deployment${NC}"
         echo -e "${BLUE}📋 Planned deployment features:${NC}"
-        echo -e "${BLUE}   • OpenEMR 8.3.0 with HTTPS-only access (port 443)${NC}"
+        echo -e "${BLUE}   • OpenEMR 8.4.1 with HTTPS-only access (port 443)${NC}"
         echo -e "${BLUE}   • EKS Auto Mode for managed EC2 compute${NC}"
         echo -e "${BLUE}   • Aurora Serverless V2 MySQL database${NC}"
         echo -e "${BLUE}   • Valkey Serverless cache (Redis-compatible)${NC}"
@@ -544,12 +544,12 @@ provide_recommendations() {
     echo -e "   • Basic deployment: CloudWatch logs only"
     echo -e "   • Optional: Enhanced monitoring stack: cd $PROJECT_ROOT/monitoring && ./install-monitoring.sh"
     echo -e "   • Enhanced stack includes:"
-    echo -e "     - Prometheus v88.6.2 (metrics & alerting)"
+    echo -e "     - Prometheus v91.8.2 (metrics & alerting)"
     echo -e "     - Grafana (dashboards with auto-discovery)"
     echo -e "     - Loki v7.0.0 (log aggregation)"
     echo -e "     - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)"
     echo -e "     - Mimir v6.2.0 (long-term metrics storage)"
-    echo -e "     - OTeBPF v0.12.2 (eBPF auto-instrumentation)"
+    echo -e "     - OTeBPF v0.13.0 (eBPF auto-instrumentation)"
     echo -e "     - AlertManager (Slack integration support)"
     echo -e "     - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)"
     echo -e "   • Configure alerting for critical issues"

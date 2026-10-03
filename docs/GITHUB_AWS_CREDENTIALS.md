@@ -62,7 +62,7 @@ This project supports **two authentication methods** for GitHub Actions to acces
 
 ### Prerequisites
 
-- Terraform 1.16.0 or newer (see main README for installation)
+- Terraform 1.16.4 or newer (see main README for installation)
 - AWS CLI 2.15+ configured with credentials
 - IAM permissions to create OIDC providers and roles
 
@@ -173,7 +173,7 @@ If you move to a different AWS account:
 The default policy in `oidc_provider/main.tf` grants minimal permissions needed for the `monthly-version-check.yml` workflow:
 
 - `eks:DescribeAddonVersions` - For checking EKS add-on versions
-- `rds:DescribeDBEngineVersions` - For checking Aurora MySQL versions  
+- `rds:DescribeDBEngineVersions` - For checking Aurora MySQL versions
 - `sts:GetCallerIdentity` - For AWS credential validation
 
 **To add more permissions** for other workflows (e.g., Terraform deployments, backups):
@@ -291,4 +291,3 @@ resource "aws_iam_role_policy" "github_actions_version_check" {
 - **AWS Blog**: [Use IAM roles to connect GitHub Actions to actions in AWS](https://aws.amazon.com/blogs/security/use-iam-roles-to-connect-github-actions-to-actions-in-aws/)
 - **AWS Documentation**: [Creating OpenID Connect identity providers](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html)
 - **GitHub Documentation**: [Security hardening with OpenID Connect](https://docs.github.com/en/actions/deployment/security-hardening-your-deployments/about-security-hardening-with-openid-connect)
-

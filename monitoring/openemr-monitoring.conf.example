@@ -27,12 +27,12 @@ ACCESS_MODE_RWX="ReadWriteMany"
 # CHART VERSIONS (pinned for stability)
 # =============================================================================
 # These versions are tested and known to work together
-CHART_KPS_VERSION="88.6.2"     # kube-prometheus-stack
+CHART_KPS_VERSION="91.8.2"     # kube-prometheus-stack
 CHART_LOKI_VERSION="7.0.0"     # Grafana Loki stack
 CHART_TEMPO_VERSION="2.26.0"   # Grafana Tempo Distributed (distributed tracing in microservice mode)
 CHART_MIMIR_VERSION="6.2.0"    # Grafana Mimir (long-term metrics storage)
-OTEBPF_VERSION="v0.12.2"        # OTeBPF (eBPF auto-instrumentation) - Docker Hub: otel/ebpf-instrument
-CERT_MANAGER_VERSION="v1.21.1" # cert-manager (TLS certificate management)
+OTEBPF_VERSION="v0.13.0"        # OTeBPF (eBPF auto-instrumentation) - Docker Hub: otel/ebpf-instrument
+CERT_MANAGER_VERSION="v1.21.2" # cert-manager (TLS certificate management)
 
 # =============================================================================
 # TIMEOUTS AND RETRIES

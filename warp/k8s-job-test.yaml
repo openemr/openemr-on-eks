@@ -103,7 +103,7 @@ spec:
 
           echo "Installing Python dependencies..."
           # Versions pinned to match versions.yaml
-          pip install --no-cache-dir pymysql==1.2.0 boto3==1.43.86
+          pip install --no-cache-dir pymysql==1.2.3 boto3==1.43.106
 
           echo "Extracting warp code from ConfigMap..."
           cd /app
@@ -161,4 +161,3 @@ spec:
 
       # Use IRSA for S3 access (if configured)
       # The service account should have S3 read permissions
-

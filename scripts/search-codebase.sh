@@ -32,11 +32,11 @@ readonly PROJECT_ROOT
 search_codebase() {
     local search_term="$1"
     local case_sensitive="${2:-false}"
-    
+
     echo -e "${CYAN}🔍 Searching codebase for: ${BLUE}'$search_term'${NC}"
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
-    
+
     # Define exclusion patterns
     local exclude_patterns=(
         "--exclude-dir=.git"
@@ -58,31 +58,31 @@ search_codebase() {
         "--exclude=*.temp"
         "--exclude=console/console"
     )
-    
+
     # Build grep command
     local grep_cmd="grep -rn"
     if [ "$case_sensitive" = "false" ]; then
         grep_cmd="$grep_cmd -i"
     fi
-    
+
     # shellcheck disable=SC2124  # Intentionally concatenating array to string for grep command
     grep_cmd="$grep_cmd ${exclude_patterns[*]}"
-    
+
     # Search and display results
     local results
     results=$( (cd "$PROJECT_ROOT" && $grep_cmd "$search_term" . 2>/dev/null) || true)
-    
+
     if [ -z "$results" ]; then
         echo -e "${YELLOW}No matches found for '$search_term'${NC}"
         echo ""
         return 1
     fi
-    
+
     # Count matches
     local match_count=$(echo "$results" | wc -l | tr -d ' ')
     echo -e "${GREEN}Found $match_count match(es):${NC}"
     echo ""
-    
+
     # Display results with context
     echo "$results" | while IFS= read -r line; do
         if [ -n "$line" ]; then
@@ -90,11 +90,11 @@ search_codebase() {
             file_path=$(echo "$line" | cut -d: -f1)
             line_num=$(echo "$line" | cut -d: -f2)
             content=$(echo "$line" | cut -d: -f3-)
-            
+
             echo -e "${BLUE}$file_path${NC}:${CYAN}$line_num${NC}:$content"
         fi
     done
-    
+
     echo ""
     echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 }
@@ -102,20 +102,20 @@ search_codebase() {
 # Main execution
 main() {
     local search_term="${1:-}"
-    
+
     if [ -z "$search_term" ]; then
         echo -e "${CYAN}Codebase Search Tool${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
         echo -e "${BLUE}Enter search term:${NC} "
         read -r search_term
-        
+
         if [ -z "$search_term" ]; then
             echo -e "${RED}Error: Search term cannot be empty${NC}"
             exit 1
         fi
     fi
-    
+
     search_codebase "$search_term" "false"
 }
 

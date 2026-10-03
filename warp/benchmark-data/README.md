@@ -148,4 +148,3 @@ The compressed dataset files are approximately:
 - **Warp README.md**: Main documentation with benchmark results
 - **Warp DEVELOPER.md**: Developer guide and architecture details
 - **Dataset Documentation**: https://registry.opendata.aws/cmsdesynpuf-omop/
-

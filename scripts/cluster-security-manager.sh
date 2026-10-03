@@ -64,14 +64,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -80,7 +80,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -92,7 +92,7 @@ get_aws_region() {
             echo "⚠️  Invalid AWS_REGION format in environment: $AWS_REGION"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     REGION="$AWS_REGION"
@@ -293,7 +293,7 @@ case "$1" in
   "disable")
     # Disable public access command - restricts cluster to private network only
     echo "🔒 Disabling public access for enhanced security..."
-    
+
     # Update EKS cluster configuration to disable public access
     # This ensures the cluster is only accessible from within the VPC
     if aws eks update-cluster-config \
@@ -395,7 +395,7 @@ case "$1" in
   "status")
     # Status command - displays current cluster endpoint configuration
     echo "📊 Current cluster endpoint configuration:"
-    
+
     # Query and display cluster endpoint configuration in table format
     aws eks describe-cluster --name "$CLUSTER_NAME" --region "$REGION" \
       --query 'cluster.resourcesVpcConfig.{PublicAccess:endpointPublicAccess,PrivateAccess:endpointPrivateAccess,AllowedCIDRs:publicAccessCidrs}' \

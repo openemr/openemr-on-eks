@@ -52,17 +52,17 @@ download_dataset_files() {
     local data_dir="$1"
     local s3_bucket="s3://synpuf-omop/cmsdesynpuf1k"
     local region="us-west-2"
-    
+
     echo "Downloading dataset files from S3..."
     echo ""
-    
+
     # Check if AWS CLI is available
     if ! command -v aws &> /dev/null; then
         echo -e "${RED}ERROR: AWS CLI is not installed or not in PATH${NC}"
         echo "Please install AWS CLI to download dataset files."
         exit 1
     fi
-    
+
     # File names
     local files=(
         "CDM_PERSON.csv.bz2"
@@ -70,7 +70,7 @@ download_dataset_files() {
         "CDM_DRUG_EXPOSURE.csv.bz2"
         "CDM_OBSERVATION.csv.bz2"
     )
-    
+
     # Download each file (using --no-sign-request for public bucket access)
     for file in "${files[@]}"; do
         echo -n "Downloading $file... "
@@ -83,7 +83,7 @@ download_dataset_files() {
             exit 1
         fi
     done
-    
+
     echo ""
     echo -e "${GREEN}✓ All dataset files downloaded successfully${NC}"
     echo ""
@@ -92,7 +92,7 @@ download_dataset_files() {
 # Function to clean up existing data files
 cleanup_existing_files() {
     local data_dir="$1"
-    
+
     # File names
     local files=(
         "CDM_PERSON.csv.bz2"
@@ -100,7 +100,7 @@ cleanup_existing_files() {
         "CDM_DRUG_EXPOSURE.csv.bz2"
         "CDM_OBSERVATION.csv.bz2"
     )
-    
+
     local found_files=0
     for file in "${files[@]}"; do
         if [ -f "$data_dir/$file" ]; then
@@ -108,7 +108,7 @@ cleanup_existing_files() {
             break
         fi
     done
-    
+
     if [ $found_files -eq 1 ]; then
         echo "Removing existing dataset files..."
         for file in "${files[@]}"; do
@@ -125,12 +125,12 @@ cleanup_existing_files() {
 count_records() {
     local file="$1"
     local name="$2"
-    
+
     if [ ! -f "$file" ]; then
         echo "ERROR: File not found: $file"
         return 1
     fi
-    
+
     # Count lines excluding header (tail -n +2 skips first line)
     if command -v bzcat &> /dev/null; then
         local count=$(bzcat "$file" | tail -n +2 | wc -l | tr -d ' ')
@@ -143,7 +143,7 @@ count_records() {
         echo "ERROR: Neither bzcat nor bunzip2 found. Please install one."
         return 1
     fi
-    
+
     echo "$count"
 }
 
@@ -285,7 +285,7 @@ if [ "$PERSON_COUNT" -eq "$EXPECTED_PERSON" ] && \
     echo "  - Observations: $OBSERVATION_COUNT"
     echo "  - Total: $TOTAL records"
     echo ""
-    
+
     # Clean up data files unless --keep-downloaded-data flag is set
     if [ "$KEEP_DATA" = false ]; then
         echo "Cleaning up downloaded data files..."
@@ -297,19 +297,18 @@ if [ "$PERSON_COUNT" -eq "$EXPECTED_PERSON" ] && \
     else
         echo -e "${YELLOW}ℹ Data files preserved (--keep-downloaded-data flag set)${NC}"
     fi
-    
+
     exit 0
 else
     echo -e "${RED}✗ Some counts do not match the documented values${NC}"
     echo ""
     echo "Please verify the dataset files are correct."
     echo ""
-    
+
     # Don't delete files if verification failed
     if [ "$KEEP_DATA" = false ]; then
         echo -e "${YELLOW}ℹ Data files preserved due to verification failure${NC}"
     fi
-    
+
     exit 1
 fi
-

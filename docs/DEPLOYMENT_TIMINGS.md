@@ -13,25 +13,25 @@ This guide provides measured timing data for various operations in the OpenEMR o
 <!-- BEGIN AUTOMATED E2E TIMINGS -->
 ## Latest Automated E2E Timing Report
 
-- **Generated:** 2026-08-10 21:00:26 UTC
-- **OpenEMR:** 8.2.0
+- **Generated:** 2026-10-03 19:16:01 UTC
+- **OpenEMR:** 8.4.1
 - **AWS Region:** us-west-2
 - **Scope:** full 10-step suite
-- **Run ID:** 20260810-140518
-- **Total elapsed:** 10508s (175m 8s)
+- **Run ID:** 20261003-121826
+- **Total elapsed:** 10655s (177m 35s)
 
 | Phase | Status | Seconds | Duration |
 |---|---:|---:|---:|
-| Infrastructure Deployment | SUCCESS | 1549 | 25m 49s |
-| OpenEMR Deployment | SUCCESS | 1100 | 18m 20s |
-| Test Data Deployment | SUCCESS | 386 | 6m 26s |
-| Backup Creation | SUCCESS | 32 | 0m 32s |
-| Monitoring Stack Test | SUCCESS | 926 | 15m 26s |
-| Infrastructure Deletion | SUCCESS | 1450 | 24m 10s |
-| Infrastructure Recreation | SUCCESS | 1402 | 23m 22s |
-| Backup Restoration | SUCCESS | 2122 | 35m 22s |
-| Restoration Verification | SUCCESS | 49 | 0m 49s |
-| Final Cleanup | SUCCESS | 1485 | 24m 45s |
+| Infrastructure Deployment | SUCCESS | 1291 | 21m 31s |
+| OpenEMR Deployment | SUCCESS | 1313 | 21m 53s |
+| Test Data Deployment | SUCCESS | 363 | 6m 03s |
+| Backup Creation | SUCCESS | 39 | 0m 39s |
+| Monitoring Stack Test | SUCCESS | 940 | 15m 40s |
+| Infrastructure Deletion | SUCCESS | 1251 | 20m 51s |
+| Infrastructure Recreation | SUCCESS | 1631 | 27m 11s |
+| Backup Restoration | SUCCESS | 2433 | 40m 33s |
+| Restoration Verification | SUCCESS | 63 | 1m 03s |
+| Final Cleanup | SUCCESS | 1325 | 22m 05s |
 
 <!-- END AUTOMATED E2E TIMINGS -->
 

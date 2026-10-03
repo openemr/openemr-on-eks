@@ -1,6 +1,6 @@
 # OpenEMR on EKS Logging Guide
 
-This comprehensive guide covers the enhanced logging configuration for OpenEMR 8.3.0 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
+This comprehensive guide covers the enhanced logging configuration for OpenEMR 8.4.1 on Amazon EKS, including CloudWatch integration, Fluent Bit configuration, and troubleshooting.
 
 ## 📋 Table of Contents
 
@@ -18,7 +18,7 @@ This comprehensive guide covers the enhanced logging configuration for OpenEMR 8
 
 ## Overview
 
-OpenEMR 8.3.0 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
+OpenEMR 8.4.1 includes comprehensive logging capabilities designed for healthcare compliance and operational monitoring:
 
 - **Multi-layer logging**: Application, system, audit, and infrastructure logs
 - **Real-time processing**: Fluent Bit with 5-second refresh intervals
@@ -156,7 +156,7 @@ The Fluent Bit configuration is deployed as a ConfigMap (`fluent-bit-sidecar-con
     storage.path                      /tmp/fluent-bit-buffer
     storage.backlog.mem_limit         50M
     storage.pause_on_chunks_overlimit On
-    storage.max_chunks_up             256              
+    storage.max_chunks_up             256
 ```
 
 ### Input Configuration
@@ -347,7 +347,7 @@ The configuration includes a record modifier filter that adds metadata to all lo
     Match               *
     Record              cluster_name ${CLUSTER_NAME}
     Record              region ${AWS_REGION}
-    Record              openemr_version 8.3.0
+    Record              openemr_version 8.4.1
     Record              pod_name ${HOSTNAME}
 ```
 
@@ -395,7 +395,7 @@ Fluent Bit is deployed as a sidecar container within each OpenEMR pod, providing
 
 ```yaml
 - name: fluent-bit-sidecar
-  image: fluent/fluent-bit:5.1.1
+  image: fluent/fluent-bit:5.1.3
   ports:
   - containerPort: 2020
     name: fluent-bit-http

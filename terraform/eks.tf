@@ -69,7 +69,7 @@ resource "aws_security_group" "floci_eks_node" {
 module "eks" {
   # Source module for EKS cluster creation with Auto Mode support
   source  = "terraform-aws-modules/eks/aws"
-  version = "21.25.0" # Latest stable version with Auto Mode support
+  version = "21.26.0" # Latest stable version with Auto Mode support
 
   # Cluster identification and version configuration
   name               = var.cluster_name       # EKS cluster name
@@ -192,10 +192,10 @@ resource "time_sleep" "wait_for_compute" {
 # Metrics Server provides resource utilization metrics for HPA (Horizontal Pod Autoscaler)
 resource "aws_eks_addon" "metrics_server" {
   cluster_name                = module.eks.cluster_name
-  addon_name                  = "metrics-server"    # Essential for autoscaling
-  addon_version               = "v0.9.0-eksbuild.7" # Latest stable version for Kubernetes 1.36
-  resolve_conflicts_on_create = "OVERWRITE"         # Overwrite any existing conflicts
-  resolve_conflicts_on_update = "OVERWRITE"         # Overwrite any existing conflicts
+  addon_name                  = "metrics-server"     # Essential for autoscaling
+  addon_version               = "v0.9.0-eksbuild.11" # Latest stable version for Kubernetes 1.36
+  resolve_conflicts_on_create = "OVERWRITE"          # Overwrite any existing conflicts
+  resolve_conflicts_on_update = "OVERWRITE"          # Overwrite any existing conflicts
 
   # Wait for compute infrastructure to be ready
   # Metrics Server needs compute nodes to collect metrics from

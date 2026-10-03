@@ -118,12 +118,12 @@ readonly RETRY_DELAY=${RETRY_DELAY:-5}
 aws_with_retry() {
     local max_attempts="$MAX_RETRIES"
     local attempt=1
-    
+
     while [ "$attempt" -le "$max_attempts" ]; do
         # Capture stderr to a temp file to show errors on failure, let stdout pass through
         local temp_error_file
         temp_error_file=$(mktemp)
-        
+
         if aws "$@" 2>"$temp_error_file"; then
             rm -f "$temp_error_file"
             return 0
@@ -135,16 +135,16 @@ aws_with_retry() {
                 echo -e "${RED}   Error: $(cat "$temp_error_file")${NC}" >&2
             fi
             rm -f "$temp_error_file"
-            
+
             if [ "$attempt" -lt "$max_attempts" ]; then
                 echo -e "${BLUE}   Retrying in ${RETRY_DELAY} seconds...${NC}" >&2
                 sleep "$RETRY_DELAY"
             fi
-            
+
             attempt=$((attempt + 1))
         fi
     done
-    
+
     echo -e "${RED}❌ AWS command failed after $max_attempts attempts: aws $*${NC}" >&2
     return 1
 }
@@ -153,23 +153,23 @@ aws_with_retry() {
 kubectl_with_retry() {
     local max_attempts="$MAX_RETRIES"
     local attempt=1
-    
+
     while [ "$attempt" -le "$max_attempts" ]; do
         if kubectl "$@" 2>/dev/null; then
             return 0
         else
             local exit_code=$?
             echo -e "${YELLOW}⚠️  kubectl command failed (attempt $attempt/$max_attempts, exit code: $exit_code)${NC}"
-            
+
             if [ "$attempt" -lt "$max_attempts" ]; then
                 echo -e "${BLUE}   Retrying in ${RETRY_DELAY} seconds...${NC}"
                 sleep "$RETRY_DELAY"
             fi
-            
+
             attempt=$((attempt + 1))
         fi
     done
-    
+
     echo -e "${RED}❌ kubectl command failed after $max_attempts attempts: kubectl $*${NC}" >&2
     return 1
 }
@@ -178,23 +178,23 @@ kubectl_with_retry() {
 terraform_with_retry() {
     local max_attempts="$MAX_RETRIES"
     local attempt=1
-    
+
     while [ "$attempt" -le "$max_attempts" ]; do
         if terraform -chdir="$TERRAFORM_DIR" "$@" 2>/dev/null; then
             return 0
         else
             local exit_code=$?
             echo -e "${YELLOW}⚠️  Terraform command failed (attempt $attempt/$max_attempts, exit code: $exit_code)${NC}"
-            
+
             if [ "$attempt" -lt "$max_attempts" ]; then
                 echo -e "${BLUE}   Retrying in ${RETRY_DELAY} seconds...${NC}"
                 sleep "$RETRY_DELAY"
             fi
-            
+
             attempt=$((attempt + 1))
         fi
     done
-    
+
     echo -e "${RED}❌ Terraform command failed after $max_attempts attempts: terraform -chdir=\"$TERRAFORM_DIR\" $*${NC}" >&2
     return 1
 }
@@ -206,12 +206,12 @@ wait_for_aws_resource() {
     local expected_status="$3"
     local max_wait_time="${4:-600}"
     local check_interval="${5:-30}"
-    
+
     local elapsed=0
     local last_status=""
-    
+
     echo -e "${YELLOW}⏳ Waiting for $resource_type '$resource_id' to reach status '$expected_status'...${NC}"
-    
+
     while [ $elapsed -lt "$max_wait_time" ]; do
         local current_status
         case $resource_type in
@@ -247,23 +247,23 @@ wait_for_aws_resource() {
                 return 1
                 ;;
         esac
-        
+
         if [ "$current_status" = "$expected_status" ]; then
             echo -e "${GREEN}✅ $resource_type '$resource_id' reached status '$expected_status'${NC}"
             return 0
         fi
-        
+
         # Only show status if it changed to avoid spam
         if [ "$current_status" != "$last_status" ]; then
             echo -e "${BLUE}   Current status: $current_status${NC}"
             last_status="$current_status"
         fi
-        
+
         echo -e "${BLUE}   Progress: ${elapsed}s / ${max_wait_time}s${NC}"
         sleep "$check_interval"
         elapsed=$((elapsed + check_interval))
     done
-    
+
     echo -e "${RED}❌ Timeout waiting for $resource_type '$resource_id' to reach status '$expected_status'${NC}" >&2
     return 1
 }
@@ -430,14 +430,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -445,7 +445,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -456,7 +456,7 @@ get_aws_region() {
             echo -e "${YELLOW}⚠️  Invalid AWS_REGION format in environment: $AWS_REGION${NC}"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     echo -e "${YELLOW}⚠️  Could not determine AWS region, using default: $AWS_REGION${NC}"
@@ -493,17 +493,17 @@ auto_detect_latest_snapshot() {
     # Get current cluster identifier from Terraform
     local cluster_identifier
     cluster_identifier=$(terraform_with_retry output -raw cluster_name 2>/dev/null || echo "")
-    
+
     # If cluster_name is just "openemr-eks", we need to get the actual RDS cluster identifier
     if [ "$cluster_identifier" = "openemr-eks" ]; then
         cluster_identifier=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
     fi
-    
+
     if [ -z "$cluster_identifier" ]; then
         echo -e "${RED}❌ Could not determine cluster name from Terraform${NC}" >&2
         return 1
     fi
-    
+
     # Get the most recent available snapshot
     local latest_snapshot
     latest_snapshot=$(aws_with_retry rds describe-db-cluster-snapshots \
@@ -512,11 +512,11 @@ auto_detect_latest_snapshot() {
         --snapshot-type manual \
         --query "DBClusterSnapshots[?Status==\`available\`] | sort_by(@, &SnapshotCreateTime) | [-1].DBClusterSnapshotIdentifier" \
         --output text 2>/dev/null)
-    
+
     if [ -n "$latest_snapshot" ] && [ "$latest_snapshot" != "None" ]; then
         SNAPSHOT_ID="$latest_snapshot"
         echo -e "${GREEN}✅ Using latest snapshot: $SNAPSHOT_ID${NC}"
-        
+
         # Also suggest the corresponding backup bucket
         local snapshot_date
         snapshot_date=$(echo "$latest_snapshot" | grep -o '[0-9]\{8\}-[0-9]\{6\}' || echo "")
@@ -557,19 +557,19 @@ ensure_kubeconfig() {
 # Validate Terraform state and required outputs
 validate_terraform_state() {
     echo -e "${YELLOW}🔍 Validating Terraform state...${NC}"
-    
+
     # Check if Terraform is initialized
     if [ ! -d "$TERRAFORM_DIR/.terraform" ]; then
         echo -e "${RED}❌ Terraform not initialized. Run 'terraform init' first${NC}" >&2
         return 1
     fi
-    
+
     # Check if Terraform state exists
     if ! terraform_with_retry state list; then
         echo -e "${RED}❌ Terraform state not accessible${NC}" >&2
         return 1
     fi
-    
+
     # Verify required outputs exist
     local required_outputs=("cluster_name" "aurora_cluster_id" "aurora_db_subnet_group_name")
     for output in "${required_outputs[@]}"; do
@@ -578,7 +578,7 @@ validate_terraform_state() {
             return 1
         fi
     done
-    
+
     echo -e "${GREEN}✅ Terraform state validation passed${NC}"
     return 0
 }
@@ -586,14 +586,14 @@ validate_terraform_state() {
 # Validate backup bucket exists and contains required data
 validate_backup_bucket() {
     echo -e "${YELLOW}🔍 Validating backup bucket...${NC}"
-    
+
     # Check if bucket exists
     if ! aws_with_retry s3 ls "s3://$BACKUP_BUCKET"; then
         echo -e "${RED}❌ Backup bucket '$BACKUP_BUCKET' does not exist or is not accessible${NC}" >&2
         suggest_available_backup_buckets
         return 1
     fi
-    
+
     # Check if bucket has application-data folder
     if ! aws_with_retry s3 ls "s3://$BACKUP_BUCKET/application-data/"; then
         echo -e "${RED}❌ Backup bucket does not contain 'application-data' folder${NC}" >&2
@@ -601,7 +601,7 @@ validate_backup_bucket() {
         suggest_available_backup_buckets
         return 1
     fi
-    
+
     echo -e "${GREEN}✅ Backup bucket validation passed${NC}"
     return 0
 }
@@ -609,40 +609,40 @@ validate_backup_bucket() {
 # Suggest available backup buckets
 suggest_available_backup_buckets() {
     echo -e "${BLUE}🔍 Looking for available OpenEMR backup buckets...${NC}" >&2
-    
+
     # Get account ID for bucket naming pattern
     local account_id
     account_id=$(aws_with_retry sts get-caller-identity --query Account --output text 2>/dev/null || echo "")
-    
+
     if [ -z "$account_id" ]; then
         echo -e "${YELLOW}   ⚠️  Could not determine AWS account ID${NC}" >&2
         return 1
     fi
-    
+
     # Look for OpenEMR backup buckets
     local backup_buckets
     backup_buckets=$(aws_with_retry s3 ls --region "$AWS_REGION" 2>/dev/null | \
         grep "openemr-backups-$account_id-openemr-eks-" | \
         awk '{print $3}' | sort -r | head -5)
-    
+
     if [ -n "$backup_buckets" ]; then
         echo -e "${GREEN}   📋 Available OpenEMR backup buckets:${NC}" >&2
         echo -e "${GREEN}   ┌─────────────────────────────────────────────────────────────┐${NC}" >&2
         echo -e "${GREEN}   │ Bucket Name                                                │${NC}" >&2
         echo -e "${GREEN}   ├─────────────────────────────────────────────────────────────┤${NC}" >&2
-        
+
         while IFS= read -r bucket_name; do
             if [ -n "$bucket_name" ]; then
                 printf "${GREEN}   │ %-59s │${NC}\n" "$bucket_name" >&2
             fi
         done <<< "$backup_buckets"
-        
+
         echo -e "${GREEN}   └─────────────────────────────────────────────────────────────┘${NC}" >&2
-        
+
         # Suggest the most recent bucket
         local most_recent_bucket
         most_recent_bucket=$(echo "$backup_buckets" | head -1)
-        
+
         if [ -n "$most_recent_bucket" ]; then
             echo -e "${CYAN}   💡 Most recent backup bucket: $most_recent_bucket${NC}" >&2
             echo -e "${CYAN}   💡 You can use this bucket with the appropriate snapshot ID${NC}" >&2
@@ -656,7 +656,7 @@ suggest_available_backup_buckets() {
 # Validate RDS snapshot exists and is available
 validate_snapshot() {
     echo -e "${YELLOW}🔍 Validating RDS snapshot...${NC}"
-    
+
     # Check if snapshot exists
     local snapshot_info
     snapshot_info=$(aws_with_retry rds describe-db-cluster-snapshots \
@@ -664,17 +664,17 @@ validate_snapshot() {
         --db-cluster-snapshot-identifier "$SNAPSHOT_ID" \
         --query 'DBClusterSnapshots[0]' \
         --output json 2>/dev/null || echo "{}")
-    
+
     if [ "$snapshot_info" = "{}" ] || [ "$snapshot_info" = "null" ]; then
         echo -e "${RED}❌ Snapshot '$SNAPSHOT_ID' does not exist${NC}" >&2
         suggest_available_snapshots
         return 1
     fi
-    
+
     # Check snapshot status
     local snapshot_status
     snapshot_status=$(echo "$snapshot_info" | jq -r '.Status' 2>/dev/null || echo "unknown")
-    
+
     if [ "$snapshot_status" = "available" ]; then
         echo -e "${GREEN}✅ Snapshot '$SNAPSHOT_ID' is available${NC}"
         return 0
@@ -721,21 +721,21 @@ explain_snapshot_status() {
 # Suggest available snapshots for the current cluster
 suggest_available_snapshots() {
     echo -e "${BLUE}🔍 Looking for available snapshots for this cluster...${NC}" >&2
-    
+
     # Get current cluster identifier from Terraform
     local cluster_identifier
     cluster_identifier=$(terraform_with_retry output -raw cluster_name 2>/dev/null || echo "")
-    
+
     # If cluster_name is just "openemr-eks", we need to get the actual RDS cluster identifier
     if [ "$cluster_identifier" = "openemr-eks" ]; then
         cluster_identifier=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
     fi
-    
+
     if [ -z "$cluster_identifier" ]; then
         echo -e "${YELLOW}   ⚠️  Could not determine cluster name from Terraform${NC}" >&2
         return 1
     fi
-    
+
     # Get available snapshots for this cluster
     local available_snapshots
     available_snapshots=$(aws_with_retry rds describe-db-cluster-snapshots \
@@ -744,13 +744,13 @@ suggest_available_snapshots() {
         --snapshot-type manual \
         --query "DBClusterSnapshots[?Status==\`available\`].[DBClusterSnapshotIdentifier,SnapshotCreateTime]" \
         --output text 2>/dev/null | sort -k2 -r | head -5)
-    
+
     if [ -n "$available_snapshots" ]; then
         echo -e "${GREEN}   📋 Available snapshots for cluster '$cluster_identifier':${NC}" >&2
         echo -e "${GREEN}   ┌─────────────────────────────────────────────────────────────┐${NC}" >&2
         echo -e "${GREEN}   │ Snapshot ID                                    │ Created        │${NC}" >&2
         echo -e "${GREEN}   ├─────────────────────────────────────────────────────────────┤${NC}" >&2
-        
+
         while IFS=$'\t' read -r snapshot_id create_time; do
             if [ -n "$snapshot_id" ] && [ -n "$create_time" ]; then
                 # Format the timestamp for better readability
@@ -759,13 +759,13 @@ suggest_available_snapshots() {
                 printf "${GREEN}   │ %-47s │ %-13s │${NC}\n" "$snapshot_id" "$formatted_time" >&2
             fi
         done <<< "$available_snapshots"
-        
+
         echo -e "${GREEN}   └─────────────────────────────────────────────────────────────┘${NC}" >&2
-        
+
         # Suggest the most recent snapshot
         local most_recent_snapshot
         most_recent_snapshot=$(echo "$available_snapshots" | head -1 | cut -f1)
-        
+
         if [ -n "$most_recent_snapshot" ]; then
             echo -e "${CYAN}   💡 Suggested command:${NC}" >&2
             echo -e "${CYAN}   ./scripts/restore.sh $BACKUP_BUCKET $most_recent_snapshot --region $AWS_REGION${NC}" >&2
@@ -779,11 +779,11 @@ suggest_available_snapshots() {
 # Validate Kubernetes resources exist (optional for clean state)
 validate_kubernetes_resources() {
     echo -e "${YELLOW}🔍 Validating Kubernetes resources...${NC}"
-    
+
     # Check if namespace exists (optional - may not exist after clean deployment)
     if kubectl_with_retry get namespace "$NAMESPACE" >/dev/null 2>&1; then
         echo -e "${GREEN}✅ Namespace '$NAMESPACE' exists${NC}"
-        
+
         # Check if PVC exists (only if namespace exists)
         if kubectl_with_retry get pvc openemr-sites-pvc -n "$NAMESPACE" >/dev/null 2>&1; then
             echo -e "${GREEN}✅ PVC 'openemr-sites-pvc' exists${NC}"
@@ -793,18 +793,18 @@ validate_kubernetes_resources() {
     else
         echo -e "${YELLOW}⚠️  Namespace '$NAMESPACE' does not exist (expected after clean deployment)${NC}"
     fi
-    
+
     # Check if EFS storage class exists and is properly configured
     # Note: Storage classes are recreated during deployment, so this check is optional
     if kubectl_with_retry get storageclass efs-sc >/dev/null 2>&1; then
         echo -e "${GREEN}✅ EFS storage class exists${NC}"
-        
+
         # Get EFS ID from Terraform and validate storage class configuration
         local efs_id
         efs_id=$(terraform_with_retry output -raw efs_id 2>/dev/null || echo "")
         if [ -n "$efs_id" ]; then
             echo -e "${BLUE}   EFS ID: $efs_id${NC}"
-            
+
             # Check if storage class has correct EFS ID
             local current_efs_id
             current_efs_id=$(kubectl get storageclass efs-sc -o jsonpath='{.parameters.fileSystemId}' 2>/dev/null || echo "")
@@ -820,23 +820,23 @@ validate_kubernetes_resources() {
     else
         echo -e "${YELLOW}⚠️  EFS storage class not found (will be created during deployment)${NC}"
     fi
-    
+
     return 0
 }
 
 # Function to get OpenEMR role ARN from Terraform
 get_openemr_role_arn() {
     echo -e "${BLUE}   Getting OpenEMR role ARN from Terraform...${NC}" >&2
-    
+
     local role_arn
     role_arn=$(terraform -chdir="$PROJECT_ROOT/terraform" output -raw openemr_role_arn 2>/dev/null)
-    
+
     if [ -z "$role_arn" ] || [ "$role_arn" = "null" ]; then
         echo -e "${RED}❌ Failed to get OpenEMR role ARN from Terraform${NC}" >&2
         echo -e "${RED}   Please ensure Terraform state is available and the role exists${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${GREEN}   ✅ OpenEMR role ARN: $role_arn${NC}" >&2
     # Only output the clean role ARN to stdout (last line)
     echo "$role_arn"
@@ -845,7 +845,7 @@ get_openemr_role_arn() {
 # Ensure EFS storage class is properly configured
 ensure_efs_storage_class() {
     echo -e "${YELLOW}🔧 Ensuring EFS storage class is properly configured...${NC}"
-    
+
     # Get EFS ID from Terraform
     local efs_id
     efs_id=$(terraform_with_retry output -raw efs_id 2>/dev/null || echo "")
@@ -853,14 +853,14 @@ ensure_efs_storage_class() {
         echo -e "${RED}❌ Could not retrieve EFS ID from Terraform${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   EFS ID: $efs_id${NC}"
-    
+
     # Check if storage class exists and has correct EFS ID
     if kubectl get storageclass efs-sc >/dev/null 2>&1; then
         local current_efs_id
         current_efs_id=$(kubectl get storageclass efs-sc -o jsonpath='{.parameters.fileSystemId}' 2>/dev/null || echo "")
-        
+
         if [ "$current_efs_id" = "$efs_id" ]; then
             echo -e "${GREEN}   ✅ EFS storage class is correctly configured${NC}"
             return 0
@@ -872,7 +872,7 @@ ensure_efs_storage_class() {
         echo -e "${YELLOW}   ⚠️  EFS storage class not found${NC}"
         echo -e "${BLUE}   🔄 Creating EFS storage class...${NC}"
     fi
-    
+
     # Create or update storage class with correct EFS ID
     if cat <<EOF | kubectl apply -f -
 apiVersion: storage.k8s.io/v1
@@ -899,22 +899,22 @@ EOF
 # Parse backup metadata to understand backup strategy and configuration
 parse_backup_metadata() {
     echo -e "${YELLOW}🔍 Parsing backup metadata...${NC}"
-    
+
     # Download metadata file
     local metadata_file="/tmp/backup-metadata-${SNAPSHOT_ID}.json"
     local metadata_downloaded=false
-    
+
     # Try timestamp-based filename first (backup-metadata-TIMESTAMP.json)
     local metadata_files
     metadata_files=$(aws_with_retry s3 ls "s3://$BACKUP_BUCKET/metadata/" --region "$AWS_REGION" 2>/dev/null | grep -o "backup-metadata-[0-9]*-[0-9]*\.json" | head -1)
-    
+
     if [ -n "$metadata_files" ]; then
         echo -e "${BLUE}   Found metadata file: $metadata_files${NC}"
         if aws_with_retry s3 cp "s3://$BACKUP_BUCKET/metadata/$metadata_files" "$metadata_file" 2>/dev/null; then
             metadata_downloaded=true
         fi
     fi
-    
+
     if [ "$metadata_downloaded" = false ]; then
         echo -e "${YELLOW}⚠️  Could not download backup metadata, using defaults${NC}"
         echo -e "${BLUE}   Backup strategy: same-region (default)${NC}"
@@ -925,12 +925,12 @@ parse_backup_metadata() {
         echo -e "${GREEN}✅ Backup metadata parsing completed (using defaults)${NC}"
         return 0
     fi
-    
+
     # Parse backup strategy
     local backup_strategy
     backup_strategy=$(jq -r '.backup_strategy // "same-region"' "$metadata_file" 2>/dev/null)
     echo -e "${BLUE}   Backup strategy: $backup_strategy${NC}"
-    
+
     # Parse backup region
     local backup_region
     backup_region=$(jq -r '.backup_region // empty' "$metadata_file" 2>/dev/null)
@@ -939,7 +939,7 @@ parse_backup_metadata() {
         # Update AWS_REGION for restore operations
         AWS_REGION="$backup_region"
     fi
-    
+
     # Parse target account (for cross-account restores)
     local target_account
     target_account=$(jq -r '.target_account_id // empty' "$metadata_file" 2>/dev/null)
@@ -947,7 +947,7 @@ parse_backup_metadata() {
         echo -e "${BLUE}   Cross-account backup detected: $target_account${NC}"
         # Note: Cross-account restore would require additional AWS credential setup
     fi
-    
+
     # Parse components backed up
     local aurora_backed_up
     aurora_backed_up=$(jq -r '.components.aurora_rds // false' "$metadata_file" 2>/dev/null)
@@ -955,7 +955,7 @@ parse_backup_metadata() {
     k8s_backed_up=$(jq -r '.components.kubernetes_config // false' "$metadata_file" 2>/dev/null)
     local app_data_backed_up
     app_data_backed_up=$(jq -r '.components.application_data // false' "$metadata_file" 2>/dev/null)
-    
+
     echo -e "${BLUE}   Components backed up:${NC}"
     echo -e "${BLUE}     - Aurora RDS: $aurora_backed_up${NC}"
     echo -e "${BLUE}     - Kubernetes config: $k8s_backed_up${NC}"
@@ -969,10 +969,10 @@ parse_backup_metadata() {
         APP_DATA_KEY="$app_key_from_meta"
         echo -e "${BLUE}   App data key (manifest v${manifest_version}): $APP_DATA_KEY${NC}"
     fi
-    
+
     # Clean up metadata file
     rm -f "$metadata_file"
-    
+
     echo -e "${GREEN}✅ Backup metadata parsed successfully${NC}"
     return 0
 }
@@ -980,25 +980,25 @@ parse_backup_metadata() {
 # Validate AWS credentials and service access
 validate_aws_credentials() {
     echo -e "${YELLOW}🔍 Validating AWS credentials...${NC}"
-    
+
     # Check AWS credentials
     if ! aws_with_retry sts get-caller-identity; then
         echo -e "${RED}❌ AWS credentials not configured or invalid${NC}" >&2
             return 1
     fi
-    
+
     # Check if we can access RDS
     if ! aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --max-items 1; then
         echo -e "${RED}❌ Cannot access RDS service in region '$AWS_REGION'${NC}" >&2
         return 1
     fi
-    
+
     # Check if we can access S3
     if ! aws_with_retry s3 ls --region "$AWS_REGION"; then
         echo -e "${RED}❌ Cannot access S3 service in region '$AWS_REGION'${NC}" >&2
             return 1
     fi
-    
+
     echo -e "${GREEN}✅ AWS credentials validation passed${NC}"
     return 0
 }
@@ -1006,51 +1006,51 @@ validate_aws_credentials() {
 # Check if the correct database exists and handle early restore if needed
 check_and_prepare_database() {
     echo -e "${YELLOW}🔍 Checking database existence and configuration...${NC}"
-    
+
     # Get expected cluster identifier from Terraform
     local expected_cluster_id
     expected_cluster_id=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
     expected_cluster_id=$(echo "$expected_cluster_id" | tr -d '\r\n%')
-    
+
     if [ -z "$expected_cluster_id" ]; then
         echo -e "${RED}❌ Could not get expected cluster ID from Terraform${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   Expected cluster ID: $expected_cluster_id${NC}"
-    
+
     # Check if the expected cluster exists
     local cluster_exists=false
     local cluster_status=""
     local cluster_valid=false
-    
+
     if aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$expected_cluster_id" >/dev/null 2>&1; then
         cluster_exists=true
         cluster_status=$(aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$expected_cluster_id" --query 'DBClusters[0].Status' --output text 2>/dev/null || echo "unknown")
         echo -e "${BLUE}   Found existing cluster with status: $cluster_status${NC}"
-        
+
         # Check if cluster has the correct instances
         if [ "$cluster_status" = "available" ]; then
             echo -e "${BLUE}   Validating cluster instances...${NC}"
-            
+
             # Get expected instance identifiers based on Terraform naming pattern
             # Instances are named: ${cluster_name}-aurora-${count.index} (0 and 1)
             local cluster_name
             cluster_name=$(terraform_with_retry output -raw cluster_name 2>/dev/null || echo "")
             cluster_name=$(echo "$cluster_name" | tr -d '\r\n%')
-            
+
             if [ -n "$cluster_name" ]; then
                 local expected_instance_1="${cluster_name}-aurora-0"
                 local expected_instance_2="${cluster_name}-aurora-1"
-                
+
                 echo -e "${BLUE}   Expected instances: $expected_instance_1, $expected_instance_2${NC}"
-                
+
                 # Check if both expected instances exist and are available
                 local instance_1_exists=false
                 local instance_2_exists=false
                 local instance_1_status=""
                 local instance_2_status=""
-                
+
                 if aws_with_retry rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$expected_instance_1" >/dev/null 2>&1; then
                     instance_1_exists=true
                     instance_1_status=$(aws_with_retry rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$expected_instance_1" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "unknown")
@@ -1058,7 +1058,7 @@ check_and_prepare_database() {
                 else
                     echo -e "${YELLOW}   Instance 1 ($expected_instance_1): not found${NC}"
                 fi
-                
+
                 if aws_with_retry rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$expected_instance_2" >/dev/null 2>&1; then
                     instance_2_exists=true
                     instance_2_status=$(aws_with_retry rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$expected_instance_2" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "unknown")
@@ -1066,7 +1066,7 @@ check_and_prepare_database() {
                 else
                     echo -e "${YELLOW}   Instance 2 ($expected_instance_2): not found${NC}"
                 fi
-                
+
                 # Validate cluster configuration
                 if [ "$instance_1_exists" = true ] && [ "$instance_2_exists" = true ] && [ "$instance_1_status" = "available" ] && [ "$instance_2_status" = "available" ]; then
                     cluster_valid=true
@@ -1089,21 +1089,21 @@ check_and_prepare_database() {
     else
         echo -e "${BLUE}   No existing cluster found${NC}"
     fi
-    
+
     # Check if there are any other RDS clusters that might conflict
     local other_clusters
     other_clusters=$(aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --query "DBClusters[?DBClusterIdentifier!=\`$expected_cluster_id\`].DBClusterIdentifier" --output text 2>/dev/null || echo "")
-    
+
     if [ -n "$other_clusters" ] && [ "$other_clusters" != "None" ]; then
         echo -e "${YELLOW}⚠️  Found other RDS clusters that may conflict:${NC}"
         echo -e "${BLUE}   $other_clusters${NC}"
         echo -e "${YELLOW}   These will be cleaned up during the restore process${NC}"
     fi
-    
+
     # Determine if we need early database restore
     if [ "$cluster_exists" = false ] || [ "$cluster_status" != "available" ] || [ "$cluster_valid" = false ]; then
         echo -e "${YELLOW}ℹ️  Database needs to be restored from snapshot${NC}"
-        
+
         if [ "$cluster_exists" = true ]; then
             if [ "$cluster_status" != "available" ]; then
                 echo -e "${YELLOW}   Existing cluster is not available (status: $cluster_status)${NC}"
@@ -1115,7 +1115,7 @@ check_and_prepare_database() {
             echo -e "${YELLOW}   No existing cluster found${NC}"
             echo -e "${YELLOW}   Will create new cluster from snapshot${NC}"
         fi
-        
+
         # Set flag to indicate we need early database restore
         EARLY_DB_RESTORE_NEEDED=true
     else
@@ -1123,7 +1123,7 @@ check_and_prepare_database() {
         echo -e "${GREEN}✅ All instances are properly configured${NC}"
         EARLY_DB_RESTORE_NEEDED=false
     fi
-    
+
     return 0
 }
 
@@ -1359,10 +1359,10 @@ main_inverted() {
 pre_flight_validation() {
     echo -e "${BLUE}🔍 Pre-flight Validation${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    
+
     local validation_failed=false
     local failed_checks=()
-    
+
     # Snapshot and bucket are checked first — restore cannot proceed without them
     validate_terraform_state || { validation_failed=true; failed_checks+=("Terraform state"); }
     validate_backup_bucket || { validation_failed=true; failed_checks+=("Backup bucket"); }
@@ -1382,7 +1382,7 @@ pre_flight_validation() {
     validate_aws_credentials || { validation_failed=true; failed_checks+=("AWS credentials"); }
     parse_backup_metadata || { validation_failed=true; failed_checks+=("Backup metadata"); }
     check_and_prepare_database || { validation_failed=true; failed_checks+=("Database preparation"); }
-    
+
     if [ "$validation_failed" = true ]; then
         echo -e "${RED}❌ Pre-flight validation failed${NC}" >&2
         echo -e "${RED}   Failed checks: ${failed_checks[*]}${NC}" >&2
@@ -1400,65 +1400,65 @@ pre_flight_validation() {
 # Run clean deployment script to remove existing resources
 run_clean_deployment() {
     echo -e "${YELLOW}🧹 Running clean deployment to remove existing resources...${NC}"
-    
+
     if ! "$PROJECT_ROOT/scripts/clean-deployment.sh" --force; then
         echo -e "${RED}❌ Clean deployment failed${NC}" >&2
         return 1
     fi
 
     echo -e "${GREEN}✅ Clean deployment completed successfully${NC}"
-    
+
     # Add a small delay to ensure EFS cleanup is fully propagated
     echo -e "${BLUE}   Waiting for EFS cleanup to propagate...${NC}"
     sleep 10
-    
+
     # Restart EFS CSI driver to ensure it's fresh and ready
     echo -e "${BLUE}   Restarting EFS CSI driver to ensure fresh state...${NC}"
     kubectl rollout restart daemonset/efs-csi-node -n kube-system >/dev/null 2>&1
     kubectl rollout restart deployment/efs-csi-controller -n kube-system >/dev/null 2>&1
-    
+
     # Wait for EFS CSI driver to be fully ready after restart
     echo -e "${BLUE}   Waiting for EFS CSI driver to be ready...${NC}"
     kubectl rollout status daemonset/efs-csi-node -n kube-system --timeout=120s
     kubectl rollout status deployment/efs-csi-controller -n kube-system --timeout=120s
-    
+
     # Additional wait to ensure CSI driver is fully operational
     echo -e "${BLUE}   Ensuring EFS CSI driver is operational...${NC}"
     sleep 30
-    
+
     return 0
 }
 
 # Destroy existing RDS cluster and instances
 destroy_rds_cluster() {
     echo -e "${YELLOW}🗑️  Destroying existing RDS cluster...${NC}"
-    
+
     # Get cluster identifier from Terraform
     local cluster_identifier
     cluster_identifier=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
-    
+
     if [ -z "$cluster_identifier" ]; then
         echo -e "${RED}❌ Could not get cluster identifier from Terraform${NC}" >&2
         return 1
     fi
 
     echo -e "${BLUE}   Cluster: $cluster_identifier${NC}"
-    
+
     # Check if cluster exists
     if ! aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier"; then
         echo -e "${YELLOW}ℹ️  RDS cluster not found, skipping destruction${NC}"
         return 0
     fi
-    
+
     # Disable deletion protection
     echo -e "${BLUE}   Disabling deletion protection...${NC}"
     aws_with_retry rds modify-db-cluster --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --no-deletion-protection || true
     echo -e "${GREEN}   ✅ Deletion protection disabled${NC}"
-    
+
     # Delete instances first
     local instances
     instances=$(aws_with_retry rds describe-db-instances --region "$AWS_REGION" --query "DBInstances[?DBClusterIdentifier=='$cluster_identifier'].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
-    
+
     if [ -n "$instances" ]; then
         echo -e "${YELLOW}🗑️  Deleting database instances...${NC}"
         for instance in $instances; do
@@ -1466,22 +1466,22 @@ destroy_rds_cluster() {
             aws_with_retry rds delete-db-instance --region "$AWS_REGION" --db-instance-identifier "$instance" --skip-final-snapshot || true
             echo -e "${GREEN}   ✅ Deletion initiated for: $instance${NC}"
         done
-        
+
         # Wait for instances to be deleted with progress tracking
         echo -e "${YELLOW}⏳ Waiting for instances to be deleted...${NC}"
         local max_wait=$DB_INSTANCE_DELETE_TIMEOUT
         local elapsed=0
         local last_status=""
-        
+
         while [ $elapsed -lt "$max_wait" ]; do
             local remaining_instances
             remaining_instances=$(aws rds describe-db-instances --region "$AWS_REGION" --query "DBInstances[?DBClusterIdentifier=='$cluster_identifier' && DBInstanceStatus!='deleting'].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
-            
+
             if [ -z "$remaining_instances" ]; then
                 echo -e "${GREEN}✅ All instances deleted successfully${NC}"
             break
         fi
-        
+
             # Show detailed status for each remaining instance
             local status_info=""
             for instance in $remaining_instances; do
@@ -1489,69 +1489,69 @@ destroy_rds_cluster() {
                 instance_status=$(aws rds describe-db-instances --region "$AWS_REGION" --db-instance-identifier "$instance" --query 'DBInstances[0].DBInstanceStatus' --output text 2>/dev/null || echo "unknown")
                 status_info="$status_info $instance($instance_status)"
             done
-            
+
             # Only show status if it changed to avoid spam
             if [ "$status_info" != "$last_status" ]; then
                 echo -e "${BLUE}   Remaining instances:$status_info${NC}"
                 last_status="$status_info"
             fi
-            
+
             echo -e "${BLUE}   Progress: ${elapsed}s / ${max_wait}s${NC}"
             sleep "$STATUS_CHECK_INTERVAL"
             elapsed=$((elapsed + STATUS_CHECK_INTERVAL))
         done
-        
+
         if [ $elapsed -ge "$max_wait" ]; then
             echo -e "${RED}❌ Timeout waiting for instances to be deleted${NC}" >&2
         return 1
         fi
     fi
-    
+
     # Delete cluster
     echo -e "${YELLOW}🗑️  Deleting cluster: $cluster_identifier${NC}"
     aws_with_retry rds delete-db-cluster --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --skip-final-snapshot || true
     echo -e "${GREEN}   ✅ Cluster deletion initiated${NC}"
-    
+
     # Wait for cluster deletion with longer timeout
     wait_for_aws_resource "db-cluster" "$cluster_identifier" "deleted" 1200 "$STATUS_CHECK_INTERVAL" || {
         echo -e "${RED}❌ Timeout waiting for cluster deletion${NC}" >&2
         return 1
     }
-    
+
     return 0
 }
 
 # Destroy existing RDS cluster before restore
 destroy_existing_rds_cluster() {
     echo -e "${YELLOW}🗑️  Destroying existing RDS cluster...${NC}"
-    
+
     # Get cluster identifier from Terraform
     local cluster_identifier
     cluster_identifier=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
-    
+
     if [ -z "$cluster_identifier" ]; then
         echo -e "${RED}❌ Could not get cluster identifier from Terraform${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   Cluster: $cluster_identifier${NC}"
-    
+
     # Check if cluster exists
     if ! aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" >/dev/null 2>&1; then
         echo -e "${GREEN}   ✅ Cluster does not exist, nothing to destroy${NC}"
         return 0
     fi
-    
+
     # Get cluster status
     local cluster_status
     cluster_status=$(aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --query 'DBClusters[0].Status' --output text 2>/dev/null || echo "unknown")
     echo -e "${BLUE}   Current cluster status: $cluster_status${NC}"
-    
+
     # List and delete all instances in the cluster
     echo -e "${YELLOW}🗑️  Deleting database instances...${NC}"
     local instances
     instances=$(aws_with_retry rds describe-db-instances --region "$AWS_REGION" --query "DBInstances[?DBClusterIdentifier=='$cluster_identifier'].DBInstanceIdentifier" --output text 2>/dev/null || echo "")
-    
+
     if [ -n "$instances" ]; then
         for instance in $instances; do
             echo -e "${BLUE}   Deleting instance: $instance${NC}"
@@ -1560,7 +1560,7 @@ destroy_existing_rds_cluster() {
                 return 1
             }
         done
-        
+
         # Wait for all instances to be deleted
         echo -e "${YELLOW}⏳ Waiting for instances to be deleted...${NC}"
         for instance in $instances; do
@@ -1573,14 +1573,14 @@ destroy_existing_rds_cluster() {
     else
         echo -e "${BLUE}   No instances found in cluster${NC}"
     fi
-    
+
     # Check if deletion protection is enabled and disable it if needed
     echo -e "${BLUE}   Checking for deletion protection...${NC}"
     local deletion_protection
     deletion_protection=$(aws_with_retry rds describe-db-clusters --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --query 'DBClusters[0].DeletionProtection' --output text 2>/dev/null || echo "false")
     # Convert to lowercase for comparison
     deletion_protection=$(echo "$deletion_protection" | tr '[:upper:]' '[:lower:]')
-    
+
     if [ "$deletion_protection" = "true" ]; then
         echo -e "${YELLOW}⚠️  Deletion protection is enabled, disabling it...${NC}"
         if ! aws_with_retry rds modify-db-cluster --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --no-deletion-protection; then
@@ -1588,7 +1588,7 @@ destroy_existing_rds_cluster() {
             return 1
         fi
         echo -e "${GREEN}   ✅ Deletion protection disabled${NC}"
-        
+
         # Wait for modification to complete
         echo -e "${YELLOW}⏳ Waiting for deletion protection to be disabled...${NC}"
         wait_for_aws_resource "db-cluster" "$cluster_identifier" "available" 300 "$STATUS_CHECK_INTERVAL" || {
@@ -1598,21 +1598,21 @@ destroy_existing_rds_cluster() {
     else
         echo -e "${GREEN}   ✅ Deletion protection is disabled${NC}"
     fi
-    
+
     # Delete the cluster
     echo -e "${YELLOW}🗑️  Deleting database cluster...${NC}"
     aws_with_retry rds delete-db-cluster --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" --skip-final-snapshot || {
         echo -e "${RED}❌ Failed to delete cluster${NC}" >&2
         return 1
     }
-    
+
     # Wait for cluster to be deleted
     echo -e "${YELLOW}⏳ Waiting for cluster to be deleted...${NC}"
     wait_for_aws_resource "db-cluster" "$cluster_identifier" "deleted" "$DB_CLUSTER_WAIT_TIMEOUT" "$STATUS_CHECK_INTERVAL" || {
         echo -e "${RED}❌ Timeout waiting for cluster to be deleted${NC}" >&2
         return 1
     }
-    
+
     echo -e "${GREEN}   ✅ Database cluster destroyed successfully${NC}"
     return 0
 }
@@ -1621,30 +1621,30 @@ destroy_existing_rds_cluster() {
 # If the snapshot's KMS key is in PendingDeletion state, cancel deletion and re-enable it
 check_and_recover_snapshot_kms_key() {
     echo -e "${YELLOW}🔍 Checking snapshot's KMS key status...${NC}"
-    
+
     # Get the KMS key ID from the snapshot
     local snapshot_kms_key
     snapshot_kms_key=$(aws_with_retry rds describe-db-cluster-snapshots --region "$AWS_REGION" --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --query 'DBClusterSnapshots[0].KmsKeyId' --output text 2>/dev/null || echo "")
-    
+
     if [ -z "$snapshot_kms_key" ] || [ "$snapshot_kms_key" = "None" ]; then
         echo -e "${BLUE}   Snapshot is not encrypted or KMS key not found${NC}"
         return 0
     fi
-    
+
     echo -e "${BLUE}   Snapshot KMS key: $snapshot_kms_key${NC}"
-    
+
     # Check the key state
     local key_state enabled
     key_state=$(aws kms describe-key --region "$AWS_REGION" --key-id "$snapshot_kms_key" --query 'KeyMetadata.KeyState' --output text 2>/dev/null || echo "")
     enabled=$(aws kms describe-key --region "$AWS_REGION" --key-id "$snapshot_kms_key" --query 'KeyMetadata.Enabled' --output text 2>/dev/null || echo "")
-    
+
     if [ -z "$key_state" ]; then
         echo -e "${RED}❌ Could not determine KMS key state${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   KMS key state: $key_state, Enabled: $enabled${NC}"
-    
+
     # If key is pending deletion, cancel it
     if [ "$key_state" = "PendingDeletion" ]; then
         echo -e "${YELLOW}⚠️  KMS key is pending deletion - canceling deletion...${NC}"
@@ -1653,11 +1653,11 @@ check_and_recover_snapshot_kms_key() {
             return 1
         fi
         echo -e "${GREEN}   ✅ KMS key deletion canceled${NC}"
-        
+
         # Update key state after cancellation
         key_state="Disabled"
     fi
-    
+
     # If key is disabled, enable it
     if [ "$enabled" = "false" ] || [ "$enabled" = "False" ]; then
         echo -e "${YELLOW}⚠️  KMS key is disabled - enabling it...${NC}"
@@ -1667,11 +1667,11 @@ check_and_recover_snapshot_kms_key() {
         fi
         echo -e "${GREEN}   ✅ KMS key enabled${NC}"
     fi
-    
+
     # Verify key is now enabled and available
     key_state=$(aws kms describe-key --region "$AWS_REGION" --key-id "$snapshot_kms_key" --query 'KeyMetadata.KeyState' --output text 2>/dev/null || echo "")
     enabled=$(aws kms describe-key --region "$AWS_REGION" --key-id "$snapshot_kms_key" --query 'KeyMetadata.Enabled' --output text 2>/dev/null || echo "")
-    
+
     # Key must be in Enabled state AND have Enabled=true
     # Note: After canceling deletion, KeyState may still be "Disabled" briefly before transitioning to "Enabled"
     if [ "$enabled" != "true" ] && [ "$enabled" != "True" ]; then
@@ -1679,13 +1679,13 @@ check_and_recover_snapshot_kms_key() {
         echo -e "${RED}   State: $key_state, Enabled: $enabled${NC}" >&2
         return 1
     fi
-    
+
     # Check that key is not in an unusable state
     if [ "$key_state" = "PendingDeletion" ] || [ "$key_state" = "PendingImport" ] || [ "$key_state" = "Unavailable" ]; then
         echo -e "${RED}❌ KMS key is in an unusable state: $key_state${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${GREEN}   ✅ KMS key is available for use${NC}"
     return 0
 }
@@ -1698,25 +1698,25 @@ reset_rds_master_password() {
     local max_attempts=3
     local attempt=0
     local wait_time=10
-    
+
     echo -e "${YELLOW}🔑 Resetting RDS master password to match Terraform state...${NC}"
-    
+
     # Get the current password from Terraform
     local terraform_password
     terraform_password=$(terraform_with_retry output -raw aurora_password 2>/dev/null || echo "")
-    
+
     if [ -z "$terraform_password" ]; then
         echo -e "${RED}❌ Could not get password from Terraform${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   Updating master password for cluster: $cluster_identifier${NC}"
-    
+
     # Reset the password with retry logic
     while [ $attempt -lt $max_attempts ]; do
         attempt=$((attempt + 1))
         echo -e "${BLUE}   Attempt $attempt/$max_attempts${NC}"
-        
+
         if aws_with_retry rds modify-db-cluster \
             --region "$AWS_REGION" \
             --db-cluster-identifier "$cluster_identifier" \
@@ -1724,21 +1724,21 @@ reset_rds_master_password() {
             --apply-immediately \
             --query 'DBCluster.{Status:Status}' \
             --output text > /dev/null 2>&1; then
-            
+
             echo -e "${GREEN}   ✅ Master password reset successfully${NC}"
             echo -e "${BLUE}   Waiting ${wait_time} seconds for password change to propagate...${NC}"
             sleep "$wait_time"
-            
+
             # Verify the password change took effect by attempting a connection test
             echo -e "${BLUE}   Verifying password change...${NC}"
             local db_endpoint
             db_endpoint=$(terraform_with_retry output -raw aurora_endpoint 2>/dev/null || echo "")
-            
+
             if [ -n "$db_endpoint" ]; then
                 # Get a pod to test connection from
                 local test_pod
                 test_pod=$(kubectl get pods -n openemr -l app=openemr -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                
+
                 if [ -n "$test_pod" ]; then
                     if kubectl exec "$test_pod" -n openemr -c openemr -- mysql -h "$db_endpoint" -u openemr -p"$terraform_password" -e "SELECT 1;" > /dev/null 2>&1; then
                         echo -e "${GREEN}   ✅ Password change verified - database connection successful${NC}"
@@ -1750,18 +1750,18 @@ reset_rds_master_password() {
                     fi
                 fi
             fi
-            
+
             # If we can't verify, assume success since the AWS command succeeded
             echo -e "${GREEN}   ✅ Password reset command succeeded${NC}"
             return 0
         fi
-        
+
         if [ $attempt -lt $max_attempts ]; then
             echo -e "${YELLOW}   ⚠️  Password reset failed, retrying in 5 seconds...${NC}"
             sleep 5
         fi
     done
-    
+
     echo -e "${RED}❌ Failed to reset master password after $max_attempts attempts${NC}" >&2
     return 1
 }
@@ -1769,84 +1769,84 @@ reset_rds_master_password() {
 # Restore RDS cluster from snapshot
 restore_rds_cluster_from_snapshot() {
     echo -e "${YELLOW}🔄 Restoring RDS cluster from snapshot...${NC}"
-    
+
     # Check and recover the snapshot's KMS key if needed
     if ! check_and_recover_snapshot_kms_key; then
         echo -e "${RED}❌ Failed to prepare snapshot's KMS key${NC}" >&2
         return 1
     fi
-    
+
     # First destroy existing cluster if it exists
     if ! destroy_existing_rds_cluster; then
         echo -e "${RED}❌ Failed to destroy existing cluster${NC}" >&2
         return 1
     fi
-    
+
     # Get cluster identifier from Terraform
     local cluster_identifier
     cluster_identifier=$(terraform_with_retry output -raw aurora_cluster_id 2>/dev/null || echo "")
-    
+
     if [ -z "$cluster_identifier" ]; then
         echo -e "${RED}❌ Could not get cluster identifier from Terraform${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${BLUE}   Cluster: $cluster_identifier${NC}"
     echo -e "${BLUE}   Snapshot: $SNAPSHOT_ID${NC}"
-    
+
     # Get snapshot details
     local engine port
     engine=$(aws_with_retry rds describe-db-cluster-snapshots --region "$AWS_REGION" --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --query 'DBClusterSnapshots[0].Engine' --output text 2>/dev/null || echo "aurora-mysql")
     port=$(aws_with_retry rds describe-db-cluster-snapshots --region "$AWS_REGION" --db-cluster-snapshot-identifier "$SNAPSHOT_ID" --query 'DBClusterSnapshots[0].Port' --output text 2>/dev/null || echo "3306")
-    
+
     if [ "$port" = "0" ] || [ -z "$port" ]; then
         port="3306"
     fi
-    
+
     # Get configuration from Terraform
     local db_subnet_group_name vpc_security_group_ids engine_version
     db_subnet_group_name=$(terraform_with_retry output -raw aurora_db_subnet_group_name 2>/dev/null || echo "")
     engine_version=$(terraform_with_retry output -raw aurora_engine_version 2>/dev/null || echo "8.0.mysql_aurora.3.12.0")
-    
+
     # Log the engine version being used
     echo -e "${BLUE}   Using engine version: $engine_version${NC}"
-    
+
     # Get security group ID from Terraform state
     vpc_security_group_ids=$(terraform_with_retry show -json 2>/dev/null | jq -r '.values.root_module.resources[] | select(.type == "aws_security_group" and .name == "rds") | .values.id' 2>/dev/null || echo "")
-    
+
     # KMS Key handling:
     # - By default, we do NOT specify --kms-key-id during restore
     # - The snapshot is already encrypted and AWS will automatically use the snapshot's original KMS key
     # - Users can optionally provide a custom KMS key via --kms-key flag (e.g., if they copied the original key)
     # - Specifying an incorrect KMS key would cause a KMSKeyNotAccessibleFault error
-    
+
     echo -e "${BLUE}   Master username/password will be inherited from snapshot${NC}"
-    
+
     if [ -n "$CUSTOM_KMS_KEY" ]; then
         echo -e "${BLUE}   KMS encryption will use custom key: $CUSTOM_KMS_KEY${NC}"
     else
         echo -e "${BLUE}   KMS encryption will use snapshot's original key (default)${NC}"
     fi
-    
+
     # Build restore command (master username/password are inherited from snapshot)
     local restore_cmd
     restore_cmd="aws rds restore-db-cluster-from-snapshot --region \"$AWS_REGION\" --db-cluster-identifier \"$cluster_identifier\" --snapshot-identifier \"$SNAPSHOT_ID\" --engine \"$engine\" --engine-version \"$engine_version\" --port \"$port\""
-    
+
     if [ -n "$db_subnet_group_name" ]; then
         restore_cmd="$restore_cmd --db-subnet-group-name \"$db_subnet_group_name\""
         echo -e "${BLUE}   Using subnet group: $db_subnet_group_name${NC}"
     fi
-    
+
     if [ -n "$vpc_security_group_ids" ]; then
         restore_cmd="$restore_cmd --vpc-security-group-ids \"$vpc_security_group_ids\""
         echo -e "${BLUE}   Using security groups: $vpc_security_group_ids${NC}"
     fi
-    
+
     # Add custom KMS key if provided
     if [ -n "$CUSTOM_KMS_KEY" ]; then
         restore_cmd="$restore_cmd --kms-key-id \"$CUSTOM_KMS_KEY\""
     fi
-    
+
     # Execute restore command
     echo -e "${BLUE}   Executing restore command...${NC}"
     echo -e "${BLUE}   Command: $restore_cmd${NC}"
@@ -1855,19 +1855,19 @@ restore_rds_cluster_from_snapshot() {
         return 1
     fi
     echo -e "${GREEN}   ✅ Restore command executed successfully${NC}"
-    
+
     # Wait for cluster to be available
     wait_for_aws_resource "db-cluster" "$cluster_identifier" "available" "$DB_CLUSTER_WAIT_TIMEOUT" "$STATUS_CHECK_INTERVAL" || {
         echo -e "${RED}❌ Timeout waiting for cluster to be available${NC}" >&2
             return 1
     }
-    
+
     # Apply serverless scaling configuration
     echo -e "${YELLOW}⚙️  Applying serverless scaling configuration...${NC}"
     local min_capacity max_capacity
     min_capacity=$(terraform_with_retry show -json 2>/dev/null | jq -r '.values.root_module.resources[] | select(.type == "aws_rds_cluster" and .name == "openemr") | .values.serverless_v2_scaling_configuration[0].min_capacity' 2>/dev/null || echo "0.5")
     max_capacity=$(terraform_with_retry show -json 2>/dev/null | jq -r '.values.root_module.resources[] | select(.type == "aws_rds_cluster" and .name == "openemr") | .values.serverless_v2_scaling_configuration[0].max_capacity' 2>/dev/null || echo "16")
-    
+
     # Handle null values from Terraform
     if [ "$min_capacity" = "null" ] || [ -z "$min_capacity" ]; then
         min_capacity="0.5"
@@ -1875,33 +1875,33 @@ restore_rds_cluster_from_snapshot() {
     if [ "$max_capacity" = "null" ] || [ -z "$max_capacity" ]; then
         max_capacity="16"
     fi
-    
+
     echo -e "${BLUE}   Min capacity: ${min_capacity} ACU, Max capacity: ${max_capacity} ACU${NC}"
     aws_with_retry rds modify-db-cluster --region "$AWS_REGION" --db-cluster-identifier "$cluster_identifier" \
         --serverless-v2-scaling-configuration MinCapacity="$min_capacity",MaxCapacity="$max_capacity"
     echo -e "${GREEN}   ✅ Serverless scaling configuration applied${NC}"
-    
+
     # Create database instances
     echo -e "${YELLOW}🏗️  Creating database instances...${NC}"
     local instance_count
     # Get the count of cluster instances from Terraform state
     instance_count=$(terraform_with_retry show -json 2>/dev/null | jq -r '.values.root_module.resources[] | select(.type == "aws_rds_cluster_instance" and .name == "openemr")' | jq -s 'length' 2>/dev/null || echo "2")
-    
+
     # Handle null values and ensure we have a valid number
     if [ "$instance_count" = "null" ] || [ -z "$instance_count" ] || ! echo "$instance_count" | grep -q '^[0-9]\+$'; then
         instance_count=2
     fi
-    
+
     echo -e "${BLUE}   Creating $instance_count instances${NC}"
-    
+
     # Get the cluster name from Terraform to match the expected instance naming pattern
     local cluster_name
     cluster_name=$(terraform_with_retry output -raw cluster_name 2>/dev/null || echo "openemr-eks")
-    
+
     for ((i=0; i<instance_count; i++)); do
         local instance_identifier="${cluster_name}-aurora-${i}"
         echo -e "${BLUE}   Creating instance: $instance_identifier${NC}"
-        
+
         aws_with_retry rds create-db-instance --region "$AWS_REGION" \
             --db-instance-identifier "$instance_identifier" \
             --db-cluster-identifier "$cluster_identifier" \
@@ -1911,28 +1911,28 @@ restore_rds_cluster_from_snapshot() {
             return 1
         }
     done
-    
+
     # Wait for all instances to be available
     echo -e "${YELLOW}⏳ Waiting for database instances to be available...${NC}"
     for ((i=0; i<instance_count; i++)); do
         local instance_identifier="${cluster_name}-aurora-${i}"
         echo -e "${BLUE}   Waiting for instance: $instance_identifier${NC}"
-        
+
         wait_for_aws_resource "db-instance" "$instance_identifier" "available" 1200 30 || {
             echo -e "${RED}❌ Instance $instance_identifier failed to become available${NC}" >&2
             return 1
         }
     done
-    
+
     echo -e "${GREEN}✅ All database instances are available${NC}"
-    
+
     # Reset the master password to match Terraform state
     # This is necessary because the snapshot has the old password
     if ! reset_rds_master_password "$cluster_identifier"; then
         echo -e "${RED}❌ Failed to reset master password${NC}" >&2
         return 1
     fi
-    
+
     echo -e "${GREEN}✅ RDS cluster restored successfully${NC}"
     return 0
 }
@@ -1947,7 +1947,7 @@ restore_application_data() {
 # Deploy OpenEMR with defaults and deployment
 deploy_openemr() {
     echo -e "${YELLOW}🚀 Deploying OpenEMR with defaults and deployment...${NC}"
-    
+
     # Run restore-defaults.sh with force flag
     echo -e "${BLUE}   Running restore-defaults.sh --force...${NC}"
     if ! "$PROJECT_ROOT/scripts/restore-defaults.sh" --force; then
@@ -1955,7 +1955,7 @@ deploy_openemr() {
             return 1
         fi
     echo -e "${GREEN}   ✅ restore-defaults.sh completed${NC}"
-    
+
     # Run deploy.sh
     echo -e "${BLUE}   Running deploy.sh...${NC}"
     if ! "$PROJECT_ROOT/k8s/deploy.sh"; then
@@ -1963,7 +1963,7 @@ deploy_openemr() {
         return 1
     fi
     echo -e "${GREEN}   ✅ deploy.sh completed${NC}"
-    
+
     echo -e "${GREEN}✅ OpenEMR deployment completed successfully${NC}"
     return 0
 }
@@ -2093,31 +2093,31 @@ _openemr_pod_is_healthy() {
 # Clean up crypto key cache files after deployment
 cleanup_crypto_keys() {
     echo -e "${YELLOW}🔑 Cleaning up crypto key cache files...${NC}"
-    
+
     # Wait a moment for pods to be running
     echo -e "${BLUE}   Waiting for pods to be running...${NC}"
     sleep 10
-    
+
     # Get all pod names
     local pods
     pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-    
+
     if [ -z "$pods" ]; then
         echo -e "${YELLOW}⚠️  No OpenEMR pods found to clean crypto keys${NC}"
         return 0
     fi
-    
+
     # Delete sixa/sixb from each pod
     for pod in $pods; do
         echo -e "${BLUE}   Cleaning crypto keys from pod: $pod${NC}"
         kubectl exec -n "$NAMESPACE" "$pod" -c openemr -- sh -c "find /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/methods/ -name '*six*' -type f -delete 2>/dev/null || true" 2>/dev/null || true
         echo -e "${GREEN}   ✅ Cleaned crypto keys from $pod${NC}"
     done
-    
+
     # Wait for OpenEMR to regenerate keys and stabilize
     echo -e "${BLUE}   Waiting 30 seconds for OpenEMR to regenerate keys...${NC}"
     sleep 30
-    
+
     echo -e "${GREEN}✅ Crypto key cleanup completed${NC}"
     return 0
 }
@@ -2125,18 +2125,18 @@ cleanup_crypto_keys() {
 # Verify restore success with retry logic
 verify_restore_success() {
     echo -e "${YELLOW}🔍 Verifying restore success (max attempts: ${VERIFICATION_MAX_ATTEMPTS})...${NC}"
-    
+
     local attempt=1
-    
+
     while [ "$attempt" -le "$VERIFICATION_MAX_ATTEMPTS" ]; do
         echo -e "${BLUE}   Verification attempt $attempt/$VERIFICATION_MAX_ATTEMPTS${NC}"
-        
+
         # Poll for pods to be ready with timeout
         echo -e "${BLUE}   Waiting for pods to be ready (timeout: ${VERIFICATION_TIMEOUT}s, interval: ${VERIFICATION_INTERVAL}s)...${NC}"
         local elapsed=0
         local ready_count=0
         local desired_count=0
-        
+
         while [ "$elapsed" -lt "$VERIFICATION_TIMEOUT" ]; do
             ready_count=$(_normalize_replica_count "$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")")
             desired_count=$(_normalize_replica_count "$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")")
@@ -2157,21 +2157,21 @@ verify_restore_success() {
             sleep "$VERIFICATION_INTERVAL"
             elapsed=$((elapsed + VERIFICATION_INTERVAL))
         done
-        
+
         # If this is not the last attempt, clean crypto keys and retry
         if [ "$attempt" -lt "$VERIFICATION_MAX_ATTEMPTS" ]; then
             echo -e "${YELLOW}⚠️  Verification attempt $attempt failed: ${ready_count}/${desired_count} pods ready with HTTP health${NC}"
             echo -e "${BLUE}   Cleaning crypto keys and retrying...${NC}"
-            
+
             # Clean crypto keys from all pods
             local pods
             pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
-            
+
             for pod in $pods; do
                 echo -e "${BLUE}   Cleaning crypto keys from pod: $pod${NC}"
                 kubectl exec -n "$NAMESPACE" "$pod" -c openemr -- sh -c "find /var/www/localhost/htdocs/openemr/sites/default/documents/logs_and_misc/methods/ -name '*six*' -type f -delete 2>/dev/null || true" 2>/dev/null || true
             done
-            
+
             echo -e "${BLUE}   Waiting 30 seconds for pods to regenerate keys and stabilize...${NC}"
             sleep 30
         else
@@ -2179,10 +2179,10 @@ verify_restore_success() {
             echo -e "${RED}❌ All $VERIFICATION_MAX_ATTEMPTS verification attempts failed: ${ready_count}/${desired_count} pods ready with HTTP health${NC}" >&2
             return 1
         fi
-        
+
         attempt=$((attempt + 1))
     done
-    
+
     return 1
 }
 

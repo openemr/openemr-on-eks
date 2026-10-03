@@ -296,7 +296,7 @@ _all_tf_output_names() {
 
 @test "CONTRACT: Warp minimum Python matches boto3 compatibility" {
   grep -Fq 'python_requires=">=3.10"' "$WARP_SETUP"
-  grep -Fq "python-version: ['3.10', '3.14.7']" "$CI_WORKFLOW"
+  grep -Fq "python-version: ['3.10', '3.14.8']" "$CI_WORKFLOW"
 }
 
 @test "CONTRACT: Warp runtime PyMySQL pins match versions.yaml" {
@@ -351,7 +351,7 @@ _all_tf_output_names() {
   [ -s "${PROJECT_ROOT}/oidc_provider/.terraform.lock.hcl" ]
   grep -Fq 'provider "registry.terraform.io/hashicorp/aws"' \
     "${PROJECT_ROOT}/oidc_provider/.terraform.lock.hcl"
-  grep -Fq 'terraform_version: 1.16.0' "$CONTRACT_WORKFLOW"
+  grep -Fq 'terraform_version: 1.16.4' "$CONTRACT_WORKFLOW"
   grep -Fq 'terraform init -backend=false -lockfile=readonly' "$CONTRACT_WORKFLOW"
   ! grep -R -F 'terraform init -upgrade' \
     "${PROJECT_ROOT}/scripts" "${PROJECT_ROOT}/oidc_provider/scripts"

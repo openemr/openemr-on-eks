@@ -240,14 +240,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -255,7 +255,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -266,7 +266,7 @@ get_aws_region() {
             log_warning "Invalid AWS_REGION format in environment: $AWS_REGION"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     log_warning "Could not determine AWS region, using default: $AWS_REGION"
@@ -372,12 +372,12 @@ check_bucket_exists() {
     # Returns: "exists", "deleting", "not-found", or "error"
     local bucket_name=$1
     local region=$2
-    
+
     # Try to check bucket existence using head-bucket (most reliable)
     local head_output
     head_output=$(aws s3api head-bucket --bucket "$bucket_name" --region "$region" 2>&1)
     local head_exit=$?
-    
+
     if [ $head_exit -eq 0 ]; then
         # Bucket exists, try to get location to verify it's fully available
         local location_output
@@ -413,7 +413,7 @@ wait_for_bucket_deletion() {
     while [ $elapsed -lt "$timeout" ]; do
         local bucket_state
         bucket_state=$(check_bucket_exists "$bucket_name" "$region")
-        
+
         if [ "$bucket_state" = "not-found" ]; then
             log_success "Bucket deletion completed"
             return 0
@@ -448,7 +448,7 @@ create_s3_bucket_with_retry() {
     # Check if bucket exists in a deleting state
     local bucket_state
     bucket_state=$(check_bucket_exists "$bucket_name" "$region")
-    
+
     if [ "$bucket_state" = "deleting" ]; then
         log_info "Bucket is currently being deleted, waiting for deletion to complete..."
         if ! wait_for_bucket_deletion "$bucket_name" "$region"; then
@@ -463,7 +463,7 @@ create_s3_bucket_with_retry() {
     while [ $attempt -le "$max_attempts" ]; do
         # Calculate exponential backoff delay
         local delay=$((base_delay * (2 ** (attempt - 1))))
-        
+
         if [ $attempt -gt 1 ]; then
             log_info "Retry attempt $attempt/$max_attempts after ${delay}s delay..."
             sleep "$delay"
@@ -552,7 +552,7 @@ check_dependencies() {
 # This function ensures the backup strategy is properly configured and validates required parameters
 validate_backup_strategy() {
     log_info "Validating backup strategy: $BACKUP_STRATEGY"
-    
+
     case "$BACKUP_STRATEGY" in
         "same-region")
             # Same region backup - no additional validation needed
@@ -573,17 +573,17 @@ validate_backup_strategy() {
                 log_error "Cross-account backup requires --target-account parameter"
                 exit 1
             fi
-            
+
             # Validate account ID format (12 digits)
             if ! [[ "$TARGET_ACCOUNT_ID" =~ ^[0-9]{12}$ ]]; then
                 log_error "Invalid AWS account ID format: $TARGET_ACCOUNT_ID (must be 12 digits)"
                 exit 1
             fi
-            
+
             if [ "$AWS_REGION" = "$BACKUP_REGION" ]; then
                 log_warning "Cross-account backup with same region - consider using different region for better disaster recovery"
             fi
-            
+
             log_info "Using cross-account backup strategy: account $TARGET_ACCOUNT_ID, region $BACKUP_REGION"
             ;;
         *)
@@ -592,7 +592,7 @@ validate_backup_strategy() {
             exit 1
             ;;
     esac
-    
+
     log_success "Backup strategy validated"
 }
 
@@ -638,7 +638,7 @@ log_info "Creating backup bucket: s3://${BACKUP_BUCKET}"
 if create_s3_bucket_with_retry "$BACKUP_BUCKET" "$BACKUP_REGION" 5; then
     # Enable versioning and encryption
     log_info "Configuring bucket versioning and encryption..."
-    
+
     if aws s3api put-bucket-versioning \
         --bucket "$BACKUP_BUCKET" \
         --region "$BACKUP_REGION" \
@@ -760,7 +760,7 @@ if [ -n "$AURORA_CLUSTER_ID" ] && [ "$AURORA_CLUSTER_ID" != "None" ]; then
                     --output text 2>/dev/null | grep -q "True"; then
                     # Auto-detect KMS key for encrypted snapshots
                     log_info "RDS cluster is encrypted - auto-detecting KMS key"
-                    
+
                     if [ "$BACKUP_STRATEGY" = "cross-account" ]; then
                         # For cross-account, use default KMS key in target account
                         DEFAULT_KMS_KEY=$(aws kms list-aliases \
@@ -795,7 +795,7 @@ if [ -n "$AURORA_CLUSTER_ID" ] && [ "$AURORA_CLUSTER_ID" != "None" ]; then
                     # Execute the enhanced copy command
                     log_info "Executing enhanced snapshot copy..."
                     log_info "Command: $COPY_CMD $KMS_KEY_PARAM"
-                    
+
                     if eval "$COPY_CMD $KMS_KEY_PARAM" >/dev/null 2>&1; then
                         log_success "Enhanced snapshot copy initiated: ${BACKUP_SNAPSHOT_ID}"
 
@@ -804,7 +804,7 @@ if [ -n "$AURORA_CLUSTER_ID" ] && [ "$AURORA_CLUSTER_ID" != "None" ]; then
                         if wait_for_snapshot_availability "$BACKUP_SNAPSHOT_ID" "$BACKUP_REGION" "$SNAPSHOT_AVAILABILITY_TIMEOUT"; then
                             log_success "Enhanced snapshot copy completed successfully"
                             SNAPSHOT_ID="$BACKUP_SNAPSHOT_ID"  # Use the copied snapshot ID
-                            
+
                             # Update result based on strategy
                             case "$BACKUP_STRATEGY" in
                                 "cross-region")
@@ -895,16 +895,16 @@ fi
 wait_for_ready_pod_with_efs() {
     local max_attempts=30  # 5 minutes (30 * 10 seconds)
     local attempt=1
-    
+
     # Redirect logs to stderr so only pod name goes to stdout
     log_info "Waiting for a Ready OpenEMR pod with EFS volume mounted and swarm mode complete..." >&2
-    
+
     while [ $attempt -le $max_attempts ]; do
         # Get ALL running pods, not just the first one
         local pod_names
         pod_names=$(kubectl get pods -n "$NAMESPACE" -l app=openemr \
             -o jsonpath='{.items[?(@.status.phase=="Running")].metadata.name}' 2>/dev/null)
-        
+
         # Check each pod to find one that's ready
         for pod_name in $pod_names; do
             if [ -n "$pod_name" ]; then
@@ -912,24 +912,24 @@ wait_for_ready_pod_with_efs() {
                 local ready
                 ready=$(kubectl get pod "$pod_name" -n "$NAMESPACE" \
                     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null)
-                
+
                 if [ "$ready" = "True" ]; then
                 # Check if sites directory exists (indicates EFS is mounted and initialized)
                 if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
                    sh -c "test -d /var/www/localhost/htdocs/openemr/sites" 2>/dev/null; then
-                    
+
                     # CRITICAL: Verify container is fully initialized by checking for tar utility
                     # This prevents race conditions where pod is "Ready" but container init isn't complete
                     if kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
                        sh -c "command -v tar" >/dev/null 2>&1; then
-                        
+
                         # CRITICAL: Verify OpenEMR swarm mode initialization is complete for THIS pod
                         # Check /root/instance-swarm-ready (container-local) not docker-completed (EFS-shared)
                         # This ensures THIS specific pod has completed swarm init, not just a previous pod
                         local instance_swarm_ready
                         instance_swarm_ready=$(kubectl exec -n "$NAMESPACE" "$pod_name" -c openemr -- \
                            sh -c "test -f /root/instance-swarm-ready && echo 'yes' || echo 'no'" 2>/dev/null || echo 'no')
-                        
+
                         if [ "$instance_swarm_ready" = "yes" ]; then
                             log_success "Found Ready pod with EFS mounted, container initialized, and swarm mode complete: $pod_name" >&2
                             echo "$pod_name"
@@ -948,12 +948,12 @@ wait_for_ready_pod_with_efs() {
             fi
         fi
         done
-        
+
         log_info "Waiting for Ready pod with swarm mode complete (attempt $attempt/$max_attempts)..." >&2
         sleep 10
         ((attempt += 1))
     done
-    
+
     log_error "No Ready pod with EFS mounted and swarm mode complete found within 5 minutes" >&2
     return 1
 }
@@ -971,10 +971,10 @@ if kubectl cluster-info >/dev/null 2>&1; then
 
     if [ -n "$POD_NAME" ]; then
         log_info "Using OpenEMR pod for backup: ${POD_NAME}"
-        
+
         # Re-verify pod is still running before backup
         pod_phase=$(kubectl get pod "$POD_NAME" -n "$NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null)
-        
+
         if [ "$pod_phase" != "Running" ]; then
             log_error "Pod $POD_NAME is no longer running (status: $pod_phase)"
             log_error "Pod may have been terminated between selection and backup"
@@ -994,22 +994,22 @@ if kubectl cluster-info >/dev/null 2>&1; then
         log_info "Verifying sites directory exists on pod $POD_NAME..."
         sites_check_output=$(kubectl exec -n "$NAMESPACE" "$POD_NAME" -c openemr -- sh -c "test -d /var/www/localhost/htdocs/openemr/sites && echo 'EXISTS' || echo 'NOT_FOUND'" 2>&1)
         sites_check_exit=$?
-        
+
         log_info "Sites directory check result: exit=$sites_check_exit, output='$sites_check_output'"
-        
+
         if [ $sites_check_exit -eq 0 ] && [[ "$sites_check_output" == *"EXISTS"* ]]; then
             log_success "Sites directory confirmed accessible"
-            
+
             # Create tar archive with error capture
             log_info "Creating tar archive of sites/ directory..."
             tar_output=$(kubectl exec -n "$NAMESPACE" "$POD_NAME" -c openemr -- sh -c "tar -czf /tmp/${APP_BACKUP_FILE} -C /var/www/localhost/htdocs/openemr sites/" 2>&1)
             tar_exit=$?
-            
+
             log_info "Tar creation result: exit=$tar_exit"
-            
+
             if [ $tar_exit -eq 0 ]; then
                 log_success "Tar archive created successfully"
-                
+
                 # Copy from pod
                 log_info "Copying tar archive from pod..."
                 kubectl cp "${NAMESPACE}/${POD_NAME}:/tmp/${APP_BACKUP_FILE}" "./${APP_BACKUP_FILE}" -c openemr 2>/dev/null

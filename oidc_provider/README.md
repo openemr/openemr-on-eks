@@ -55,7 +55,7 @@ This Terraform module provisions the GitHub OIDC provider and IAM roles needed f
 
 ## Prerequisites
 
-- **Terraform 1.16.0 or newer** (see main README for installation instructions)
+- **Terraform 1.16.4 or newer** (see main README for installation instructions)
 - **AWS CLI 2.15+** (must be installed and configured)
 - **IAM permissions** to create OIDC providers and IAM roles:
   - `iam:CreateOpenIDConnectProvider`
@@ -225,4 +225,3 @@ If workflows fail with permission errors:
 - **Complete documentation**: [docs/GITHUB_AWS_CREDENTIALS.md](../docs/GITHUB_AWS_CREDENTIALS.md)
 - **AWS Blog**: [Use IAM roles to connect GitHub Actions to actions in AWS](https://aws.amazon.com/blogs/security/use-iam-roles-to-connect-github-actions-to-actions-in-aws/)
 - **AWS Documentation**: [Creating OpenID Connect identity providers](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_providers_create_oidc.html)
-

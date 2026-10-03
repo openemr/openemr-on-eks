@@ -324,7 +324,7 @@ spec:
           apt-get update && apt-get install -y gcc && rm -rf /var/lib/apt/lists/*
           
           echo "Installing Python dependencies..."
-          pip install --no-cache-dir pymysql==1.2.0 boto3==1.43.86
+          pip install --no-cache-dir pymysql==1.2.3 boto3==1.43.106
           
           echo "Extracting warp code from ConfigMap..."
           cd /app

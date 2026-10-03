@@ -52,7 +52,7 @@ This comprehensive guide provides step-by-step instructions for deploying a prod
 ```bash
 # Required tools and minimum versions
 aws-cli >= 2.15.0
-terraform >= 1.16.0
+terraform >= 1.16.4
 kubectl >= 1.29.0
 helm >= 3.12.0
 jq >= 1.6
@@ -252,7 +252,7 @@ def estimate_monthly_cost(users: int, environment: str = "production") -> Dict[s
         aurora = 87
         valkey = 22
         efs = 30
-        aws_backup = 18 # Small deployment: ~200 GB backup 
+        aws_backup = 18 # Small deployment: ~200 GB backup
     elif users <= 200:  # Medium practice
         ec2_compute = 135
         aurora = 173
@@ -404,7 +404,7 @@ cluster_name = "openemr-eks"
 kubernetes_version = "1.36"
 
 # OpenEMR Application Configuration
-openemr_version = "8.3.0"  # Latest stable OpenEMR version
+openemr_version = "8.4.1"  # Latest stable OpenEMR version
 
 # Network Configuration
 vpc_cidr        = "10.0.0.0/16"
@@ -485,7 +485,7 @@ terraform apply tfplan
 # Monitor deployment (~41 minutes in the OpenEMR 8.2.0 full-run baseline)
 # Infrastructure (Terraform): 23 minutes 52 seconds
 #   - EKS cluster: 15-20 minutes
-#   - Aurora RDS cluster: 10-12 minutes  
+#   - Aurora RDS cluster: 10-12 minutes
 #   - VPC/NAT gateways: 3-5 minutes
 #   - Other resources (S3, EFS, ElastiCache, KMS, WAF): 5-8 minutes
 # Application deployment: 17 minutes 30 seconds in the 8.2.0 E2E phase
@@ -972,12 +972,12 @@ Next steps:
    • Basic deployment: CloudWatch logs + Database Insights
    • Optional: Enhanced monitoring stack: cd /path/to/openemr-on-eks/monitoring && ./install-monitoring.sh
    • Enhanced stack includes:
-     - Prometheus v88.6.2 (metrics & alerting)
+     - Prometheus v91.8.2 (metrics & alerting)
      - Grafana (dashboards with auto-discovery)
      - Loki v7.0.0 (log aggregation with S3 storage)
      - Tempo v2.26.0 (distributed tracing with S3 storage, microservice mode)
      - Mimir v6.2.0 (long-term metrics storage)
-     - OTeBPF v0.12.2 (eBPF auto-instrumentation)
+     - OTeBPF v0.13.0 (eBPF auto-instrumentation)
      - AlertManager (Slack integration support)
      - OpenEMR-specific monitoring (ServiceMonitor, PrometheusRule)
    • **Loki S3 Storage**: Loki uses AWS S3 for production-grade log storage. As [recommended by Grafana](https://grafana.com/docs/loki/latest/setup/install/helm/configure-storage/), we configure object storage via cloud provider for production deployments. This provides better durability, scalability, and cost-effectiveness compared to filesystem storage.

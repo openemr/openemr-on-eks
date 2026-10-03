@@ -71,13 +71,13 @@ Commands follow a consistent pattern:
 ```python
 class CCDADataUploadCommand:
     """Command for uploading CCDA data to OpenEMR"""
-    
+
     @staticmethod
     def add_arguments(parser):
         """Add command-specific arguments"""
         parser.add_argument('--data-source', required=True)
         # ... more arguments
-    
+
     def execute(self, args):
         """Execute the command"""
         # 1. Discover database credentials
@@ -95,13 +95,13 @@ Core modules provide reusable functionality:
 ```python
 class OpenEMRDBImporter:
     """Direct database importer for OpenEMR"""
-    
+
     def __init__(self, db_host, db_user, db_password, db_name):
         """Initialize with database credentials"""
-    
+
     def connect(self) -> bool:
         """Establish database connection"""
-    
+
     def import_patient(self, person_data, conditions, medications, observations):
         """Import a patient directly into OpenEMR database"""
 ```
@@ -124,7 +124,7 @@ logger = logging.getLogger(__name__)
 
 class NewCommand:
     """Description of the new command"""
-    
+
     @staticmethod
     def add_arguments(parser):
         """Add command-specific arguments"""
@@ -132,7 +132,7 @@ class NewCommand:
             '--option',
             help='Description of option'
         )
-    
+
     def execute(self, args):
         """Execute the command"""
         try:
@@ -252,13 +252,13 @@ The `OMOPToCCDAConverter` class converts OMOP CDM format to CCDA XML:
 class OMOPToCCDAConverter:
     def load_data(self, max_records=None, start_from=0):
         """Load OMOP data from source"""
-    
+
     def convert_to_ccda(self, person_data, conditions, observations, medications):
         """Convert OMOP data to CCDA XML"""
-    
+
     def _map_gender(self, gender_concept_id):
         """Map OMOP gender concept ID to HL7 gender code"""
-    
+
     def _format_date(self, date_str):
         """Format date to HL7 format (YYYYMMDD)"""
 ```
@@ -275,7 +275,7 @@ def _calculate_optimal_batch_size(self):
     """Calculate optimal batch size based on available resources"""
     cpu_count = os.cpu_count() or 1
     memory_gb = psutil.virtual_memory().total / (1024**3)
-    
+
     # Batch size based on CPU and memory
     batch_size = min(cpu_count * 50, int(memory_gb * 10))
     return max(100, min(batch_size, 1000))  # Clamp between 100-1000
@@ -292,7 +292,7 @@ with ThreadPoolExecutor(max_workers=self.workers) as executor:
         batch = data['persons'][i:i + self.batch_size]
         future = executor.submit(self._process_batch, batch, data, dry_run)
         futures.append(future)
-    
+
     # Collect results
     for future in as_completed(futures):
         batch_stats = future.result()
@@ -364,7 +364,7 @@ class TestClassName(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures"""
         self.instance = ClassName(...)
-    
+
     def test_method(self):
         """Test specific method"""
         result = self.instance.method()

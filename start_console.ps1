@@ -43,7 +43,7 @@ $goVersionMatch = $goVersionOutput -match 'go(\d+)\.(\d+)'
 if ($goVersionMatch) {
     $majorVersion = [int]$matches[1]
     $minorVersion = [int]$matches[2]
-    
+
     if ($majorVersion -lt 1 -or ($majorVersion -eq 1 -and $minorVersion -lt 25)) {
         Write-Host "Error: Go version $($matches[0]) is installed, but version 1.25 or later is required." -ForegroundColor Red
         Write-Host "Please upgrade Go: https://golang.org/dl/" -ForegroundColor Yellow
@@ -88,4 +88,3 @@ if ($LASTEXITCODE -eq 0) {
     Write-Host "  - The code compiles without errors" -ForegroundColor Yellow
     exit 1
 }
-

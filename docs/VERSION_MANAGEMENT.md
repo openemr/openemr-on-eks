@@ -97,12 +97,12 @@ The `versions.yaml` file serves as the single source of truth for all version in
 # Core Application Versions
 applications:
   openemr:
-    current: "8.3.0"
+    current: "8.4.1"
     registry: "openemr/openemr"
 ```
 
-Selected current project pins include OpenEMR 8.3.0, EKS 1.36, Terraform
-1.16.0, CI Python 3.14.7, kubectl v1.37.0, Floci 2.0.0 (`applications.floci`),
+Selected current project pins include OpenEMR 8.4.1, EKS 1.36, Terraform
+1.16.4, CI Python 3.14.8, kubectl v1.37.1, Floci 2.1.0 (`applications.floci`),
 and the `ubuntu-26.04` GitHub runner.
 Always read `versions.yaml` rather than copying this summary into automation.
 
@@ -305,7 +305,7 @@ The version checking workflow uses AWS CLI commands to fetch the latest versions
 The workflow interacts with the following AWS services:
 
 1. **EKS (Elastic Kubernetes Service)** - For Kubernetes and add-on version information
-2. **RDS (Relational Database Service)** - For Aurora MySQL version information  
+2. **RDS (Relational Database Service)** - For Aurora MySQL version information
 3. **STS (Security Token Service)** - For credential validation
 
 #### Minimum IAM Policy
@@ -646,7 +646,7 @@ Enable detailed logging:
 export LOG_LEVEL=DEBUG
 ./scripts/version-manager.sh check
 
-# or 
+# or
 
 ./scripts/version-manager.sh check --log-level DEBUG
 ```

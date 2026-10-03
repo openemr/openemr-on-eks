@@ -33,4 +33,3 @@ output "summary" {
     instructions      = "Add the role_arn value to your GitHub repository secrets as AWS_OIDC_ROLE_ARN"
   }
 }
-

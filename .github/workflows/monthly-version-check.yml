@@ -62,8 +62,8 @@ on:
 env:
   VERSION_CHECK_ENABLED: "true" # Enable version checking functionality
   LOG_LEVEL: INFO               # Logging level for detailed output
-  TF_VERSION: "1.16.0"          # Terraform version for infrastructure checks
-  KUBECTL_VERSION: "v1.37.0"    # kubectl version for Kubernetes checks
+  TF_VERSION: "1.16.4"          # Terraform version for infrastructure checks
+  KUBECTL_VERSION: "v1.37.1"    # kubectl version for Kubernetes checks
 
 # Authentication Note:
 # This repository now prefers GitHub OIDC → AWS IAM role.
@@ -127,7 +127,7 @@ jobs:
       # This step enables AWS API access for enhanced version checking via OIDC
       - name: Configure AWS credentials (OIDC preferred)
         if: env.AWS_OIDC_ROLE_ARN != ''
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ secrets.AWS_OIDC_ROLE_ARN }}
           aws-region: ${{ secrets.AWS_REGION || 'us-west-2' }}
@@ -137,7 +137,7 @@ jobs:
       # This step falls back to static credentials if OIDC is not configured
       - name: Configure AWS credentials (static fallback)
         if: env.AWS_OIDC_ROLE_ARN == '' && env.AWS_ACCESS_KEY_ID != ''
-        uses: aws-actions/configure-aws-credentials@cbe3b392738ccf3f987d68400dafcf4b0624a56c # v6.2.4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

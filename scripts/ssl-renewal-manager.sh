@@ -74,14 +74,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -89,7 +89,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -100,7 +100,7 @@ get_aws_region() {
             echo -e "${YELLOW}⚠️  Invalid AWS_REGION format in environment: $AWS_REGION${NC}"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     echo -e "${YELLOW}⚠️  Could not determine AWS region, using default: $AWS_REGION${NC}"

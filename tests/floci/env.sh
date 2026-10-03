@@ -9,7 +9,7 @@ _FLOCI_PROJECT_ROOT="$(cd "${_FLOCI_ENV_DIR}/../.." && pwd)"
 if [ -z "${FLOCI_VERSION:-}" ] && command -v yq >/dev/null 2>&1 && [ -f "${_FLOCI_PROJECT_ROOT}/versions.yaml" ]; then
   FLOCI_VERSION="$(yq eval '.applications.floci.current' "${_FLOCI_PROJECT_ROOT}/versions.yaml" 2>/dev/null || true)"
 fi
-export FLOCI_VERSION="${FLOCI_VERSION:-2.0.0}"
+export FLOCI_VERSION="${FLOCI_VERSION:-2.1.0}"
 
 export AWS_ENDPOINT_URL="${FLOCI_ENDPOINT:-http://localhost:4566}"
 export AWS_DEFAULT_REGION="${FLOCI_REGION:-us-east-1}"

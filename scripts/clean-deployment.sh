@@ -118,14 +118,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -133,7 +133,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -144,7 +144,7 @@ get_aws_region() {
             echo -e "${YELLOW}⚠️  Invalid AWS_REGION format in environment: $AWS_REGION${NC}"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     echo -e "${YELLOW}⚠️  Could not determine AWS region, using default: $AWS_REGION${NC}"
@@ -259,27 +259,27 @@ if [ -f "terraform.tfstate" ]; then
     if [ -n "$EFS_FILE_SYSTEM_ID" ]; then
         echo -e "${BLUE}   EFS File System ID: $EFS_FILE_SYSTEM_ID${NC}"
         echo -e "${BLUE}   AWS Region: $AWS_REGION${NC}"
-        
+
         # Step 3a: Delete all OpenEMR-related PVCs and Storage Classes
         echo -e "${BLUE}   Step 3a: Deleting all OpenEMR PVCs and Storage Classes...${NC}"
-        
+
         # Delete all PVCs with 'openemr' in the name across all namespaces
         echo -e "${BLUE}   Deleting all OpenEMR PVCs...${NC}"
         kubectl get pvc --all-namespaces -o json | jq -r '.items[] | select(.metadata.name | contains("openemr")) | "\(.metadata.namespace) \(.metadata.name)"' | while read -r namespace pvc; do
             echo -e "${BLUE}   Deleting PVC: $pvc in namespace: $namespace${NC}"
             kubectl delete pvc "$pvc" -n "$namespace" --timeout=30s 2>/dev/null || echo "   Failed to delete $pvc"
         done
-        
+
         # Delete all Storage Classes with 'efs' in the name
         echo -e "${BLUE}   Deleting all EFS Storage Classes...${NC}"
         kubectl get storageclass -o json | jq -r '.items[] | select(.metadata.name | contains("efs")) | .metadata.name' | while read -r sc; do
             echo -e "${BLUE}   Deleting Storage Class: $sc${NC}"
             kubectl delete storageclass "$sc" --timeout=30s 2>/dev/null || echo "   Failed to delete $sc"
         done
-        
+
         # Step 3b: Direct EFS wipe (bypassing CSI driver)
         echo -e "${BLUE}   Step 3b: Performing direct EFS wipe...${NC}"
-        
+
         # Create a temporary namespace for direct EFS access
         TEMP_NAMESPACE="openemr-efs-wipe-$(date +%s)"
         echo -e "${BLUE}   Creating temporary namespace: $TEMP_NAMESPACE${NC}"
@@ -295,7 +295,7 @@ if [ -f "terraform.tfstate" ]; then
 
         # Step 3b: Recreate efs-sc Storage Class and wipe OpenEMR directory
         echo -e "${BLUE}   Step 3b: Recreating efs-sc Storage Class and wiping OpenEMR directory...${NC}"
-        
+
         # First, recreate the normal efs-sc Storage Class
         echo -e "${BLUE}   Recreating efs-sc Storage Class...${NC}"
         cat > "/tmp/efs-sc-recreate.yaml" <<EOF
@@ -326,20 +326,20 @@ EOF
         fi
         rm -f "/tmp/efs-sc-recreate.yaml"
         echo -e "${GREEN}   ✅ Recreated efs-sc Storage Class${NC}"
-        
+
         # Restart EFS CSI driver to pick up the new storage class configuration
         echo -e "${BLUE}   Restarting EFS CSI driver to apply new storage class...${NC}"
         kubectl rollout restart daemonset/efs-csi-node -n kube-system >/dev/null 2>&1
         kubectl rollout restart deployment/efs-csi-controller -n kube-system >/dev/null 2>&1
-        
+
         echo -e "${BLUE}   Waiting for EFS CSI driver to be ready...${NC}"
         kubectl rollout status daemonset/efs-csi-node -n kube-system --timeout=120s >/dev/null 2>&1 || echo "   ⚠️  DaemonSet rollout check timed out, but driver may still be operational"
         kubectl rollout status deployment/efs-csi-controller -n kube-system --timeout=120s >/dev/null 2>&1 || echo "   ⚠️  Deployment rollout check timed out, but driver may still be operational"
         echo -e "${GREEN}   ✅ EFS CSI driver restart initiated${NC}"
-        
+
         # Additional wait to ensure CSI driver is fully ready
         sleep 10
-        
+
         # Create PVC for EFS access (will remain Pending until pod is scheduled with WaitForFirstConsumer)
         cat > "/tmp/temp-efs-pvc.yaml" <<EOF
 apiVersion: v1
@@ -471,7 +471,7 @@ EOF
         max_retries=3
         attempt=1
         job_succeeded=false
-        
+
         while [ $attempt -le $max_retries ]; do
             if [ $attempt -gt 1 ]; then
                 echo -e "${YELLOW}   Retry attempt $attempt/$max_retries${NC}"
@@ -479,7 +479,7 @@ EOF
                 kubectl delete job efs-wipe-job -n "$TEMP_NAMESPACE" 2>/dev/null || true
                 sleep 5
             fi
-            
+
             echo -e "${BLUE}   Waiting for complete EFS wipe to finish (attempt $attempt)...${NC}"
             kubectl wait --for=condition=Complete job/efs-wipe-job -n "$TEMP_NAMESPACE" --timeout=300s 2>/dev/null || true
 
@@ -488,7 +488,7 @@ EOF
             for i in {1..150}; do
                 job_status=$(kubectl get job efs-wipe-job -n "$TEMP_NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}' 2>/dev/null || echo "Unknown")
                 job_failed=$(kubectl get job efs-wipe-job -n "$TEMP_NAMESPACE" -o jsonpath='{.status.conditions[?(@.type=="Failed")].status}' 2>/dev/null || echo "Unknown")
-                
+
                 if [ "$job_status" = "True" ]; then
                     echo -e "${GREEN}✅ EFS wipe job completed successfully${NC}"
                     # Show the logs
@@ -497,18 +497,18 @@ EOF
                     job_succeeded=true
                     break
                 fi
-                
+
                 if [ "$job_failed" = "True" ]; then
                     echo -e "${YELLOW}   ⚠️  EFS wipe job failed on attempt $attempt${NC}"
-                    
+
                     # Get pod name for diagnostics
                     POD_NAME=$(kubectl get pods -n "$TEMP_NAMESPACE" -l job-name=efs-wipe-job -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-                    
+
                     if [ -n "$POD_NAME" ]; then
                         echo -e "${YELLOW}   POD LOGS FOR: $POD_NAME${NC}"
                         kubectl logs "$POD_NAME" -n "$TEMP_NAMESPACE" 2>/dev/null || echo "   Could not retrieve logs"
                     fi
-                    
+
                     # If this is not the last attempt, delete job and retry
                     if [ $attempt -lt $max_retries ]; then
                         echo -e "${YELLOW}   Cleaning up failed job and retrying...${NC}"
@@ -523,20 +523,20 @@ EOF
                         # Last attempt failed - print full diagnostics
                         echo -e "${RED}   ❌ EFS wipe job FAILED after $max_retries attempts - printing diagnostic information${NC}"
                         echo ""
-                        
+
                         if [ -n "$POD_NAME" ]; then
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                             echo -e "${RED}   POD LOGS FOR: $POD_NAME${NC}"
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                             kubectl logs "$POD_NAME" -n "$TEMP_NAMESPACE" 2>/dev/null || echo "   Could not retrieve logs"
                             echo ""
-                            
+
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                             echo -e "${RED}   POD STATUS FOR: $POD_NAME${NC}"
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                             kubectl describe pod "$POD_NAME" -n "$TEMP_NAMESPACE" 2>/dev/null | tail -80
                             echo ""
-                            
+
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                             echo -e "${RED}   JOB STATUS${NC}"
                             echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -545,50 +545,50 @@ EOF
                         else
                             echo -e "${RED}   Could not find pod for job efs-wipe-job${NC}"
                         fi
-                        
+
                         kubectl delete namespace "$TEMP_NAMESPACE" 2>/dev/null || true
                         exit 1
                     fi
                 fi
-                
+
                 # Show progress every 10 seconds
                 if [ $((i % 5)) -eq 0 ]; then
                     echo -e "${BLUE}   Still waiting... (${i}/150)${NC}"
                 fi
-                
+
                 sleep 2
             done
-            
+
             # If job succeeded, break out of retry loop
             if [ "$job_succeeded" = true ]; then
                 break
             fi
-            
+
             attempt=$((attempt + 1))
         done
-        
+
         # Check if we timed out
         if [ "$job_status" != "True" ] && [ "$job_failed" != "True" ]; then
             echo -e "${RED}   ❌ EFS wipe job timed out after 300 seconds${NC}"
             echo ""
-            
+
             # Get pod name
             POD_NAME=$(kubectl get pods -n "$TEMP_NAMESPACE" -l job-name=efs-wipe-job -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-            
+
             if [ -n "$POD_NAME" ]; then
                 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                 echo -e "${RED}   POD LOGS FOR: $POD_NAME (timeout)${NC}"
                 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                 kubectl logs "$POD_NAME" -n "$TEMP_NAMESPACE" 2>/dev/null || echo "   Could not retrieve logs"
                 echo ""
-                
+
                 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                 echo -e "${RED}   POD STATUS FOR: $POD_NAME (timeout)${NC}"
                 echo -e "${RED}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
                 kubectl describe pod "$POD_NAME" -n "$TEMP_NAMESPACE" 2>/dev/null | tail -80
                 echo ""
             fi
-            
+
             kubectl delete namespace "$TEMP_NAMESPACE" 2>/dev/null || true
             exit 1
         fi
@@ -596,7 +596,7 @@ EOF
         # Clean up temporary resources
         echo -e "${BLUE}   Cleaning up temporary resources...${NC}"
         kubectl delete namespace "$TEMP_NAMESPACE" --timeout=30s 2>/dev/null || true
-        
+
         echo -e "${GREEN}✅ Complete EFS filesystem wipe completed${NC}"
     else
         echo -e "${YELLOW}⚠️  Could not retrieve EFS File System ID from Terraform${NC}"
@@ -648,7 +648,7 @@ if [ "$DB_CLEANUP" = true ]; then
         # Retrieve database connection details from Terraform state
         echo -e "${BLUE}   Getting database details from Terraform...${NC}"
     cd "$PROJECT_ROOT/terraform"
-        
+
         # Validate terraform state
         if ! terraform output -raw aurora_endpoint >/dev/null 2>&1; then
             echo -e "${RED}   ❌ Terraform state appears to be invalid or corrupted${NC}"
@@ -704,55 +704,55 @@ spec:
     - |
       echo "Using OpenEMR container ($OPENEMR_VERSION) for database cleanup..."
       echo "Testing MySQL connection to: \${MYSQL_HOST}"
-      
+
       # Install MySQL client
       echo "Installing MySQL client..."
       apk add --no-cache mysql-client
-      
+
       # Test connection with timeout
       echo "Waiting for MySQL connection..."
       connection_timeout=30
       connection_attempts=0
-      
+
       while [ \$connection_attempts -lt \$connection_timeout ]; do
         if mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SELECT 1;" >/dev/null 2>&1; then
           echo "✅ Successfully connected to MySQL database"
           break
         fi
-        
+
         echo "Connection attempt \$((connection_attempts + 1))/\$connection_timeout failed, retrying in 2 seconds..."
         sleep 2
         connection_attempts=\$((connection_attempts + 1))
       done
-      
+
       if [ \$connection_attempts -ge \$connection_timeout ]; then
         echo "❌ ERROR: Failed to connect to MySQL database after \$connection_timeout attempts"
         echo "Database may not exist or be accessible. This is normal if the database was already destroyed."
         echo "Database cleanup will be handled during deployment."
         exit 0  # Exit successfully since this is expected in some cases
       fi
-      
+
       echo "Connected to MySQL, proceeding with complete database cleanup..."
-      
+
       # Drop the entire openemr database - much simpler and more reliable
       echo "  - Dropping entire openemr database..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "DROP DATABASE IF EXISTS openemr;" 2>/dev/null || {
         echo "❌ Failed to drop openemr database"
         exit 1
       }
-      
+
       echo "✅ OpenEMR database dropped successfully"
-      
+
       # Create empty openemr database for auto-configuration
       echo "  - Creating empty openemr database for auto-configuration..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "CREATE DATABASE openemr CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;" 2>/dev/null || {
         echo "❌ Failed to create openemr database"
         exit 1
       }
-      
+
       echo "✅ Empty OpenEMR database created successfully"
       echo "✅ Database cleanup completed - OpenEMR will configure the empty database during deployment"
-      
+
       echo "Database cleanup completed successfully with OpenEMR container"
     env:
     - name: MYSQL_HOST
@@ -782,7 +782,7 @@ EOF
             db_max_retries=3
             db_attempt=1
             db_cleanup_succeeded=false
-            
+
             while [ $db_attempt -le $db_max_retries ]; do
                 if [ $db_attempt -gt 1 ]; then
                     echo -e "${YELLOW}   Retry attempt $db_attempt/$db_max_retries for database cleanup${NC}"
@@ -804,10 +804,10 @@ spec:
     args:
     - |
       echo "Starting database cleanup attempt $db_attempt..."
-      
+
       # Install mysql client
       apk add --no-cache mysql-client
-      
+
       # Test database connection
       echo "Testing database connection..."
       if ! mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SELECT 1" 2>/dev/null; then
@@ -815,24 +815,24 @@ spec:
         exit 1
       fi
       echo "✅ Database connection successful"
-      
+
       # Drop and recreate the openemr database
       echo "  - Dropping existing openemr database..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "DROP DATABASE IF EXISTS openemr;" 2>/dev/null || {
         echo "❌ Failed to drop openemr database"
         exit 1
       }
-      
+
       # Create empty openemr database for auto-configuration
       echo "  - Creating empty openemr database for auto-configuration..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "CREATE DATABASE openemr CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;" 2>/dev/null || {
         echo "❌ Failed to create openemr database"
         exit 1
       }
-      
+
       echo "✅ Empty OpenEMR database created successfully"
       echo "✅ Database cleanup completed - OpenEMR will configure the empty database during deployment"
-      
+
       echo "Database cleanup completed successfully with OpenEMR container"
     env:
     - name: MYSQL_HOST
@@ -853,9 +853,9 @@ spec:
   restartPolicy: Never
 DBEOFPOD
                 fi
-                
+
                 echo -e "${BLUE}   Waiting for database cleanup to complete (attempt $db_attempt)...${NC}"
-                
+
                 # Wait for the pod to complete (not just be Ready)
                 kubectl wait --for=condition=Ready pod/db-cleanup-pod -n "$TEMP_NAMESPACE" --timeout=30s 2>/dev/null || true
                 echo -e "${BLUE}   Pod is ready, waiting for completion...${NC}"
@@ -866,7 +866,7 @@ DBEOFPOD
 
                 while [ $attempt -lt "$max_attempts" ]; do
                     echo -e "${BLUE}   Checking completion... (attempt $((attempt + 1))/$max_attempts)${NC}"
-                    
+
                     # Check if pod has completed successfully
                     pod_phase=$(kubectl get pod db-cleanup-pod -n "$TEMP_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
                     if [ "$pod_phase" = "Succeeded" ]; then
@@ -902,19 +902,19 @@ DBEOFPOD
                     # Last attempt failed - print full diagnostics
                     pod_phase=$(kubectl get pod db-cleanup-pod -n "$TEMP_NAMESPACE" -o jsonpath='{.status.phase}' 2>/dev/null || echo "Unknown")
                     pod_reason=$(kubectl get pod db-cleanup-pod -n "$TEMP_NAMESPACE" -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null || echo "")
-                    
+
                     echo -e "${RED}❌ Database cleanup FAILED after $db_max_retries attempts${NC}"
                     echo -e "${BLUE}   Pod status: $pod_phase${NC}"
                     if [ -n "$pod_reason" ]; then
                         echo -e "${BLUE}   Pod reason: $pod_reason${NC}"
                     fi
-                    
+
                     echo -e "${BLUE}   Pod details:${NC}"
                     kubectl get pod db-cleanup-pod -n "$TEMP_NAMESPACE"
-                    
+
                 echo -e "${BLUE}   Pod logs:${NC}"
                     kubectl logs db-cleanup-pod -n "$TEMP_NAMESPACE" || echo "No logs available"
-                    
+
                     # Check if this is a connection failure (database doesn't exist)
                     if kubectl logs db-cleanup-pod -n "$TEMP_NAMESPACE" 2>/dev/null | grep -q "Database may not exist or be accessible"; then
                         echo -e "${BLUE}ℹ️  Database appears to be unavailable - this is normal if it was already destroyed${NC}"

@@ -54,7 +54,7 @@ permissions:
 env:
   # Tool versions for reproducibility (synced with versions.yaml)
   TRIVY_VERSION: '0.74.0'
-  CHECKOV_VERSION: '3.3.16'
+  CHECKOV_VERSION: '3.3.22'
   KICS_VERSION: 'v2.1.20'
   GOSEC_VERSION: 'v2.29.0'
   PYTHON_VERSION: '3.14'
@@ -123,7 +123,7 @@ jobs:
           [ -f "trivy-config-results.txt" ] && cat trivy-config-results.txt || echo "No results"
 
       - name: Upload Trivy SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true
         with:
@@ -185,7 +185,7 @@ jobs:
           done
 
       - name: Upload Checkov SARIF
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true
         with:
@@ -234,7 +234,7 @@ jobs:
           fi
 
       - name: Upload KICS SARIF
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true
         with:
@@ -304,7 +304,7 @@ jobs:
           fi
 
       - name: Upload Bandit SARIF
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true
         with:
@@ -362,7 +362,7 @@ jobs:
           fi
 
       - name: Upload gosec SARIF
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true
         with:

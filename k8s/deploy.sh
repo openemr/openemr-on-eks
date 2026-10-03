@@ -180,14 +180,14 @@ get_aws_region() {
     if [ -f "$TERRAFORM_DIR/terraform.tfstate" ]; then
         cd "$TERRAFORM_DIR"
         local terraform_region
-        
+
         # Extract region directly from state file JSON
         terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' terraform.tfstate 2>/dev/null | \
             head -1 | \
             sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-        
+
         cd - >/dev/null
-        
+
         # Validate region format
         if [ -n "$terraform_region" ] && [[ "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
             AWS_REGION="$terraform_region"
@@ -195,7 +195,7 @@ get_aws_region() {
             return 0
         fi
     fi
-    
+
     # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
     if [ -n "${AWS_REGION:-}" ] && [ "$AWS_REGION" != "us-west-2" ]; then
         # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -206,7 +206,7 @@ get_aws_region() {
             log_warning "Invalid AWS_REGION format in environment: $AWS_REGION"
         fi
     fi
-    
+
     # Priority 3: Fall back to default
     AWS_REGION="us-west-2"
     log_warning "Could not determine AWS region, using default: $AWS_REGION"
@@ -220,7 +220,7 @@ show_deployment_status() {
     ready_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
     desired_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
     available_replicas=$(kubectl get deployment openemr -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
-    
+
     # Sanitize all variables to ensure they're clean integers
     ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
     desired_replicas=$(printf '%s' "$desired_replicas" | tr -d '[:space:]')
@@ -229,12 +229,12 @@ show_deployment_status() {
     pod_count="${pod_count:-0}"
     running_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . 2>/dev/null || true)
     running_pods="${running_pods:-0}"
-    
+
     # Ensure all variables are clean integers
     ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
     desired_replicas=$(printf '%s' "$desired_replicas" | tr -d '[:space:]')
     available_replicas=$(printf '%s' "$available_replicas" | tr -d '[:space:]')
-    
+
     # Validate all variables are valid integers (fallback to 0 if invalid)
     if [ -z "$ready_replicas" ] || ! [[ "$ready_replicas" =~ ^[0-9]+$ ]]; then
         ready_replicas=0
@@ -289,15 +289,15 @@ show_startup_logs() {
     # Get the most recent pod (usually the one starting up)
     local pod_name
     pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --sort-by='.metadata.creationTimestamp' -o jsonpath='{.items[-1].metadata.name}' 2>/dev/null || echo "")
-    
+
     if [ -n "$pod_name" ]; then
         echo -e "${CYAN}📋 Recent OpenEMR startup logs from pod: $pod_name${NC}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-        
+
         # Get the last 10 lines of OpenEMR container logs
         local logs
         logs=$(kubectl logs "$pod_name" -n "$NAMESPACE" -c openemr --tail=10 2>/dev/null || echo "No logs available yet")
-        
+
         if [ "$logs" != "No logs available yet" ]; then
             # Format logs with nice indentation and color coding
             echo "$logs" | while IFS= read -r line; do
@@ -315,7 +315,7 @@ show_startup_logs() {
         else
             echo -e "${YELLOW}   Container is still initializing - logs will appear shortly...${NC}"
         fi
-        
+
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo ""
     else
@@ -341,7 +341,7 @@ kubectl_safe() {
     if [[ -n "${NAMESPACE:-}" ]]; then
         namespace_arg="-n $NAMESPACE"
     fi
-    
+
     # Execute kubectl command and handle failures gracefully
     if ! kubectl "$namespace_arg" "$@"; then
         log_error "kubectl command failed: kubectl $namespace_arg $*"
@@ -357,7 +357,7 @@ kubectl_get_json() {
     local resource="$1"    # The Kubernetes resource to query (e.g., "deployment/openemr")
     local jsonpath="$2"    # The JSONPath expression to extract data
     local default="${3:-}" # Fallback value if extraction fails
-    
+
     local result
     # Attempt to extract the value using JSONPath
     if result=$(kubectl_safe get "$resource" -o jsonpath="$jsonpath" 2>/dev/null); then
@@ -387,15 +387,15 @@ check_and_ensure_database() {
     temp_namespace="db-check-temp-$(date +%s)"
     local max_attempts=5
     local attempt=1
-    
+
     log_info "Verifying database connection and ensuring 'openemr' database exists..."
-    
+
     # Create temporary namespace for database check
     if ! kubectl create namespace "$temp_namespace" --dry-run=client -o yaml | kubectl apply -f -; then
         log_error "Failed to create namespace for database check"
         return 1
     fi
-    
+
     # Create database credentials secret
     if ! kubectl create secret generic temp-db-credentials \
         --namespace="$temp_namespace" \
@@ -407,7 +407,7 @@ check_and_ensure_database() {
         kubectl delete namespace "$temp_namespace" 2>/dev/null || true
         return 1
     fi
-    
+
     # Create database check pod
     if ! cat <<EOF | kubectl apply -f -
 apiVersion: v1
@@ -443,24 +443,24 @@ spec:
       set -e
       echo "Using OpenEMR container ($OPENEMR_VERSION) for database check..."
       echo "Testing MySQL connection to: \${MYSQL_HOST}"
-      
+
       # Install MySQL client
       apk add --no-cache mysql-client
-      
+
       # Test connection and check/create database
       echo "Testing database connection..."
       mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SELECT 1;" 2>/dev/null || {
         echo "❌ Failed to connect to MySQL database"
         exit 1
       }
-      
+
       echo "✅ Successfully connected to MySQL database"
-      
+
       # Check if openemr database exists
       echo "Checking if 'openemr' database exists..."
       DB_EXISTS=\$(mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "SHOW DATABASES LIKE 'openemr';" 2>/dev/null | grep -c "openemr" || true)
       DB_EXISTS=\${DB_EXISTS:-0}
-      
+
       if [ "\$DB_EXISTS" = "0" ]; then
         echo "⚠️  'openemr' database does not exist, creating empty database..."
         mysql -h \${MYSQL_HOST} -u \${MYSQL_USER} -p\${MYSQL_PASSWORD} -e "CREATE DATABASE openemr CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;" 2>/dev/null || {
@@ -471,7 +471,7 @@ spec:
       else
         echo "✅ 'openemr' database already exists"
       fi
-      
+
       echo "✅ Database check completed successfully"
 EOF
     then
@@ -479,29 +479,29 @@ EOF
         kubectl delete namespace "$temp_namespace" 2>/dev/null || true
         return 1
     fi
-    
+
     # Wait for pod to be ready
     kubectl wait --for=condition=Ready pod/db-check-pod -n "$temp_namespace" --timeout=60s 2>/dev/null || true
-    
+
     # Wait for completion
     while [ $attempt -le $max_attempts ]; do
         if kubectl logs db-check-pod -n "$temp_namespace" 2>/dev/null | grep -q "Database check completed successfully"; then
             log_success "Database check completed successfully"
             break
         fi
-        
+
         if [ $attempt -eq $max_attempts ]; then
             log_error "Database check failed after $max_attempts attempts"
             kubectl logs db-check-pod -n "$temp_namespace" 2>/dev/null || true
             kubectl delete namespace "$temp_namespace" 2>/dev/null || true
             return 1
         fi
-        
+
         log_info "Waiting for database check to complete... (attempt $attempt/$max_attempts)"
         sleep 10
         attempt=$((attempt + 1))
     done
-    
+
     # Cleanup
     kubectl delete namespace "$temp_namespace" 2>/dev/null || true
     log_success "Database is ready for OpenEMR deployment"
@@ -517,7 +517,7 @@ check_openemr_installation() {
     if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
         return 1
     fi
-    
+
     # Second check: Verify the deployment exists and has ready replicas
     # This checks that the Kubernetes deployment resource exists and has
     # at least one pod in the ready state
@@ -528,13 +528,13 @@ check_openemr_installation() {
     if [ -z "$ready_replicas" ] || ! [[ "$ready_replicas" =~ ^[0-9]+$ ]]; then
         ready_replicas=0
     fi
-    
+
     if [ "$ready_replicas" -ge 1 ]; then
         # Third check: Verify at least one pod is actually running
         # This ensures we have a pod in the Running phase, not just Ready
         local pod_name
         pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        
+
         if [ -n "$pod_name" ]; then
             # Fourth check: Verify OpenEMR application is actually responding
             # This performs a real HTTP request to the OpenEMR login page to ensure
@@ -544,7 +544,7 @@ check_openemr_installation() {
             fi
         fi
     fi
-    
+
     return 1  # OpenEMR is not properly installed or functional
 }
 
@@ -554,33 +554,33 @@ check_openemr_installation() {
 # to indicate the appropriate deployment strategy.
 analyze_cluster_state() {
     log_step "Analyzing current cluster state..."
-    
+
     # Check 1: Namespace existence
     # If the namespace doesn't exist, this is definitely a fresh deployment
     if ! kubectl get namespace "$NAMESPACE" >/dev/null 2>&1; then
         log_info "Namespace '$NAMESPACE' does not exist - fresh deployment"
         return 0  # Fresh deployment needed
     fi
-    
+
     # Check 2: Deployment existence
     # If the deployment doesn't exist, we need a fresh deployment
     if ! kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" >/dev/null 2>&1; then
         log_info "OpenEMR deployment does not exist - fresh deployment"
         return 0  # Fresh deployment needed
     fi
-    
+
     # Check 3: Deployment status analysis
     # Get detailed status information about the current deployment
     local ready_replicas desired_replicas available_replicas
     ready_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
     desired_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
     available_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
-    
+
     # Sanitize all variables to ensure they're clean integers
     ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
     desired_replicas=$(printf '%s' "$desired_replicas" | tr -d '[:space:]')
     available_replicas=$(printf '%s' "$available_replicas" | tr -d '[:space:]')
-    
+
     # Validate all variables are valid integers (fallback to 0 if invalid)
     if [ -z "$ready_replicas" ] || ! [[ "$ready_replicas" =~ ^[0-9]+$ ]]; then
         ready_replicas=0
@@ -591,15 +591,15 @@ analyze_cluster_state() {
     if [ -z "$available_replicas" ] || ! [[ "$available_replicas" =~ ^[0-9]+$ ]]; then
         available_replicas=0
     fi
-    
+
     log_info "Current deployment state: $ready_replicas/$desired_replicas ready, $available_replicas available"
-    
+
     # Check 4: Determine if OpenEMR is fully functional
     # If we have the expected number of ready replicas, test if they're actually working
     if [ "$ready_replicas" -ge "$desired_replicas" ] && [ "$ready_replicas" -gt 0 ]; then
         local pod_name
         pod_name=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        
+
         if [ -n "$pod_name" ]; then
             # Test if the application is actually responding to requests
             if kubectl exec "$pod_name" -n "$NAMESPACE" -- curl -s -f http://localhost/interface/login/login.php >/dev/null 2>&1; then
@@ -608,7 +608,7 @@ analyze_cluster_state() {
             fi
         fi
     fi
-    
+
     # Check 5: Look for failed or stuck pods that need cleanup
     # Count pods in the Failed phase - these are completely dead and need removal
     local failed_pods
@@ -619,12 +619,12 @@ analyze_cluster_state() {
     if [ -z "$failed_pods" ] || ! [[ "$failed_pods" =~ ^[0-9]+$ ]]; then
         failed_pods=0
     fi
-    
+
     if [ "$failed_pods" -gt 0 ]; then
         log_warning "Found $failed_pods failed pods - cleanup needed"
         return 1  # Needs cleanup before proceeding
     fi
-    
+
     # Check 6: Look for pods in problematic states that prevent normal operation
     # These states indicate pods that are stuck and can't recover on their own:
     # - CrashLoopBackOff: Pod keeps crashing and restarting
@@ -634,12 +634,12 @@ analyze_cluster_state() {
     # Count problematic pods with robust error handling
     problematic_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | grep -c -E "(CrashLoopBackOff|ImagePullBackOff|ErrImagePull)" || true)
     problematic_pods="${problematic_pods:-0}"
-    
+
     if [ "$problematic_pods" -gt 0 ]; then
         log_warning "Found $problematic_pods pods in problematic states - cleanup needed"
         return 1  # Needs cleanup before proceeding
     fi
-    
+
     # If we reach here, the deployment exists but isn't fully ready
     # This could be a normal deployment in progress or a partially failed state
     log_info "Deployment exists but not fully ready - proceeding with update"
@@ -664,7 +664,7 @@ analyze_cluster_state() {
 # detects failed or problematic resources.
 cleanup_failed_deployment() {
     log_step "Cleaning up failed deployment states..."
-    
+
     # Remove pods in Failed phase
     # These are pods that have completely failed and are dead. They need to be
     # forcefully deleted to allow the deployment controller to create new ones.
@@ -672,7 +672,7 @@ cleanup_failed_deployment() {
     kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Failed --no-headers 2>/dev/null | \
         awk '{print $1}' | \
         xargs -r kubectl delete pod -n "$NAMESPACE" --force --grace-period=0 2>/dev/null || true
-    
+
     # Remove pods in problematic states
     # These pods are stuck in states where they can't recover on their own.
     # Force deletion allows the deployment controller to create replacement pods.
@@ -680,7 +680,7 @@ cleanup_failed_deployment() {
         grep -E "(CrashLoopBackOff|ImagePullBackOff|ErrImagePull)" | \
         awk '{print $1}' | \
         xargs -r kubectl delete pod -n "$NAMESPACE" --force --grace-period=0 2>/dev/null || true
-    
+
     # Clean up old replica sets
     # During rolling updates, old replica sets with 0 replicas can accumulate.
     # These should be cleaned up to keep the cluster tidy and avoid confusion.
@@ -688,7 +688,7 @@ cleanup_failed_deployment() {
     kubectl get replicasets -n "$NAMESPACE" -l app=openemr --no-headers 2>/dev/null | \
         awk '$2==0 {print $1}' | \
         xargs -r kubectl delete replicaset -n "$NAMESPACE" 2>/dev/null || true
-    
+
     # Wait for cleanup to complete
     # Give Kubernetes time to process the deletions before proceeding.
     # This prevents race conditions and ensures clean state.
@@ -703,9 +703,9 @@ cleanup_failed_deployment() {
 # Validate all prerequisites
 validate_prerequisites() {
     log_step "Validating prerequisites..."
-    
+
     local errors=0
-    
+
     # Validate Redis availability (critical for OpenEMR functionality)
     if [ "$REDIS_ENDPOINT" = "redis-not-available" ]; then
         log_error "Redis endpoint not available - CRITICAL FAILURE"
@@ -714,7 +714,7 @@ validate_prerequisites() {
     else
         log_success "Redis endpoint validated: $REDIS_ENDPOINT"
     fi
-    
+
     # Validate Aurora availability (critical for data persistence)
     if [ -z "$AURORA_ENDPOINT" ] || [ "$AURORA_ENDPOINT" = "aurora-not-available" ]; then
         log_error "Aurora endpoint not available - CRITICAL FAILURE"
@@ -723,7 +723,7 @@ validate_prerequisites() {
     else
         log_success "Aurora endpoint validated: $AURORA_ENDPOINT"
     fi
-    
+
     # Validate EFS CSI driver (critical for persistent storage)
     log_info "Validating EFS CSI driver..."
     if ! kubectl get storageclass efs-sc >/dev/null 2>&1; then
@@ -733,7 +733,7 @@ validate_prerequisites() {
     else
         log_success "EFS storage class validated"
     fi
-    
+
     # Validate cluster connectivity (critical for deployment)
     if ! kubectl cluster-info >/dev/null 2>&1; then
         log_error "Cannot connect to Kubernetes cluster - CRITICAL FAILURE"
@@ -742,40 +742,40 @@ validate_prerequisites() {
     else
         log_success "Kubernetes cluster connectivity validated"
     fi
-    
+
     # Fail fast if any critical prerequisites are missing
     if [ $errors -gt 0 ]; then
         log_error "Prerequisites validation failed with $errors critical errors"
         log_error "Deployment cannot proceed - fix prerequisites and retry"
         exit 1
     fi
-    
+
      log_success "All prerequisites validated"
 }
 
 # Validate deployment success
 validate_deployment_success() {
     log_step "Validating deployment success..."
-    
+
     # Wait for at least one pod to be ready
     local max_wait=$POD_READY_TIMEOUT  # Use configured timeout
     local wait_time=0
     local ready_pods=0
-    
+
     while [ $wait_time -lt $max_wait ]; do
         ready_pods=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running --no-headers 2>/dev/null | grep -c . || true)
         ready_pods="${ready_pods:-0}"
-        
+
         if [ "$ready_pods" -ge 1 ]; then
             log_success "Found $ready_pods running OpenEMR pods"
             break
         fi
-        
+
         log_info "Waiting for OpenEMR pods to be ready... (${wait_time}s elapsed)"
         sleep 30
         wait_time=$((wait_time + 30))
     done
-    
+
     if [ "$ready_pods" -eq 0 ]; then
         log_error "No OpenEMR pods are running after 20 minutes"
         log_info "Debugging pod status..."
@@ -783,27 +783,27 @@ validate_deployment_success() {
         kubectl describe pods -n "$NAMESPACE" -l app=openemr
         exit 1
     fi
-    
+
     # Test OpenEMR responsiveness
     log_info "Testing OpenEMR responsiveness..."
     local test_pod
     test_pod=$(kubectl get pods -n "$NAMESPACE" -l app=openemr --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-    
+
     if [ -n "$test_pod" ]; then
         local max_health_checks=$((HEALTH_CHECK_TIMEOUT / 10))  # Convert seconds to 10-second intervals
         local health_check=0
-        
+
         while [ $health_check -lt $max_health_checks ]; do
             if kubectl exec "$test_pod" -n "$NAMESPACE" -- curl -s -f http://localhost/interface/login/login.php >/dev/null 2>&1; then
                 log_success "OpenEMR is responding to HTTP requests"
                 return 0
             fi
-            
+
             log_info "Waiting for OpenEMR to be responsive... (check $((health_check + 1))/$max_health_checks)"
             sleep 10
             health_check=$((health_check + 1))
         done
-        
+
         log_error "OpenEMR is not responding to HTTP requests after 10 minutes"
         log_info "Debugging pod logs..."
         kubectl logs "$test_pod" -n "$NAMESPACE" --tail=50
@@ -859,12 +859,12 @@ validate_deployment_health() {
         ready_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
         desired_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.spec.replicas}' 2>/dev/null || echo "0")
         available_replicas=$(kubectl get deployment "$DEPLOYMENT_NAME" -n "$NAMESPACE" -o jsonpath='{.status.availableReplicas}' 2>/dev/null || echo "0")
-        
+
         # Sanitize all variables to ensure they're clean integers
         ready_replicas=$(printf '%s' "$ready_replicas" | tr -d '[:space:]')
         desired_replicas=$(printf '%s' "$desired_replicas" | tr -d '[:space:]')
         available_replicas=$(printf '%s' "$available_replicas" | tr -d '[:space:]')
-        
+
         # Validate all variables are valid integers (fallback to 0 if invalid)
         if [ -z "$ready_replicas" ] || ! [[ "$ready_replicas" =~ ^[0-9]+$ ]]; then
             ready_replicas=0
@@ -1372,10 +1372,10 @@ if [ $cluster_state_result -eq 2 ]; then
     kubectl apply -f service.yaml
     kubectl apply -f ingress.yaml
     kubectl apply -f network-policies.yaml
-    
+
     # Clean up temporary file
     rm -f deployment-temp.yaml 2>/dev/null || true
-    
+
     # Skip the deployment and rollout logic
     log_success "All components verified - OpenEMR is ready"
     log_success "OpenEMR deployment completed successfully!"
@@ -1497,7 +1497,7 @@ if ! validate_storage_classes; then
         # Recreate from template (create temporary file to avoid modifying original)
         temp_storage_file=$(mktemp)
         sed "s/fileSystemId: \${EFS_ID}/fileSystemId: $current_efs_id/g" storage.yaml > "$temp_storage_file"
-        
+
         if kubectl apply -f "$temp_storage_file"; then
             log_success "Storage classes applied from temporary file"
         else
@@ -1505,7 +1505,7 @@ if ! validate_storage_classes; then
             rm -f "$temp_storage_file"
             exit 1
         fi
-        
+
         # Clean up temporary file
         rm -f "$temp_storage_file"
 
@@ -1627,12 +1627,12 @@ while [ $pvc_wait_time -lt $pvc_wait_max ]; do
     if ! [[ "$essential_pvcs_bound" =~ ^[0-9]+$ ]]; then
         essential_pvcs_bound=0
     fi
-    
+
     if [ "$essential_pvcs_bound" -ge "$ESSENTIAL_PVC_COUNT" ]; then
         log_success "Essential PVCs are bound ($essential_pvcs_bound/$ESSENTIAL_PVC_COUNT)"
         break
     fi
-    
+
     log_info "Waiting for PVCs to be bound... ($essential_pvcs_bound/$ESSENTIAL_PVC_COUNT bound, ${pvc_wait_time}s elapsed)"
     sleep $PVC_CHECK_INTERVAL
     pvc_wait_time=$((pvc_wait_time + PVC_CHECK_INTERVAL))
@@ -1669,7 +1669,7 @@ echo ""
         # Show progress indicator
         progress=$((attempt * 100 / max_attempts))
         echo -e "${BLUE}   Progress: ${progress}% (${attempt}/${max_attempts} checks)${NC}"
-        
+
         # Show startup logs for user visibility
         show_startup_logs
 

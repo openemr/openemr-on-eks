@@ -65,10 +65,10 @@ permissions:
 
 # Environment variables for consistent tool versions across all jobs
 env:
-  PYTHON_VERSION: '3.14.7'    # Python version for YAML validation and dependencies
-  TERRAFORM_VERSION: '1.16.0' # Terraform version for infrastructure validation
-  KUBECTL_VERSION: 'v1.37.0'  # kubectl version for Kubernetes manifest validation
-  UV_VERSION: '0.12.9'       # uv version for the knowledge MCP package
+  PYTHON_VERSION: '3.14.8'    # Python version for YAML validation and dependencies
+  TERRAFORM_VERSION: '1.16.4' # Terraform version for infrastructure validation
+  KUBECTL_VERSION: 'v1.37.1'  # kubectl version for Kubernetes manifest validation
+  UV_VERSION: '0.12.21'      # uv version for the knowledge MCP package
   TRIVY_VERSION: '0.74.0'     # Trivy engine version (synced with versions.yaml)
 
 # Checkout/setup v7 actions require Node 24; the GitHub-hosted runners below provide it.
@@ -386,7 +386,7 @@ jobs:
 
       # Step 5: Upload SARIF results to GitHub Security tab
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         if: always()
         continue-on-error: true  # Don't fail if GitHub Advanced Security is not enabled
         with:
@@ -461,7 +461,7 @@ jobs:
     runs-on: ubuntu-26.04
     strategy:
       matrix:
-        python-version: ['3.10', '3.14.7']
+        python-version: ['3.10', '3.14.8']
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.test_suite == 'all' ||

@@ -212,7 +212,7 @@ fi
 if [ "$LATEST_ONLY" = true ]; then
     # Latest-only mode: distinguish the reviewed project pin from raw image tags.
     echo -e "${BLUE}Reviewed OpenEMR version (from versions.yaml):${NC}"
-    
+
     latest_version=$(echo "$tags" | filter_versions "" true "$TAGS_TO_SHOW")
     echo -e "${GREEN}  $RECOMMENDED_VERSION${NC} (reviewed - recommended for production)"
     if [ -n "$latest_version" ] && [ "$RECOMMENDED_VERSION" != "$latest_version" ]; then

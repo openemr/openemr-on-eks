@@ -10,4 +10,3 @@ exclude =
     *.egg-info,
     build,
     dist
-

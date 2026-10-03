@@ -125,7 +125,7 @@ graph TD
 
 - **Purpose**: Provider configuration and data sources
 - **Key Components**:
-  - AWS provider configuration (v6.62.0)
+  - AWS provider configuration (v6.67.0)
   - Kubernetes provider configuration (v3.2.1)
   - Data sources for availability zones, caller identity, and public IP
   - Common tags and local values
@@ -292,7 +292,7 @@ graph TD
 
 - **Purpose**: CloudWatch log groups
 - **Key Components**:
-  - 10+ log groups for OpenEMR 8.3.0
+  - 10+ log groups for OpenEMR 8.4.1
   - Fluent Bit metrics log group
   - Different retention periods for different log types
   - KMS encryption for all log groups

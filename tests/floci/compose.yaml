@@ -2,7 +2,7 @@
 # Prefer GitHub Actions for routine runs; use this compose only when reproducing failures.
 services:
   floci:
-    image: floci/floci:${FLOCI_VERSION:-2.0.0}
+    image: floci/floci:${FLOCI_VERSION:-2.1.0}
     ports:
       # Bind to loopback only (local/CI debug; not exposed on all interfaces)
       - "127.0.0.1:4566:4566"

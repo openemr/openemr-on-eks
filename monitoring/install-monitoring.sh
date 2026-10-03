@@ -67,12 +67,12 @@
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Helm Chart Versions                                                     │
 # └─────────────────────────────────────────────────────────────────────────┘
-#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 88.6.2)
+#   CHART_KPS_VERSION          kube-prometheus-stack chart version (default: 91.8.2)
 #   CHART_LOKI_VERSION         Loki chart version (default: 7.0.0)
 #   CHART_TEMPO_VERSION        Tempo distributed chart version (default: 2.26.0)
 #   CHART_MIMIR_VERSION        Mimir chart version (default: 6.2.0)
-#   OTEBPF_VERSION             OTeBPF version (default: v0.12.2)
-#   CERT_MANAGER_VERSION       cert-manager version (default: v1.21.1)
+#   OTEBPF_VERSION             OTeBPF version (default: v0.13.0)
+#   CERT_MANAGER_VERSION       cert-manager version (default: v1.21.2)
 #
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ Timeout and Retry Configuration                                         │
@@ -248,7 +248,7 @@ readonly VALUES_FILE_IS_TEMP
 readonly LOG_FILE="${LOG_FILE:-${SCRIPT_DIR}/openemr-monitoring.log}"
 
 # Chart versions (pin to known-good)
-readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-88.6.2}"
+readonly CHART_KPS_VERSION="${CHART_KPS_VERSION:-91.8.2}"
 readonly CHART_LOKI_VERSION="${CHART_LOKI_VERSION:-7.0.0}"
 readonly CHART_TEMPO_VERSION="${CHART_TEMPO_VERSION:-2.26.0}"
 readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.2.0}"
@@ -256,7 +256,7 @@ readonly CHART_MIMIR_VERSION="${CHART_MIMIR_VERSION:-6.2.0}"
 # Using Docker Hub image: otel/ebpf-instrument
 # Official image repository: https://hub.docker.com/r/otel/ebpf-instrument
 # GitHub: https://github.com/open-telemetry/opentelemetry-network
-readonly OTEBPF_VERSION="${OTEBPF_VERSION:-v0.12.2}"
+readonly OTEBPF_VERSION="${OTEBPF_VERSION:-v0.13.0}"
 readonly OTEBPF_IMAGE="${OTEBPF_IMAGE:-otel/ebpf-instrument}"
 
 # Timeouts / retries
@@ -304,14 +304,14 @@ get_aws_region() {
     terraform_region=$(grep -o '"region"[[:space:]]*:[[:space:]]*"[^"]*"' "$TERRAFORM_DIR/terraform.tfstate" 2>/dev/null | \
         head -1 | \
         sed 's/.*"region"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/' || echo "")
-    
+
     # Validate region format
     if [[ -n "$terraform_region" && "$terraform_region" =~ ^[a-z]{2}-[a-z]+-[0-9]+$ ]]; then
       echo "$terraform_region"
       return 0
     fi
   fi
-  
+
   # Priority 2: If AWS_REGION is explicitly set via environment AND it's not the default, use it
   if [[ -n "${AWS_REGION:-}" && "${AWS_REGION}" != "us-west-2" ]]; then
     # Validate it's a real region format (e.g., us-west-2, eu-west-1, ap-southeast-1)
@@ -320,13 +320,13 @@ get_aws_region() {
       return 0
     fi
   fi
-  
+
   # Priority 3: Try to get from AWS_DEFAULT_REGION environment variable
   if [[ -n "${AWS_DEFAULT_REGION:-}" ]]; then
     echo "${AWS_DEFAULT_REGION}"
     return 0
   fi
-  
+
   # Priority 4: Try to get region from kubectl cluster info
   local cluster_endpoint
   cluster_endpoint=$(kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}' 2>/dev/null || echo "")
@@ -334,7 +334,7 @@ get_aws_region() {
     echo "${BASH_REMATCH[1]}"
     return 0
   fi
-  
+
   # Priority 5: Try to get from EC2 metadata (if running on EC2)
   if command -v curl >/dev/null 2>&1; then
     local region
@@ -344,7 +344,7 @@ get_aws_region() {
       return 0
     fi
   fi
-  
+
   # Default to us-west-2 if all else fails
   echo "us-west-2"
 }
@@ -358,12 +358,12 @@ get_cluster_name() {
   # Try to get from kubectl context
   local cluster_name
   cluster_name=$(kubectl config view --minify -o jsonpath='{.clusters[0].name}' 2>/dev/null | sed 's|.*/||' 2>/dev/null)
-  
+
   if [[ -n "$cluster_name" && "$cluster_name" != "null" ]]; then
     echo "$cluster_name"
     return 0
   fi
-  
+
   # Default fallback
   echo "openemr-eks"
 }
@@ -533,7 +533,7 @@ readonly TEMPO_SPAN_START_TIME_SHIFT="${TEMPO_SPAN_START_TIME_SHIFT:-1h}"
 readonly TEMPO_SPAN_END_TIME_SHIFT="${TEMPO_SPAN_END_TIME_SHIFT:--1h}"
 
 # ---- cert-manager (pinned version for TLS certificate management)
-readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.21.1}"
+readonly CERT_MANAGER_VERSION="${CERT_MANAGER_VERSION:-v1.21.2}"
 
 # Colors
 readonly RED='\033[0;31m'; readonly GREEN='\033[0;32m'
@@ -578,7 +578,7 @@ trap cleanup EXIT
 # ------------------------------
 # Config & Input Validation
 # ------------------------------
-load_config(){ 
+load_config(){
   if [[ "$CONFIG_LOADED" != "1" ]]; then
     log_debug "No configuration file found at: $CONFIG_FILE"
   fi
@@ -603,37 +603,37 @@ validate_inputs(){
       local max_var="${comp}_MAX_REPLICAS"
       local min_val="${!min_var}"
       local max_val="${!max_var}"
-      
+
       if ! [[ "$min_val" =~ ^[0-9]+$ && "$max_val" =~ ^[0-9]+$ ]]; then
         log_error "Invalid replica values for $comp: min=$min_val, max=$max_val (must be positive integers)"
         return 1
       fi
-      
+
       if [[ "$min_val" -lt 1 || "$max_val" -lt 1 ]]; then
         log_error "Invalid replica values for $comp: min=$min_val, max=$max_val (must be >= 1)"
         return 1
       fi
-      
+
       if [[ "$min_val" -gt "$max_val" ]]; then
         log_error "Invalid replica values for $comp: min=$min_val > max=$max_val"
         return 1
       fi
-      
+
       if [[ "$max_val" -gt 10 ]]; then
         log_warn "High max replicas for $comp: $max_val (consider cost implications)"
       fi
     done
-    
+
     # Validate HPA targets
     if ! [[ "$HPA_CPU_TARGET" =~ ^[0-9]+$ && "$HPA_MEMORY_TARGET" =~ ^[0-9]+$ ]]; then
       log_error "Invalid HPA targets: CPU=$HPA_CPU_TARGET, Memory=$HPA_MEMORY_TARGET (must be positive integers)"
       return 1
     fi
-    
+
     if [[ "$HPA_CPU_TARGET" -lt 10 || "$HPA_CPU_TARGET" -gt 90 ]]; then
       log_warn "Unusual CPU target: $HPA_CPU_TARGET% (recommended: 50-80%)"
     fi
-    
+
     if [[ "$HPA_MEMORY_TARGET" -lt 10 || "$HPA_MEMORY_TARGET" -gt 90 ]]; then
       log_warn "Unusual memory target: $HPA_MEMORY_TARGET% (recommended: 60-85%)"
     fi
@@ -651,7 +651,7 @@ validate_inputs(){
     log_error "PROMETHEUS_MAX_REPLICAS must equal PROMETHEUS_MIN_REPLICAS; chart-level Prometheus HPA is unsupported"
     return 1
   fi
-  
+
   log_success "Configuration validation passed"
 }
 
@@ -697,9 +697,9 @@ check_eks_auto_mode(){ log_step "Checking EKS Auto Mode status..."; if kubectl g
 # ------------------------------
 # Namespace / RBAC / Security
 # ------------------------------
-ensure_namespace(){ 
+ensure_namespace(){
   local ns="$1"
-  if ! kubectl get namespace "$ns" >/dev/null 2>&1; then 
+  if ! kubectl get namespace "$ns" >/dev/null 2>&1; then
     log_info "Creating namespace: $ns"
     if [[ "$ns" == "monitoring" ]]; then
       # Monitoring namespace needs privileged PodSecurity for OTeBPF and node-exporter
@@ -716,7 +716,7 @@ ensure_namespace(){
       kubectl create namespace "$ns"
     fi
     log_audit "CREATE" "namespace:$ns" "SUCCESS"
-  else 
+  else
     log_debug "Namespace $ns exists"
     # Ensure monitoring namespace has privileged PodSecurity if it exists
     if [[ "$ns" == "monitoring" ]]; then
@@ -863,16 +863,16 @@ create_secure_password_file(){
 }
 create_grafana_secret(){
   local p="$1"
-  
+
   # Check if Grafana admin secret already exists
   if kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
     log_info "Grafana admin secret already exists - preserving existing credentials"
     log_info "Admin credentials will not be changed - existing credentials remain valid"
-    
+
     # Retrieve existing password from secret
     local existing_password
     existing_password=$(kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" -o jsonpath='{.data.admin-password}' | base64 -d 2>/dev/null || echo "")
-    
+
     if [ -n "$existing_password" ]; then
       log_success "Retrieved existing Grafana admin password from secret"
       # Update the password variable to use existing password
@@ -883,14 +883,14 @@ create_grafana_secret(){
   else
     log_info "Creating new Grafana admin secret..."
   fi
-  
+
   # Create or update the secret
   kubectl create secret generic grafana-admin-secret \
     --from-literal=admin-user="admin" \
     --from-literal=admin-password="$p" \
     --namespace="$MONITORING_NAMESPACE" \
     --dry-run=client -o yaml | kubectl apply -f -
-  
+
   log_audit "CREATE" "secret:grafana-admin-secret" "SUCCESS"
 }
 write_credentials_file(){
@@ -915,7 +915,7 @@ write_credentials_file(){
     # Try to extract existing password from file
     local existing_password
     existing_password=$(grep "Grafana Admin Password: " "$f" | sed 's/.*Grafana Admin Password: //' | head -1)
-    
+
     if [[ -n "$existing_password" && "$existing_password" == "$p" ]]; then
       log_info "Credentials file already exists with correct password - preserving existing file"
       log_info "Using existing credentials from: $f"
@@ -1023,7 +1023,7 @@ alertmanager_enabled(){ [[ -n "$SLACK_WEBHOOK_URL" && -n "$SLACK_CHANNEL" && "$S
 validate_helm_values(){
   local vf="$1"; log_debug "Validating Helm values file: $vf"
   [[ -r "$vf" ]] || { log_error "Values file not readable: $vf"; return 1; }
-  
+
   # Try yq first (more reliable), fall back to Python
   if command -v yq >/dev/null 2>&1; then
     yq eval '.' "$vf" >/dev/null 2>&1 || { log_error "Invalid YAML syntax"; return 1; }
@@ -1036,7 +1036,7 @@ PY
   else
     log_warn "No YAML validator available (yq or python3 with PyYAML), skipping validation"
   fi
-  
+
   grep -q "existingSecret:" "$vf" || { log_error "Grafana not configured to use existingSecret"; return 1; }
   log_success "Values file validation passed"
 }
@@ -1090,7 +1090,7 @@ grafana:
     existingSecret: "grafana-admin-secret" # checkov:skip=CKV_SECRET_6:Kubernetes Secret name, not secret material.
     userKey: admin-user
     passwordKey: admin-password
-  
+
   persistence:
     enabled: true
     storageClassName: ${sc_prom}
@@ -1259,7 +1259,7 @@ wait_for_prom_operator_webhook(){
 create_alertmanager_config(){
   if ! alertmanager_enabled; then log_info "Skipping Alertmanager config (SLACK_WEBHOOK_URL/SLACK_CHANNEL not set or invalid)."; return 0; fi
   log_step "Creating AlertManager configuration for Slack channel ${SLACK_CHANNEL}..."
-  
+
   kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Secret
@@ -1299,15 +1299,15 @@ install_prometheus_stack(){
   local vf="$1"
   log_step "Installing kube-prometheus-stack (version ${CHART_KPS_VERSION})..."
   log_info "⏱️  Expected duration: ~3 minutes"
-  
+
   # Install with retry logic for network resilience
   local max_retries="${MAX_RETRIES}"
   local retry_delay="${HELM_INSTALL_RETRY_DELAY}"
   local attempt=1
-  
+
   while [ $attempt -le "$max_retries" ]; do
     log_info "Attempt $attempt/$max_retries: Installing Prometheus Stack..."
-    
+
     # Test cluster connectivity before attempting installation
     if ! kubectl cluster-info >/dev/null 2>&1; then
       log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
@@ -1315,7 +1315,7 @@ install_prometheus_stack(){
       ((attempt += 1))
       continue
     fi
-    
+
     # Attempt Helm installation with enhanced timeout and retry settings
     if helm upgrade --install prometheus-stack prometheus-community/kube-prometheus-stack \
       --namespace "$MONITORING_NAMESPACE" --create-namespace \
@@ -1323,7 +1323,7 @@ install_prometheus_stack(){
       --timeout "$TIMEOUT_HELM" --atomic --wait --wait-for-jobs \
       --set crds.upgradeJob.enabled=true \
       --values "$vf" 2>&1 | tee "${SCRIPT_DIR}/helm-install-kps.log"; then
-      
+
       # Verify installation success
       if helm status prometheus-stack -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
         log_success "Prometheus Stack installed successfully on attempt $attempt"
@@ -1342,16 +1342,16 @@ install_prometheus_stack(){
         sleep "$retry_delay"
       fi
     fi
-    
+
     ((attempt += 1))
   done
-  
+
   if [ $attempt -gt "$max_retries" ]; then
     log_error "Prometheus Stack installation failed after $max_retries attempts. Check ${SCRIPT_DIR}/helm-install-kps.log"
     log_audit "INSTALL" "prometheus-stack" "FAILED"
     return 1
   fi
-  
+
   # Wait for pods with enhanced timeout - ALL must be ready
   log_info "Waiting for Prometheus and Grafana pods to be ready..."
   if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=grafana -n "$MONITORING_NAMESPACE" --timeout="$TIMEOUT_KUBECTL"; then
@@ -1369,19 +1369,19 @@ install_prometheus_stack(){
 install_loki_stack(){
   log_step "Installing Loki (version ${CHART_LOKI_VERSION}) with S3 storage..."
   log_info "⏱️  Expected duration: ~3 minutes"
-  
+
   # Get S3 bucket name and IAM role ARN from Terraform outputs
   local terraform_dir="${SCRIPT_DIR}/../terraform"
   local loki_bucket_name=""
   local loki_role_arn=""
-  
+
   if [[ -d "$terraform_dir" ]] && command -v terraform >/dev/null 2>&1; then
     log_info "Retrieving Loki S3 bucket and IAM role from Terraform outputs..."
     cd "$terraform_dir" || return 1
     loki_bucket_name=$(terraform output -raw loki_s3_bucket_name 2>/dev/null || echo "")
     loki_role_arn=$(terraform output -raw loki_s3_role_arn 2>/dev/null || echo "")
     cd "$SCRIPT_DIR" || return 1
-    
+
     if [[ -z "$loki_bucket_name" ]] || [[ -z "$loki_role_arn" ]]; then
       log_error "Failed to retrieve Loki S3 bucket name or IAM role ARN from Terraform"
       log_error "Bucket name: ${loki_bucket_name:-NOT_FOUND}"
@@ -1389,7 +1389,7 @@ install_loki_stack(){
       log_error "Please ensure Terraform has been applied with the Loki S3 resources"
       return 1
     fi
-    
+
     log_success "Found Loki S3 bucket: $loki_bucket_name"
     log_success "Found Loki IAM role: $loki_role_arn"
   else
@@ -1397,11 +1397,11 @@ install_loki_stack(){
     log_error "Cannot retrieve S3 bucket and IAM role for Loki"
     return 1
   fi
-  
+
   # Annotate Loki service account with IAM role ARN for IRSA
   log_step "Configuring Loki service account with IAM role annotation..."
   ensure_namespace "$MONITORING_NAMESPACE"
-  
+
   # Create or update Loki service account with IAM role annotation
   kubectl apply -f - <<EOF
 apiVersion: v1
@@ -1412,17 +1412,17 @@ metadata:
   annotations:
     eks.amazonaws.com/role-arn: ${loki_role_arn}
 EOF
-  
+
   log_success "Loki service account configured with IAM role annotation"
-  
+
   # Install with retry logic for network resilience
   local max_retries="${MAX_RETRIES}"
   local retry_delay="${HELM_INSTALL_RETRY_DELAY}"
   local attempt=1
-  
+
   while [ $attempt -le "$max_retries" ]; do
     log_info "Attempt $attempt/$max_retries: Installing Loki Stack..."
-    
+
     # Test cluster connectivity before attempting installation
     if ! kubectl cluster-info >/dev/null 2>&1; then
       log_warn "Cluster connectivity issue detected, waiting ${retry_delay}s before retry..."
@@ -1430,7 +1430,7 @@ EOF
       ((attempt += 1))
       continue
     fi
-    
+
     # Attempt Helm installation with S3 storage configuration
     # Using SimpleScalable deployment mode for distributed architecture (groups components into read, write, backend)
     # This provides better scalability and high availability compared to SingleBinary mode
@@ -1491,7 +1491,7 @@ EOF
       --set write.persistence.storageClass="${STORAGE_CLASS_RWO}" \
       --set backend.persistence.storageClass="${STORAGE_CLASS_RWO}" \
       2>&1 | tee "${SCRIPT_DIR}/helm-install-loki.log"; then
-      
+
       # Verify installation success
       if helm status loki -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
         log_success "Loki Stack installed successfully on attempt $attempt"
@@ -1510,16 +1510,16 @@ EOF
         sleep "$retry_delay"
       fi
     fi
-    
+
     ((attempt += 1))
   done
-  
+
   if [ $attempt -gt "$max_retries" ]; then
     log_error "Loki Stack installation failed after $max_retries attempts. Check ${SCRIPT_DIR}/helm-install-loki.log"
     log_audit "INSTALL" "loki" "FAILED"
     return 1
   fi
-  
+
   # Wait for pods with enhanced timeout - but don't fail if they're not ready immediately
   log_info "Waiting for Loki pods to be ready (this may take a few minutes for distributed mode)..."
   local wait_timeout=300  # 5 minutes
@@ -1535,7 +1535,7 @@ EOF
     log_info "Loki Helm release installed. Pods may still be starting up."
     log_audit "INSTALL" "loki" "PARTIAL"
   fi
-  
+
   # Ensure volume_enabled is set in Loki configuration
   # Note: This is set during initial install, but we verify it here
   log_step "Verifying Loki volume_enabled configuration..."
@@ -1567,7 +1567,7 @@ create_additional_hpa(){
     log_info "Autoscaling disabled - skipping additional HPA resources"
     return 0
   fi
-  
+
   log_step "Creating additional HPA resources..."
   if alertmanager_enabled; then
     kubectl apply -f - <<EOF
@@ -1605,14 +1605,14 @@ install_tempo(){
   local terraform_dir="${SCRIPT_DIR}/../terraform"
   local tempo_bucket_name=""
   local tempo_role_arn=""
-  
+
   if [[ -d "$terraform_dir" ]] && command -v terraform >/dev/null 2>&1; then
     log_info "Retrieving Tempo S3 bucket and IAM role from Terraform outputs..."
     cd "$terraform_dir" || return 1
     tempo_bucket_name=$(terraform output -raw tempo_s3_bucket_name 2>/dev/null || echo "")
     tempo_role_arn=$(terraform output -raw tempo_s3_role_arn 2>/dev/null || echo "")
     cd "$SCRIPT_DIR" || return 1
-    
+
     if [[ -z "$tempo_bucket_name" ]] || [[ -z "$tempo_role_arn" ]]; then
       log_error "Failed to retrieve Tempo S3 bucket name or IAM role ARN from Terraform"
       log_error "Bucket name: ${tempo_bucket_name:-NOT_FOUND}"
@@ -1620,7 +1620,7 @@ install_tempo(){
       log_error "Please ensure Terraform has been applied with the Tempo S3 resources"
       return 1
     fi
-    
+
     log_success "Found Tempo S3 bucket: $tempo_bucket_name"
     log_success "Found Tempo IAM role: $tempo_role_arn"
   else
@@ -1628,7 +1628,7 @@ install_tempo(){
     log_error "Cannot retrieve S3 bucket and IAM role for Tempo"
     return 1
   fi
-  
+
   # Create Tempo service account with IAM role annotation and Helm labels
   log_step "Configuring Tempo service account with IAM role annotation..."
   kubectl apply -f - <<EOF
@@ -1644,11 +1644,11 @@ metadata:
     meta.helm.sh/release-name: tempo
     meta.helm.sh/release-namespace: ${MONITORING_NAMESPACE}
 EOF
-  
+
   log_success "Tempo service account configured with IAM role annotation"
 
   log_info "Installing Tempo using Helm chart (version: ${CHART_TEMPO_VERSION})..."
-  
+
   # Create Tempo configuration for distributed mode
   # The tempo-distributed chart uses external configuration
   local TEMPO_CONFIG_FILE="${SCRIPT_DIR}/tempo-config.yaml"
@@ -1738,7 +1738,7 @@ tempo:
     create: false
     annotations:
       eks.amazonaws.com/role-arn: ${tempo_role_arn}
-  
+
 # Component replicas and resources
 distributor:
   replicas: ${TEMPO_MIN_REPLICAS}
@@ -1841,16 +1841,16 @@ EOF
     --from-file=tempo.yaml="$TEMPO_CONFIG_FILE" \
     --namespace "$MONITORING_NAMESPACE" \
     --dry-run=client -o yaml | kubectl apply -f -
-  
+
   log_success "Tempo configuration ConfigMap created"
-  
+
   # Create tempo-runtime ConfigMap (required by tempo-distributed chart)
   log_info "Creating Tempo runtime ConfigMap..."
   kubectl create configmap tempo-runtime \
     --from-literal=overrides.yaml="" \
     --namespace "$MONITORING_NAMESPACE" \
     --dry-run=client -o yaml | kubectl apply -f -
-  
+
   log_success "Tempo runtime ConfigMap created"
 
   # Install Tempo using Helm (using tempo-distributed chart for distributed mode)
@@ -1903,7 +1903,7 @@ EOF
     fi
     sleep "${TEMPO_READINESS_SLEEP_INTERVAL}"
   done
-  
+
   if [[ "$tempo_ready" == "true" ]]; then
     log_success "Tempo components are running"
   else
@@ -1914,7 +1914,7 @@ EOF
   rm -f "$TEMPO_VALUES_FILE" "$TEMPO_CONFIG_FILE"
 
   log_success "Tempo Helm chart installed and ready"; log_audit "INSTALL" "tempo" "SUCCESS"
-  
+
   # Patch Tempo distributor service to expose OTLP ports (4317 gRPC, 4318 HTTP)
   log_info "Patching Tempo distributor service to expose OTLP ports..."
   if kubectl patch svc tempo-distributor -n "$MONITORING_NAMESPACE" --type='json' -p='[{"op": "add", "path": "/spec/ports/-", "value": {"name": "otlp-grpc", "port": 4317, "protocol": "TCP", "targetPort": 4317}}, {"op": "add", "path": "/spec/ports/-", "value": {"name": "otlp-http", "port": 4318, "protocol": "TCP", "targetPort": 4318}}]' 2>/dev/null; then
@@ -1937,7 +1937,7 @@ install_mimir(){
   local mimir_ruler_bucket_name=""
   local alertmanager_bucket_name=""
   local mimir_role_arn=""
-  
+
   if [[ -d "$terraform_dir" ]] && command -v terraform >/dev/null 2>&1; then
     log_info "Retrieving Mimir S3 buckets and IAM role from Terraform outputs..."
     cd "$terraform_dir" || return 1
@@ -1947,7 +1947,7 @@ install_mimir(){
     alertmanager_bucket_name=$(terraform output -raw alertmanager_s3_bucket_name 2>/dev/null || echo "")
     mimir_role_arn=$(terraform output -raw mimir_s3_role_arn 2>/dev/null || echo "")
     cd "$SCRIPT_DIR" || return 1
-    
+
     if [[ -z "$mimir_blocks_bucket_name" ]] || [[ -z "$mimir_role_arn" ]]; then
       log_error "Failed to retrieve Mimir blocks S3 bucket name or IAM role ARN from Terraform"
       log_error "Blocks bucket name: ${mimir_blocks_bucket_name:-NOT_FOUND}"
@@ -1955,17 +1955,17 @@ install_mimir(){
       log_error "Please ensure Terraform has been applied with the Mimir S3 resources"
       return 1
     fi
-    
+
     if [[ -z "$mimir_ruler_bucket_name" ]]; then
       log_warn "Mimir ruler bucket not found, using blocks bucket for ruler storage (may cause validation errors)"
       mimir_ruler_bucket_name="$mimir_blocks_bucket_name"
     fi
-    
+
     if [[ -z "$alertmanager_bucket_name" ]]; then
       log_warn "AlertManager bucket not found, using Mimir blocks bucket for alertmanager storage"
       alertmanager_bucket_name="$mimir_blocks_bucket_name"
     fi
-    
+
     log_success "Found Mimir blocks S3 bucket: $mimir_blocks_bucket_name"
     log_success "Found Mimir ruler S3 bucket: $mimir_ruler_bucket_name"
     log_success "Found AlertManager S3 bucket: $alertmanager_bucket_name"
@@ -1975,7 +1975,7 @@ install_mimir(){
     log_error "Cannot retrieve S3 bucket and IAM role for Mimir"
     return 1
   fi
-  
+
   # Create Mimir service account with IAM role annotation and Helm labels
   log_step "Configuring Mimir service account with IAM role annotation..."
   kubectl apply -f - <<EOF
@@ -1991,11 +1991,11 @@ metadata:
     meta.helm.sh/release-name: mimir
     meta.helm.sh/release-namespace: ${MONITORING_NAMESPACE}
 EOF
-  
+
   log_success "Mimir service account configured with IAM role annotation"
 
   log_info "Installing Mimir using Helm chart (version: ${CHART_MIMIR_VERSION})..."
-  
+
   # Create Mimir values for Helm installation
   local MIMIR_VALUES_FILE="${SCRIPT_DIR}/mimir-values.yaml"
   local mimir_autoscaling_enabled=false
@@ -2016,18 +2016,18 @@ mimir:
     # Explicitly disable ingest_storage to prevent Kafka requirement
     ingest_storage:
       enabled: false
-    
+
     ingester:
       # Enable Push gRPC API for classic architecture (required when ingest_storage is disabled)
       push_grpc_method_enabled: true
-    
+
     blocks_storage:
       backend: s3
       s3:
         bucket_name: ${mimir_blocks_bucket_name}
         region: ${AWS_REGION}
         endpoint: s3.${AWS_REGION}.amazonaws.com
-    
+
     ruler_storage:
       backend: s3
       s3:
@@ -2035,7 +2035,7 @@ mimir:
         region: ${AWS_REGION}
         endpoint: s3.${AWS_REGION}.amazonaws.com
         # Note: Using separate bucket from blocks_storage to avoid Mimir validation error
-    
+
     alertmanager_storage:
       backend: s3
       s3:
@@ -2141,7 +2141,7 @@ EOF
     --set alertmanager.persistentVolume.storageClass="${STORAGE_CLASS_RWO}"; then
     log_error "Failed to install Mimir Helm chart"; return 1
   fi
-  
+
   log_info "Mimir Helm chart installed (not waiting for readiness - will initialize in background)"
 
   log_info "Waiting for Mimir pods to be ready..."
@@ -2173,7 +2173,7 @@ install_otebpf(){
   ensure_namespace "$MONITORING_NAMESPACE"
 
   log_info "Installing OTeBPF as DaemonSet for eBPF auto-instrumentation..."
-  
+
   # Install OpenTelemetry eBPF Instrumentation as a DaemonSet
   # OTeBPF provides zero-code instrumentation using eBPF for automatic trace collection
   kubectl apply -f - <<EOF
@@ -2363,11 +2363,11 @@ EOF
 # ------------------------------
 verify_installation(){
   log_step "Verifying monitoring stack installation..."
-  
+
   # Wait for critical pods to be ready before verification
   # Use more lenient checks - at least one pod should be ready for each component
   log_info "Waiting for monitoring pods to be ready..."
-  
+
   # Check Prometheus - at least one pod should be ready
   if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=prometheus -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_MEDIUM}" >/dev/null 2>&1; then
     local prometheus_running
@@ -2379,7 +2379,7 @@ verify_installation(){
     return 1
   fi
   fi
-  
+
   # Check Grafana: prefer Deployment rollout (init containers + Pending during node/CNI bring-up in EKS Auto Mode),
   # then Ready wait + Running fallback using MEDIUM timeout (same budget as Prometheus / Alertmanager).
   log_info "Waiting for Grafana deployment rollout..."
@@ -2395,7 +2395,7 @@ verify_installation(){
       return 1
     fi
   fi
-  
+
   # Check Alertmanager - at least one pod should be ready
   if ! kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=alertmanager -n "$MONITORING_NAMESPACE" --timeout="${KUBECTL_WAIT_TIMEOUT_MEDIUM}" >/dev/null 2>&1; then
     local alertmanager_running
@@ -2407,15 +2407,15 @@ verify_installation(){
     return 1
     fi
   fi
-  
+
   local checks=("prometheus:prometheus-stack-kube-prom-prometheus:${PROMETHEUS_PORT}" "grafana:prometheus-stack-grafana:80" "alertmanager:prometheus-stack-kube-prom-alertmanager:${ALERTMANAGER_PORT}" "loki:loki-gateway:${LOKI_PORT}" "tempo:tempo-query-frontend:${TEMPO_HTTP_PORT}" "mimir:mimir-gateway:${MIMIR_PORT}")
   local failed=0
   for c in "${checks[@]}"; do IFS=':' read -r name svc _ <<<"$c"; log_info "Checking $name service..."
     if kubectl get service "$svc" -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
       local eps; eps="$(kubectl get endpoints "$svc" -n "$MONITORING_NAMESPACE" -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null || echo "")"
-      if [[ -n "$eps" ]]; then 
+      if [[ -n "$eps" ]]; then
         log_success "✅ $name service has endpoints"
-      else 
+      else
         # For Tempo and Mimir, if service exists but no endpoints yet, check if pods are running
         if [[ "$name" == "tempo" || "$name" == "mimir" ]]; then
           local running_pods
@@ -2444,40 +2444,40 @@ verify_installation(){
   running="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || true)"
   failed_p="$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || true)"
   pending="${pending:-0}"; running="${running:-0}"; failed_p="${failed_p:-0}"
-  
+
   # Check OTeBPF separately - DaemonSets can have pending pods (normal for EKS Auto Mode)
   local otebpf_running otebpf_pending otebpf_failed
   otebpf_running=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Running --no-headers 2>/dev/null | wc -l || true)
   otebpf_pending=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Pending --no-headers 2>/dev/null | wc -l || true)
   otebpf_failed=$(kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Failed --no-headers 2>/dev/null | wc -l || true)
   otebpf_running="${otebpf_running:-0}"; otebpf_pending="${otebpf_pending:-0}"; otebpf_failed="${otebpf_failed:-0}"
-  
+
   # Exclude OTeBPF pods from overall pending/failed counts since DaemonSet pending pods are expected
   pending=$((pending - otebpf_pending))
   failed_p=$((failed_p - otebpf_failed))
-  
+
   # Check HPA-enabled components separately - they can have pending pods during scale-up (normal for EKS Auto Mode).
   # Grafana and Prometheus are deliberately static because their chart-level HPA/PVC combinations are unsupported.
   local hpa_pending
   hpa_pending=$(kubectl get pods -n "$MONITORING_NAMESPACE" --field-selector=status.phase=Pending --no-headers 2>/dev/null | \
     grep -cE "(alertmanager|tempo|mimir)" || true)
   hpa_pending="${hpa_pending:-0}"
-  
+
   # Exclude HPA-enabled component pending pods from failure count (they'll schedule as cluster scales)
   local non_hpa_pending=$((pending - hpa_pending))
-  
+
   log_info "Pods: $running running, $pending pending ($hpa_pending from HPA-enabled components), $failed_p failed"
-  
+
   if [[ "$otebpf_running" -ge 1 ]]; then
     log_info "✅ OTeBPF: $otebpf_running running, $otebpf_pending pending (expected for DaemonSet in EKS Auto Mode)"
   else
     log_warn "⚠️ OTeBPF: No running pods yet (may need more cluster resources or nodes to scale)"
   fi
-  
+
   if [[ "$hpa_pending" -gt 0 ]]; then
     log_info "ℹ️  HPA-enabled components have $hpa_pending pending pod(s) - this is normal during cluster scale-up in EKS Auto Mode"
   fi
-  
+
   # Check for failed pods (excluding OTeBPF, which we check separately)
   if [[ "$failed_p" -gt 0 ]]; then
     local non_otebpf_failed
@@ -2488,14 +2488,14 @@ verify_installation(){
       ((failed += 1))
     fi
   fi
-  
+
   # Check OTeBPF failed pods separately (this is concerning and should be reported)
-  if [[ "$otebpf_failed" -gt 0 ]]; then 
+  if [[ "$otebpf_failed" -gt 0 ]]; then
     log_warn "⚠️ OTeBPF has $otebpf_failed failed pod(s) - this is concerning"
     kubectl get pods -n "$MONITORING_NAMESPACE" -l app=otebpf --field-selector=status.phase=Failed || true
     ((failed += 1))
   fi
-  
+
   # Only fail if there are non-HPA pending pods (HPA pending pods are expected during scale-up)
   # But warn if there are many HPA pending pods for extended periods
   if [[ "$non_hpa_pending" -gt 0 ]]; then
@@ -2504,16 +2504,16 @@ verify_installation(){
       grep -vE "(grafana|prometheus|alertmanager|tempo|mimir|otebpf)" || true
     # Don't fail on this - just warn, as it could be temporary
   fi
-  
-  if [[ $failed -eq 0 ]]; then 
-    log_success "🎉 All monitoring components verified successfully!"; 
-    log_audit "VERIFY" "monitoring_stack" "SUCCESS"; 
-    print_access_help; 
+
+  if [[ $failed -eq 0 ]]; then
+    log_success "🎉 All monitoring components verified successfully!";
+    log_audit "VERIFY" "monitoring_stack" "SUCCESS";
+    print_access_help;
     return 0
-  else 
-    log_error "❌ CRITICAL FAILURE: Monitoring installation has $failed issues"; 
-    log_audit "VERIFY" "monitoring_stack" "FAILED"; 
-    print_troubleshooting_help; 
+  else
+    log_error "❌ CRITICAL FAILURE: Monitoring installation has $failed issues";
+    log_audit "VERIFY" "monitoring_stack" "FAILED";
+    print_troubleshooting_help;
     log_error "All monitoring components must be working - installation failed"
     return 1
   fi
@@ -2573,17 +2573,17 @@ print_troubleshooting_help(){
 # ------------------------------
 create_grafana_cloudwatch_iam(){
   log_step "Setting up CloudWatch IAM permissions for Grafana..."
-  
+
   # Get Grafana CloudWatch role ARN from Terraform outputs
   local role_arn
   local terraform_dir="${SCRIPT_DIR}/../terraform"
-  
+
   if [[ -f "$terraform_dir/terraform.tfstate" ]] || [[ -n "${TERRAFORM_STATE_PATH:-}" ]]; then
     log_info "Retrieving Grafana CloudWatch IAM role from Terraform..."
-    
+
     # Try to get from Terraform output
     role_arn=$(cd "$terraform_dir" && terraform output -raw grafana_cloudwatch_role_arn 2>/dev/null || echo "")
-    
+
     if [[ -n "$role_arn" && "$role_arn" != "null" ]]; then
       log_success "Found Terraform-managed IAM role: $role_arn"
     else
@@ -2598,10 +2598,10 @@ create_grafana_cloudwatch_iam(){
     log_warn "Please run 'terraform apply' first to create the Grafana CloudWatch IAM role"
     return 0
   fi
-  
+
   # Annotate Grafana service account with the Terraform-created role
   log_info "Annotating Grafana service account with IAM role..."
-  
+
   if kubectl annotate serviceaccount prometheus-stack-grafana \
     -n "$MONITORING_NAMESPACE" \
     eks.amazonaws.com/role-arn="$role_arn" \
@@ -2765,7 +2765,7 @@ data:
         editable: true
 EOF
   log_success "Grafana datasources created"; log_audit "CREATE" "grafana_datasources" "SUCCESS"
-  
+
   # Grafana sidecar automatically reloads datasources from configmaps (no restart needed)
   # However, CloudWatch/X-Ray datasources need Grafana to restart to pick up IRSA credentials
   log_info "Restarting Grafana pod to ensure IRSA credentials are picked up for CloudWatch/X-Ray datasources..."
@@ -2925,11 +2925,11 @@ uninstall_all(){
   helm uninstall tempo -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   helm uninstall mimir -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   helm uninstall alloy -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
-  
+
   # Delete Kubernetes resources (continue even if they don't exist)
   kubectl delete configmap tempo-config tempo-runtime -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete serviceaccount tempo -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
-  
+
   # Remove OTeBPF resources (current)
   kubectl delete daemonset otebpf -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete service otebpf -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
@@ -2937,7 +2937,7 @@ uninstall_all(){
   kubectl delete serviceaccount otebpf -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete clusterrolebinding otebpf-cluster-role-binding --ignore-not-found 2>/dev/null || true
   kubectl delete clusterrole otebpf-cluster-role --ignore-not-found 2>/dev/null || true
-  
+
   # Remove old Beyla resources (if they exist from previous installations)
   kubectl delete daemonset beyla -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete service beyla -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
@@ -2945,12 +2945,12 @@ uninstall_all(){
   kubectl delete serviceaccount beyla -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete clusterrolebinding beyla-cluster-role-binding --ignore-not-found 2>/dev/null || true
   kubectl delete clusterrole beyla-cluster-role --ignore-not-found 2>/dev/null || true
-  
+
   # Delete secrets and configmaps
   kubectl delete -n "$MONITORING_NAMESPACE" secret grafana-admin-secret grafana-basic-auth --ignore-not-found 2>/dev/null || true
   kubectl delete cm grafana-datasources grafana-dashboard-openemr -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete secret alertmanager-config -n "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
-  
+
   # Delete namespaces (continue even if they don't exist)
   kubectl delete ns "$OBSERVABILITY_NAMESPACE" --ignore-not-found 2>/dev/null || true
   kubectl delete ns "$MONITORING_NAMESPACE" --ignore-not-found 2>/dev/null || true
@@ -2978,7 +2978,7 @@ main(){
   case "$cmd" in
     install)
       configure_namespace_security
-      
+
       # Check if Grafana secret already exists to determine if we should preserve credentials
       local pw
       if kubectl get secret grafana-admin-secret -n "$MONITORING_NAMESPACE" >/dev/null 2>&1; then
@@ -2995,7 +2995,7 @@ main(){
         log_info "Fresh Grafana installation - generating new credentials"
         pw="$(generate_secure_password)"
       fi
-      
+
       create_grafana_secret "$pw"
       write_credentials_file "$pw"
       create_values_file

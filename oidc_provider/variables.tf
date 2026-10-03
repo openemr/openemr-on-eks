@@ -62,4 +62,3 @@ variable "github_actions_role_name" {
     error_message = "IAM role name must match AWS IAM naming requirements (alphanumeric and +=,.@_- only)."
   }
 }
-
